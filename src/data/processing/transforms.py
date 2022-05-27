@@ -1,17 +1,18 @@
 """
-Filename: transforms.py
+    @file:              transforms.py
+    @Author:            Maxence Larose, Nicolas Raymond
 
-Author: Nicolas Raymond
+    @Creation Date:     05/2022
+    @Last modification: 05/2022
 
-Description: Defines all transformations related to preprocessing treatment
-
-Date of last modification : 2021/11/01
+    @Description:       This file contains two classes, ContinuousTransform and CategoricalTransform, which simply list
+                        methods that defines transformations that can be applied on data during preprocessing.
 """
 
-import pandas as pd
-
-from torch import from_numpy, tensor
 from typing import Optional, Tuple
+
+import pandas as pd
+from torch import from_numpy, tensor
 
 
 class ContinuousTransform:
@@ -20,9 +21,11 @@ class ContinuousTransform:
     """
 
     @staticmethod
-    def normalize(df: pd.DataFrame,
-                  mean: Optional[pd.Series] = None,
-                  std: Optional[pd.Series] = None) -> pd.DataFrame:
+    def normalize(
+            df: pd.DataFrame,
+            mean: Optional[pd.Series] = None,
+            std: Optional[pd.Series] = None
+    ) -> pd.DataFrame:
         """
         Applies normalization to columns of a pandas dataframe
         """
@@ -32,8 +35,10 @@ class ContinuousTransform:
             return (df-df.mean())/df.std()
 
     @staticmethod
-    def fill_missing(df: pd.DataFrame,
-                     mean: Optional[pd.Series] = None) -> pd.DataFrame:
+    def fill_missing(
+            df: pd.DataFrame,
+            mean: Optional[pd.Series] = None
+    ) -> pd.DataFrame:
         """
         Fills missing values of continuous data columns with mean
         """
@@ -43,13 +48,13 @@ class ContinuousTransform:
             return df.fillna(df.mean())
 
     @staticmethod
-    def to_tensor(df: pd.DataFrame) -> tensor:
+    def to_tensor(
+            df: pd.DataFrame
+    ) -> tensor:
         """
         Takes a dataframe with categorical columns and return a tensor with "longs"
-
         Args:
             df: dataframe with categorical columns only
-
         Returns: tensor
         """
         return from_numpy(df.to_numpy(dtype=float)).float()
@@ -61,15 +66,19 @@ class CategoricalTransform:
     """
 
     @staticmethod
-    def one_hot_encode(df: pd.DataFrame) -> pd.DataFrame:
+    def one_hot_encode(
+            df: pd.DataFrame
+    ) -> pd.DataFrame:
         """
         One hot encodes all columns of the dataframe
         """
         return pd.get_dummies(df)
 
     @staticmethod
-    def ordinal_encode(df: pd.DataFrame,
-                       encodings: Optional[dict] = None) -> Tuple[pd.DataFrame, dict]:
+    def ordinal_encode(
+            df: pd.DataFrame,
+            encodings: Optional[dict] = None
+    ) -> Tuple[pd.DataFrame, dict]:
         """
         Applies ordinal encoding to all columns of the dataframe
         """
@@ -87,8 +96,10 @@ class CategoricalTransform:
         return df, encodings
 
     @staticmethod
-    def fill_missing(df: pd.DataFrame,
-                     mode: Optional[pd.Series] = None) -> pd.DataFrame:
+    def fill_missing(
+            df: pd.DataFrame,
+            mode: Optional[pd.Series] = None
+    ) -> pd.DataFrame:
         """
         Fills missing values of continuous data columns with mode
         """
@@ -98,14 +109,13 @@ class CategoricalTransform:
             return df.fillna(df.mode().iloc[0])
 
     @staticmethod
-    def to_tensor(df: pd.DataFrame) -> tensor:
+    def to_tensor(
+            df: pd.DataFrame
+    ) -> tensor:
         """
         Takes a dataframe with numerical columns and return a tensor with "floats"
-
         Args:
             df: dataframe with categorical columns only
-
         Returns: tensor
         """
         return from_numpy(df.to_numpy(dtype=float)).long()
-
