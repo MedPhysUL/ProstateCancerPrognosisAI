@@ -43,11 +43,14 @@ class HDFDataset(ArrayDataset):
         file = h5py.File(path)
         img, seg = [], []
         for patient in file.keys():
-            if file[patient]['0'].attrs['Modality'] == "CT":
-                img.append(np.array(file[patient]['0']['image']))
-                seg.append(np.array(file[patient]['0']['Prostate_label_map']))
-            else:
-                img.append(np.array(file[patient]['1']['image']))
-                seg.append(np.array(file[patient]['1']['Prostate_label_map']))
+            try:
+                if file[patient]['0'].attrs['Modality'] == "CT":
+                    img.append(np.array(file[patient]['0']['image']))
+                    seg.append(np.array(file[patient]['0']['Prostate_label_map']))
+                else:
+                    img.append(np.array(file[patient]['1']['image']))
+                    seg.append(np.array(file[patient]['1']['Prostate_label_map']))
+            except KeyError:
+                print(f"Patient {patient} ignored.")
 
         super().__init__(img=img, seg=seg, img_transform=img_transform, seg_transform=seg_transform)
