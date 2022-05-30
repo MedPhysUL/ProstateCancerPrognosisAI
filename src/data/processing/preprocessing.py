@@ -13,8 +13,8 @@ from typing import List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-from resilientmodels.data.processing.transforms import ContinuousTransform as ConT
-from resilientmodels.data.processing.transforms import CategoricalTransform as CaT
+from src.data.processing.transforms import ContinuousTransform as ConT
+from src.data.processing.transforms import CategoricalTransform as CaT
 
 
 ENCODINGS = ["ordinal", "one-hot"]
@@ -26,12 +26,21 @@ def preprocess_continuous(
         std: Optional[pd.Series] = None
 ) -> pd.DataFrame:
     """
-    Applies all continuous transforms to a dataframe containing only continuous data
-    Args:
-        df: pandas dataframe
-        mean: pandas series with mean
-        std: pandas series with standard deviations
-    Returns: preprocessed dataframe
+    Applies all continuous transforms to a dataframe containing only continuous data.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe containing all data.
+    mean : Optional[pd.Series]
+        Pandas series with mean.
+    std : Optional[pd.Series]
+        Pandas series with standard deviations
+
+    Returns
+    -------
+    preprocessed_dataframe : pd.DataFrame
+        Dataframe containing data on which all continuous transforms have been applied.
     """
     return ConT.normalize(ConT.fill_missing(df, mean), mean, std)
 
@@ -44,14 +53,23 @@ def preprocess_categoricals(
 ) -> Tuple[pd.DataFrame, Optional[dict]]:
     """
     Applies all categorical transforms to a dataframe containing only continuous data
-    Args:
-        df: pandas dataframe
-        encoding: one option in ("ordinal", "one-hot")
-        mode: panda series with modes of columns
-        encodings: dict of dict with integers to use as encoding for each category's values
-    Returns:pandas dataframe, dict of encodings
-    """
 
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe containing all data.
+    encoding : str
+        One option in ("ordinal", "one-hot").
+    mode : Optional[pd.Series]
+        Pandas series with modes of columns.
+    encodings : Optional[dict]
+        Dict of dict with integers to use as encoding for each category's values
+
+    Returns
+    -------
+    df, encodings : Tuple[pd.DataFrame, Optional[dict]]
+        Pandas dataframe, dictionary of encodings.
+    """
     if encoding not in ENCODINGS:
         raise ValueError("Encoding option not available")
 
@@ -72,13 +90,21 @@ def create_groups(
         nb_group: int
 ) -> pd.DataFrame:
     """
-    Change each value of the column cont_col for its belonging group
-    computed using nb_group quantiles
-    Args:
-        df: pandas dataframe
-        cont_col: name of the continuous column
-        nb_group: number of quantiles (group) wanted
-    Returns: dataframe with modified column
+    Change each value of the column cont_col for its belonging group computed using nb_group quantiles.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe containing all data.
+    cont_col : str
+        Name of the continuous column.
+    nb_group : int
+        Number of quantiles (group) wanted.
+
+    Returns
+    -------
+    df : pd.DataFrame
+        Dataframe with modified column.
     """
 
     if nb_group < 2:
@@ -120,16 +146,26 @@ def turn_to_range(
         group: str
 ) -> int:
     """
-    Changes categorical values of selected index into a string representing a range
-    Args:
-        df: pandas dataframe
-        cont_col: name of continuous column
-        start_index: index where to start the modification
-        quantile: quantile to reach
-        group: name of the group to be assigned
-    Returns: index where the quantile was exceeded
-    """
+    Changes categorical values of selected index into a string representing a range.
 
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe containing all data.
+    cont_col : str
+        Name of a continuous column.
+    start_index : int
+        Index where to start the modification.
+    quantile : float
+        Quantile to reach.
+    group : str
+        Name of the group to be assigned.
+
+    Returns
+    -------
+    Index : int
+        Index where the quantile was exceeded.
+    """
     # We get the index of the column
     j = df.columns.get_loc(cont_col)
 
@@ -142,12 +178,19 @@ def turn_to_range(
 
 def remove_nan(
         record: List[str]
-) -> List:
+) -> List[str]:
     """
-    Removes nans from a record
-    Args:
-        record: list of str
-    Returns: curated list
+    Removes nans from a record.
+
+    Parameters
+    ----------
+    record : List[str]
+        List of strings.
+
+    Returns
+    -------
+    curated list : List[str]
+        List of strings.
     """
     record = [x for x in record if str(x) != 'nan']
 

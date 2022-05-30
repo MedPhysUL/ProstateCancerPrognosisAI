@@ -9,15 +9,15 @@
 """
 
 from __future__ import annotations
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 from torch import cat, from_numpy, tensor
 from torch.utils.data import Dataset
 
-from resilientmodels.data.processing.transforms import CategoricalTransform as CaT
-from resilientmodels.data.processing.preprocessing import preprocess_categoricals, preprocess_continuous
+from src.data.processing.transforms import CategoricalTransform as CaT
+from src.data.processing.preprocessing import preprocess_categoricals, preprocess_continuous
 
 
 class MaskType:
@@ -230,18 +230,20 @@ class ProstateCancerDataset(Dataset):
     def _create_feature_selection_idx_groups(
             self,
             groups: Optional[List[List[str]]]
-    ) -> Dict:
+    ) -> Dict[int, dict[str, list | Any]]:
         """
         Creates a list of lists with idx of features in the different groups. All the features not included in any group
         will be used to create an additional group.
 
         Parameters
         ----------
-            groups: List of list with name of columns to use in group for feature selection
+        groups: Optional[List[List[str]]]
+            List of list with name of columns to use in group for feature selection.
             
         Returns
         -------
-        List of list
+        feature_idx_groups : Dict[str]
+            Dictionary of the features and indexes.
         """
         # We create an additional group with the features that are not already in a group
         groups = [] if (groups is None or groups[0] is None) else groups
@@ -282,11 +284,19 @@ class ProstateCancerDataset(Dataset):
             to_tensor: bool = False
     ) -> Callable:
         """
-        Defines the function used to set categorical data after masks update
-        Args:
-            cat_cols: list with names of categorical columns
-            to_tensor: true if we want the data to be converted into tensor
-        Returns: function
+        Defines the function used to set categorical data after masks update.
+
+        Parameters
+        ----------
+        cat_cols : Optional[List[str]]
+            List with names of categorical columns.
+        to_tensor : bool, default = False
+            True if we want the data to be converted into tensor.
+
+        Returns
+        -------
+        set_categorical : Callable
+            The function used to set categorical data after masks update.
         """
         # If there is no categorical columns
         if cat_cols is None:
@@ -312,10 +322,17 @@ class ProstateCancerDataset(Dataset):
             cat_cols: Optional[List[str]] = None
     ) -> Tuple[Callable, Dict[str, Dict[str, int]]]:
         """
-        Defines the function used to extract the modes of categorical columns
-        Args:
-            cat_cols: list of categorical column names
-        Returns: function, dictionary with categories encodings
+        Defines the function used to extract the modes of categorical columns.
+
+        Parameters
+        ----------
+        cat_cols : Optional[List[str]]
+            List of categorical column names
+
+        Returns
+        -------
+        get_modes, encodings : Tuple[Callable, Dict[str, Dict[str, int]]]
+            The function used to extract the modes of categorical columns paired with categorical variables encodings.
         """
         # If there is not categorical column
         if cat_cols is None:
@@ -344,12 +361,21 @@ class ProstateCancerDataset(Dataset):
             to_tensor: bool = False
     ) -> Callable:
         """
-        Defines the method used to extract the features (processed data) for training
-        Args:
-            cont_cols: list of continuous column names
-            cat_cols: list of categorical column names
-            to_tensor: true if the data must be converted to tensor
-        Returns: function
+        Defines the method used to extract the features (processed data) for training.
+
+        Parameters
+        ----------
+        cont_cols : Optional[List[str]]
+            List of continuous column names.
+        cat_cols : Optional[List[str]]
+            list of categorical column names
+        to_tensor : bool
+            True if the data must be converted to tensor
+
+        Returns
+        -------
+        feature_getter : Callable
+            Function used to extract features from data.
         """
         if cont_cols is None:
 
@@ -392,11 +418,19 @@ class ProstateCancerDataset(Dataset):
             to_tensor: bool = False
     ) -> Callable:
         """
-        Defines the function used to set numerical continuous data after masks update
-        Args:
-            cont_cols: list of continuous column names
-            to_tensor: true if data needs to be converted into tensor
-        Returns: function
+        Defines the function used to set numerical continuous data after masks update.
+
+        Parameters
+        ----------
+        cont_cols : Optional[List[str]]
+            List of continuous column names.
+        to_tensor : False
+            True if data needs to be converted into tensor.
+
+        Returns
+        -------
+        numerical_data_setter : Callable
+             Function used to set numerical continuous data after masks update.
         """
         # If there is no continuous column
         if cont_cols is None:
@@ -422,11 +456,17 @@ class ProstateCancerDataset(Dataset):
             cont_cols: Optional[List[str]] = None
     ) -> Callable:
         """
-        Defines the function used to extract the mean and the standard deviations
-        of numerical columns in a dataframe.
-        Args:
-            cont_cols: list with names of continuous columns
-        Returns: function
+        Defines the function used to extract the mean and the standard deviations of numerical columns in a dataframe.
+
+        Parameters
+        ----------
+        cont_cols : Optional[List[str]]
+            List with names of continuous columns.
+
+        Returns
+        -------
+        numerical_stats_getter : Callable
+            Function used to extract the mean and the standard deviations of numerical columns in a dataframe.
         """
         # If there is no continuous column
         if cont_cols is None:
@@ -448,14 +488,20 @@ class ProstateCancerDataset(Dataset):
             categorical: bool = False
     ) -> Tuple[pd.DataFrame, Optional[List[str]], Optional[List[str]]]:
         """
-        Returns an augmented dataframe by concatenating original df and data
-        Args:
-            data: pandas dataframe with 2 columns
-                  First column must be PARTICIPANT ids
-                  Second column must be the feature we want to add
-            categorical: True if the new features are categorical
-            gene: True if the new features are considered as genes
-        Returns: pandas dataframe, list of cont cols, list of cat cols
+        Returns an augmented dataframe by concatenating original df and data.
+
+        Parameters
+        ----------
+        data : pd.Dataframe
+            Dataframe with 2 columns. First column must be PATIENT ids. Second column must be the feature we want to
+            add.
+        categorical : bool
+            True if the new features are categorical.
+
+        Returns
+        -------
+        df, cont_cols, cat_cols : Tuple[pd.DataFrame, Optional[List[str]], Optional[List[str]]]
+            Pandas dataframe, list of cont cols, list of cat cols.
         """
         # Extraction of the original dataframe
         df = self._retrieve_subset_from_original(self._cont_cols, self._cat_cols)
@@ -480,13 +526,15 @@ class ProstateCancerDataset(Dataset):
             std: pd.Series
     ) -> None:
         """
-        Fills missing values of numerical continuous data according according to the means of the
-        training mask and then normalizes continuous data using the means and the standard
-        deviations of the training mask.
-        Args:
-            mu: means of the numerical column according to the training mask
-            std: standard deviations of the numerical column according to the training mask
-        Returns: None
+        Fills missing values of numerical continuous data according according to the means of the training mask and
+        then normalizes continuous data using the means and the standard deviations of the training mask.
+
+        Parameters
+        ----------
+        mu : pd.Series
+            Means of the numerical column according to the training mask.
+        std : pd.Series
+            Standard deviations of the numerical column according to the training mask.
         """
         # We fill missing with means and normalize the data
         x_cont = preprocess_continuous(self._original_data[self._cont_cols].copy(), mu, std)
@@ -497,14 +545,22 @@ class ProstateCancerDataset(Dataset):
     def _retrieve_subset_from_original(
             self,
             cont_cols: Optional[List[str]] = None,
-            cat_cols: List[str] = None
+            cat_cols: Optional[List[str]] = None
     ) -> pd.DataFrame:
         """
-        Returns a copy of a subset of the original dataframe
-        Args:
-            cont_cols: list of continuous columns
-            cat_cols: list of categorical columns
-        Returns: dataframe
+        Returns a copy of a subset of the original dataframe.
+
+        Parameters
+        ----------
+        cont_cols : Optional[List[str]]
+            List of continuous columns.
+        cat_cols : Optional[List[str]]
+            List of categorical columns.
+
+        Returns
+        -------
+        subset_df : pd.DataFrame
+            Copy of a subset of the original dataframe.
         """
         selected_cols = []
         if cont_cols is not None:
@@ -518,9 +574,12 @@ class ProstateCancerDataset(Dataset):
             self
     ) -> pd.DataFrame:
         """
-        Returns a copy of the original pandas dataframe where missing values
-        are imputed according to the training mask.
-        Returns: pandas dataframe
+        Returns a copy of the original pandas dataframe where missing values are imputed according to the training mask.
+
+        Returns
+        -------
+        imputed_df : pd.DataFrame
+            Copy of the original pandas dataframe where missing values are imputed according to the training mask.
         """
         imputed_df = self.original_data.drop([self._ids_col, self._target_col], axis=1).copy()
         if self._cont_cols is not None:
@@ -536,11 +595,19 @@ class ProstateCancerDataset(Dataset):
             cat_cols: List[str] = None
     ) -> ProstateCancerDataset:
         """
-        Returns a subset of the current dataset using the given cont_cols and cat_cols
-        Args:
-            cont_cols: list of continuous columns
-            cat_cols: list of categorical columns
-        Returns: instance of the PetaleDataset class
+        Returns a subset of the current dataset using the given cont_cols and cat_cols.
+
+        Parameters
+        ----------
+        cont_cols : Optional[List[str]]
+            List of continuous columns.
+        cat_cols : Optional[List[str]]
+            List of categorical columns.
+
+        Returns
+        -------
+        sub_dataset : ProstateCancerDataset
+            Instance of the ProstateCancerDataset class.
         """
         subset = self._retrieve_subset_from_original(cont_cols, cat_cols)
 
@@ -562,14 +629,20 @@ class ProstateCancerDataset(Dataset):
             categorical: bool = False
     ) -> ProstateCancerDataset:
         """
-        Returns a superset of the current dataset by including the given data
-        Args:
-            data: pandas dataframe with 2 columns
-                  First column must be PARTICIPANT ids
-                  Second column must be the feature we want to add
-            categorical: True if the new feature is categorical
-            gene: True if the new feature is considered as a gene
-        Returns: instance of the PetaleDataset class
+        Returns a superset of the current dataset by including the given data.
+
+        Parameters
+        ----------
+        data : pd.Dataframe
+            Dataframe with 2 columns. First column must be PATIENT ids. Second column must be the feature we want to
+            add.
+        categorical : bool
+            True if the new features are categorical.
+
+        Returns
+        -------
+        sub_dataset : ProstateCancerDataset
+            Instance of the ProstateCancerDataset class.
         """
         # We build the augmented dataframe
         df, cont_cols, cat_cols = self._get_augmented_dataframe(data, categorical)
@@ -590,7 +663,7 @@ class ProstateCancerDataset(Dataset):
             self
     ) -> Tuple[Optional[pd.Series], Optional[pd.Series], Optional[pd.Series]]:
         """
-        Returns the current statistics and encodings related to the training data
+        Returns the current statistics and encodings related to the training data.
         """
         # We extract the current training data
         train_data = self._original_data.iloc[self._train_mask]
@@ -606,10 +679,17 @@ class ProstateCancerDataset(Dataset):
             cat_cols: List[str]
     ) -> Union[np.array, tensor]:
         """
-        Returns one hot encodings associated to the specified categorical columns
-        Args:
-            cat_cols: list of categorical columns
-        Returns: array or tensor with one hot encodings
+        Returns one hot encodings associated to the specified categorical columns.
+
+        Parameters
+        ----------
+        cat_cols : Optional[List[str]]
+            List of categorical columns.
+
+        Returns
+        -------
+        one_hot_encodings : Union[np.array, tensor]
+            One hot vector of categorical columns.
         """
         # We check if the column names specified are categorical
         self._valid_columns_type(cat_cols, categorical=True)
@@ -630,13 +710,17 @@ class ProstateCancerDataset(Dataset):
             valid_mask: Optional[List[int]] = None
     ) -> None:
         """
-        Updates the train, valid and test masks and then preprocesses the data available
-        according to the current statistics of the training data
-        Args:
-            train_mask: list of idx in the training set
-            test_mask: list of idx in the test set
-            valid_mask: list of idx in the valid set
-        Returns: None
+        Updates the train, valid and test masks and then preprocesses the data available according to the current
+        statistics of the training data.
+
+        Parameters
+        ----------
+        train_mask : List[int]
+            List of idx in the training set.
+        test_mask : List[int]
+            List of idx in the test set.
+        valid_mask : Optional[List[int]]
+            List of idx in the valid set.
         """
         # We set the new masks values
         self._train_mask, self._test_mask = train_mask, test_mask
@@ -655,12 +739,14 @@ class ProstateCancerDataset(Dataset):
             categorical: bool
     ) -> None:
         """
-        Checks if all element in the column names list are either in
-        the cat_cols list or the cont_cols list
-        Args:
-            col_list: list of column names
-            categorical: if True,
-        Returns: None
+        Checks if all element in the column names list are either in the cat_cols list or the cont_cols list.
+
+        Parameters
+        ----------
+        col_list : List[str]
+            List of column names.
+        categorical : bool
+            Whether columns contain categorical variables or not.
         """
         if categorical:
             cols = self._cat_cols if self._cat_cols is not None else []
@@ -681,11 +767,20 @@ class ProstateCancerDataset(Dataset):
     ) -> Union[np.array, tensor]:
         """
         Sets the targets according to the task and the choice of container
-        Args:
-            targets_column: column of the dataframe with the targets
-            classification: true for classification task, false for regression
-            target_to_tensor: true if we want the targets to be in a tensor, false for numpy array
-        Returns: targets
+
+        Parameters
+        ----------
+        targets_column : pd.Series
+            Column of the dataframe with the targets.
+        classification : bool
+            True for classification task, false for regression.
+        target_to_tensor : bool
+            True if we want the targets to be in a tensor, false for numpy array.
+
+        Returns
+        -------
+        targets : Union[np.array, tensor]
+            Targets in a proper format.
         """
         # Set targets protected attribute according to task
         t = targets_column.to_numpy(dtype=float)
@@ -705,11 +800,14 @@ class ProstateCancerDataset(Dataset):
             columns: Optional[List[str]] = None
     ) -> None:
         """
-        Checks if the columns are all in the dataframe
-        Args:
-            df: pandas dataframe with original data
-            columns: list of column names
-        Returns: None
+        Checks if the columns are all in the dataframe.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Pandas dataframe with original data.
+        columns : Optional[List[str]]
+            List of column names.
         """
         if columns is not None:
             dataframe_columns = list(df.columns.values)

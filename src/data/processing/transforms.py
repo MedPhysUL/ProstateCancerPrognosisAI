@@ -52,10 +52,17 @@ class ContinuousTransform:
             df: pd.DataFrame
     ) -> tensor:
         """
-        Takes a dataframe with categorical columns and return a tensor with "longs"
-        Args:
-            df: dataframe with categorical columns only
-        Returns: tensor
+        Takes a dataframe with categorical columns and return a tensor with "longs".
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Dataframe with categorical columns only.
+
+        Returns
+        -------
+        df_tensor : tensor
+            Dataframe as a tensor.
         """
         return from_numpy(df.to_numpy(dtype=float)).float()
 
@@ -114,8 +121,15 @@ class CategoricalTransform:
     ) -> tensor:
         """
         Takes a dataframe with numerical columns and return a tensor with "floats"
-        Args:
-            df: dataframe with categorical columns only
-        Returns: tensor
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Dataframe with categorical columns only.
+
+        Returns
+        -------
+        df_tensor : tensor
+            Dataframe as a tensor.
         """
         return from_numpy(df.to_numpy(dtype=float)).long()
