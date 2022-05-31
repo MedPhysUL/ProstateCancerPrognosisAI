@@ -1,3 +1,6 @@
+# NOTES
+# Cleaner le try-except et le tasse-467 une fois qu'on a regler le fait quon a des 467 et des 333
+#
 """
     @file:              hdf_dataset.py
     @Author:            Raphael Brodeur
@@ -43,14 +46,14 @@ class HDFDataset(ArrayDataset):
         file = h5py.File(path)
         img, seg = [], []
         for patient in file.keys():
-            try:
-                if file[patient]['0'].attrs['Modality'] == "CT":
+            try: #va enelever ca
+                if file[patient]['0'].attrs['Modality'] == "CT" and file[patient]['0']['image'].shape == (333, 333, 573): # va enlver le and
                     img.append(np.array(file[patient]['0']['image']))
                     seg.append(np.array(file[patient]['0']['Prostate_label_map']))
-                else:
+                if file[patient]['1'].attrs['Modality'] == "CT" and file[patient]['1']['image'].shape == (333, 333, 573): #va remettre else
                     img.append(np.array(file[patient]['1']['image']))
                     seg.append(np.array(file[patient]['1']['Prostate_label_map']))
-            except KeyError:
-                print(f"Patient {patient} ignored.")
+            except KeyError:                                # va enlever ca
+                print(f"Patient {patient} ignored.")        # pis ca
 
         super().__init__(img=img, seg=seg, img_transform=img_transform, seg_transform=seg_transform)
