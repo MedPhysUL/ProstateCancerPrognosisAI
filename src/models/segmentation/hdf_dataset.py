@@ -51,7 +51,7 @@ class HDFDataset(ArrayDataset):
                     img.append(np.transpose(np.array(file[patient]['0']['image']), (2, 0, 1)))
                     seg.append(np.transpose(np.array(file[patient]['0']['Prostate_label_map']), (2, 0, 1)))
                 if file[patient]['1'].attrs['Modality'] == "CT" and file[patient]['1']['image'].shape == (333, 333, 573): #va remettre else
-                    img.append(np.transpose(np.array(file[patient]['1']['image']),(2, 0, 1)))
+                    img.append(np.transpose(np.array(file[patient]['1']['image']), (2, 0, 1)))
                     seg.append(np.transpose(np.array(file[patient]['1']['Prostate_label_map']), (2, 0, 1)))
             except KeyError:                                # va enlever ca
                 print(f"Patient {patient} ignored.")        # pis ca
