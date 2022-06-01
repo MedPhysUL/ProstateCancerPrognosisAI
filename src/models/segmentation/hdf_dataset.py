@@ -23,7 +23,7 @@ from monai.data import ArrayDataset
 class HDFDataset(ArrayDataset):
     """
     A class used to create a dataset of various patients and their respective CT and segmentation map from a given local
-    HDF5 file.
+    HDF5 file. The rendered dataset is (Patients x Channels x Z x X x Y).
     """
     def __init__(
             self,
@@ -48,11 +48,11 @@ class HDFDataset(ArrayDataset):
         for patient in file.keys():
             try: #va enelever  ca
                 if file[patient]['0'].attrs['Modality'] == "CT" and file[patient]['0']['image'].shape == (333, 333, 573): # va enlver le and
-                    img.append(np.array(file[patient]['0']['image']))
-                    seg.append(np.array(file[patient]['0']['Prostate_label_map']))
+                    img.append(np.transpose(np.array(file[patient]['0']['image']), (2, 0, 1)))
+                    seg.append(np.transpose(np.array(file[patient]['0']['Prostate_label_map']), (2, 0, 1)))
                 if file[patient]['1'].attrs['Modality'] == "CT" and file[patient]['1']['image'].shape == (333, 333, 573): #va remettre else
-                    img.append(np.array(file[patient]['1']['image']))
-                    seg.append(np.array(file[patient]['1']['Prostate_label_map']))
+                    img.append(np.transpose(np.array(file[patient]['1']['image']),(2, 0, 1)))
+                    seg.append(np.transpose(np.array(file[patient]['1']['Prostate_label_map']), (2, 0, 1)))
             except KeyError:                                # va enlever ca
                 print(f"Patient {patient} ignored.")        # pis ca
 
