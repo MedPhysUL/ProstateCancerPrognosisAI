@@ -46,7 +46,7 @@ class HDFDataset(ArrayDataset):
         file = h5py.File(path)
         img, seg = [], []
         for patient in file.keys():
-            try: #va enelever ca
+            try: #va enelever  ca
                 if file[patient]['0'].attrs['Modality'] == "CT" and file[patient]['0']['image'].shape == (333, 333, 573): # va enlver le and
                     img.append(np.array(file[patient]['0']['image']))
                     seg.append(np.array(file[patient]['0']['Prostate_label_map']))
