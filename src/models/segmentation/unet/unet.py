@@ -46,7 +46,7 @@ if __name__ == "__main__":
     # Visualise
     # print('ds shape:', np.shape(ds))
     # w/ aucune transformation : (Patient, Channels, Z, X,Y). ZXY est en array
-    # w/ AddChannel() : (140, 2, 1, 573, 333, 333) -- (P, C, Added, Z, X, Y). (AZXY) est en array
+    # w/ AddChannel() : (140, 2, 1, 573, 333, 333) -- (P, C, Added, Z, X, Y). AZXY est en array
 
     train_ds = ds[:-num_val]
     val_ds = ds[-num_val:]
@@ -154,7 +154,7 @@ if __name__ == "__main__":
                 batch_images = batch_images.to(device)
                 batch_segs = batch_segs.to(device)
                 #Visualize
-                # print(batch_images.shape)
+                # print('batch_image de val_loader est de shape :'batch_images.shape)
                 # (3, 573, 333, 333) sur THE WORST -- (Patients de la batch?, Z, X, Y)
                 # w/ AddChannel() : (3, 1, 573, 333, 333) sur THE WORST -- (Patients de la batch?, Added, Z, X, Y)
 
