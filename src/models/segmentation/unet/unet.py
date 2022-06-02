@@ -41,7 +41,8 @@ if __name__ == "__main__":
     img_trans = Compose([AddChannel()])
     seg_trans = Compose([AddChannel()])
 
-    ds = HDFDataset('C:/Users/MALAR507/Documents/GitHub/ProstateCancerPrognosisAI/examples/local_data/patients_dataset.h5')
+    # ds = HDFDataset('C:/Users/MALAR507/Documents/GitHub/ProstateCancerPrognosisAI/examples/local_data/patients_dataset.h5')
+    ds = HDFDataset('C:/Users/rapha/Desktop/patients_dataset.h5', img_transform=img_trans, seg_transform=seg_trans)
     # Visualise
     # print('ds shape:', np.shape(ds))
     # w/ aucune transformation : (Patient, Channels, Z, X,Y). ZXY est en array
@@ -73,7 +74,7 @@ if __name__ == "__main__":
     # w/ AddChannel() : 7 -- idem
     for i in val_loader:
         # print('length of i', len(i))
-        # 2 -- image et seg?
+        # 2 -- image et seg
         # w/ AddChannel() : 2 -- idem
         for j in i:
             # print('length of j', len(j))
@@ -91,7 +92,7 @@ if __name__ == "__main__":
     # Visualisation d'une image post DataLoader. Aussi, demonstration d'une utilisation de first() :
     # check_image, check_segmentation = first(val_loader)
     # print(check_image.shape)
-    # plt.imshow(check_image[0, 120], cmap='gray')      # w/ AddChannel() : doit s'occuper du added donc serait par ex
+    # plt.imshow(check_image[0, 120], cmap='gray')       # w/ AddChannel() : doit s'occuper du added donc serait par ex
     # plt.imshow(check_segmentation[0, 120], alpha=0.1)  # plt.imshow(check_image[0, 0, 120]) et idem pour segmentation
     # plt.show()
     # Donne une belle image et sa segmentation en overlay
@@ -107,9 +108,9 @@ if __name__ == "__main__":
     net = UNet(
         dimensions=3,
         in_channels=1,                  # lors de la prediction, tu feed une image (1 channel)
-        out_channels=1,                 # et tu obtients une seg (1 channel)
+        out_channels=1,                 # et tu obtiens une seg (1 channel. Ce que eux nomment channels est features.
         channels=(8, 16, 32, 64, 128),
-        strides=(2, 2, 2, 2)
+        strides=(1, 1, 1, 1)
     ).to(device)
 
     opt = torch.optim.Adam(net.parameters(), lr)
@@ -130,10 +131,12 @@ if __name__ == "__main__":
         for batch in train_loader:
             batch_images = batch[0].to(device)
             batch_segs = batch[1].to(device)
+            # print(batch_images.shape)
+            # print pas?
 
             opt.zero_grad()
             ############################# RuntimeError: Given groups=1, weight of size [8, 1, 3, 3, 3],
-            y_pred = net(batch_images)  #  expected input[1, 4, 573, 333, 333] to have 1 channels,
+            y_pred = net(batch_images)  #  expected input[1, 4, 573, 333, 333] to have 1 channels,testé: le 8 correspond au premier feature nbr dans UNET
             #############################  but got 4 channels instead. 4 est pour les 4 patients d'une batch et 1 est channel(img/seg)
             loss_val = loss(y_pred, batch_segs)
             loss_val.backwards()
@@ -150,8 +153,12 @@ if __name__ == "__main__":
             for batch_images, batch_segs in val_loader:
                 batch_images = batch_images.to(device)
                 batch_segs = batch_segs.to(device)
+                #Visualize
+                # print(batch_images.shape)
+                # (3, 573, 333, 333) sur THE WORST -- (Patients de la batch?, Z, X, Y)
+                # w/ AddChannel() : (3, 1, 573, 333, 333) sur THE WORST -- (Patients de la batch?, Added, Z, X, Y)
 
-                y_pred = net(batch_images)
+                y_pred = net(batch_images)      # Plante ici
                 pred_metric = metric(y_pred, batch_segs)
                 metric_vals.append(pred_metric.item())
 
