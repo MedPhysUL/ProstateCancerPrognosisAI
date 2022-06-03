@@ -8,7 +8,9 @@
     @Description:       This file contains an implementation of a U-Net.
 
 """
-
+#
+# Erreur de cuDNN: message contre-intuitif mais est generalement du a trop de memoire allouée
+#
 import numpy as np
 
 from src.models.segmentation.hdf_dataset import HDFDataset
@@ -32,21 +34,23 @@ if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     num_workers = 0 # semble runner sans se locker lorsque l'on met plus que 0 workers
     num_val = 25
-    batch_size = 4
-    num_epochs = 30
+    batch_size = 1
+    num_epochs = 2
     lr = 5e-3
 
     # Setting up data
 
-    img_trans = Compose([AddChannel()])
-    seg_trans = Compose([AddChannel()])
+    img_trans = Compose([AddChannel(), ToTensor(dtype=torch.float32)])
+    seg_trans = Compose([AddChannel(), ToTensor(dtype=torch.float32)])
 
-    # ds = HDFDataset('C:/Users/MALAR507/Documents/GitHub/ProstateCancerPrognosisAI/examples/local_data/patients_dataset.h5')
-    ds = HDFDataset('C:/Users/rapha/Desktop/patients_dataset.h5', img_transform=img_trans, seg_transform=seg_trans)
+    ds = HDFDataset('C:/Users/MALAR507/Documents/GitHub/ProstateCancerPrognosisAI/examples/local_data/patients_dataset.h5',  img_transform=img_trans, seg_transform=seg_trans)
+    # ds = HDFDataset('C:/Users/rapha/Desktop/patients_dataset.h5', img_transform=img_trans, seg_transform=seg_trans)
     # Visualise
     # print('ds shape:', np.shape(ds))
     # w/ aucune transformation : (Patient, Channels, Z, X,Y). ZXY est en array
     # w/ AddChannel() : (140, 2, 1, 573, 333, 333) -- (P, C, Added, Z, X, Y). AZXY est en array
+
+
 
     train_ds = ds[:-num_val]
     val_ds = ds[-num_val:]
@@ -72,6 +76,7 @@ if __name__ == "__main__":
     # print('val_loader length:', len(val_loader))
     # 7 -- il s'agit du nombres de batches
     # w/ AddChannel() : 7 -- idem
+    '''
     for i in val_loader:
         # print('length of i', len(i))
         # 2 -- image et seg
@@ -85,6 +90,7 @@ if __name__ == "__main__":
                 # (Z, X, Y) -- dimensions de nos images
                 # w/ AddChannel() : (1, 573, 333, 333) -- (Added, Z, X, Y)
                 pass
+    '''
     # Donc post DataLoader on a :
     # val_loader est de shape (Batch, Channels, Patients de la batch, Z, X, Y)
     # w/ AddChannel() : val_loader est de shape (Batch, Channels, Patients de la batch, Added, Z, X, Y)
@@ -109,7 +115,7 @@ if __name__ == "__main__":
         dimensions=3,
         in_channels=1,                  # lors de la prediction, tu feed une image (1 channel)
         out_channels=1,                 # et tu obtiens une seg (1 channel. Ce que eux nomment channels est features.
-        channels=(8, 16, 32, 64, 128),
+        channels=(8, 16, 32, 64, 128),     # default : (8, 16, 32, 64, 128)
         strides=(1, 1, 1, 1)
     ).to(device)
 
@@ -132,14 +138,20 @@ if __name__ == "__main__":
             batch_images = batch[0].to(device)
             batch_segs = batch[1].to(device)
             # print(batch_images.shape)
-            # print pas?
+            #
+            # w/ AddChannel() : (2, 1, 40, 233, 233) -- (patients de la batch, channel(i/s), Z, X, Y)
 
             opt.zero_grad()
             ############################# RuntimeError: Given groups=1, weight of size [8, 1, 3, 3, 3],
             y_pred = net(batch_images)  #  expected input[1, 4, 573, 333, 333] to have 1 channels,testé: le 8 correspond au premier feature nbr dans UNET
             #############################  but got 4 channels instead. 4 est pour les 4 patients d'une batch et 1 est channel(img/seg)
+
+            # binarizing
+            y_pred = torch.sigmoid(y_pred)
+
             loss_val = loss(y_pred, batch_segs)
-            loss_val.backwards()
+            # print(loss_val)
+            loss_val.backward()
             opt.step()
 
             step_losses.append((total_step, loss_val.item()))
@@ -154,17 +166,23 @@ if __name__ == "__main__":
                 batch_images = batch_images.to(device)
                 batch_segs = batch_segs.to(device)
                 #Visualize
-                # print('batch_image de val_loader est de shape :'batch_images.shape)
+                # print('batch_image de val_loader est de shape :', batch_images.shape)
                 # (3, 573, 333, 333) sur THE WORST -- (Patients de la batch?, Z, X, Y)
-                # w/ AddChannel() : (3, 1, 573, 333, 333) sur THE WORST -- (Patients de la batch?, Added, Z, X, Y)
+                # w/ AddChannel() : (3, 1, 573, 333, 333) sur THE WORST -- (Patients de la batch, Added, Z, X, Y)
 
-                y_pred = net(batch_images)      # Plante ici
-                pred_metric = metric(y_pred, batch_segs)
-                metric_vals.append(pred_metric.item())
+                y_pred = net(batch_images)
 
+                #binarizing
+                y_pred = torch.sigmoid(y_pred)
+                y_pred = torch.round(y_pred)
+
+                pred_metric = metric(y_pred=y_pred, y=batch_segs)
+                metric_vals += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
+                # print('metric_vals :', metric_vals)
+
+        print(np.mean(metric_vals))
         epoch_metrics.append((total_step, np.average(metric_vals)))
-
-        progress_bar(epoch + 1, num_epochs, f'Validation metric: {epoch_metrics[-1][1]:.3}')
+        progress_bar(epoch + 1, num_epochs, f'Validation metric: {epoch_metrics[-1][1]}')
 
 
 
