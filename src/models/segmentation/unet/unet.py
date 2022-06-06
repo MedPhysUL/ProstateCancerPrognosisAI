@@ -8,9 +8,6 @@
     @Description:       This file contains an implementation of a U-Net.
 
 """
-#
-# Erreur de cuDNN: message contre-intuitif mais est generalement du a trop de memoire allouée
-#
 import numpy as np
 
 from src.models.segmentation.hdf_dataset import HDFDataset
