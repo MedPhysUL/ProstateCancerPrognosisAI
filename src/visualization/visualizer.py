@@ -29,6 +29,11 @@ class Visualizer:
 
     """
 
+    def _visualize_axial():
+        pass
+    def _visualize_coronal():
+        pass
+    def _
     @staticmethod
     def visualize(
             img: np.ndarray,
@@ -53,23 +58,23 @@ class Visualizer:
         plt.subplots_adjust(bottom=0.20)
         img_max = np.max(img)
         img_min = np.min(img)
-        anatomical_planes = AnatomicalPlane
+
 
         # Axial
-        img_with_axial_plane_moved_to_first_axis = np.moveaxis(img, anatomical_planes.AXIAL, 0)
-        max_axial_slice = img.shape[anatomical_planes.AXIAL] - 1
+        img_with_axial_plane_moved_to_first_axis = np.moveaxis(img, AnatomicalPlane.AXIAL, 0)
+        max_axial_slice = img.shape[AnatomicalPlane.AXIAL] - 1
         initial_axial_img = img_with_axial_plane_moved_to_first_axis[int(max_axial_slice / 2)]
-        seg_with_axial_plane_moved_to_first_axis = np.moveaxis(seg, anatomical_planes.AXIAL, 0)
+        seg_with_axial_plane_moved_to_first_axis = np.moveaxis(seg, AnatomicalPlane.AXIAL, 0)
         initial_axial_seg = seg_with_axial_plane_moved_to_first_axis[int(max_axial_slice / 2)]
 
-        axial_3d_img = axes[anatomical_planes.AXIAL].imshow(
+        axial_3d_img = axes[AnatomicalPlane.AXIAL].imshow(
             initial_axial_img,
             cmap="Greys_r",
             vmax=img_max,
             vmin=img_min
         )
 
-        axial_3d_seg = axes[anatomical_planes.AXIAL].imshow(
+        axial_3d_seg = axes[AnatomicalPlane.AXIAL].imshow(
             initial_axial_seg,
             vmax=1,
             vmin=0,
@@ -77,7 +82,7 @@ class Visualizer:
         )
 
         ax_slice = plt.axes(
-            [0.14 + anatomical_planes.AXIAL.value * 0.27, 0.15, 0.2, 0.02],
+            [0.14 + AnatomicalPlane.AXIAL.value * 0.27, 0.15, 0.2, 0.02],
             facecolor='lightgoldenrodyellow'
         )
 
@@ -101,21 +106,21 @@ class Visualizer:
         axial_slice_index.on_changed(axial_image_update)
 
         # Coronal
-        img_with_coronal_plane_moved_to_first_axis = np.moveaxis(img, anatomical_planes.CORONAL, 0)
-        max_coronal_slice = img.shape[anatomical_planes.CORONAL] - 1
+        img_with_coronal_plane_moved_to_first_axis = np.moveaxis(img, AnatomicalPlane.CORONAL, 0)
+        max_coronal_slice = img.shape[AnatomicalPlane.CORONAL] - 1
         initial_coronal_img = img_with_coronal_plane_moved_to_first_axis[int(max_coronal_slice / 2)]
 
-        seg_with_coronal_plane_moved_to_first_axis = np.moveaxis(seg, anatomical_planes.CORONAL, 0)
+        seg_with_coronal_plane_moved_to_first_axis = np.moveaxis(seg, AnatomicalPlane.CORONAL, 0)
         initial_coronal_seg = seg_with_coronal_plane_moved_to_first_axis[int(max_coronal_slice / 2)]
 
-        coronal_3d_img = axes[anatomical_planes.CORONAL].imshow(
+        coronal_3d_img = axes[AnatomicalPlane.CORONAL].imshow(
             initial_coronal_img,
             cmap="Greys_r",
             vmax=img_max,
             vmin=img_min
         )
 
-        coronal_3d_seg = axes[anatomical_planes.CORONAL].imshow(
+        coronal_3d_seg = axes[AnatomicalPlane.CORONAL].imshow(
             initial_coronal_seg,
             vmax=1,
             vmin=0,
@@ -123,7 +128,7 @@ class Visualizer:
         )
 
         ax_slice = plt.axes(
-            [0.14 + anatomical_planes.CORONAL.value * 0.27, 0.15, 0.2, 0.02],
+            [0.14 + AnatomicalPlane.CORONAL.value * 0.27, 0.15, 0.2, 0.02],
             facecolor='lightgoldenrodyellow'
         )
 
@@ -147,17 +152,17 @@ class Visualizer:
         coronal_slice_index.on_changed(coronal_image_update)
 
         # Sagittal
-        img_with_sagittal_plane_moved_to_first_axis = np.moveaxis(img, anatomical_planes.SAGITTAL, 0)
+        img_with_sagittal_plane_moved_to_first_axis = np.moveaxis(img, AnatomicalPlane.SAGITTAL, 0)
 
-        max_sagittal_slice = img.shape[anatomical_planes.SAGITTAL] - 1
+        max_sagittal_slice = img.shape[AnatomicalPlane.SAGITTAL] - 1
 
         initial_sagittal_img = img_with_sagittal_plane_moved_to_first_axis[int(max_sagittal_slice / 2)]
 
-        seg_with_sagittal_plane_moved_to_first_axis = np.moveaxis(seg, anatomical_planes.SAGITTAL, 0)
+        seg_with_sagittal_plane_moved_to_first_axis = np.moveaxis(seg, AnatomicalPlane.SAGITTAL, 0)
 
         initial_sagittal_seg = seg_with_sagittal_plane_moved_to_first_axis[int(max_sagittal_slice / 2)]
 
-        sagittal_3d_img = axes[anatomical_planes.SAGITTAL].imshow(
+        sagittal_3d_img = axes[AnatomicalPlane.SAGITTAL].imshow(
             initial_sagittal_img,
             cmap="Greys_r",
             vmax=img_max,
@@ -165,7 +170,7 @@ class Visualizer:
 
         )
 
-        sagittal_3d_seg = axes[anatomical_planes.SAGITTAL].imshow(
+        sagittal_3d_seg = axes[AnatomicalPlane.SAGITTAL].imshow(
             initial_sagittal_seg,
             vmax=1,
             vmin=0,
@@ -173,7 +178,7 @@ class Visualizer:
         )
 
         ax_slice = plt.axes(
-            [0.14 + anatomical_planes.SAGITTAL.value * 0.27, 0.15, 0.2, 0.02],
+            [0.14 + AnatomicalPlane.SAGITTAL.value * 0.27, 0.15, 0.2, 0.02],
             facecolor='lightgoldenrodyellow'
         )
 
@@ -195,9 +200,12 @@ class Visualizer:
             plt.draw()
 
         sagittal_slice_index.on_changed(sagittal_image_update)
-
+        
         plt.show()
         return fig, axes
+
+
+
 
 
 
