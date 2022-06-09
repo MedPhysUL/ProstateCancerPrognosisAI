@@ -13,7 +13,7 @@
 
 from enum import IntEnum
 from functools import partial
-from typing import NamedTuple, Union
+from typing import NamedTuple, Optional
 
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
@@ -40,11 +40,11 @@ class Visualizer:
     """
 
     class Config(NamedTuple):
-        img_plane_in_first_axis: np.ndarray
-        seg_plane_in_first_axis: Union[np.ndarray, None]
-        slice_index: Union[Slider, None]
+        img_plane_in_first_axis: Optional[np.ndarray]
+        seg_plane_in_first_axis: Optional[np.ndarray]
+        slice_index: Optional[Slider]
         img_3d: plt.axes
-        seg_3d: Union[plt.axes, None]
+        seg_3d: Optional[plt.axes]
 
     @staticmethod
     def _get_config(
@@ -265,7 +265,7 @@ class Visualizer:
             )
 
             returns = Visualizer.Config(
-                img_plane_in_first_axis=img_axial,
+                img_plane_in_first_axis=None,
                 seg_plane_in_first_axis=seg_axial,
                 slice_index=slice_index,
                 img_3d=img_3d,
@@ -285,7 +285,7 @@ class Visualizer:
             )
 
             returns = Visualizer.Config(
-                img_plane_in_first_axis=img_axial,
+                img_plane_in_first_axis=None,
                 seg_plane_in_first_axis=seg_axial,
                 slice_index=None,
                 img_3d=img_3d,
@@ -325,14 +325,12 @@ class Visualizer:
         slice_value = truth_config.slice_index.val
 
         new_img = image_config.img_plane_in_first_axis[slice_value]
-        new_img_truth = truth_config.img_plane_in_first_axis[slice_value]
-        new_img_pred = pred_config.img_plane_in_first_axis[slice_value]
         new_seg_truth = truth_config.seg_plane_in_first_axis[slice_value]
         new_seg_pred = pred_config.seg_plane_in_first_axis[slice_value]
 
         image_config.img_3d.set_data(new_img)
-        truth_config.img_3d.set_data(new_img_truth)
-        pred_config.img_3d.set_data(new_img_pred)
+        truth_config.img_3d.set_data(new_img)
+        pred_config.img_3d.set_data(new_img)
         truth_config.seg_3d.set_data(new_seg_truth)
         pred_config.seg_3d.set_data(new_seg_pred)
 
