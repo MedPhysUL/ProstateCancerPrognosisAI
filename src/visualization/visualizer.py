@@ -12,7 +12,7 @@
 
 from enum import IntEnum
 from functools import partial
-from typing import Dict, List, Union, Tuple
+from typing import Dict, Union
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -106,7 +106,6 @@ class Visualizer:
     @staticmethod
     def _update_plane(
             val,
-            plane: AnatomicalPlane,
             set_up: Dict[str, Union[np.ndarray, Slider, plt.axes]]
     ):
         """
@@ -114,8 +113,6 @@ class Visualizer:
 
         Parameters
         ----------
-        plane : AnatomicalPlane
-            The anatomical plane to update. Coronal, sagittal or axial.
         set_up : Dict[str, Union[np.ndarray, Slider, plt.axes]]
             A dictionary output by the _visualize_plane method.
         """
@@ -128,11 +125,11 @@ class Visualizer:
 
     def visualize(
             self,
-            img,
-            seg
+            img: np.ndarray,
+            seg: np.ndarray
     ):
         """
-        Visualizes a patient's image (whether it is a PET or a CT) alongside its respective segmentation. Sliders allow
+        Plots a patient's image (whether it is a PET or a CT) alongside its respective segmentation. Sliders allow
         the user to slice through the coronal, sagittal and axial views.
 
         Parameters
@@ -151,23 +148,15 @@ class Visualizer:
 
         set_up_coronal["slice_index"].on_changed(partial(
             self._update_plane,
-            plane=AnatomicalPlane.CORONAL,
             set_up=set_up_coronal
         ))
         set_up_sagittal["slice_index"].on_changed(partial(
             self._update_plane,
-            plane=AnatomicalPlane.SAGITTAL,
             set_up=set_up_sagittal
         ))
         set_up_axial["slice_index"].on_changed(partial(
             self._update_plane,
-            plane=AnatomicalPlane.AXIAL,
             set_up=set_up_axial
         ))
 
         plt.show()
-
-
-
-
-
