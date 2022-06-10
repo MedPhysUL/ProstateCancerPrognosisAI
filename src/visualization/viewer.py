@@ -1,12 +1,12 @@
 """
-    @file:              visualizer.py
+    @file:              viewer.py
     @Author:            Maxence Larose, Raphael Brodeur
 
     @Creation Date:     06/2022
     @Last modification: 06/2022
 
-    @Description:       This file contains the Visualizer class which is used to visualize a patient's image (whether
-                        it is a PET or a CT) alongside its respective segmentation and to compare an image alongside its
+    @Description:       This file contains the Viewer class which is used to visualize a patient's image (whether
+                        it is a CT or a PET) alongside its respective segmentation and to compare an image alongside its
                         ground truth segmentation map and a predicted segmentation map in axial view. Sliders allow the
                         user to slice through the plotted views.
 """
@@ -33,18 +33,18 @@ class Plot(IntEnum):
     PREDICTION = 2
 
 
-class Visualizer:
+class Viewer:
     """
-    A class which is used to visualize a patient's image (whether it is a PET or a CT) alongside its respective
+    A class which is used to visualize a patient's image (whether it is a CT or a PET) alongside its respective
     segmentation. Sliders allow the user to slice through the coronal, sagittal and axial views.
     """
 
     class Config(NamedTuple):
-        img_plane_in_first_axis: Optional[np.ndarray]
-        seg_plane_in_first_axis: Optional[np.ndarray]
+        img_plane: Optional[np.ndarray]
+        seg_plane: Optional[np.ndarray]
         slice_index: Optional[Slider]
-        img_3d: plt.axes
-        seg_3d: Optional[plt.axes]
+        img_plot: plt.axes
+        seg_plot: Optional[plt.axes]
 
     @staticmethod
     def _get_config(
@@ -81,18 +81,18 @@ class Visualizer:
         max_slice = img.shape[plane.value] - 1
         img_max = np.max(img)
         img_min = np.min(img)
-        img_plane_in_first_axis = np.moveaxis(img, plane.value, 0)
-        initial_img = img_plane_in_first_axis[int(max_slice / 2)]
-        seg_plane_in_first_axis = np.moveaxis(seg, plane.value, 0)
-        initial_seg = seg_plane_in_first_axis[int(max_slice / 2)]
+        img_plane = np.moveaxis(img, plane.value, 0)
+        initial_img = img_plane[int(max_slice / 2)]
+        seg_plane = np.moveaxis(seg, plane.value, 0)
+        initial_seg = seg_plane[int(max_slice / 2)]
 
-        img_3d = axes[plane.value].imshow(
+        img_plot = axes[plane.value].imshow(
             initial_img,
             cmap=kwargs.get("cmap", "Greys_r"),
             vmax=img_max,
             vmin=img_min
         )
-        seg_3d = axes[plane.value].imshow(
+        seg_plot = axes[plane.value].imshow(
             initial_seg,
             vmax=1,
             vmin=0,
@@ -112,15 +112,13 @@ class Visualizer:
             valstep=1
         )
 
-        returns = Visualizer.Config(
-            img_plane_in_first_axis=img_plane_in_first_axis,
-            seg_plane_in_first_axis=seg_plane_in_first_axis,
+        return Viewer.Config(
+            img_plane=img_plane,
+            seg_plane=seg_plane,
             slice_index=slice_index,
-            img_3d=img_3d,
-            seg_3d=seg_3d
+            img_plot=img_plot,
+            seg_plot=seg_plot
         )
-
-        return returns
 
     @staticmethod
     def _update_plane(
@@ -136,10 +134,10 @@ class Visualizer:
             A Config as output by the _get_config method.
         """
         slice_value = config.slice_index.val
-        new_img = config.img_plane_in_first_axis[slice_value]
-        new_seg = config.seg_plane_in_first_axis[slice_value]
-        config.img_3d.set_data(new_img)
-        config.seg_3d.set_data(new_seg)
+        new_img = config.img_plane[slice_value]
+        new_seg = config.seg_plane[slice_value]
+        config.img_plot.set_data(new_img)
+        config.seg_plot.set_data(new_seg)
 
         plt.draw()
 
@@ -150,7 +148,7 @@ class Visualizer:
             **kwargs
     ):
         """
-        Plots a patient's image (whether it is a PET or a CT) alongside its respective segmentation. Sliders allow
+        Plots a patient's image (whether it is a CT or a PET) alongside its respective segmentation. Sliders allow
         the user to slice through the coronal, sagittal and axial views.
 
         Parameters
@@ -205,7 +203,7 @@ class Visualizer:
         Parameters
         ----------
         plot : Plot
-            What is to be plotted. Image, ground truth segmentation map or prediction map.
+            What is to be plotted. Image, ground truth segmentation map or predicted segmentation map.
         img : np.ndarray
             An image array.
         seg_truth : np.ndarray
@@ -233,7 +231,7 @@ class Visualizer:
 
         axes[plot.value].set_title(plot.name)
 
-        img_3d = axes[plot].imshow(
+        img_plot = axes[plot].imshow(
             initial_img,
             cmap=kwargs.get("cmap", "Greys_r"),
             vmax=img_max,
@@ -244,7 +242,7 @@ class Visualizer:
             seg_axial = np.moveaxis(seg_truth, AnatomicalPlane.AXIAL.value, 0)
             initial_seg = seg_axial[int(max_slice / 2)]
 
-            seg_3d = axes[1].imshow(
+            seg_plot = axes[1].imshow(
                 initial_seg,
                 vmax=1,
                 vmin=0,
@@ -264,44 +262,40 @@ class Visualizer:
                 valstep=1
             )
 
-            returns = Visualizer.Config(
-                img_plane_in_first_axis=None,
-                seg_plane_in_first_axis=seg_axial,
+            return Viewer.Config(
+                img_plane=None,
+                seg_plane=seg_axial,
                 slice_index=slice_index,
-                img_3d=img_3d,
-                seg_3d=seg_3d
+                img_plot=img_plot,
+                seg_plot=seg_plot
             )
-            return returns
 
         if plot.value == 2:
             seg_axial = np.moveaxis(seg_pred, AnatomicalPlane.AXIAL.value, 0)
             initial_seg = seg_axial[int(max_slice / 2)]
 
-            seg_3d = axes[2].imshow(
+            seg_plot = axes[2].imshow(
                 initial_seg,
                 vmax=1,
                 vmin=0,
                 alpha=kwargs.get("alpha", 0.1)
             )
 
-            returns = Visualizer.Config(
-                img_plane_in_first_axis=None,
-                seg_plane_in_first_axis=seg_axial,
+            return Viewer.Config(
+                img_plane=None,
+                seg_plane=seg_axial,
                 slice_index=None,
-                img_3d=img_3d,
-                seg_3d=seg_3d
+                img_plot=img_plot,
+                seg_plot=seg_plot
             )
-            return returns
 
-        returns = Visualizer.Config(
-            img_plane_in_first_axis=img_axial,
-            seg_plane_in_first_axis=None,
+        return Viewer.Config(
+            img_plane=img_axial,
+            seg_plane=None,
             slice_index=None,
-            img_3d=img_3d,
-            seg_3d=None
+            img_plot=img_plot,
+            seg_plot=None
         )
-
-        return returns
 
     @staticmethod
     def _update_compare(
@@ -324,15 +318,15 @@ class Visualizer:
         """
         slice_value = truth_config.slice_index.val
 
-        new_img = image_config.img_plane_in_first_axis[slice_value]
-        new_seg_truth = truth_config.seg_plane_in_first_axis[slice_value]
-        new_seg_pred = pred_config.seg_plane_in_first_axis[slice_value]
+        new_img = image_config.img_plane[slice_value]
+        new_seg_truth = truth_config.seg_plane[slice_value]
+        new_seg_pred = pred_config.seg_plane[slice_value]
 
-        image_config.img_3d.set_data(new_img)
-        truth_config.img_3d.set_data(new_img)
-        pred_config.img_3d.set_data(new_img)
-        truth_config.seg_3d.set_data(new_seg_truth)
-        pred_config.seg_3d.set_data(new_seg_pred)
+        image_config.img_plot.set_data(new_img)
+        truth_config.img_plot.set_data(new_img)
+        pred_config.img_plot.set_data(new_img)
+        truth_config.seg_plot.set_data(new_seg_truth)
+        pred_config.seg_plot.set_data(new_seg_pred)
 
         plt.draw()
 
@@ -344,7 +338,7 @@ class Visualizer:
             **kwargs
     ):
         """
-        Plots in axial view a patient's image (whether it is a PET or a CT) alongside its ground truth segmentation and
+        Plots in axial view a patient's image (whether it is a CT or a PET) alongside its ground truth segmentation and
         its predicted segmentation. A slider allows the user to slice through the body.
 
         Parameters
@@ -397,3 +391,89 @@ class Visualizer:
             ))
 
         plt.show()
+
+    @staticmethod
+    def compare_single_slice(
+            img: np.ndarray,
+            seg_truth: np.ndarray,
+            seg_pred: np.ndarray,
+            z_slice: int,
+            savefig: bool = False,
+            path: str = ".",
+            show: bool = True,
+            **kwargs
+    ):
+        """
+        Plots in axial view a patient's image (whether it is a CT or a PET) alongside its ground truth segmentation and
+        its predicted segmentation.
+
+        Parameters
+        ----------
+        img : np.ndarray
+            An image array.
+        seg_truth : np.ndarray
+            A ground truth segmentation map array.
+        seg_pred : np.ndarray
+            A predicted segmentation map array.
+        z_slice : int
+            The z slice to plot.
+        savefig : bool
+            Whether to save the figure.
+        path : str
+            A path to where the figure is to be saved.
+        show : bool
+            Whether to show the figure.
+        **kwargs
+            cmap : str
+                A color map for the image.
+            alpha : float
+                The opacity of the segmentation map, between 0 (transparent) and 1 (opaque).
+        """
+        fig, axes = plt.subplots(1, 3)
+        img_max = np.max(img)
+        img_min = np.min(img)
+        img_axial = np.moveaxis(img, AnatomicalPlane.AXIAL.value, 0)
+        seg_truth_axial = np.moveaxis(seg_truth, AnatomicalPlane.AXIAL.value, 0)
+        seg_pred_axial = np.moveaxis(seg_pred, AnatomicalPlane.AXIAL.value, 0)
+
+        axes[0].set_title("Image")
+        axes[0].imshow(
+            img_axial[z_slice],
+            cmap=kwargs.get("cmap", "Greys_r"),
+            vmax=img_max,
+            vmin=img_min
+        )
+
+        axes[1].set_title("Ground Truth")
+        axes[1].imshow(
+            img_axial[z_slice],
+            cmap=kwargs.get("cmap", "Greys_r"),
+            vmax=img_max,
+            vmin=img_min
+        )
+        axes[1].imshow(
+            seg_truth_axial[z_slice],
+            vmax=1,
+            vmin=0,
+            alpha=kwargs.get("alpha", 0.1)
+        )
+
+        axes[2].set_title("Prediction")
+        axes[2].imshow(
+            img_axial[z_slice],
+            cmap=kwargs.get("cmap", "Greys_r"),
+            vmax=img_max,
+            vmin=img_min
+        )
+        axes[2].imshow(
+            seg_pred_axial[z_slice],
+            vmax=1,
+            vmin=0,
+            alpha=kwargs.get("alpha", 0.1)
+        )
+
+        if savefig:
+            plt.savefig(fname=path)
+
+        if show:
+            plt.show()
