@@ -1,14 +1,15 @@
 """
     @file:              sampling.py
-    @Author:            Maxence Larose, Nicolas Raymond
+    @Author:            Maxence Larose, Nicolas Raymond, Raphael Brodeur
 
     @Creation Date:     05/2022
-    @Last modification: 05/2022
+    @Last modification: 06/2022
 
     @Description:       Defines the RandomStratifiedSampler class used to separate test sets and valid sets from train
                         sets. Also contains few functions used to extract specific datasets
 """
 
+from copy import deepcopy
 from itertools import product
 from json import load
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -91,7 +92,7 @@ class RandomStratifiedSampler:
 
     def __call__(
             self,
-            stratify: Optional[Union[np.array, tensor]] = None
+            stratify: Optional[Union[List[np.array], List[tensor]]] = None
     ) -> Dict[int, Dict[str, Union[List[int], Dict[str, List[int]]]]]:
         """
         Returns lists of indexes to use as train, valid and test masks for outer and inner validation loops.
@@ -128,17 +129,17 @@ class RandomStratifiedSampler:
         """
         # We set targets to use for stratification
         targets = self.__dataset.y if stratify is None else stratify
-        targets = targets if self.is_categorical(targets) else self.mimic_classes(targets)
+        targets = [target if self.is_categorical(target) else self.mimic_classes(target) for target in targets]
 
         # We set the random state
         if self.random_state is not None:
             np.seed(self.random_state)
 
         # We initialize the dict that will contain the results and the list of indexes to use
-        masks, idx = {}, np.array(range(len(targets)))
+        masks, idx = {}, np.array(range(len(targets[0])))
 
         # We save a copy of targets in an array
-        targets_c = np.array(targets)
+        targets_c = deepcopy(targets)
 
         with tqdm(total=(self.n_out_split + self.n_out_split*self.n_in_split)) as bar:
             for i in range(self.n_out_split):
@@ -178,10 +179,16 @@ class RandomStratifiedSampler:
         split : Callable
             Split function.
         """
+
         if valid_size > 0:
 
             # Split must extract train, valid and test masks
-            def split(idx: np.array, targets: np.array) -> Dict[str, np.array]:
+            def split(idx: np.array, targets: List[np.array]) -> Dict[str, np.array]:
+                train_mask, valid_mask, test_mask = None, None, None
+                # We make a pseudo-multilabel
+                targets_str = targets[0].astype(str)
+                for i in range(len(targets)-1):
+                    targets_str = np.char.add(targets_str, targets[i+1].astype(str))
 
                 # We initialize loop important values
                 mask_ok = False
@@ -189,8 +196,8 @@ class RandomStratifiedSampler:
 
                 # We test multiple possibilities till we find one or the patience is achieved
                 while not mask_ok and nb_tries_remaining > 0:
-                    remaining_idx, test_mask = train_test_split(idx, stratify=targets[idx], test_size=test_size)
-                    train_mask, valid_mask = train_test_split(remaining_idx, stratify=targets[remaining_idx],
+                    remaining_idx, test_mask = train_test_split(idx, stratify=targets_str[idx], test_size=test_size)
+                    train_mask, valid_mask = train_test_split(remaining_idx, stratify=targets_str[remaining_idx],
                                                               test_size=valid_size)
                     mask_ok = self.check_masks_validity(train_mask, test_mask, valid_mask)
                     nb_tries_remaining -= 1
@@ -201,7 +208,12 @@ class RandomStratifiedSampler:
                 return {MaskType.TRAIN: train_mask, MaskType.VALID: valid_mask, MaskType.TEST: test_mask}
         else:
             # Split must extract train and test masks only
-            def split(idx: np.array, targets: np.array) -> Dict[str, np.array]:
+            def split(idx: np.array, targets: List[np.array]) -> Dict[str, np.array]:
+                train_mask, test_mask = None, None
+                # We make a pseudo-multilabel
+                targets_str = targets[0].astype(str)
+                for i in range(len(targets)-1):
+                    targets_str = np.char.add(targets_str, targets[i+1].astype(str))
 
                 # We initialize loop important values
                 mask_ok = False
@@ -209,7 +221,7 @@ class RandomStratifiedSampler:
 
                 # We test multiple possibilities till we find one or the patience is achieved
                 while not mask_ok and nb_tries_remaining > 0:
-                    train_mask, test_mask = train_test_split(idx, stratify=targets[idx], test_size=test_size)
+                    train_mask, test_mask = train_test_split(idx, stratify=targets_str[idx], test_size=test_size)
                     mask_ok = self.check_masks_validity(train_mask, test_mask)
                     nb_tries_remaining -= 1
 
