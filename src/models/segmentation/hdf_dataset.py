@@ -17,6 +17,8 @@ from typing import Callable, Optional
 
 import h5py
 from monai.data import ArrayDataset
+from monai.transforms import CenterSpatialCrop, CropForeground, SpatialCrop
+import torch
 
 
 class HDFDataset(ArrayDataset):
@@ -24,6 +26,7 @@ class HDFDataset(ArrayDataset):
     A class used to create a dataset of various patients and their respective CT and segmentation map from a given local
     HDF5 file. The rendered images are in shape (Z x X x Y).
     """
+
     def __init__(
             self,
             path: str,
@@ -44,13 +47,46 @@ class HDFDataset(ArrayDataset):
             A single or a sequence of transforms to apply to the segmentation.
         """
         file = h5py.File(path)
-        img, seg = [], []
+        img_list, seg_list = [], []
         for patient in file.keys():
             if file[patient]['0'].attrs['Modality'] == "CT":
-                img.append(np.transpose(np.array(file[patient]['0']['image']), (2, 0, 1)))
-                seg.append(np.transpose(np.array(file[patient]['0']['0']['Prostate_label_map']), (2, 0, 1)))
-            else:
-                img.append(np.transpose(np.array(file[patient]['1']['image']), (2, 0, 1)))
-                seg.append(np.transpose(np.array(file[patient]['1']['0']['Prostate_label_map']), (2, 0, 1)))
+                img = np.transpose(np.array(file[patient]['0']['image']), (2, 0, 1))
+                # seg = np.transpose(np.array(file[patient]['0']['0']['Prostate_label_map']), (2, 0, 1))
+                seg = np.transpose(np.array(file[patient]['0']['Prostate_label_map']), (2, 0, 1))
 
-        super().__init__(img=img, seg=seg, img_transform=img_transform, seg_transform=seg_transform)
+                img_cropped, seg_cropped = self._crop(img=img, seg=seg)
+                img_list.append(img_cropped)
+                seg_list.append(seg_cropped)
+
+            else:
+                img = np.transpose(np.array(file[patient]['1']['image']), (2, 0, 1))
+                # seg = np.transpose(np.array(file[patient]['1']['0']['Prostate_label_map']), (2, 0, 1))
+                seg = np.transpose(np.array(file[patient]['1']['Prostate_label_map']), (2, 0, 1))
+
+                img_cropped, seg_cropped = self._crop(img=img, seg=seg)
+                img_list.append(img_cropped)
+                seg_list.append(seg_cropped)
+
+        super().__init__(img=img_list, seg=seg_list, img_transform=img_transform, seg_transform=seg_transform)
+
+    def _crop(
+            self,
+            img,
+            seg,
+            z_dim=None,
+            xy_dim=32
+    ):
+        """
+
+        """
+        img_cropped, start, end = CropForeground(return_coords=True)(img)
+        seg_cropped = SpatialCrop(roi_start=start, roi_end=end)(seg)
+
+        # img_cropped = CenterSpatialCrop(roi_size=(10000, 20, 20))(img_cropped)
+        # seg_cropped = CenterSpatialCrop(roi_size=(10000, 20, 20))(seg_cropped)
+
+        if z_dim:
+            img_cropped, seg_cropped = img_cropped[z_dim[0]:z_dim[1]], seg_cropped[z_dim[0]:z_dim[1]]
+            return img_cropped, seg_cropped
+
+        return img_cropped, seg_cropped
