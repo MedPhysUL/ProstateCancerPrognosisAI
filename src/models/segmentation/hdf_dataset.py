@@ -1,6 +1,3 @@
-#
-# Présentement ne fait que prendre la seg 0 mais ultimement on veut : SEG > RTSTRCT (soit 0 ou 1).
-#
 """
     @file:              hdf_dataset.py
     @Author:            Raphael Brodeur
@@ -9,22 +6,22 @@
     @Last modification: 06/2022
 
     @Description:       This file contains a class used to create a dataset of various patients and their respective CT
-                        and segmentation map from a given local HDF5 file.
+                        and segmentation map from a given local HDF5 file. The foreground is cropped and a crop along Z
+                        can be specified.
 """
 
 import numpy as np
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 import h5py
 from monai.data import ArrayDataset
-from monai.transforms import CenterSpatialCrop, CropForeground, SpatialCrop
-import torch
+from monai.transforms import CropForeground, SpatialCrop
 
 
 class HDFDataset(ArrayDataset):
     """
     A class used to create a dataset of various patients and their respective CT and segmentation map from a given local
-    HDF5 file. The rendered images are in shape (Z x X x Y).
+    HDF5 file. The rendered images are in shape (Z, X, Y).
     """
 
     def __init__(
@@ -35,7 +32,7 @@ class HDFDataset(ArrayDataset):
     ):
         """
         Creates a dataset of various patients and their respective CT and segmentation map from a given local HDf5 file.
-        Images and segmentations are in shape (Z, X, Y).
+        Images and segmentation maps are rendered in shape (Z, X, Y).
 
         Parameters
         ----------
@@ -51,39 +48,49 @@ class HDFDataset(ArrayDataset):
         for patient in file.keys():
             if file[patient]['0'].attrs['Modality'] == "CT":
                 img = np.transpose(np.array(file[patient]['0']['image']), (2, 0, 1))
-                # seg = np.transpose(np.array(file[patient]['0']['0']['Prostate_label_map']), (2, 0, 1))
-                seg = np.transpose(np.array(file[patient]['0']['Prostate_label_map']), (2, 0, 1))
+                seg = np.transpose(np.array(file[patient]['0']['0']['Prostate_label_map']), (2, 0, 1))
 
-                img_cropped, seg_cropped = self._crop(img=img, seg=seg)
+                img_cropped, seg_cropped = self._crop(img=img, seg=seg, z_dim=[50, 178])
                 img_list.append(img_cropped)
                 seg_list.append(seg_cropped)
 
             else:
                 img = np.transpose(np.array(file[patient]['1']['image']), (2, 0, 1))
-                # seg = np.transpose(np.array(file[patient]['1']['0']['Prostate_label_map']), (2, 0, 1))
-                seg = np.transpose(np.array(file[patient]['1']['Prostate_label_map']), (2, 0, 1))
+                seg = np.transpose(np.array(file[patient]['1']['0']['Prostate_label_map']), (2, 0, 1))
 
-                img_cropped, seg_cropped = self._crop(img=img, seg=seg)
+                img_cropped, seg_cropped = self._crop(img=img, seg=seg, z_dim=[50, 178])
                 img_list.append(img_cropped)
                 seg_list.append(seg_cropped)
 
         super().__init__(img=img_list, seg=seg_list, img_transform=img_transform, seg_transform=seg_transform)
 
+    @staticmethod
     def _crop(
-            self,
-            img,
-            seg,
-            z_dim=None,
-            xy_dim=32
+            img: np.ndarray,
+            seg: np.ndarray,
+            z_dim: Optional[List] = None
     ):
         """
+        Crops the foreground. A crop along Z can be specified.
 
+        Parameters
+        ----------
+        img : np.ndarray
+            An image array in shape (Z, X, Y).
+        seg : np.ndarray
+            A segmentation map array in shape (Z, X, Y).
+        z_dim : Optional[List]
+            Lower bound and upper bound of the crop to apply along Z.
+
+        Returns
+        -------
+        img_cropped : np.ndarray
+            A cropped image array.
+        seg_cropped : np.ndarray
+            A cropped segmentation map array.
         """
         img_cropped, start, end = CropForeground(return_coords=True)(img)
         seg_cropped = SpatialCrop(roi_start=start, roi_end=end)(seg)
-
-        # img_cropped = CenterSpatialCrop(roi_size=(10000, 20, 20))(img_cropped)
-        # seg_cropped = CenterSpatialCrop(roi_size=(10000, 20, 20))(seg_cropped)
 
         if z_dim:
             img_cropped, seg_cropped = img_cropped[z_dim[0]:z_dim[1]], seg_cropped[z_dim[0]:z_dim[1]]
