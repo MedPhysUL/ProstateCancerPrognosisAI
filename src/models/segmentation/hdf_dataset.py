@@ -1,30 +1,29 @@
-# NOTES
-# Cleaner le try-except et le tasse-467 une fois qu'on a regler le fait quon a des 467 et des 333
-# AUSSI [x,y,z] de memoire est a enlever
 """
     @file:              hdf_dataset.py
     @Author:            Raphael Brodeur
 
     @Creation Date:     05/2022
-    @Last modification: 05/2022
+    @Last modification: 06/2022
 
     @Description:       This file contains a class used to create a dataset of various patients and their respective CT
-                        and segmentation map from a given local HDF5 file.
+                        and segmentation map from a given local HDF5 file. The foreground is cropped and a crop along Z
+                        can be specified.
 """
 
 import numpy as np
-from typing import Callable, Optional, Sequence
+from typing import Callable, List, Optional
 
 import h5py
-from torch.utils.data import Dataset
 from monai.data import ArrayDataset
+from monai.transforms import CropForeground, SpatialCrop
 
 
 class HDFDataset(ArrayDataset):
     """
     A class used to create a dataset of various patients and their respective CT and segmentation map from a given local
-    HDF5 file. The rendered dataset is (Patients x Channels x Z x X x Y).
+    HDF5 file. The rendered images are in shape (Z, X, Y).
     """
+
     def __init__(
             self,
             path: str,
@@ -33,6 +32,7 @@ class HDFDataset(ArrayDataset):
     ):
         """
         Creates a dataset of various patients and their respective CT and segmentation map from a given local HDf5 file.
+        Images and segmentation maps are rendered in shape (Z, X, Y).
 
         Parameters
         ----------
@@ -44,16 +44,56 @@ class HDFDataset(ArrayDataset):
             A single or a sequence of transforms to apply to the segmentation.
         """
         file = h5py.File(path)
-        img, seg = [], []
+        img_list, seg_list = [], []
         for patient in file.keys():
-            try: #va enelever  ca
-                if file[patient]['0'].attrs['Modality'] == "CT" and file[patient]['0']['image'].shape == (333, 333, 573): # va enlver le and
-                    img.append(np.transpose(np.array(file[patient]['0']['image'][100:233, 100:233, 80:180]), (2, 0, 1)))
-                    seg.append(np.transpose(np.array(file[patient]['0']['Prostate_label_map'][100:233, 100:233, 80:180]), (2, 0, 1)))
-                if file[patient]['1'].attrs['Modality'] == "CT" and file[patient]['1']['image'].shape == (333, 333, 573): #va remettre else
-                    img.append(np.transpose(np.array(file[patient]['1']['image'][100:233, 100:233, 80:180]), (2, 0, 1)))
-                    seg.append(np.transpose(np.array(file[patient]['1']['Prostate_label_map'][100:233, 100:233, 80:180]), (2, 0, 1)))
-            except KeyError:                                # va enlever ca
-                print(f"Patient {patient} ignored.")        # pis ca
+            if file[patient]['0'].attrs['Modality'] == "CT":
+                img = np.transpose(np.array(file[patient]['0']['image']), (2, 0, 1))
+                seg = np.transpose(np.array(file[patient]['0']['0']['Prostate_label_map']), (2, 0, 1))
 
-        super().__init__(img=img, seg=seg, img_transform=img_transform, seg_transform=seg_transform)
+                img_cropped, seg_cropped = self._crop(img=img, seg=seg, z_dim=[50, 178])
+                img_list.append(img_cropped)
+                seg_list.append(seg_cropped)
+
+            else:
+                img = np.transpose(np.array(file[patient]['1']['image']), (2, 0, 1))
+                seg = np.transpose(np.array(file[patient]['1']['0']['Prostate_label_map']), (2, 0, 1))
+
+                img_cropped, seg_cropped = self._crop(img=img, seg=seg, z_dim=[50, 178])
+                img_list.append(img_cropped)
+                seg_list.append(seg_cropped)
+
+        super().__init__(img=img_list, seg=seg_list, img_transform=img_transform, seg_transform=seg_transform)
+
+    @staticmethod
+    def _crop(
+            img: np.ndarray,
+            seg: np.ndarray,
+            z_dim: Optional[List] = None
+    ):
+        """
+        Crops the foreground. A crop along Z can be specified.
+
+        Parameters
+        ----------
+        img : np.ndarray
+            An image array in shape (Z, X, Y).
+        seg : np.ndarray
+            A segmentation map array in shape (Z, X, Y).
+        z_dim : Optional[List]
+            Lower bound and upper bound of the crop to apply along Z.
+
+        Returns
+        -------
+        img_cropped : np.ndarray
+            A cropped image array.
+        seg_cropped : np.ndarray
+            A cropped segmentation map array.
+        """
+        img_cropped, start, end = CropForeground(return_coords=True)(img)
+        seg_cropped = SpatialCrop(roi_start=start, roi_end=end)(seg)
+
+        if z_dim:
+            img_cropped, seg_cropped = img_cropped[z_dim[0]:z_dim[1]], seg_cropped[z_dim[0]:z_dim[1]]
+            return img_cropped, seg_cropped
+
+        return img_cropped, seg_cropped
