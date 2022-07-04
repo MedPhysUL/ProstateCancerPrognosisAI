@@ -28,8 +28,8 @@ if __name__ == '__main__':
     num_workers = 0
     num_val = 30
     batch_size = 1
-    num_epochs = 2
-    lr = 5e-3
+    num_epochs = 1000
+    lr = 1e-4
 
     trans = Compose([
         AddChannel(),
@@ -37,7 +37,11 @@ if __name__ == '__main__':
         ToTensor(dtype=torch.float32)
     ])
 
-    ds = HDFDataset(path='.', img_transform=trans, seg_transform=trans)
+    ds = HDFDataset(
+        path='C:/Users/MALAR507/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5',
+        img_transform=trans,
+        seg_transform=trans
+    )
 
     train_ds = ds[:-num_val]
     val_ds = ds[-num_val:]
@@ -45,12 +49,14 @@ if __name__ == '__main__':
     train_loader = DataLoader(
         dataset=train_ds,
         num_workers=num_workers,
-        batch_size=batch_size
+        batch_size=batch_size,
+        pin_memory=True
     )
     val_loader = DataLoader(
         dataset=val_ds,
         num_workers=num_workers,
-        batch_size=batch_size
+        batch_size=batch_size,
+        pin_memory=True
     )
 
     net = UNet(
@@ -105,4 +111,5 @@ if __name__ == '__main__':
                 metric_vals += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
 
         epoch_metrics.append((total_step, np.average(metric_vals)))
+        print(f"EPOCH {epoch + 1}, val metric : {epoch_metrics[-1][1]}")
         progress_bar(epoch + 1, num_epochs, f'Validation metric: {epoch_metrics[-1][1]}')

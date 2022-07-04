@@ -18,6 +18,26 @@ from monai.data import ArrayDataset
 from monai.transforms import CropForeground, SpatialCrop
 
 
+PATIENTS_TO_DISCARD = [
+    "TEP-051",
+    "TEP-093",
+    "TEP-094",
+    "TEP-090",
+    "TEP-102",
+    "TEP-119",
+    "TEP-133",
+    "TEP-175",
+    "TEP-176",
+    "TEP-296",
+    "TEP-306",
+    "TEP-358",
+    "TEP-363",
+    "TEP-377",
+    "TEP-407",
+    "TEP-482",
+]
+
+
 class HDFDataset(ArrayDataset):
     """
     A class used to create a dataset of various patients and their respective CT and segmentation map from a given local
@@ -46,7 +66,9 @@ class HDFDataset(ArrayDataset):
         file = h5py.File(path)
         img_list, seg_list = [], []
         for patient in file.keys():
-            if file[patient]['0'].attrs['Modality'] == "CT":
+            if patient in PATIENTS_TO_DISCARD:
+                print(f"Scuffed patient named {patient} avoided.")
+            elif file[patient]['0'].attrs['Modality'] == "CT":
                 img = np.transpose(np.array(file[patient]['0']['image']), (2, 0, 1))
                 seg = np.transpose(np.array(file[patient]['0']['0']['Prostate_label_map']), (2, 0, 1))
 
