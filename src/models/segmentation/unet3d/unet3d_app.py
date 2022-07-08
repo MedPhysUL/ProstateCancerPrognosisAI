@@ -3,7 +3,7 @@
     @Author:            Raphael Brodeur
 
     @Creation Date:     05/2022
-    @Last modification: 06/2022
+    @Last modification: 07/2022
 
     @Description:       This file contains an implementation of a 3D U-Net.
 
@@ -77,6 +77,7 @@ if __name__ == '__main__':
     epoch_train_losses = []
     epoch_val_losses = []
     epoch_val_metrics = []
+    best_metric = 0
 
     for epoch in range(num_epochs):
         net.train()
@@ -125,6 +126,10 @@ if __name__ == '__main__':
         epoch_val_losses.append(np.average(loss_val_list))
         epoch_val_metrics.append(np.average(metric_vals))
         print(f"EPOCH {epoch + 1}, val metric : {epoch_val_metrics[-1]}")
+
+        if epoch_val_metrics[-1] > best_metric:
+            torch.save(net.state_dict(), 'best_model_parameters.pt')
+
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)
 
