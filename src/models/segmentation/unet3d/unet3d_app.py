@@ -38,7 +38,7 @@ if __name__ == '__main__':
     ])
 
     ds = HDFDataset(
-        path='C:/Users/MALAR507/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5',
+        path='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5',
         img_transform=trans,
         seg_transform=trans
     )
