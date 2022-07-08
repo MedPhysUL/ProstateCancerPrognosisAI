@@ -17,18 +17,21 @@ from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
 from monai.networks.nets import UNet
 from monai.transforms import AddChannel, CenterSpatialCrop, Compose, ToTensor
-from monai.utils import progress_bar, set_determinism
+from monai.utils import set_determinism
 import torch
+from torch.utils.tensorboard import SummaryWriter
 
 
 if __name__ == '__main__':
     set_determinism(seed=1010710)
 
+    writer = SummaryWriter()
+
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 30
     batch_size = 1
-    num_epochs = 1000
+    num_epochs = 3
     lr = 1e-4
 
     trans = Compose([
@@ -71,12 +74,13 @@ if __name__ == '__main__':
     loss = DiceLoss(sigmoid=True)
     metric = DiceMetric(include_background=True, reduction='mean')
 
-    step_losses = []
-    epoch_metrics = []
-    total_step = 0
+    epoch_train_losses = []
+    epoch_val_losses = []
+    epoch_val_metrics = []
 
     for epoch in range(num_epochs):
         net.train()
+        batch_loss = []
 
         for batch in train_loader:
             batch_images = batch[0].to(device)
@@ -87,14 +91,17 @@ if __name__ == '__main__':
 
             y_pred = torch.sigmoid(y_pred)
 
-            loss_val = loss(y_pred, batch_segs)
-            loss_val.backward()
+            loss_train = loss(y_pred, batch_segs)
+            loss_train.backward()
             opt.step()
 
-            step_losses.append((total_step, loss_val.item()))
-            total_step += 1
+            batch_loss.append(loss_train.item())
+
+        epoch_train_losses.append(np.average(batch_loss))
+        writer.add_scalar('avg training loss per batch per epoch', epoch_train_losses[-1], epoch + 1)
 
         net.eval()
+        loss_val_list = []
         metric_vals = []
 
         with torch.no_grad():
@@ -107,9 +114,19 @@ if __name__ == '__main__':
                 y_pred = torch.sigmoid(y_pred)
                 y_pred = torch.round(y_pred)
 
+                # Loss
+                loss_val = loss(y_pred, batch_segs)
+                loss_val_list.append(loss_val.item())
+
+                # Metric
                 pred_metric = metric(y_pred=y_pred, y=batch_segs)
                 metric_vals += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
 
-        epoch_metrics.append((total_step, np.average(metric_vals)))
-        print(f"EPOCH {epoch + 1}, val metric : {epoch_metrics[-1][1]}")
-        progress_bar(epoch + 1, num_epochs, f'Validation metric: {epoch_metrics[-1][1]}')
+        epoch_val_losses.append(np.average(loss_val_list))
+        epoch_val_metrics.append(np.average(metric_vals))
+        print(f"EPOCH {epoch + 1}, val metric : {epoch_val_metrics[-1]}")
+        writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
+        writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)
+
+    writer.flush()
+    writer.close()
