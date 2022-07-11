@@ -31,7 +31,7 @@ if __name__ == '__main__':
     num_workers = 0
     num_val = 30
     batch_size = 1
-    num_epochs = 3
+    num_epochs = 1000
     lr = 1e-4
 
     trans = Compose([
@@ -128,6 +128,7 @@ if __name__ == '__main__':
         print(f"EPOCH {epoch + 1}, val metric : {epoch_val_metrics[-1]}")
 
         if epoch_val_metrics[-1] > best_metric:
+            best_metric = epoch_val_metrics[-1]
             torch.save(net.state_dict(), 'best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)

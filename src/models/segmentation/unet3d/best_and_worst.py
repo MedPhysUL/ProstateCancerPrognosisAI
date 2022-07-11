@@ -68,7 +68,6 @@ if __name__ == '__main__':
             batch_segs = batch_segs.to(device)
 
             y_pred = net(batch_images)
-
             y_pred = torch.sigmoid(y_pred)
             y_pred = torch.round(y_pred)
 
@@ -80,3 +79,56 @@ if __name__ == '__main__':
     print('min:', metric_list[np.argmin(metric_list)], 'at index:', np.argmin(metric_list))
     print('mediane:', metric_list[np.argsort(metric_list)[len(metric_list)//2]], 'at:', np.argsort(metric_list)[len(metric_list)//2])
     print('moyenne:', np.average(metric_list))
+
+    patient_idx = 0
+    with torch.no_grad():
+        for patient_img, patient_seg in val_loader:
+            if patient_idx == np.argmax(metric_list):
+                print('Best image')
+                print(patient_idx)
+                img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+                seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+                patient_img = patient_img.to(device)
+                y_pred = net(patient_img)
+                y_pred = torch.sigmoid(y_pred)
+                y_pred = torch.round(y_pred)
+                seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+                Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
+                patient_idx += 1
+            if patient_idx == np.argmin(metric_list):
+                print('Worst image')
+                print(patient_idx)
+                img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+                seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+                patient_img = patient_img.to(device)
+                y_pred = net(patient_img)
+                y_pred = torch.sigmoid(y_pred)
+                y_pred = torch.round(y_pred)
+                seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+                Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
+                patient_idx += 1
+            if patient_idx == np.argsort(metric_list)[len(metric_list)//2]:
+                print('Median image')
+                print(patient_idx)
+                img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+                seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+                patient_img = patient_img.to(device)
+                y_pred = net(patient_img)
+                y_pred = torch.sigmoid(y_pred)
+                y_pred = torch.round(y_pred)
+                seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+                Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
+                patient_idx += 1
+            else:
+                patient_idx += 1
+
+    with torch.no_grad():
+        for patient_img, patient_seg in val_loader:
+            img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+            seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+            patient_img = patient_img.to(device)
+            y_pred = net(patient_img)
+            y_pred = torch.sigmoid(y_pred)
+            y_pred = torch.round(y_pred)
+            seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+            Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
