@@ -57,7 +57,7 @@ if __name__ == '__main__':
         channels=(8, 16, 32, 64, 128),
         strides=(1, 1, 1, 1)
     ).to(device)
-    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/src/models/segmentation/unet3d/runs/exp1/best_model_parameters.pt'))
+    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/src/models/segmentation/unet3d/runs/exp2/best_model_parameters.pt'))
 
     net.eval()
     metric_list = []
@@ -132,3 +132,4 @@ if __name__ == '__main__':
             y_pred = torch.round(y_pred)
             seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
             Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
+            

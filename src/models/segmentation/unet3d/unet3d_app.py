@@ -90,8 +90,6 @@ if __name__ == '__main__':
             opt.zero_grad()
             y_pred = net(batch_images)
 
-            y_pred = torch.sigmoid(y_pred)
-
             loss_train = loss(y_pred, batch_segs)
             loss_train.backward()
             opt.step()
@@ -112,14 +110,14 @@ if __name__ == '__main__':
 
                 y_pred = net(batch_images)
 
-                y_pred = torch.sigmoid(y_pred)
-                y_pred = torch.round(y_pred)
-
                 # Loss
                 loss_val = loss(y_pred, batch_segs)
                 loss_val_list.append(loss_val.item())
 
                 # Metric
+                y_pred = torch.sigmoid(y_pred)
+                y_pred = torch.round(y_pred)
+
                 pred_metric = metric(y_pred=y_pred, y=batch_segs)
                 metric_vals += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
 
