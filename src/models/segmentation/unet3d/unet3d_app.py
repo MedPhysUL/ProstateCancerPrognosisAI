@@ -25,7 +25,7 @@ from torch.utils.tensorboard import SummaryWriter
 if __name__ == '__main__':
     set_determinism(seed=1010710)
 
-    writer = SummaryWriter()
+    writer = SummaryWriter(log_dir='runs/exp2')
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
@@ -129,7 +129,7 @@ if __name__ == '__main__':
 
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'best_model_parameters.pt')
+            torch.save(net.state_dict(), 'runs/exp2/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)
