@@ -133,7 +133,7 @@ class RandomStratifiedSampler:
 
         # We set the random state
         if self.random_state is not None:
-            np.seed(self.random_state)
+            np.random.seed(self.random_state)
 
         # We initialize the dict that will contain the results and the list of indexes to use
         masks, idx = {}, np.array(range(len(targets[0])))
