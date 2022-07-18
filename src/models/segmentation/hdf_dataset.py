@@ -73,6 +73,7 @@ class HDFDataset(ArrayDataset):
                 seg = np.transpose(np.array(file[patient]['0']['0']['Prostate_label_map']), (2, 0, 1))
 
                 img_cropped, seg_cropped = self._crop(img=img, seg=seg, z_dim=[50, 178])
+
                 img_list.append(img_cropped)
                 seg_list.append(seg_cropped)
 
@@ -81,6 +82,7 @@ class HDFDataset(ArrayDataset):
                 seg = np.transpose(np.array(file[patient]['1']['0']['Prostate_label_map']), (2, 0, 1))
 
                 img_cropped, seg_cropped = self._crop(img=img, seg=seg, z_dim=[50, 178])
+
                 img_list.append(img_cropped)
                 seg_list.append(seg_cropped)
 

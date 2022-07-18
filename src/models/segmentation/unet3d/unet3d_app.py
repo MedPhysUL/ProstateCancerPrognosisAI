@@ -16,7 +16,8 @@ from monai.data import DataLoader
 from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
 from monai.networks.nets import UNet
-from monai.transforms import AddChannel, CenterSpatialCrop, Compose, ToTensor
+from monai.transforms import AddChannel, CenterSpatialCrop, Compose, KeepLargestConnectedComponent, ThresholdIntensity, \
+    ToTensor, HistogramNormalize
 from monai.utils import set_determinism
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -25,29 +26,39 @@ from torch.utils.tensorboard import SummaryWriter
 if __name__ == '__main__':
     set_determinism(seed=1010710)
 
-    writer = SummaryWriter(log_dir='runs/exp2')
+    writer = SummaryWriter(log_dir='runs/exp_delete')
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 30
-    batch_size = 1
-    num_epochs = 1000
-    lr = 1e-4
+    batch_size = 2
+    num_epochs = 120
+    lr = 1e-3
 
-    trans = Compose([
+    img_trans = Compose([
         AddChannel(),
         CenterSpatialCrop(roi_size=(1000, 128, 128)),
+        ThresholdIntensity(threshold=-250, above=True, cval=-250),
+        ThresholdIntensity(threshold=500, above=False, cval=500),
+        HistogramNormalize(num_bins=751, min=0, max=1),
+        ToTensor(dtype=torch.float32)
+    ])
+    seg_trans = Compose([
+        AddChannel(),
+        CenterSpatialCrop(roi_size=(1000, 128, 128)),
+        KeepLargestConnectedComponent(),
         ToTensor(dtype=torch.float32)
     ])
 
     ds = HDFDataset(
         path='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5',
-        img_transform=trans,
-        seg_transform=trans
+        img_transform=img_trans,
+        seg_transform=seg_trans
     )
 
-    train_ds = ds[:-num_val]
-    val_ds = ds[-num_val:]
+    # train_ds = ds[:-num_val]
+    # val_ds = ds[-num_val:]
+
 
     train_loader = DataLoader(
         dataset=train_ds,
@@ -61,16 +72,17 @@ if __name__ == '__main__':
         batch_size=batch_size,
         pin_memory=True
     )
-
     net = UNet(
         dimensions=3,
         in_channels=1,
         out_channels=1,
-        channels=(8, 16, 32, 64, 128),
-        strides=(1, 1, 1, 1)
+        channels=(64, 128, 256, 512, 1024),
+        strides=(2, 2, 2, 2),
+        dropout=0.2
     ).to(device)
-
-    opt = torch.optim.Adam(net.parameters(), lr)
+    #
+    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
+    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=opt, gamma=0.99)
     loss = DiceLoss(sigmoid=True)
     metric = DiceMetric(include_background=True, reduction='mean')
 
@@ -89,7 +101,6 @@ if __name__ == '__main__':
 
             opt.zero_grad()
             y_pred = net(batch_images)
-
             loss_train = loss(y_pred, batch_segs)
             loss_train.backward()
             opt.step()
@@ -98,6 +109,8 @@ if __name__ == '__main__':
 
         epoch_train_losses.append(np.average(batch_loss))
         writer.add_scalar('avg training loss per batch per epoch', epoch_train_losses[-1], epoch + 1)
+
+        lr_scheduler.step()
 
         net.eval()
         loss_val_list = []
@@ -127,7 +140,7 @@ if __name__ == '__main__':
 
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'runs/exp2/best_model_parameters.pt')
+            torch.save(net.state_dict(), 'runs/exp_delete/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)

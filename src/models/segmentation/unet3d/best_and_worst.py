@@ -15,11 +15,11 @@ from src.visualization.viewer import Viewer
 
 from monai.data import DataLoader
 from monai.metrics import DiceMetric
-from monai.transforms import AddChannel, CenterSpatialCrop, Compose, ToTensor
+from monai.transforms import AddChannel, CenterSpatialCrop, Compose, ToTensor, ThresholdIntensity, HistogramNormalize,\
+    KeepLargestConnectedComponent
 from monai.networks.nets import UNet
 from monai.utils import set_determinism
 import torch
-
 
 if __name__ == '__main__':
     set_determinism(seed=1010710)
@@ -31,17 +31,28 @@ if __name__ == '__main__':
     batch_size = 1
 
     # Load validation set
-    trans = Compose([
+    img_trans = Compose([
         AddChannel(),
         CenterSpatialCrop(roi_size=(1000, 128, 128)),
+        ThresholdIntensity(threshold=-250, above=True, cval=-250),
+        ThresholdIntensity(threshold=500, above=False, cval=500),
+        HistogramNormalize(num_bins=751, min=0, max=1),
         ToTensor(dtype=torch.float32)
     ])
+    seg_trans = Compose([
+        AddChannel(),
+        CenterSpatialCrop(roi_size=(1000, 128, 128)),
+        KeepLargestConnectedComponent(),
+        ToTensor(dtype=torch.float32)
+    ])
+
     ds = HDFDataset(
         path='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5',
-        img_transform=trans,
-        seg_transform=trans
+        img_transform=img_trans,
+        seg_transform=seg_trans
     )
     val_ds = ds[-num_val:]
+
     val_loader = DataLoader(
         dataset=val_ds,
         num_workers=num_workers,
@@ -54,13 +65,15 @@ if __name__ == '__main__':
         dimensions=3,
         in_channels=1,
         out_channels=1,
-        channels=(8, 16, 32, 64, 128),
-        strides=(1, 1, 1, 1)
+        channels=(64, 128, 256, 512, 1024),
+        strides=(2, 2, 2, 2),
+        dropout=0.2
     ).to(device)
-    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/src/models/segmentation/unet3d/runs/exp2/best_model_parameters.pt'))
+    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/src/models/segmentation/unet3d/runs/exp4/best_model_parameters.pt'))
 
     net.eval()
     metric_list = []
+
 
     with torch.no_grad():
         for batch_images, batch_segs in val_loader:
@@ -78,8 +91,11 @@ if __name__ == '__main__':
     print('max:', metric_list[np.argmax(metric_list)], 'at index:', np.argmax(metric_list))
     print('min:', metric_list[np.argmin(metric_list)], 'at index:', np.argmin(metric_list))
     print('mediane:', metric_list[np.argsort(metric_list)[len(metric_list)//2]], 'at:', np.argsort(metric_list)[len(metric_list)//2])
+    print('np.mediane', np.median(metric_list))
     print('moyenne:', np.average(metric_list))
+    ####################################################################################################################
 
+    ####################################################################################################################
     patient_idx = -1
     with torch.no_grad():
         for patient_img, patient_seg in val_loader:
@@ -96,7 +112,7 @@ if __name__ == '__main__':
                 y_pred = torch.round(y_pred)
                 print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
                 seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-                Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
+                Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
 
             if patient_idx == np.argmin(metric_list):
                 print('Worst image', patient_idx)
@@ -108,7 +124,7 @@ if __name__ == '__main__':
                 y_pred = torch.round(y_pred)
                 print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
                 seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-                Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
+                Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
 
             if patient_idx == np.argsort(metric_list)[len(metric_list)//2]:
                 print('Median image', patient_idx)
@@ -120,7 +136,7 @@ if __name__ == '__main__':
                 y_pred = torch.round(y_pred)
                 print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
                 seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-                Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
+                Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
 
     with torch.no_grad():
         for patient_img, patient_seg in val_loader:
@@ -130,5 +146,18 @@ if __name__ == '__main__':
             y_pred = net(patient_img)
             y_pred = torch.sigmoid(y_pred)
             y_pred = torch.round(y_pred)
+            print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
             seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
             Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
+
+    ###
+    # from monai.utils import first
+    # from torch.utils.tensorboard import SummaryWriter
+    # writer = SummaryWriter(log_dir='runs/exp4')
+    # with torch.no_grad():
+    #     img, seg = first(val_loader)
+    #     img = img.to(device)
+    #     writer.add_graph(net, img)
+    # writer.flush()
+    # writer.close()
+    ###
