@@ -57,10 +57,11 @@ if __name__ == '__main__':
         seg_transform=seg_trans
     )
 
-    # train_ds = ds[:-num_val]
-    # val_ds = ds[-num_val:]
-    ds_len = len(ds)
-    train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
+    train_ds = ds[:-num_val]
+    val_ds = ds[-num_val:]
+
+    # print(len(ds))
+    # train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
 
     train_loader = DataLoader(
         dataset=train_ds,
@@ -82,7 +83,7 @@ if __name__ == '__main__':
         strides=(2, 2, 2, 2),
         dropout=0.2
     ).to(device)
-    #
+
     opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=opt, gamma=0.99)
     loss = DiceLoss(sigmoid=True)

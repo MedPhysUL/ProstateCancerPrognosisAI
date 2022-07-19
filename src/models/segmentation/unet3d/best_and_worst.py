@@ -19,6 +19,7 @@ from monai.transforms import AddChannel, CenterSpatialCrop, Compose, ToTensor, T
     KeepLargestConnectedComponent
 from monai.networks.nets import UNet
 from monai.utils import set_determinism
+from torch.utils.data.dataset import random_split
 import torch
 
 if __name__ == '__main__':
@@ -51,7 +52,9 @@ if __name__ == '__main__':
         img_transform=img_trans,
         seg_transform=seg_trans
     )
-    val_ds = ds[-num_val:]
+
+    # val_ds = ds[-num_val:]
+    train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
 
     val_loader = DataLoader(
         dataset=val_ds,
