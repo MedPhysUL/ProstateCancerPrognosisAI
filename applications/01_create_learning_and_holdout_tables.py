@@ -1,11 +1,11 @@
 """
-    @file:              create_holdout_set.py
+    @file:              01_create_learning_and_holdout_tables.py
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
     @Last modification: 07/2022
 
-    @Description:       Small script used to create the holdout set.
+    @Description:       Small script used to create the learning and holdout sets csv tables.
 """
 
 import os
@@ -21,8 +21,8 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                  Dataset                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
-    df = pd.read_excel(io=CLINICAL_DATA_PATH, header=1)
-    df = df[df[ID].isin(os.listdir(PATIENTS_FOLDER_PATH))]
+    df = pd.read_excel(io=CLINICAL_DATA_PATH, sheet_name="sheet1", header=1)
+    df = df[df[ID].isin(os.listdir(IMAGES_FOLDER_PATH))]
 
     targets_cols = [PN, BCR]
     features_cols = [col for col in COLUMNS_TYPES.keys()]
@@ -57,5 +57,5 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------------------------------------------------- #
     #                                              Saving DataFrames                                              #
     # ----------------------------------------------------------------------------------------------------------- #
-    learning_df.to_excel(LEARNING_DATAFRAME_PATH, index=False)
-    holdout_df.to_excel(HOLDOUT_DATAFRAME_PATH, index=False)
+    learning_df.to_csv(LEARNING_TABLE_PATH, index=False)
+    holdout_df.to_csv(HOLDOUT_TABLE_PATH, index=False)

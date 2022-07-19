@@ -1,15 +1,12 @@
 """
-    @file:              generate_descriptive_analyses.py
+    @file:              02_generate_outliers_records.py
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
     @Last modification: 07/2022
 
-    @Description:       This file stores the procedures that needs to be executed in order to extract descriptive tables
-                        with information from all variables of a table.
+    @Description:       Script used to generate a folder containing information about outliers.
 """
-
-import os
 
 import pandas as pd
 
@@ -21,16 +18,22 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                DataFrames                                                   #
     # ----------------------------------------------------------------------------------------------------------- #
-    learning_df = pd.read_excel(LEARNING_DATAFRAME_PATH)
-    holdout_df = pd.read_excel(HOLDOUT_DATAFRAME_PATH)
+    learning_df = pd.read_csv(LEARNING_TABLE_PATH)
+    holdout_df = pd.read_csv(HOLDOUT_TABLE_PATH)
 
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                 Cleaner                                                     #
     # ----------------------------------------------------------------------------------------------------------- #
-    data_cleaner = DataCleaner(
-        records_path=RECORDS_PATH,
+    learning_set_data_cleaner = DataCleaner(
+        records_path=f"{OUTLIERS_RECORDS_PATH}/learning_set",
         ids_col=ID,
     )
 
-    data_cleaner(df=learning_df)
+    learning_set_data_cleaner(df=learning_df)
+
+    data_cleaner = DataCleaner(
+        records_path=f"{OUTLIERS_RECORDS_PATH}/holdout_set",
+        ids_col=ID,
+    )
+
     data_cleaner(df=holdout_df)
