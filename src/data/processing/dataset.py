@@ -568,7 +568,7 @@ class ProstateCancerDataset(Dataset):
         if cat_cols is not None:
             selected_cols += cat_cols
 
-        return self.original_data[[self._ids_col, self._targets_col] + selected_cols].copy()
+        return self.original_data[[self._ids_col] + self._targets_col + selected_cols].copy()
 
     def get_imputed_dataframe(
             self
@@ -581,7 +581,7 @@ class ProstateCancerDataset(Dataset):
         imputed_df : pd.DataFrame
             Copy of the original pandas dataframe where missing values are imputed according to the training mask.
         """
-        imputed_df = self.original_data.drop([self._ids_col, self._targets_col], axis=1).copy()
+        imputed_df = self.original_data.drop([self._ids_col] + self._targets_col, axis=1).copy()
         if self._cont_cols is not None:
             imputed_df[self._cont_cols] = np.array(self._x_cont)
         if self._cat_cols is not None:
