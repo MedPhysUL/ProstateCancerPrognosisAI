@@ -100,7 +100,7 @@ class RandomStratifiedSampler:
 
         Parameters
         ----------
-        stratify : Optional[Union[np.array, tensor]]
+        stratify : Optional[Union[List[np.array], List[tensor]]]
             Array or tensor used for stratified split (if None, dataset.y will be used).
 
         Returns
