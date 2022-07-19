@@ -19,7 +19,7 @@ LEARNING_DATAFRAME_PATH = "local_data/learning_dataframe.xlsx"
 HOLDOUT_DATAFRAME_PATH = "local_data/holdout_dataframe.xlsx"
 
 PATIENTS_FOLDER_PATH = "local_data/patients"
-RECORDS_PATH = "local_data/records.json"
+RECORDS_PATH = "local_data/records"
 
 # COLUMNS
 ID = "ID"

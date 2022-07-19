@@ -25,6 +25,9 @@ if __name__ == '__main__':
     df = df[df[ID].isin(os.listdir(PATIENTS_FOLDER_PATH))]
 
     targets_cols = [PN, BCR]
+    features_cols = [col for col in COLUMNS_TYPES.keys()]
+
+    df = df[features_cols + targets_cols]
     target_df = df[targets_cols]
 
     dataset = ProstateCancerDataset(
@@ -47,12 +50,12 @@ if __name__ == '__main__':
         random_state=SEED
     )
 
-    masks = rss(stratify=target_df.transpose().to_numpy())
+    masks = rss()
     learning_idx, holdout_idx = masks[0][MaskType.TRAIN], masks[0][MaskType.TEST]
     learning_df, holdout_df = df.iloc[learning_idx, :], df.iloc[holdout_idx, :]
 
     # ----------------------------------------------------------------------------------------------------------- #
     #                                              Saving DataFrames                                              #
     # ----------------------------------------------------------------------------------------------------------- #
-    learning_df.to_excel(LEARNING_DATAFRAME_PATH)
-    holdout_df.to_excel(HOLDOUT_DATAFRAME_PATH)
+    learning_df.to_excel(LEARNING_DATAFRAME_PATH, index=False)
+    holdout_df.to_excel(HOLDOUT_DATAFRAME_PATH, index=False)
