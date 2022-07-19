@@ -20,13 +20,14 @@ from monai.transforms import AddChannel, CenterSpatialCrop, Compose, KeepLargest
     ToTensor, HistogramNormalize
 from monai.utils import set_determinism
 import torch
+from torch.utils.data.dataset import random_split
 from torch.utils.tensorboard import SummaryWriter
 
 
 if __name__ == '__main__':
     set_determinism(seed=1010710)
 
-    writer = SummaryWriter(log_dir='runs/exp_delete')
+    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete')
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
@@ -37,7 +38,7 @@ if __name__ == '__main__':
 
     img_trans = Compose([
         AddChannel(),
-        CenterSpatialCrop(roi_size=(1000, 128, 128)),
+        CenterSpatialCrop(roi_size=(1000, 160, 160)),
         ThresholdIntensity(threshold=-250, above=True, cval=-250),
         ThresholdIntensity(threshold=500, above=False, cval=500),
         HistogramNormalize(num_bins=751, min=0, max=1),
@@ -45,7 +46,7 @@ if __name__ == '__main__':
     ])
     seg_trans = Compose([
         AddChannel(),
-        CenterSpatialCrop(roi_size=(1000, 128, 128)),
+        CenterSpatialCrop(roi_size=(1000, 160, 160)),
         KeepLargestConnectedComponent(),
         ToTensor(dtype=torch.float32)
     ])
@@ -58,7 +59,8 @@ if __name__ == '__main__':
 
     # train_ds = ds[:-num_val]
     # val_ds = ds[-num_val:]
-
+    ds_len = len(ds)
+    train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
 
     train_loader = DataLoader(
         dataset=train_ds,
@@ -140,7 +142,7 @@ if __name__ == '__main__':
 
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'runs/exp_delete/best_model_parameters.pt')
+            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)

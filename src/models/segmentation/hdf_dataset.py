@@ -34,6 +34,7 @@ PATIENTS_TO_DISCARD = [
     "TEP-363",
     "TEP-377",
     "TEP-407",
+    "TEP-444",
     "TEP-482",
 ]
 
@@ -72,7 +73,7 @@ class HDFDataset(ArrayDataset):
                 img = np.transpose(np.array(file[patient]['0']['image']), (2, 0, 1))
                 seg = np.transpose(np.array(file[patient]['0']['0']['Prostate_label_map']), (2, 0, 1))
 
-                img_cropped, seg_cropped = self._crop(img=img, seg=seg, z_dim=[50, 178])
+                img_cropped, seg_cropped = self._crop(img=img, seg=seg, z_dim=[50, 210])
 
                 img_list.append(img_cropped)
                 seg_list.append(seg_cropped)
@@ -81,7 +82,7 @@ class HDFDataset(ArrayDataset):
                 img = np.transpose(np.array(file[patient]['1']['image']), (2, 0, 1))
                 seg = np.transpose(np.array(file[patient]['1']['0']['Prostate_label_map']), (2, 0, 1))
 
-                img_cropped, seg_cropped = self._crop(img=img, seg=seg, z_dim=[50, 178])
+                img_cropped, seg_cropped = self._crop(img=img, seg=seg, z_dim=[50, 210])
 
                 img_list.append(img_cropped)
                 seg_list.append(seg_cropped)

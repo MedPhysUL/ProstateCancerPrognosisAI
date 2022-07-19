@@ -33,7 +33,7 @@ if __name__ == '__main__':
     # Load validation set
     img_trans = Compose([
         AddChannel(),
-        CenterSpatialCrop(roi_size=(1000, 128, 128)),
+        CenterSpatialCrop(roi_size=(1000, 160, 160)),
         ThresholdIntensity(threshold=-250, above=True, cval=-250),
         ThresholdIntensity(threshold=500, above=False, cval=500),
         HistogramNormalize(num_bins=751, min=0, max=1),
@@ -41,7 +41,7 @@ if __name__ == '__main__':
     ])
     seg_trans = Compose([
         AddChannel(),
-        CenterSpatialCrop(roi_size=(1000, 128, 128)),
+        CenterSpatialCrop(roi_size=(1000, 160, 160)),
         KeepLargestConnectedComponent(),
         ToTensor(dtype=torch.float32)
     ])
@@ -69,11 +69,10 @@ if __name__ == '__main__':
         strides=(2, 2, 2, 2),
         dropout=0.2
     ).to(device)
-    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/src/models/segmentation/unet3d/runs/exp4/best_model_parameters.pt'))
+    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete/best_model_parameters.pt'))
 
     net.eval()
     metric_list = []
-
 
     with torch.no_grad():
         for batch_images, batch_segs in val_loader:
@@ -93,9 +92,7 @@ if __name__ == '__main__':
     print('mediane:', metric_list[np.argsort(metric_list)[len(metric_list)//2]], 'at:', np.argsort(metric_list)[len(metric_list)//2])
     print('np.mediane', np.median(metric_list))
     print('moyenne:', np.average(metric_list))
-    ####################################################################################################################
 
-    ####################################################################################################################
     patient_idx = -1
     with torch.no_grad():
         for patient_img, patient_seg in val_loader:
@@ -151,13 +148,13 @@ if __name__ == '__main__':
             Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
 
     ###
-    # from monai.utils import first
-    # from torch.utils.tensorboard import SummaryWriter
-    # writer = SummaryWriter(log_dir='runs/exp4')
-    # with torch.no_grad():
-    #     img, seg = first(val_loader)
-    #     img = img.to(device)
-    #     writer.add_graph(net, img)
-    # writer.flush()
-    # writer.close()
+    from monai.utils import first
+    from torch.utils.tensorboard import SummaryWriter
+    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete')
+    with torch.no_grad():
+        img, seg = first(val_loader)
+        img = img.to(device)
+        writer.add_graph(net, img)
+    writer.flush()
+    writer.close()
     ###
