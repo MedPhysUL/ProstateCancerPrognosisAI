@@ -64,6 +64,8 @@ class HDFDataset(ArrayDataset):
         seg_transform : Optional[Callable]
             A single or a sequence of transforms to apply to the segmentation.
         """
+        self._img_transform = img_transform
+
         file = h5py.File(path)
         img_list, seg_list = [], []
         for patient in file.keys():
@@ -87,6 +89,7 @@ class HDFDataset(ArrayDataset):
                 img_list.append(img_cropped)
                 seg_list.append(seg_cropped)
 
+        self._img_list = img_list
         super().__init__(img=img_list, seg=seg_list, img_transform=img_transform, seg_transform=seg_transform)
 
     @staticmethod
@@ -122,3 +125,14 @@ class HDFDataset(ArrayDataset):
             return img_cropped, seg_cropped
 
         return img_cropped, seg_cropped
+
+    # @property
+    # def img_transform(self):
+    #     return self._img_transform
+    #
+    # @img_transform.setter
+    # def img_transform(self, transform):
+    #     self._img_transform = transform
+    #     super().__init__(img=, img_transform=, seg=, seg_transform=)
+
+

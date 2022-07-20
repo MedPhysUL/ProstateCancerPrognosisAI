@@ -8,6 +8,8 @@
     @Description:       This file contains an implementation of a 3D U-Net.
 
 """
+from copy import deepcopy
+
 import numpy as np
 
 from src.models.segmentation.hdf_dataset import HDFDataset
@@ -20,7 +22,7 @@ from monai.transforms import AddChannel, CenterSpatialCrop, Compose, KeepLargest
     ToTensor, HistogramNormalize
 from monai.utils import set_determinism
 import torch
-from torch.utils.data.dataset import random_split
+# from torch.utils.data.dataset import random_split
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -31,7 +33,7 @@ if __name__ == '__main__':
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
-    num_val = 30
+    num_val = 29
     batch_size = 2
     num_epochs = 120
     lr = 1e-3
@@ -58,10 +60,18 @@ if __name__ == '__main__':
     )
 
     train_ds = ds[:-num_val]
+    # print(type(train_ds))
+    # print(len(train_ds.dataset.data[0].transform))
+    # print(len(train_ds.dataset.data[1].transform))
     val_ds = ds[-num_val:]
 
-    # print(len(ds))
+    print(len(ds))
     # train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
+    print(len(train_ds))
+    train_ds2 = deepcopy(train_ds)
+    train_ds2.dataset.data[0].transform = Compose([AddChannel(), CenterSpatialCrop(roi_size=(1000, 160, 160)), ToTensor(dtype=torch.float32)])
+    print(len(train_ds.dataset.data[0].transform))
+    print(len(train_ds2.dataset.data[0].transform))
 
     train_loader = DataLoader(
         dataset=train_ds,
