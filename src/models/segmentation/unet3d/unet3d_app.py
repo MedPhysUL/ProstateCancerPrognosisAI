@@ -35,14 +35,14 @@ if __name__ == '__main__':
     set_determinism(seed=1010710)
 
     writer = SummaryWriter(
-        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete'
+        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp5'
     )
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
-    num_val = 29
+    num_val = 40
     batch_size = 2
-    num_epochs = 120
+    num_epochs = 150
     lr = 1e-3
 
     # Defining Transforms
@@ -162,7 +162,7 @@ if __name__ == '__main__':
         # Save Best Metric
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete/best_model_parameters.pt')
+            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp5/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)
