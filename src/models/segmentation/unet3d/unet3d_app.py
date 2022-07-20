@@ -8,9 +8,6 @@
     @Description:       This file contains an implementation of a 3D U-Net.
 
 """
-from copy import deepcopy
-
-import numpy as np
 
 from src.models.segmentation.hdf_dataset import HDFDataset
 
@@ -18,9 +15,17 @@ from monai.data import DataLoader
 from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
 from monai.networks.nets import UNet
-from monai.transforms import AddChannel, CenterSpatialCrop, Compose, KeepLargestConnectedComponent, ThresholdIntensity, \
-    ToTensor, HistogramNormalize
+from monai.transforms import (
+    AddChannel,
+    CenterSpatialCrop,
+    Compose,
+    KeepLargestConnectedComponent,
+    ThresholdIntensity,
+    ToTensor,
+    HistogramNormalize
+)
 from monai.utils import set_determinism
+import numpy as np
 import torch
 # from torch.utils.data.dataset import random_split
 from torch.utils.tensorboard import SummaryWriter
@@ -29,7 +34,9 @@ from torch.utils.tensorboard import SummaryWriter
 if __name__ == '__main__':
     set_determinism(seed=1010710)
 
-    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete')
+    writer = SummaryWriter(
+        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete'
+    )
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
@@ -38,6 +45,7 @@ if __name__ == '__main__':
     num_epochs = 120
     lr = 1e-3
 
+    # Defining Transforms
     img_trans = Compose([
         AddChannel(),
         CenterSpatialCrop(roi_size=(1000, 160, 160)),
@@ -53,26 +61,22 @@ if __name__ == '__main__':
         ToTensor(dtype=torch.float32)
     ])
 
+    # Dataset
     ds = HDFDataset(
         path='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5',
         img_transform=img_trans,
         seg_transform=seg_trans
     )
 
+    # Train/Val Split
     train_ds = ds[:-num_val]
-    # print(type(train_ds))
-    # print(len(train_ds.dataset.data[0].transform))
-    # print(len(train_ds.dataset.data[1].transform))
     val_ds = ds[-num_val:]
 
-    print(len(ds))
     # train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
-    print(len(train_ds))
-    train_ds2 = deepcopy(train_ds)
-    train_ds2.dataset.data[0].transform = Compose([AddChannel(), CenterSpatialCrop(roi_size=(1000, 160, 160)), ToTensor(dtype=torch.float32)])
-    print(len(train_ds.dataset.data[0].transform))
-    print(len(train_ds2.dataset.data[0].transform))
 
+    # Data Augmentation
+
+    # Data Loader
     train_loader = DataLoader(
         dataset=train_ds,
         num_workers=num_workers,
@@ -85,6 +89,8 @@ if __name__ == '__main__':
         batch_size=batch_size,
         pin_memory=True
     )
+
+    # Model
     net = UNet(
         dimensions=3,
         in_channels=1,
@@ -108,6 +114,7 @@ if __name__ == '__main__':
         net.train()
         batch_loss = []
 
+        # Training
         for batch in train_loader:
             batch_images = batch[0].to(device)
             batch_segs = batch[1].to(device)
@@ -129,6 +136,7 @@ if __name__ == '__main__':
         loss_val_list = []
         metric_vals = []
 
+        # Validation
         with torch.no_grad():
             for batch_images, batch_segs in val_loader:
                 batch_images = batch_images.to(device)
@@ -151,6 +159,7 @@ if __name__ == '__main__':
         epoch_val_metrics.append(np.average(metric_vals))
         print(f"EPOCH {epoch + 1}, val metric : {epoch_val_metrics[-1]}")
 
+        # Save Best Metric
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
             torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete/best_model_parameters.pt')
