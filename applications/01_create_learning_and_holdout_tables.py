@@ -25,10 +25,9 @@ if __name__ == '__main__':
     df = df[df[ID].isin(os.listdir(IMAGES_FOLDER_PATH))]
 
     targets_cols = [PN, BCR]
-    features_cols = [col for col in COLUMNS_TYPES.keys()]
+    features_cols = [ID, AGE, PSA, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
 
     df = df[features_cols + targets_cols]
-    target_df = df[targets_cols]
 
     dataset = ProstateCancerDataset(
         df=df,
