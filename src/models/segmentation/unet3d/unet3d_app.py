@@ -9,6 +9,8 @@
 
 """
 
+from copy import deepcopy
+
 from src.models.segmentation.hdf_dataset import HDFDataset
 
 from monai.data import DataLoader
@@ -22,13 +24,15 @@ from monai.transforms import (
     KeepLargestConnectedComponent,
     ThresholdIntensity,
     ToTensor,
-    HistogramNormalize
+    HistogramNormalize,
+    RandFlip
 )
 from monai.utils import set_determinism
 import numpy as np
 import torch
 # from torch.utils.data.dataset import random_split
 from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data.dataset import ConcatDataset
 
 
 if __name__ == '__main__':
@@ -42,7 +46,7 @@ if __name__ == '__main__':
     num_workers = 0
     num_val = 40
     batch_size = 2
-    num_epochs = 150
+    num_epochs = 500
     lr = 1e-3
 
     # Defining Transforms
@@ -75,10 +79,28 @@ if __name__ == '__main__':
     # train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
 
     # Data Augmentation
+    train_ds_synth = deepcopy(train_ds)
+    train_ds_synth.dataset.data[0].transform = Compose([
+        AddChannel(),
+        RandFlip(prob=1, spatial_axis=2),
+        CenterSpatialCrop(roi_size=(1000, 160, 160)),
+        ThresholdIntensity(threshold=-250, above=True, cval=-250),
+        ThresholdIntensity(threshold=500, above=False, cval=500),
+        HistogramNormalize(num_bins=751, min=0, max=1),
+        ToTensor(dtype=torch.float32)
+    ])
+    train_ds_synth.dataset.data[1].transform = Compose([
+        AddChannel(),
+        RandFlip(prob=1, spatial_axis=2),
+        CenterSpatialCrop(roi_size=(1000, 160, 160)),
+        KeepLargestConnectedComponent(),
+        ToTensor(dtype=torch.float32)
+    ])
+    train_ds_aug = ConcatDataset((train_ds, train_ds_synth))
 
     # Data Loader
     train_loader = DataLoader(
-        dataset=train_ds,
+        dataset=train_ds_aug,
         num_workers=num_workers,
         batch_size=batch_size,
         pin_memory=True
