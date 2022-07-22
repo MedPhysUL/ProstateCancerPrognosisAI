@@ -24,15 +24,15 @@ if __name__ == '__main__':
     df = pd.read_excel(io=CLINICAL_DATA_PATH, sheet_name="sheet1", header=1)
     df = df[df[ID].isin(os.listdir(IMAGES_FOLDER_PATH))]
 
-    targets_cols = [PN, BCR]
-    features_cols = [ID, AGE, PSA, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
+    target_cols = [PN, BCR]
+    feature_cols = [ID, AGE, PSA, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
 
-    df = df[features_cols + targets_cols]
+    df = df[feature_cols + target_cols]
 
     dataset = ProstateCancerDataset(
         df=df,
         ids_col=ID,
-        targets_col=targets_cols,
+        target_cols=target_cols,
         cont_cols=[column for column, typ in COLUMNS_TYPES.items() if typ is NUMERIC_TYPE],
         cat_cols=[column for column, typ in COLUMNS_TYPES.items() if typ is CATEGORICAL_TYPE]
     )

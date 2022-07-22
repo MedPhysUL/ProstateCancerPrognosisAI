@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     05/2022
-    @Last modification: 05/2022
+    @Last modification: 07/2022
 
     @Description:       This file contains our custom torch dataset named ProstateCancerDataset.
 """
@@ -42,7 +42,7 @@ class ProstateCancerDataset(Dataset):
             self,
             df: pd.DataFrame,
             ids_col: str,
-            targets_col: List[str],
+            target_cols: List[str],
             cont_cols: Optional[List[str]] = None,
             cat_cols: Optional[List[str]] = None,
             feature_selection_groups: Optional[List[List[str]]] = None,
@@ -58,7 +58,7 @@ class ProstateCancerDataset(Dataset):
             Dataframe with the original data.
         ids_col : str
             Name of the column containing the patient ids.
-        targets_col : List[str]
+        target_cols : List[str]
             Names of columns containing targets.
         cont_cols : Optional[List[str]]
             List of column names associated with continuous data.
@@ -89,11 +89,11 @@ class ProstateCancerDataset(Dataset):
         self._ids_to_row_idx = {id_: i for i, id_ in enumerate(self._ids)}
         self._n = df.shape[0]
         self._original_data = df
-        self._targets_col = targets_col
+        self._target_cols = target_cols
         self._to_tensor = to_tensor
         self._train_mask, self._valid_mask, self._test_mask = [], None, []
         self._x_cat, self._x_cont = None, None
-        self._y = self._initialize_targets(df[targets_col], classification, to_tensor)
+        self._y = self._initialize_targets(df[target_cols], classification, to_tensor)
 
         # Define protected feature "getter" method
         self._x = self._define_feature_getter(cont_cols, cat_cols, to_tensor)
@@ -174,8 +174,8 @@ class ProstateCancerDataset(Dataset):
         return self._original_data
 
     @property
-    def targets_col(self) -> List[str]:
-        return self._targets_col
+    def target_cols(self) -> List[str]:
+        return self._target_cols
 
     @property
     def test_mask(self) -> List[int]:
@@ -568,7 +568,7 @@ class ProstateCancerDataset(Dataset):
         if cat_cols is not None:
             selected_cols += cat_cols
 
-        return self.original_data[[self._ids_col] + self._targets_col + selected_cols].copy()
+        return self.original_data[[self._ids_col] + self._target_cols + selected_cols].copy()
 
     def get_imputed_dataframe(
             self
@@ -581,7 +581,7 @@ class ProstateCancerDataset(Dataset):
         imputed_df : pd.DataFrame
             Copy of the original pandas dataframe where missing values are imputed according to the training mask.
         """
-        imputed_df = self.original_data.drop([self._ids_col] + self._targets_col, axis=1).copy()
+        imputed_df = self.original_data.drop([self._ids_col] + self._target_cols, axis=1).copy()
         if self._cont_cols is not None:
             imputed_df[self._cont_cols] = np.array(self._x_cont)
         if self._cat_cols is not None:
@@ -614,7 +614,7 @@ class ProstateCancerDataset(Dataset):
         sub_dataset = ProstateCancerDataset(
             df=subset,
             ids_col=self._ids_col,
-            targets_col=self._targets_col,
+            target_cols=self._target_cols,
             cont_cols=cont_cols,
             cat_cols=cat_cols,
             classification=self.classification,
@@ -650,7 +650,7 @@ class ProstateCancerDataset(Dataset):
         super_dataset = ProstateCancerDataset(
             df=df,
             ids_col=self._ids_col,
-            targets_col=self._targets_col,
+            target_cols=self._target_cols,
             cont_cols=cont_cols,
             cat_cols=cat_cols,
             classification=self.classification,
