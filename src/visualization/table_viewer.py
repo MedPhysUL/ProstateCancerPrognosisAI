@@ -12,31 +12,42 @@ from typing import List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import seaborn as sns
 
-from src.data.processing.dataset import ProstateCancerDataset
+from src.data.processing.dataset import MaskType, ProstateCancerDataset
 
 
 class TableViewer:
 
     def __init__(
             self,
-            datasets: List[ProstateCancerDataset]
+            dataset: ProstateCancerDataset
     ):
-        self.datasets = datasets
+        self.dataset = dataset
 
-        if not self._is_datasets_valid():
-            raise ValueError("All datasets need to have the same target, continuous data and categorical data columns.")
-        else:
-            self._target_cols = self.datasets[0].target_cols
-            self._cont_cols = self.datasets[0].cont_cols
-            self._cat_cols = self.datasets[0].cat_cols
+    def _get_nonempty_masks(self):
+        available_masks = self.dataset.train_mask, self.dataset.valid_mask, self.dataset.test_mask
+        available_masks_names = MaskType.TRAIN, MaskType.VALID, MaskType.TEST
+        return {name: mask for mask, name in zip(available_masks, available_masks_names) if mask}
 
-    def _is_datasets_valid(self):
-        is_target_cols_valid = all(ds.target_cols == self.datasets[0].target_cols for ds in self.datasets)
-        is_cont_cols_valid = all(ds.cont_cols == self.datasets[0].cont_cols for ds in self.datasets)
-        is_cat_cols_valid = all(ds.cat_cols == self.datasets[0].cat_cols for ds in self.datasets)
+    def _get_original_dataframe(self):
+        return pd.concat(
+            objs=[
+                self.dataset.original_data.iloc[mask].assign(Sets=name) for name, mask in
+                self._get_nonempty_masks().items()
+            ],
+            ignore_index=True
+        )
 
-        return all([is_target_cols_valid, is_cont_cols_valid, is_cat_cols_valid])
+    def _get_imputed_dataframe(self):
+        return pd.concat(
+            objs=[
+                self.dataset.get_imputed_dataframe().iloc[mask].assign(Sets=name) for name, mask in
+                self._get_nonempty_masks().items()
+            ],
+            ignore_index=True
+        )
 
     @staticmethod
     def _format_to_percentage(
@@ -112,23 +123,85 @@ class TableViewer:
             axes.set_title(title)
 
     def _visualize_targets(self):
-        for target in self._target_cols:
-            fig, axes = plt.subplots()
-            for dataset in self.datasets:
-                self._visualize_class_distribution(
-                    fig,
-                    axes,
-                    dataset.original_data[target],
-                    label_names={"0": 0, "1": 1}
-                )
+        for target in self.dataset.target_cols:
+            fig, axes = plt.subplots(ncols=len(self._get_nonempty_masks()), squeeze=False)
+            for idx, mask in enumerate(self._get_nonempty_masks().values()):
+                if mask:
+                    self._visualize_class_distribution(
+                        fig,
+                        axes[0, idx],
+                        self.dataset.original_data.iloc[mask][target],
+                        label_names={f"{target}_0": 0, f"{target}_1": 1},
+                    )
             fig.tight_layout()
             plt.show()
 
     def _visualize_cont_features(self):
-        pass
+        original_dataframe = self._get_original_dataframe()
+        imputed_dataframe = self._get_imputed_dataframe()
+
+        print(original_dataframe.describe())
+        print(imputed_dataframe.describe())
+
+        for cont_col in self.dataset.cont_cols:
+            fig, axes = plt.subplots()
+            sns.boxplot(
+                data=original_dataframe,
+                y=cont_col,
+                x="Sets",
+                linewidth=1,
+            )
+            fig.tight_layout()
+            plt.show()
+
+            fig, axes = plt.subplots()
+            sns.boxplot(
+                data=imputed_dataframe,
+                y=cont_col,
+                x="Sets",
+                linewidth=1,
+            )
+            fig.tight_layout()
+            plt.show()
 
     def _visualize_cat_features(self):
-        pass
+        original_dataframe = self._get_original_dataframe()
+        imputed_dataframe = self._get_imputed_dataframe()
+
+        for cat_col in self.dataset.cat_cols:
+            fig, axes = plt.subplots()
+
+            unique = pd.unique(original_dataframe[cat_col])
+            if all(isinstance(x, (int, float)) for x in unique):
+                axes.set_xticks(pd.unique(original_dataframe[cat_col]))
+
+            sns.histplot(
+                data=original_dataframe,
+                x=cat_col, hue='Sets',
+                multiple='dodge',
+                ax=axes,
+                stat='probability',
+                common_norm=False,
+                shrink=0.8
+            )
+            fig.tight_layout()
+            plt.show()
+
+            fig, axes = plt.subplots()
+
+            imputed_dataframe[cat_col] = imputed_dataframe[cat_col].astype("category")
+            axes.set_xticks(pd.unique(imputed_dataframe[cat_col]))
+            sns.histplot(
+                data=imputed_dataframe,
+                x=cat_col, hue='Sets',
+                multiple='dodge',
+                ax=axes,
+                stat='probability',
+                common_norm=False,
+                shrink=0.8
+            )
+            fig.tight_layout()
+            plt.show()
 
     def _visualize_features(self):
         self._visualize_cont_features()
