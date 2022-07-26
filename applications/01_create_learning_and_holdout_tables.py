@@ -22,7 +22,7 @@ if __name__ == '__main__':
     #                                                  Dataset                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
     df = pd.read_excel(io=CLINICAL_DATA_PATH, sheet_name="sheet1", header=1)
-    df = df[df[ID].isin(os.listdir(IMAGES_FOLDER_PATH))]  # Replace with list patients in HDF5
+    # df = df[df[ID].isin(os.listdir(IMAGES_FOLDER_PATH))]  # Replace with list patients in HDF5
 
     feature_cols = [AGE, PSA, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
     target_cols = [PN, BCR]
@@ -58,6 +58,7 @@ if __name__ == '__main__':
     )
 
     masks = rss()
+    rss.visualize_splits(masks)
     learning_idx, holdout_idx = masks[0][MaskType.TRAIN], masks[0][MaskType.TEST]
     learning_df, holdout_df = df.iloc[learning_idx, :], df.iloc[holdout_idx, :]
 
