@@ -58,7 +58,7 @@ class TableViewer:
             self
     ) -> List[Dict[str, List[int]]]:
         """
-        Get nonempty masks from all datasets.
+        Gets nonempty masks from all datasets.
 
         Returns
         -------
@@ -77,7 +77,7 @@ class TableViewer:
             self
     ) -> List[Union[pd.Series, pd.DataFrame]]:
         """
-        Get original dataframe from all datasets.
+        Gets original dataframe from all datasets.
 
         Returns
         -------
@@ -103,7 +103,7 @@ class TableViewer:
             self
     ) -> List[Union[pd.Series, pd.DataFrame]]:
         """
-        Get imputed dataframe from all datasets.
+        Gets imputed dataframe from all datasets.
 
         Returns
         -------
@@ -130,7 +130,7 @@ class TableViewer:
             path_to_save: str
     ) -> None:
         """
-        Create directories used to save tables and figures.
+        Creates directories used to save tables and figures.
 
         Parameters
         ----------
@@ -151,7 +151,7 @@ class TableViewer:
             path_to_save: str
     ) -> None:
         """
-        Save dataframes.
+        Saves dataframes.
 
         Parameters
         ----------
@@ -177,7 +177,7 @@ class TableViewer:
             values: List[float]
     ) -> str:
         """
-        Change a float to a str representing a percentage.
+        Changes a float to a str representing a percentage.
 
         Parameters
         ----------
@@ -202,7 +202,7 @@ class TableViewer:
             title: Optional[str] = None
     ) -> None:
         """
-        Update axes of a pie chart with classes distribution.
+        Updates axes of a pie chart with classes distribution.
 
         Parameters
         ----------
@@ -246,7 +246,7 @@ class TableViewer:
             show: bool
     ) -> None:
         """
-        Visualize targets pie charts.
+        Visualizes targets pie charts.
 
         Parameters
         ----------
@@ -278,7 +278,7 @@ class TableViewer:
             show: bool
     ) -> None:
         """
-        Visualize continuous features.
+        Visualizes continuous features.
 
         Parameters
         ----------
@@ -316,7 +316,7 @@ class TableViewer:
             show: bool
     ):
         """
-        Visualize categorical features.
+        Visualizes categorical features.
 
         Parameters
         ----------
@@ -373,7 +373,7 @@ class TableViewer:
             show: bool
     ) -> None:
         """
-        Visualize features.
+        Visualizes features.
 
         Parameters
         ----------
@@ -389,7 +389,7 @@ class TableViewer:
             show: Optional[bool] = True
     ):
         """
-        Visualize dataset.
+        Visualizes dataset.
 
         Parameters
         ----------

@@ -5,7 +5,7 @@
     @Creation Date:     07/2022
     @Last modification: 07/2022
 
-    @Description:       This file is used to store helpful constants.
+    @Description:       This file stores helpful constants.
 """
 
 import os

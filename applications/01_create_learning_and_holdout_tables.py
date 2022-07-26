@@ -5,7 +5,7 @@
     @Creation Date:     07/2022
     @Last modification: 07/2022
 
-    @Description:       Small script used to create the learning and holdout sets csv tables.
+    @Description:       This script is used to create the learning and holdout sets' csv tables.
 """
 
 import pandas as pd
@@ -45,6 +45,7 @@ if __name__ == '__main__':
         datasets=single_task_datasets,
         ids_to_row_idx=dict(pd.Series(df.index, index=df[ID]))
     )
+
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                 Sampling                                                    #
     # ----------------------------------------------------------------------------------------------------------- #

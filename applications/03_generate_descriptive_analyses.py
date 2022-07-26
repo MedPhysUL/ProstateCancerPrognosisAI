@@ -5,7 +5,7 @@
     @Creation Date:     07/2022
     @Last modification: 07/2022
 
-    @Description:       Script used to generate a folder containing descriptive analyses of all data.
+    @Description:       This script is used to generate a folder containing descriptive analyses of all data.
 """
 
 import pandas as pd

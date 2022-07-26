@@ -5,7 +5,7 @@
     @Creation Date:     05/2022
     @Last modification: 07/2022
 
-    @Description:       This file contains our custom torch dataset named SingleTaskDataset.
+    @Description:       This file contains a custom torch dataset named SingleTaskDataset.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ class MaskType:
     """
     Stores the constant related to mask types
     """
+
     TRAIN: str = "Train"
     VALID: str = "Valid"
     TEST: str = "Test"
@@ -35,7 +36,7 @@ class MaskType:
 
 class SingleTaskDataset(Dataset):
     """
-    Custom dataset class for single task experiments.
+    A custom dataset class used to perform single-task experiments.
     """
 
     def __init__(
@@ -67,9 +68,9 @@ class SingleTaskDataset(Dataset):
         feature_selection_groups : Optional[List[List[str]]]
             List with list of column names to consider together in group-wise feature selection.
         classification : bool
-            True for classification task, false for regression.
+            Whether to consider the task as classification. False for regression.
         to_tensor : bool
-            True if we want the features and targets in tensors, false for numpy arrays.
+            Whether we want the features and targets in tensors. False for numpy arrays.
         """
         super(SingleTaskDataset).__init__()
 

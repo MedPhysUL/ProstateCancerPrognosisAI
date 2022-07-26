@@ -5,8 +5,8 @@
     @Creation Date:     05/2022
     @Last modification: 06/2022
 
-    @Description:       Defines the RandomStratifiedSampler class used to separate test sets and valid sets from train
-                        sets. Also contains few functions used to extract specific datasets
+    @Description:       This file contains the RandomStratifiedSampler class used to separate test sets and valid sets
+                        from train sets. Also contains few functions used to extract specific datasets.
 """
 
 from copy import deepcopy
@@ -26,8 +26,8 @@ from src.data.processing.multi_task_dataset import MultiTaskDataset
 
 class RandomStratifiedSampler:
     """
-    Object uses in order to generate lists of indexes to use as train, valid and test masks for outer and inner
-    validation loops.
+    A class used to generate lists of indexes to use as train, valid and test masks for outer and inner validation
+    loops.
     """
 
     def __init__(
@@ -260,7 +260,7 @@ class RandomStratifiedSampler:
         Returns
         -------
         valid : bool
-            True if the masks are valid.
+            Whether the masks are valid.
         """
         self.__original_dataset.update_masks(train_mask, test_mask, valid_mask)
 
@@ -309,7 +309,7 @@ class RandomStratifiedSampler:
         Returns
         -------
         categorical : bool
-            True if target is a categorical variable.
+            Whether the target is a categorical variable.
         """
         target_list_copy = list(targets)
         return len(set(target_list_copy)) < 0.15*len(target_list_copy)

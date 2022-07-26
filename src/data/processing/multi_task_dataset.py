@@ -5,7 +5,7 @@
     @Creation Date:     05/2022
     @Last modification: 07/2022
 
-    @Description:       This file contains our custom torch dataset named MultiTaskDataset.
+    @Description:       This file contains a custom torch dataset named MultiTaskDataset.
 """
 
 from typing import Dict, List, Optional, Sequence, Tuple, Union
@@ -20,7 +20,10 @@ from src.data.processing.single_task_dataset import SingleTaskDataset
 
 class MultiTaskDataset(Dataset):
     """
-    Custom dataset class for multi-task experiments.
+    A custom dataset class used to perform multi-task experiments. Each MultiTaskDataset is composed of several
+    SingleTaskDatasets. All multi-task logic is integrated into the MultiTaskDataset object and only affects the
+    single-task datasets through masks updates. This class composition allows to cover the cases where some patients
+    have a missing label for one task while it is available for another.
     """
 
     def __init__(
@@ -56,9 +59,9 @@ class MultiTaskDataset(Dataset):
             idx: Union[int, List[int]]
     ) -> List[List[Optional[Union[Tuple[np.array, np.array, np.array], Tuple[tensor, tensor, tensor]]]]]:
         """
-        Get dataset items. It's important to notice that if a given index (corresponding to a specific patient ID) is
-        not available in a specific dataset, the None keyword is returned at that specific location. The items are given
-        in the following format :
+        Gets dataset items. NB if a given index (corresponding to a specific patient ID) is not available in a
+        specific dataset, the None keyword is returned at that specific location. The items are given in the following
+        format :
 
             items = [
                   ┏━ x array of the item with index = 0 in dataset 0.
@@ -110,7 +113,7 @@ class MultiTaskDataset(Dataset):
             self
     ) -> bool:
         """
-        Check if all datasets have the same patient IDs column name.
+        Checks if all datasets have the same patient IDs column name.
 
         Returns
         -------
@@ -126,7 +129,7 @@ class MultiTaskDataset(Dataset):
             self
     ) -> bool:
         """
-        Check if each patient ID is associated to a unique row index.
+        Checks if each patient ID is associated to a unique row index.
 
         Returns
         -------
@@ -143,7 +146,7 @@ class MultiTaskDataset(Dataset):
             idx: Union[int, List[int]]
     ) -> Union[str, List[str]]:
         """
-        Convert row indexes to patient IDs.
+        Converts row indexes to patient IDs.
 
         Parameters
         ----------
@@ -164,7 +167,7 @@ class MultiTaskDataset(Dataset):
             self
     ) -> List[np.ndarray]:
         """
-        Get a list of target arrays. Those arrays may contain NaN as they are not filtered.
+        Gets list of target arrays. Those arrays may contain NaN as they are not filtered.
 
         WARNING! This method should not be used to access specific dataset.y values. Always iterate through
         self.datasets to have access to the true underlying attributes of the single task datasets.
