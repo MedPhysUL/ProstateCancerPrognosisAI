@@ -1,11 +1,11 @@
 """
-    @file:              viewer.py
+    @file:              image_viewer.py
     @Author:            Maxence Larose, Raphael Brodeur
 
     @Creation Date:     06/2022
-    @Last modification: 06/2022
+    @Last modification: 07/2022
 
-    @Description:       This file contains the Viewer class which is used to visualize a patient's image (whether
+    @Description:       This file contains the ImageViewer class which is used to visualize a patient's image (whether
                         it is a CT or a PET) alongside its respective segmentation and to compare an image alongside its
                         ground truth segmentation map and a predicted segmentation map in axial view. Sliders allow the
                         user to slice through the plotted views.
@@ -33,7 +33,7 @@ class Plot(IntEnum):
     PREDICTION = 2
 
 
-class Viewer:
+class ImageViewer:
     """
     A class which is used to visualize a patient's image (whether it is a CT or a PET) alongside its respective
     segmentation. Sliders allow the user to slice through the coronal, sagittal and axial views.
@@ -112,7 +112,7 @@ class Viewer:
             valstep=1
         )
 
-        return Viewer.Config(
+        return ImageViewer.Config(
             img_plane=img_plane,
             seg_plane=seg_plane,
             slice_index=slice_index,
@@ -262,7 +262,7 @@ class Viewer:
                 valstep=1
             )
 
-            return Viewer.Config(
+            return ImageViewer.Config(
                 img_plane=None,
                 seg_plane=seg_axial,
                 slice_index=slice_index,
@@ -281,7 +281,7 @@ class Viewer:
                 alpha=kwargs.get("alpha", 0.1)
             )
 
-            return Viewer.Config(
+            return ImageViewer.Config(
                 img_plane=None,
                 seg_plane=seg_axial,
                 slice_index=None,
@@ -289,7 +289,7 @@ class Viewer:
                 seg_plot=seg_plot
             )
 
-        return Viewer.Config(
+        return ImageViewer.Config(
             img_plane=img_axial,
             seg_plane=None,
             slice_index=None,

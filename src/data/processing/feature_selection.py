@@ -5,7 +5,7 @@
     @Creation Date:     05/2022
     @Last modification: 05/2022
 
-    @Description:       Defines feature selector object, that removes unimportant features
+    @Description:       This file defines the class FeatureSelector, that is used to remove unimportant features.
 """
 
 from os.path import join
@@ -15,12 +15,13 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
-from src.data.processing.dataset import ProstateCancerDataset
+from src.data.processing.single_task_dataset import SingleTaskDataset
 
 
 class FeatureSelector:
     """
-    Object in charge of selecting the most important features of the dataset.
+    A class used to select the most important features of the dataset.
+
     Inspired from OpenAI feature selection code.
     See the following source:
     Deep Learning for Coders with fastai & PyTorch : AI Applications Without a PhD (p.486-489)
@@ -44,7 +45,7 @@ class FeatureSelector:
             List of threshold values used to for each features group.
         cumulative_imp: List[bool]
             List of bool for each features group. If True, features will be selected until their cumulative importance
-            reach the threshold. Otherwise, all features with an importance below the threshold will be removed.
+            reaches the threshold. Otherwise, all features with an importance below the threshold will be removed.
         nb_iter: int
             Number of times the feature importance must be calculated before taking the average.
         seed : Optional[int]
@@ -61,21 +62,21 @@ class FeatureSelector:
 
     def __call__(
             self,
-            dataset: ProstateCancerDataset,
+            dataset: SingleTaskDataset,
             records_path: Optional[str] = None,
             return_imp: bool = False
     ) -> Union[Tuple[Optional[List[str]], Optional[List[str]]], Tuple[Optional[List[str]], Optional[List[str]], dict]]:
         """
-        Extracts most important features using a random forest
+        Extracts most important features using a random forest.
 
         Parameters
         ----------
-        dataset : ProstateCancerDataset
+        dataset : SingleTaskDataset
             Custom dataset.
         records_path : Optional[str]
             Paths used to store figures and importance table.
         return_imp : bool
-            If True, feature importance are also returned.
+            Whether to also return feature importance.
 
         Returns
         -------
@@ -117,15 +118,15 @@ class FeatureSelector:
 
     def get_features_importance(
             self,
-            dataset: ProstateCancerDataset
+            dataset: SingleTaskDataset
     ) -> pd.DataFrame:
         """
-        Trains a random forest (with default sklearn hyperparameters) to solve the classification or regression
+        Trains a random forest (with default sklearn hyperparameters) to solve any classification or regression
         problems and uses it to extract feature importance.
 
         Parameters
         ----------
-        dataset: ProstateCancerDataset
+        dataset: SingleTaskDataset
             Custom dataset.
 
         Returns

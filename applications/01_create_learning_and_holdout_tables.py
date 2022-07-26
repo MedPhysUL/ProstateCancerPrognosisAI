@@ -5,16 +5,16 @@
     @Creation Date:     07/2022
     @Last modification: 07/2022
 
-    @Description:       Small script used to create the learning and holdout sets csv tables.
+    @Description:       This script is used to create the learning and holdout sets' csv tables.
 """
-
-import os
 
 import pandas as pd
 
-from constants import *
-from src.data.processing.dataset import MaskType, ProstateCancerDataset
+from src.data.processing.multi_task_dataset import MultiTaskDataset
 from src.data.processing.sampling import RandomStratifiedSampler
+from src.data.processing.single_task_dataset import MaskType, SingleTaskDataset
+
+from constants import *
 
 
 if __name__ == '__main__':
@@ -22,26 +22,35 @@ if __name__ == '__main__':
     #                                                  Dataset                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
     df = pd.read_excel(io=CLINICAL_DATA_PATH, sheet_name="sheet1", header=1)
-    df = df[df[ID].isin(os.listdir(IMAGES_FOLDER_PATH))]
+    # df = df[df[ID].isin(os.listdir(IMAGES_FOLDER_PATH))]  # Replace with list patients in HDF5
 
-    targets_cols = [PN, BCR]
-    features_cols = [ID, AGE, PSA, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
+    feature_cols = [AGE, PSA, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
+    target_cols = [PN, BCR]
 
-    df = df[features_cols + targets_cols]
+    df = df[[ID] + feature_cols + target_cols]
 
-    dataset = ProstateCancerDataset(
-        df=df,
-        ids_col=ID,
-        targets_col=targets_cols,
-        cont_cols=[column for column, typ in COLUMNS_TYPES.items() if typ is NUMERIC_TYPE],
-        cat_cols=[column for column, typ in COLUMNS_TYPES.items() if typ is CATEGORICAL_TYPE]
+    single_task_datasets = []
+    for target_col in target_cols:
+        single_task_datasets.append(
+            SingleTaskDataset(
+                df=df[df[target_col].notna()],
+                ids_col=ID,
+                target_col=target_col,
+                cont_cols=[AGE, PSA],
+                cat_cols=[GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
+            )
+        )
+
+    multi_task_dataset = MultiTaskDataset(
+        datasets=single_task_datasets,
+        ids_to_row_idx=dict(pd.Series(df.index, index=df[ID]))
     )
 
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                 Sampling                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
     rss = RandomStratifiedSampler(
-        dataset,
+        dataset=multi_task_dataset,
         n_out_split=1,
         n_in_split=0,
         valid_size=0,
@@ -50,6 +59,7 @@ if __name__ == '__main__':
     )
 
     masks = rss()
+    rss.visualize_splits(masks)
     learning_idx, holdout_idx = masks[0][MaskType.TRAIN], masks[0][MaskType.TEST]
     learning_df, holdout_df = df.iloc[learning_idx, :], df.iloc[holdout_idx, :]
 
