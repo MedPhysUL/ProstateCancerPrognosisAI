@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
-from src.data.processing.dataset import ProstateCancerDataset
+from src.data.processing.single_task_dataset import SingleTaskDataset
 
 
 class FeatureSelector:
@@ -61,7 +61,7 @@ class FeatureSelector:
 
     def __call__(
             self,
-            dataset: ProstateCancerDataset,
+            dataset: SingleTaskDataset,
             records_path: Optional[str] = None,
             return_imp: bool = False
     ) -> Union[Tuple[Optional[List[str]], Optional[List[str]]], Tuple[Optional[List[str]], Optional[List[str]], dict]]:
@@ -70,7 +70,7 @@ class FeatureSelector:
 
         Parameters
         ----------
-        dataset : ProstateCancerDataset
+        dataset : SingleTaskDataset
             Custom dataset.
         records_path : Optional[str]
             Paths used to store figures and importance table.
@@ -117,7 +117,7 @@ class FeatureSelector:
 
     def get_features_importance(
             self,
-            dataset: ProstateCancerDataset
+            dataset: SingleTaskDataset
     ) -> pd.DataFrame:
         """
         Trains a random forest (with default sklearn hyperparameters) to solve the classification or regression
@@ -125,7 +125,7 @@ class FeatureSelector:
 
         Parameters
         ----------
-        dataset: ProstateCancerDataset
+        dataset: SingleTaskDataset
             Custom dataset.
 
         Returns

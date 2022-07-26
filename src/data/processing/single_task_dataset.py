@@ -1,11 +1,11 @@
 """
-    @file:              dataset.py
+    @file:              single_task_dataset.py
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     05/2022
     @Last modification: 07/2022
 
-    @Description:       This file contains our custom torch dataset named ProstateCancerDataset.
+    @Description:       This file contains our custom torch dataset named SingleTaskDataset.
 """
 
 from __future__ import annotations
@@ -24,25 +24,25 @@ class MaskType:
     """
     Stores the constant related to mask types
     """
-    TRAIN: str = "train"
-    VALID: str = "valid"
-    TEST: str = "test"
-    INNER: str = "inner"
+    TRAIN: str = "Train"
+    VALID: str = "Valid"
+    TEST: str = "Test"
+    INNER: str = "Inner"
 
     def __iter__(self):
         return iter([self.TRAIN, self.VALID, self.TEST])
 
 
-class ProstateCancerDataset(Dataset):
+class SingleTaskDataset(Dataset):
     """
-    Custom dataset class for Prostate Cancer experiments
+    Custom dataset class for single task experiments.
     """
 
     def __init__(
             self,
             df: pd.DataFrame,
             ids_col: str,
-            target_cols: List[str],
+            target_col: str,
             cont_cols: Optional[List[str]] = None,
             cat_cols: Optional[List[str]] = None,
             feature_selection_groups: Optional[List[List[str]]] = None,
@@ -58,7 +58,7 @@ class ProstateCancerDataset(Dataset):
             Dataframe with the original data.
         ids_col : str
             Name of the column containing the patient ids.
-        target_cols : List[str]
+        target_col : str
             Names of columns containing targets.
         cont_cols : Optional[List[str]]
             List of column names associated with continuous data.
@@ -71,7 +71,7 @@ class ProstateCancerDataset(Dataset):
         to_tensor : bool
             True if we want the features and targets in tensors, false for numpy arrays.
         """
-        super(ProstateCancerDataset).__init__()
+        super(SingleTaskDataset).__init__()
 
         # Validation of inputs
         if cont_cols is None and cat_cols is None:
@@ -89,11 +89,11 @@ class ProstateCancerDataset(Dataset):
         self._ids_to_row_idx = {id_: i for i, id_ in enumerate(self._ids)}
         self._n = df.shape[0]
         self._original_data = df
-        self._target_cols = target_cols
+        self._target_col = target_col
         self._to_tensor = to_tensor
         self._train_mask, self._valid_mask, self._test_mask = [], None, []
         self._x_cat, self._x_cont = None, None
-        self._y = self._initialize_targets(df[target_cols], classification, to_tensor)
+        self._y = self._initialize_targets(df[target_col], classification, to_tensor)
 
         # Define protected feature "getter" method
         self._x = self._define_feature_getter(cont_cols, cat_cols, to_tensor)
@@ -174,8 +174,8 @@ class ProstateCancerDataset(Dataset):
         return self._original_data
 
     @property
-    def target_cols(self) -> List[str]:
-        return self._target_cols
+    def target_col(self) -> str:
+        return self._target_col
 
     @property
     def test_mask(self) -> List[int]:
@@ -202,7 +202,7 @@ class ProstateCancerDataset(Dataset):
         return self._x_cont
 
     @property
-    def y(self) -> List[np.array]:
+    def y(self) -> np.array:
         return self._y
 
     def _categorical_setter(
@@ -568,7 +568,7 @@ class ProstateCancerDataset(Dataset):
         if cat_cols is not None:
             selected_cols += cat_cols
 
-        return self.original_data[[self._ids_col] + self._target_cols + selected_cols].copy()
+        return self.original_data[[self._ids_col, self._target_col] + selected_cols].copy()
 
     def get_imputed_dataframe(
             self
@@ -581,7 +581,8 @@ class ProstateCancerDataset(Dataset):
         imputed_df : pd.DataFrame
             Copy of the original pandas dataframe where missing values are imputed according to the training mask.
         """
-        imputed_df = self.original_data.drop([self._ids_col] + self._target_cols, axis=1).copy()
+        imputed_df = self.original_data.copy()
+
         if self._cont_cols is not None:
             imputed_df[self._cont_cols] = np.array(self._x_cont)
         if self._cat_cols is not None:
@@ -593,7 +594,7 @@ class ProstateCancerDataset(Dataset):
             self,
             cont_cols: Optional[List[str]] = None,
             cat_cols: List[str] = None
-    ) -> ProstateCancerDataset:
+    ) -> SingleTaskDataset:
         """
         Returns a subset of the current dataset using the given cont_cols and cat_cols.
 
@@ -606,15 +607,15 @@ class ProstateCancerDataset(Dataset):
 
         Returns
         -------
-        sub_dataset : ProstateCancerDataset
+        sub_dataset : SingleTaskDataset
             Instance of the ProstateCancerDataset class.
         """
         subset = self._retrieve_subset_from_original(cont_cols, cat_cols)
 
-        sub_dataset = ProstateCancerDataset(
+        sub_dataset = SingleTaskDataset(
             df=subset,
             ids_col=self._ids_col,
-            target_cols=self._target_cols,
+            target_col=self._target_col,
             cont_cols=cont_cols,
             cat_cols=cat_cols,
             classification=self.classification,
@@ -627,7 +628,7 @@ class ProstateCancerDataset(Dataset):
             self,
             data: pd.DataFrame,
             categorical: bool = False
-    ) -> ProstateCancerDataset:
+    ) -> SingleTaskDataset:
         """
         Returns a superset of the current dataset by including the given data.
 
@@ -641,16 +642,16 @@ class ProstateCancerDataset(Dataset):
 
         Returns
         -------
-        sub_dataset : ProstateCancerDataset
+        sub_dataset : SingleTaskDataset
             Instance of the ProstateCancerDataset class.
         """
         # We build the augmented dataframe
         df, cont_cols, cat_cols = self._get_augmented_dataframe(data, categorical)
 
-        super_dataset = ProstateCancerDataset(
+        super_dataset = SingleTaskDataset(
             df=df,
             ids_col=self._ids_col,
-            target_cols=self._target_cols,
+            target_col=self._target_col,
             cont_cols=cont_cols,
             cat_cols=cat_cols,
             classification=self.classification,
@@ -761,17 +762,17 @@ class ProstateCancerDataset(Dataset):
 
     @staticmethod
     def _initialize_targets(
-            targets_dataframe: pd.DataFrame,
+            targets_column: pd.Series,
             classification: bool,
             target_to_tensor: bool
-    ) -> Union[List[np.array], List[tensor]]:
+    ) -> Union[np.array, tensor]:
         """
         Sets the targets according to the task and the choice of container
 
         Parameters
         ----------
-        targets_dataframe : pd.Dataframe
-            Dataframe of the targets.
+        targets_column : pd.Series
+            Column of the dataframe containing the targets.
         classification : bool
             True for classification task, false for regression.
         target_to_tensor : bool
@@ -782,22 +783,17 @@ class ProstateCancerDataset(Dataset):
         targets : Union[List[np.array], List[tensor]]
             Targets in a proper format.
         """
-        targets = []
         # Set targets protected attribute according to task
-        for target_column in targets_dataframe:
-            target_series = targets_dataframe[target_column]
-            t = target_series.to_numpy(dtype=float)
-            if (not classification) and target_to_tensor:
-                t = from_numpy(t).float()
-            elif classification:
-                if target_to_tensor:
-                    t = from_numpy(t).long()
-                else:
-                    t = t.astype(int)
+        t = targets_column.to_numpy(dtype=float)
+        if (not classification) and target_to_tensor:
+            t = from_numpy(t).float()
+        elif classification:
+            if target_to_tensor:
+                t = from_numpy(t).long()
+            else:
+                t = t.astype(int)
 
-            targets.append(t.squeeze())
-
-        return targets
+        return t.squeeze()
 
     @staticmethod
     def _check_columns_validity(

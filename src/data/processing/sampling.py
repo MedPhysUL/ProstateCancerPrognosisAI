@@ -20,7 +20,8 @@ from sklearn.model_selection import train_test_split
 from torch import tensor
 from tqdm import tqdm
 
-from src.data.processing.dataset import MaskType, ProstateCancerDataset
+from src.data.processing.single_task_dataset import MaskType, SingleTaskDataset
+from src.data.processing.multi_task_dataset import MultiTaskDataset
 
 
 class RandomStratifiedSampler:
@@ -31,7 +32,7 @@ class RandomStratifiedSampler:
 
     def __init__(
             self,
-            dataset: ProstateCancerDataset,
+            dataset: Union[SingleTaskDataset, MultiTaskDataset],
             n_out_split: int,
             n_in_split: int,
             valid_size: float = 0.20,
@@ -45,7 +46,7 @@ class RandomStratifiedSampler:
 
         Parameters
         ----------
-        dataset : ProstateCancerDataset
+        dataset : Union[SingleTaskDataset, MultiTaskDataset]
             Custom dataset.
         n_out_split : int
             Number of outer splits to produce.
@@ -73,12 +74,25 @@ class RandomStratifiedSampler:
         if valid_size + test_size >= 1:
             raise ValueError('Train size must be non null')
 
+        self.__original_dataset = dataset
+
         # Private attributes
-        self.__dataset = dataset
-        if self.__dataset.encodings is not None:
-            self.__unique_encodings = {k: list(v.values()) for k, v in self.__dataset.encodings.items()}
-        else:
-            self.__unique_encodings = {}
+        self.__unique_encodings = []
+        if isinstance(dataset, SingleTaskDataset):
+            self.__datasets = [dataset]
+            self.__targets = [dataset.y]
+            if self.__datasets[0].encodings is not None:
+                self.__unique_encodings = [{k: list(v.values()) for k, v in self.__datasets[0].encodings.items()}]
+            else:
+                self.__unique_encodings = [{}]
+        elif isinstance(dataset, MultiTaskDataset):
+            self.__datasets = dataset.datasets
+            self.__targets = dataset.get_targets()
+            for ds in self.__datasets:
+                if ds.encodings is not None:
+                    self.__unique_encodings.append({k: list(v.values()) for k, v in ds.encodings.items()})
+                else:
+                    self.__unique_encodings.append({})
 
         # Public attributes
         self.alpha = alpha
@@ -91,17 +105,11 @@ class RandomStratifiedSampler:
         self.split = self.__define_split_function(test_size, valid_size)
 
     def __call__(
-            self,
-            stratify: Optional[Union[List[np.array], List[tensor]]] = None
+            self
     ) -> Dict[int, Dict[str, Union[List[int], Dict[str, List[int]]]]]:
         """
         Returns lists of indexes to use as train, valid and test masks for outer and inner validation loops.
         The proportion of each class is conserved within each split.
-
-        Parameters
-        ----------
-        stratify : Optional[Union[List[np.array], List[tensor]]]
-            Array or tensor used for stratified split (if None, dataset.y will be used).
 
         Returns
         -------
@@ -128,8 +136,7 @@ class RandomStratifiedSampler:
             }
         """
         # We set targets to use for stratification
-        targets = self.__dataset.y if stratify is None else stratify
-        targets = [target if self.is_categorical(target) else self.mimic_classes(target) for target in targets]
+        targets = [target if self.is_categorical(target) else self.mimic_classes(target) for target in self.__targets]
 
         # We set the random state
         if self.random_state is not None:
@@ -255,38 +262,37 @@ class RandomStratifiedSampler:
         valid : bool
             True if the masks are valid.
         """
-        # We update the masks of the dataset
-        self.__dataset.update_masks(train_mask, test_mask, valid_mask)
+        self.__original_dataset.update_masks(train_mask, test_mask, valid_mask)
 
-        # We extract train dataframe
-        imputed_df = self.__dataset.get_imputed_dataframe()
-        train_df = imputed_df.iloc[train_mask]
+        for idx, ds in enumerate(self.__datasets):
+            # We extract train dataframe
+            imputed_df = ds.get_imputed_dataframe()
+            train_df = imputed_df.iloc[ds.train_mask]
 
-        # We check if all categories of categorical columns are in the training set
-        for cat, values in self.__unique_encodings.items():
-            for c in train_df[cat].unique():
-                if c not in values:
-                    return False
+            # We check if all categories of categorical columns are in the training set
+            for cat, values in self.__unique_encodings[idx].items():
+                for c in train_df[cat].unique():
+                    if c not in values:
+                        return False
 
-        # We save q1 and q3 of each numerical columns
-        train_quantiles = {c: (train_df[c].quantile(0.25), train_df[c].quantile(0.75))
-                           for c in self.__dataset.cont_cols}
+            # We save q1 and q3 of each numerical columns
+            train_quantiles = {c: (train_df[c].quantile(0.25), train_df[c].quantile(0.75)) for c in ds.cont_cols}
 
-        # We validate the other masks
-        other_masks = [m for m in [valid_mask, test_mask] if m is not None]
-        for mask in other_masks:
+            # We validate the other masks
+            other_masks = [m for m in [ds.valid_mask, ds.test_mask] if m is not None]
+            for mask in other_masks:
 
-            # We extract the subset
-            subset_df = imputed_df.iloc[mask]
+                # We extract the subset
+                subset_df = imputed_df.iloc[mask]
 
-            # We check if all numerical values are not extreme outliers according to the train mask
-            for cont_col, (q1, q3) in train_quantiles.items():
-                iqr = q3 - q1
-                other_min, other_max = (subset_df[cont_col].min(), subset_df[cont_col].max())
-                if other_min < q1 - self.alpha*iqr or other_max > q3 + self.alpha*iqr:
-                    return False
+                # We check if all numerical values are not extreme outliers according to the train mask
+                for cont_col, (q1, q3) in train_quantiles.items():
+                    iqr = q3 - q1
+                    other_min, other_max = (subset_df[cont_col].min(), subset_df[cont_col].max())
+                    if other_min < q1 - self.alpha*iqr or other_max > q3 + self.alpha*iqr:
+                        return False
 
-            return True
+        return True
 
     @staticmethod
     def is_categorical(
