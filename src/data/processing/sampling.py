@@ -368,13 +368,14 @@ class RandomStratifiedSampler:
         for k, v in datasets.items():
             print(f"Split {k+1} \n")
             print(f"Outer :")
-            valid = v['valid'] if v['valid'] is not None else []
-            print(f"Train {len(v['train'])} - Valid {len(valid)} - Test {len(v['test'])}")
-            print(MaskType.INNER)
-            for k1, v1 in v['inner'].items():
-                valid = v1['valid'] if v1['valid'] is not None else []
-                print(f"{k+1}.{k1} -> Train {len(v1['train'])} - Valid {len(valid)} -"
-                      f" Test {len(v1['test'])}")
+            valid = v[MaskType.VALID] if v[MaskType.VALID] is not None else []
+            print(f"Train {len(v[MaskType.TRAIN])} - Valid {len(valid)} - Test {len(v[MaskType.TEST])}")
+            if v[MaskType.INNER]:
+                print(f"{MaskType.INNER} :")
+            for k1, v1 in v[MaskType.INNER].items():
+                valid = v1[MaskType.VALID] if v1[MaskType.VALID] is not None else []
+                print(f"{k+1}.{k1} -> Train {len(v1[MaskType.TRAIN])} - Valid {len(valid)} -"
+                      f" Test {len(v1[MaskType.TEST])}")
             print("#----------------------------------#")
 
 
