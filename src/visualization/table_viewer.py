@@ -5,49 +5,171 @@
     @Creation Date:     07/2022
     @Last modification: 07/2022
 
-    @Description:       This file contains the TableViewer class which is used to visualize a prostate cancer dataset.
+    @Description:       This file contains the TableViewer class which is used to visualize a dataset.
 """
 
-from typing import List, Optional
+from copy import deepcopy
+import os
+from typing import Dict, List, Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from src.data.processing.dataset import MaskType, ProstateCancerDataset
+from src.data.processing.multi_task_dataset import MultiTaskDataset
+from src.data.processing.single_task_dataset import MaskType, SingleTaskDataset
 
 
 class TableViewer:
 
+    TABLES_PATH = "tables"
+    FIGURES_PATH = "figures"
+    ORIGINAL_DF_PATH = "original"
+    IMPUTED_DF_PATH = "imputed"
+
     def __init__(
             self,
-            dataset: ProstateCancerDataset
+            dataset: Union[SingleTaskDataset, MultiTaskDataset]
     ):
+        """
+        Sets protected and public attributes of our table viewer.
+
+        Parameters
+        ----------
+        dataset : Union[SingleTaskDataset, MultiTaskDataset]
+            Dataset.
+        """
+        sns.set_style("whitegrid")
         self.dataset = dataset
 
-    def _get_nonempty_masks(self):
-        available_masks = self.dataset.train_mask, self.dataset.valid_mask, self.dataset.test_mask
-        available_masks_names = MaskType.TRAIN, MaskType.VALID, MaskType.TEST
-        return {name: mask for mask, name in zip(available_masks, available_masks_names) if mask}
+        if isinstance(dataset, SingleTaskDataset):
+            self._datasets = [dataset]
+            self._target_cols = [dataset.target_col]
+        elif isinstance(dataset, MultiTaskDataset):
+            self._datasets = dataset.datasets
+            self._target_cols = [ds.target_col for ds in self._datasets]
 
-    def _get_original_dataframe(self):
-        return pd.concat(
-            objs=[
-                self.dataset.original_data.iloc[mask].assign(Sets=name) for name, mask in
-                self._get_nonempty_masks().items()
-            ],
-            ignore_index=True
-        )
+        self._nonempty_masks = self._get_nonempty_masks()
+        self._original_dataframes = self._get_original_dataframes()
+        self._imputed_dataframes = self._get_imputed_dataframes()
 
-    def _get_imputed_dataframe(self):
-        return pd.concat(
-            objs=[
-                self.dataset.get_imputed_dataframe().iloc[mask].assign(Sets=name) for name, mask in
-                self._get_nonempty_masks().items()
-            ],
-            ignore_index=True
-        )
+    def _get_nonempty_masks(
+            self
+    ) -> List[Dict[str, List[int]]]:
+        """
+        Get nonempty masks from all datasets.
+
+        Returns
+        -------
+        nonempty_masks : List[Dict[str, List[int]]]
+            List of nonempty masks dictionaries (one for each of the datasets contained in self._datasets).
+        """
+        nonempty_masks = []
+        for ds in self._datasets:
+            available_masks = ds.train_mask, ds.valid_mask, ds.test_mask
+            available_masks_names = MaskType.TRAIN, MaskType.VALID, MaskType.TEST
+            nonempty_masks.append({name: mask for mask, name in zip(available_masks, available_masks_names) if mask})
+
+        return nonempty_masks
+
+    def _get_original_dataframes(
+            self
+    ) -> List[Union[pd.Series, pd.DataFrame]]:
+        """
+        Get original dataframe from all datasets.
+
+        Returns
+        -------
+        original_dataframes : List[Union[pd.Series, pd.DataFrame]]
+            List of original dataframes (one for each of the datasets contained in self._datasets).
+        """
+        original_dataframes = []
+
+        for idx, ds in enumerate(self._datasets):
+            original_dataframes.append(
+                pd.concat(
+                    objs=[
+                        ds.original_data.iloc[mask].assign(Sets=name) for name, mask in
+                        self._nonempty_masks[idx].items()
+                    ],
+                    ignore_index=True
+                )
+            )
+
+        return original_dataframes
+
+    def _get_imputed_dataframes(
+            self
+    ) -> List[Union[pd.Series, pd.DataFrame]]:
+        """
+        Get imputed dataframe from all datasets.
+
+        Returns
+        -------
+        imputed_dataframes : List[Union[pd.Series, pd.DataFrame]]
+            List of imputed dataframes (one for each of the datasets contained in self._datasets).
+        """
+        imputed_dataframes = []
+
+        for idx, ds in enumerate(self._datasets):
+            imputed_dataframes.append(
+                pd.concat(
+                    objs=[
+                        ds.get_imputed_dataframe().iloc[mask].assign(Sets=name) for name, mask in
+                        self._nonempty_masks[idx].items()
+                    ],
+                    ignore_index=True
+                )
+            )
+
+        return imputed_dataframes
+
+    def _create_directories(
+            self,
+            path_to_save: str
+    ) -> None:
+        """
+        Create directories used to save tables and figures.
+
+        Parameters
+        ----------
+        path_to_save : str
+            Path to save descriptive analysis records.
+        """
+        for target_col in self._target_cols:
+            os.makedirs(os.path.join(path_to_save, target_col), exist_ok=True)
+            for path in [self.TABLES_PATH, self.FIGURES_PATH]:
+                os.makedirs(os.path.join(*[path_to_save, target_col, path]), exist_ok=True)
+                for df_path in [self.ORIGINAL_DF_PATH, self.IMPUTED_DF_PATH]:
+                    os.makedirs(
+                        os.path.join(*[path_to_save, target_col, path, df_path]), exist_ok=True
+                    )
+
+    def _save_dataframes(
+            self,
+            path_to_save: str
+    ) -> None:
+        """
+        Save dataframes.
+
+        Parameters
+        ----------
+        path_to_save : str
+            Path to save descriptive analysis records.
+        """
+        for target, original_df, imputed_df in zip(
+                self._target_cols, self._original_dataframes, self._imputed_dataframes
+        ):
+            for df, path in zip([original_df, imputed_df], [self.ORIGINAL_DF_PATH, self.IMPUTED_DF_PATH]):
+                df.to_csv(
+                    os.path.join(*[path_to_save, target, self.TABLES_PATH, path, "dataframe"]),
+                    index=False
+                )
+                df.describe().to_csv(
+                    os.path.join(*[path_to_save, target, self.TABLES_PATH, path, "description"]),
+                    index=False
+                )
 
     @staticmethod
     def _format_to_percentage(
@@ -74,19 +196,18 @@ class TableViewer:
 
     def _visualize_class_distribution(
             self,
-            fig,
-            axes,
+            axes: plt.axes,
             targets: np.array,
             label_names: dict,
             title: Optional[str] = None
     ) -> None:
         """
-        Get fig and axes of a pie chart with classes distribution.
+        Update axes of a pie chart with classes distribution.
 
         Parameters
         ----------
-        fig
-        axes
+        axes : plt.axes
+            Axes.
         targets : np.array
             Array of class targets.
         label_names : dict
@@ -94,13 +215,10 @@ class TableViewer:
         title : Optional[str]
             Title for the plot.
         """
-        # We first count the number of instances of each value in the targets vector
         label_counts = {k: np.sum(targets == v) for k, v in label_names.items()}
 
-        # We prepare a list of string to use as plot labels
         labels = [f"{k} ({v})" for k, v in label_counts.items()]
 
-        # Pie chart, where the slices will be ordered and plotted counter-clockwise:
         wedges, texts, autotexts = axes.pie(
             label_counts.values(),
             textprops=dict(color="w"),
@@ -120,93 +238,169 @@ class TableViewer:
         plt.setp(autotexts, size=8, weight="bold")
 
         if title is not None:
-            axes.set_title(title)
+            axes.set_title(f"{title} (n = {sum(label_counts.values())})")
 
-    def _visualize_targets(self):
-        for target in self.dataset.target_cols:
-            fig, axes = plt.subplots(ncols=len(self._get_nonempty_masks()), squeeze=False)
-            for idx, mask in enumerate(self._get_nonempty_masks().values()):
+    def _visualize_targets(
+            self,
+            path_to_save: str,
+            show: bool
+    ) -> None:
+        """
+        Visualize targets pie charts.
+
+        Parameters
+        ----------
+        path_to_save : str
+            Path to save descriptive analysis records.
+        show : bool
+            Whether to show figures.
+        """
+        for i, target_col in enumerate(self._target_cols):
+            fig, axes = plt.subplots(ncols=len(self._datasets), squeeze=False)
+            for idx, (name, mask) in enumerate(self._nonempty_masks[i].items()):
                 if mask:
                     self._visualize_class_distribution(
-                        fig,
-                        axes[0, idx],
-                        self.dataset.original_data.iloc[mask][target],
-                        label_names={f"{target}_0": 0, f"{target}_1": 1},
+                        axes=axes[0, idx],
+                        targets=self._original_dataframes[i].iloc[mask][target_col],
+                        label_names={f"{target_col}_0": 0, f"{target_col}_1": 1},
+                        title=name
                     )
             fig.tight_layout()
-            plt.show()
+            if path_to_save:
+                plt.savefig(os.path.join(*[path_to_save, target_col, self.FIGURES_PATH, "target.png"]))
+            if show:
+                plt.show()
+            plt.close(fig)
 
-    def _visualize_cont_features(self):
-        original_dataframe = self._get_original_dataframe()
-        imputed_dataframe = self._get_imputed_dataframe()
+    def _visualize_cont_features(
+            self,
+            path_to_save: str,
+            show: bool
+    ) -> None:
+        """
+        Visualize continuous features.
 
-        print(original_dataframe.describe())
-        print(imputed_dataframe.describe())
+        Parameters
+        ----------
+        path_to_save : str
+            Path to save descriptive analysis records.
+        show : bool
+            Whether to show figures.
+        """
+        for ds, original_df, imputed_df in zip(self._datasets, self._original_dataframes, self._imputed_dataframes):
+            for cont_col in ds.cont_cols:
+                for df, path in zip([original_df, imputed_df], [self.ORIGINAL_DF_PATH, self.IMPUTED_DF_PATH]):
+                    fig, axes = plt.subplots()
+                    sns.boxplot(
+                        data=df,
+                        y=cont_col,
+                        x="Sets",
+                        linewidth=1,
+                    )
+                    fig.tight_layout()
 
-        for cont_col in self.dataset.cont_cols:
-            fig, axes = plt.subplots()
-            sns.boxplot(
-                data=original_dataframe,
-                y=cont_col,
-                x="Sets",
-                linewidth=1,
-            )
-            fig.tight_layout()
-            plt.show()
+                    if path_to_save:
+                        plt.savefig(
+                            os.path.join(*[
+                                path_to_save, ds.target_col, self.FIGURES_PATH, path, f"{cont_col}.png"
+                            ]),
+                            dpi=300
+                        )
+                    if show:
+                        plt.show()
+                    plt.close(fig)
 
-            fig, axes = plt.subplots()
-            sns.boxplot(
-                data=imputed_dataframe,
-                y=cont_col,
-                x="Sets",
-                linewidth=1,
-            )
-            fig.tight_layout()
-            plt.show()
+    def _visualize_cat_features(
+            self,
+            path_to_save: str,
+            show: bool
+    ):
+        """
+        Visualize categorical features.
 
-    def _visualize_cat_features(self):
-        original_dataframe = self._get_original_dataframe()
-        imputed_dataframe = self._get_imputed_dataframe()
+        Parameters
+        ----------
+        path_to_save : str
+            Path to save descriptive analysis records.
+        show : bool
+            Whether to show figures.
+        """
+        for ds, original_df, imputed_df in zip(self._datasets, self._original_dataframes, self._imputed_dataframes):
+            for cat_col in ds.cat_cols:
+                for df, path in zip([original_df, imputed_df], [self.ORIGINAL_DF_PATH, self.IMPUTED_DF_PATH]):
+                    df_copy = deepcopy(df)
+                    df_copy[cat_col] = df_copy[cat_col].astype("category")
 
-        for cat_col in self.dataset.cat_cols:
-            fig, axes = plt.subplots()
+                    fig, axes = plt.subplots()
 
-            unique = pd.unique(original_dataframe[cat_col])
-            if all(isinstance(x, (int, float)) for x in unique):
-                axes.set_xticks(pd.unique(original_dataframe[cat_col]))
+                    unique = pd.unique(df_copy[cat_col])
+                    if all(isinstance(x, (int, float)) for x in unique):
+                        axes.set_xticks(pd.unique(df_copy[cat_col]))
 
-            sns.histplot(
-                data=original_dataframe,
-                x=cat_col, hue='Sets',
-                multiple='dodge',
-                ax=axes,
-                stat='probability',
-                common_norm=False,
-                shrink=0.8
-            )
-            fig.tight_layout()
-            plt.show()
+                    sns.histplot(
+                        data=df_copy,
+                        x=cat_col, hue='Sets',
+                        multiple='dodge',
+                        ax=axes,
+                        stat='percent',
+                        common_norm=False,
+                        shrink=0.8
+                    )
 
-            fig, axes = plt.subplots()
+                    fig_temp, axes_temp = plt.subplots()
+                    sns.histplot(data=df_copy, x=cat_col, hue='Sets', ax=axes_temp)
 
-            imputed_dataframe[cat_col] = imputed_dataframe[cat_col].astype("category")
-            axes.set_xticks(pd.unique(imputed_dataframe[cat_col]))
-            sns.histplot(
-                data=imputed_dataframe,
-                x=cat_col, hue='Sets',
-                multiple='dodge',
-                ax=axes,
-                stat='probability',
-                common_norm=False,
-                shrink=0.8
-            )
-            fig.tight_layout()
-            plt.show()
+                    for axes_container, axes_temp_container in zip(axes.containers, axes_temp.containers):
+                        labels = [f"{axes_temp_patch.get_height()}" for axes_temp_patch in axes_temp_container]
+                        axes.bar_label(axes_container, labels=labels)
 
-    def _visualize_features(self):
-        self._visualize_cont_features()
-        self._visualize_cat_features()
+                    plt.close(fig_temp)
+                    fig.tight_layout()
+                    if path_to_save:
+                        plt.savefig(
+                            os.path.join(*[
+                                path_to_save, ds.target_col, self.FIGURES_PATH, path, f"{cat_col}.png"
+                            ]),
+                            dpi=300
+                        )
+                    if show:
+                        plt.show()
+                    plt.close(fig)
 
-    def visualize(self):
-        self._visualize_targets()
-        self._visualize_features()
+    def _visualize_features(
+            self,
+            path_to_save: str,
+            show: bool
+    ) -> None:
+        """
+        Visualize features.
+
+        Parameters
+        ----------
+        path_to_save : str
+            Path to save descriptive analysis records.
+        """
+        self._visualize_cont_features(path_to_save, show)
+        self._visualize_cat_features(path_to_save, show)
+
+    def visualize(
+            self,
+            path_to_save: Optional[str] = None,
+            show: Optional[bool] = True
+    ):
+        """
+        Visualize dataset.
+
+        Parameters
+        ----------
+        path_to_save : str
+            Path to save descriptive analysis records.
+        show : Optional[bool]
+            Whether to show figures.
+        """
+        if path_to_save:
+            self._create_directories(path_to_save)
+            self._save_dataframes(path_to_save)
+
+        self._visualize_targets(path_to_save, show)
+        self._visualize_features(path_to_save, show)
