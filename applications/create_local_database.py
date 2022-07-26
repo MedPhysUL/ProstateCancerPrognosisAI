@@ -28,5 +28,6 @@ if __name__ == "__main__":
     patients_who_failed = extractor.create_database(
         path_to_patients_folder=r"local_data/Learning_set",
         series_descriptions=r"local_data/series_descriptions.json",
-        transformations=[transforms.Resample((1.5, 1.5, 1.5))]
+        transformations=[transforms.Resample((1.5, 1.5, 1.5))],
+        erase_unused_dicom_files=True
     )

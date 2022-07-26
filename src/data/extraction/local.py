@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     06/2022
-    @Last modification: 06/2022
+    @Last modification: 07/2022
 
     @Description:       This file contains the LocalExtractor class which is used to create HDF5 files containing the
                         images and their segmentations.
@@ -18,7 +18,7 @@ from dicom2hdf.processing.transforms import BaseTransform
 class LocalExtractor:
     """
     A LocalExtractor class which is used to extract images contained in DICOM files and aggregate these images and some
-    metadata into an HDF5 file. This file is easier to parse than the original DICOM files to retrieve images and
+    metadata into an HDF5 file. This file is then easier to parse than the original DICOM files to retrieve images and
     segmentations.
     """
 
@@ -37,9 +37,10 @@ class LocalExtractor:
 
     def create_database(
             self,
-            path_to_patients_folder,
+            path_to_patients_folder: str,
             series_descriptions: Optional[Union[str, Dict[str, List[str]]]],
             transformations: Optional[Sequence[BaseTransform]],
+            erase_unused_dicom_files: bool = False,
             overwrite_dataset: bool = False
     ) -> List[PatientWhoFailed]:
         """
@@ -57,6 +58,8 @@ class LocalExtractor:
             series descriptions.
         transformations : Optional[Sequence[BaseTransform]]
             A sequence of transformations to apply to images and segmentations.
+        erase_unused_dicom_files: bool, default = False
+            Whether to delete unused DICOM files or not. Use with caution.
         overwrite_dataset : bool, default = False.
             Overwrite existing dataset.
 
@@ -71,7 +74,7 @@ class LocalExtractor:
             tags_to_use_as_attributes=[(0x0008, 0x103E), (0x0020, 0x000E), (0x0008, 0x0060)],
             series_descriptions=series_descriptions,
             transforms=transformations,
-            erase_unused_dicom_files=True,
+            erase_unused_dicom_files=erase_unused_dicom_files,
             overwrite_dataset=overwrite_dataset
         )
 
