@@ -8,6 +8,8 @@
     @Description:       This file is used to store helpful constants.
 """
 
+import os
+
 # SEED
 SEED = 1010710
 
@@ -15,14 +17,16 @@ SEED = 1010710
 HOLDOUT_SIZE = 0.15
 
 # PATHS
-CLINICAL_DATA_PATH = "local_data/clinical_data.xlsx"
-IMAGES_FOLDER_PATH = "local_data/Images"
+DATA_PATH = "local_data"
+CLINICAL_DATA_PATH = os.path.join(DATA_PATH, "clinical_data.xlsx")
+IMAGES_FOLDER_PATH = os.path.join(DATA_PATH, "Images")
 
-LEARNING_TABLE_PATH = "local_data/learning_table.csv"
-HOLDOUT_TABLE_PATH = "local_data/holdout_table.csv"
+LEARNING_TABLE_PATH = os.path.join(DATA_PATH, "learning_table.csv")
+HOLDOUT_TABLE_PATH = os.path.join(DATA_PATH, "holdout_table.csv")
 
-RECORDS_PATH = "local_data/records"
-OUTLIERS_RECORDS_PATH = f"{RECORDS_PATH}/outliers"
+RECORDS_PATH = os.path.join("local_data", "records")
+OUTLIERS_RECORDS_PATH = os.path.join(RECORDS_PATH, "outliers")
+DESCRIPTIVE_ANALYSIS_PATH = os.path.join(RECORDS_PATH, "descriptive_analysis")
 
 # COLUMNS
 ID = "ID"
