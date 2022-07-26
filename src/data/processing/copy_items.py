@@ -15,9 +15,10 @@ from typing import List, NamedTuple, Union
 from monai.data.dataset import ArrayDataset
 from monai.transforms import Compose
 from torch.utils.data.dataset import Subset
+from torch.utils.data import ConcatDataset
 
 
-class Augmentations(NamedTuple):
+class AugmentationTransforms(NamedTuple):
     img_transforms: Compose
     seg_transforms: Compose
 
@@ -48,16 +49,17 @@ class CopyItems:
 class Augmentation:
     # Not sure about the name of this class 
 
-    def __init__(self, dataset: Union[ArrayDataset, Subset]):
-        self.copy = CopyItems(dataset)
+    def __init__(self, augmentation_transforms: List[AugmentationTransforms]):
+        self._augmentation_transforms = augmentation_transforms
 
-    def apply_augmentations(self, augmentations: List[Augmentations]):
-        for augmentation in augmentations:
-            self._apply_img_transforms(augmentation.img_transforms)
-            self._apply_seg_transforms(augmentation.seg_transforms)
+    def get_augmented_dataset(self, dataset: Union[ArrayDataset, Subset]):
+        augmented_datasets = []
 
-    def _apply_img_transforms(self, img_transforms):
-        self.copy.dataset.data[0].transform = img_transforms
+        for augmentation in self._augmentation_transforms:
+            dataset_copy = CopyItems(dataset)
+            dataset_copy.dataset.dataset.data[0].transform = augmentation.img_transforms  # Remove recurrent .dataset if splitting with slicing
+            dataset_copy.dataset.dataset.data[1].transform = augmentation.seg_transforms
 
-    def _apply_seg_transforms(self, seg_transforms):
-        self.copy.dataset.data[1].transform = seg_transforms
+            augmented_datasets.append(dataset_copy)
+
+        return ConcatDataset([dataset] + augmented_datasets)

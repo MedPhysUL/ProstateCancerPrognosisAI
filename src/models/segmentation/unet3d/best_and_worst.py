@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     metric = DiceMetric(include_background=True, reduction='mean')
-    num_val = 29
+    num_val = 40
     num_workers = 0
     batch_size = 1
 
@@ -55,8 +55,8 @@ if __name__ == '__main__':
         seg_transform=seg_trans
     )
 
-    val_ds = ds[-num_val:]
-    # train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
+    # val_ds = ds[-num_val:]
+    train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
 
     val_loader = DataLoader(
         dataset=val_ds,
@@ -75,72 +75,72 @@ if __name__ == '__main__':
     ).to(device)
 
     # Load Best Parameters
-    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp5/best_model_parameters.pt'))
+    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp7/best_model_parameters.pt'))
     net.eval()
 
     # Stats
-    # metric_list = []
-    # with torch.no_grad():
-    #     for batch_images, batch_segs in val_loader:
-    #         batch_images = batch_images.to(device)
-    #         batch_segs = batch_segs.to(device)
-    #
-    #         y_pred = net(batch_images)
-    #         y_pred = torch.sigmoid(y_pred)
-    #         y_pred = torch.round(y_pred)
-    #
-    #         pred_metric = metric(y_pred=y_pred, y=batch_segs)
-    #         metric_list += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
-    #
-    # print('les metriques des images de validation:', metric_list)
-    # print('max:', metric_list[np.argmax(metric_list)], 'at index:', np.argmax(metric_list))
-    # print('min:', metric_list[np.argmin(metric_list)], 'at index:', np.argmin(metric_list))
-    # print('mediane:', metric_list[np.argsort(metric_list)[len(metric_list)//2]], 'at:', np.argsort(metric_list)[len(metric_list)//2])
-    # print('np.mediane', np.median(metric_list))
-    # print('moyenne:', np.average(metric_list))
+    metric_list = []
+    with torch.no_grad():
+        for batch_images, batch_segs in val_loader:
+            batch_images = batch_images.to(device)
+            batch_segs = batch_segs.to(device)
+
+            y_pred = net(batch_images)
+            y_pred = torch.sigmoid(y_pred)
+            y_pred = torch.round(y_pred)
+
+            pred_metric = metric(y_pred=y_pred, y=batch_segs)
+            metric_list += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
+
+    print('les metriques des images de validation:', metric_list)
+    print('max:', metric_list[np.argmax(metric_list)], 'at index:', np.argmax(metric_list))
+    print('min:', metric_list[np.argmin(metric_list)], 'at index:', np.argmin(metric_list))
+    print('mediane:', metric_list[np.argsort(metric_list)[len(metric_list)//2]], 'at:', np.argsort(metric_list)[len(metric_list)//2])
+    print('np.mediane', np.median(metric_list))
+    print('moyenne:', np.average(metric_list))
 
     # Show best-mid-worst
-    # patient_idx = -1
-    # with torch.no_grad():
-    #     for patient_img, patient_seg in val_loader:
-    #         patient_idx += 1
-    #         print(patient_idx)
-    #
-    #         if patient_idx == np.argmax(metric_list):
-    #             print('Best image', patient_idx)
-    #             img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
-    #             seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
-    #             patient_img = patient_img.to(device)
-    #             y_pred = net(patient_img)
-    #             y_pred = torch.sigmoid(y_pred)
-    #             y_pred = torch.round(y_pred)
-    #             print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
-    #             seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-    #             Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
-    #
-    #         if patient_idx == np.argmin(metric_list):
-    #             print('Worst image', patient_idx)
-    #             img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
-    #             seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
-    #             patient_img = patient_img.to(device)
-    #             y_pred = net(patient_img)
-    #             y_pred = torch.sigmoid(y_pred)
-    #             y_pred = torch.round(y_pred)
-    #             print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
-    #             seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-    #             Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
-    #
-    #         if patient_idx == np.argsort(metric_list)[len(metric_list)//2]:
-    #             print('Median image', patient_idx)
-    #             img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
-    #             seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
-    #             patient_img = patient_img.to(device)
-    #             y_pred = net(patient_img)
-    #             y_pred = torch.sigmoid(y_pred)
-    #             y_pred = torch.round(y_pred)
-    #             print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
-    #             seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-    #             Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
+    patient_idx = -1
+    with torch.no_grad():
+        for patient_img, patient_seg in val_loader:
+            patient_idx += 1
+            print(patient_idx)
+
+            if patient_idx == np.argmax(metric_list):
+                print('Best image', patient_idx)
+                img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+                seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+                patient_img = patient_img.to(device)
+                y_pred = net(patient_img)
+                y_pred = torch.sigmoid(y_pred)
+                y_pred = torch.round(y_pred)
+                print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
+                seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+                Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
+
+            if patient_idx == np.argmin(metric_list):
+                print('Worst image', patient_idx)
+                img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+                seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+                patient_img = patient_img.to(device)
+                y_pred = net(patient_img)
+                y_pred = torch.sigmoid(y_pred)
+                y_pred = torch.round(y_pred)
+                print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
+                seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+                Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
+
+            if patient_idx == np.argsort(metric_list)[len(metric_list)//2]:
+                print('Median image', patient_idx)
+                img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+                seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+                patient_img = patient_img.to(device)
+                y_pred = net(patient_img)
+                y_pred = torch.sigmoid(y_pred)
+                y_pred = torch.round(y_pred)
+                print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
+                seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+                Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
 
     # Show All
     # with torch.no_grad():
@@ -167,24 +167,58 @@ if __name__ == '__main__':
     # writer.close()
 
     # Volume-Dice Plot
-    # metric_list = []
-    # volume_list = []
+    metric_list = []
+    volume_list = []
+    with torch.no_grad():
+        for batch_images, batch_segs in val_loader:
+            batch_images = batch_images.to(device)
+            batch_segs = batch_segs.to(device)
+
+            y_pred = net(batch_images)
+            y_pred = torch.sigmoid(y_pred)
+            y_pred = torch.round(y_pred)
+
+            pred_metric = metric(y_pred=y_pred, y=batch_segs)
+            metric_list += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
+
+            volume_list += [np.count_nonzero(batch_segs.cpu())]
+    print(metric_list)
+    print(volume_list)
+    plt.scatter(x=volume_list, y=metric_list)
+    plt.show()
+
+
+    # 3 et 20
+    # patient_idx = -1
     # with torch.no_grad():
-    #     for batch_images, batch_segs in val_loader:
-    #         batch_images = batch_images.to(device)
-    #         batch_segs = batch_segs.to(device)
+    #     for patient_img, patient_seg in val_loader:
+    #         patient_idx += 1
+    #         print(patient_idx)
     #
-    #         y_pred = net(batch_images)
-    #         y_pred = torch.sigmoid(y_pred)
-    #         y_pred = torch.round(y_pred)
+    #         if patient_idx == 20:
+    #             print('Best image', patient_idx)
+    #             img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+    #             seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+    #             patient_img = patient_img.to(device)
+    #             y_pred = net(patient_img)
+    #             y_pred = torch.sigmoid(y_pred)
+    #             y_pred = torch.round(y_pred)
+    #             print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
+    #             seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+    #             Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
     #
-    #         pred_metric = metric(y_pred=y_pred, y=batch_segs)
-    #         metric_list += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
-    #
-    #         volume_list += [np.count_nonzero(batch_segs)]
-    #
-    # plt.scatter(x=volume_list, y=metric_list)
-    # plt.show()
+    #         if patient_idx == 32:
+    #             print('Best image', patient_idx)
+    #             img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+    #             seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+    #             patient_img = patient_img.to(device)
+    #             y_pred = net(patient_img)
+    #             y_pred = torch.sigmoid(y_pred)
+    #             y_pred = torch.round(y_pred)
+    #             print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
+    #             seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+    #             Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
+
 
 
 

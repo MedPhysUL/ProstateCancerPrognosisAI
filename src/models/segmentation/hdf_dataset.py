@@ -24,8 +24,8 @@ PATIENTS_TO_DISCARD = [
     # "TEP-094",
     # "TEP-090",
     # "TEP-102",
-    "TEP-119",
-    # "TEP-133",
+    # "TEP-119",
+    # "TEP-133", # celle qui est a l'envers
     # "TEP-175",
     # "TEP-176",
     # "TEP-296",

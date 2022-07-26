@@ -9,8 +9,6 @@
 
 """
 
-from copy import deepcopy
-
 from src.models.segmentation.hdf_dataset import HDFDataset
 
 from monai.data import DataLoader
@@ -25,43 +23,44 @@ from monai.transforms import (
     ThresholdIntensity,
     ToTensor,
     HistogramNormalize,
-    RandFlip
+    Rotate90,
+    RandFlip,
 )
 from monai.utils import set_determinism
 import numpy as np
 import torch
-# from torch.utils.data.dataset import random_split
+from torch.utils.data.dataset import random_split
 from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data.dataset import ConcatDataset
+from src.data.processing.copy_items import Augmentation, AugmentationTransforms
 
 
 if __name__ == '__main__':
     set_determinism(seed=1010710)
 
     writer = SummaryWriter(
-        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp5'
+        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete'
     )
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 40
-    batch_size = 2
-    num_epochs = 500
-    lr = 1e-3
+    batch_size = 1    # 2 avant exp8     ##4
+    num_epochs = 150
+    lr = 1e-3       # 1e-3 avant exp8  ##1e-3
 
     # Defining Transforms
     img_trans = Compose([
         AddChannel(),
         CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        ThresholdIntensity(threshold=-250, above=True, cval=-250),
-        ThresholdIntensity(threshold=500, above=False, cval=500),
-        HistogramNormalize(num_bins=751, min=0, max=1),
+        # ThresholdIntensity(threshold=-250, above=True, cval=-250),
+        # ThresholdIntensity(threshold=500, above=False, cval=500),
+        # HistogramNormalize(num_bins=751, min=0, max=1),
         ToTensor(dtype=torch.float32)
     ])
     seg_trans = Compose([
         AddChannel(),
         CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        KeepLargestConnectedComponent(),
+        # KeepLargestConnectedComponent(),
         ToTensor(dtype=torch.float32)
     ])
 
@@ -73,43 +72,93 @@ if __name__ == '__main__':
     )
 
     # Train/Val Split
-    train_ds = ds[:-num_val]
-    val_ds = ds[-num_val:]
-
-    # train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
+    # train_ds = ds[:-num_val]
+    # val_ds = ds[-num_val:]
+    train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
+    print(type(train_ds))
+    print(type(val_ds))
+    print(len(train_ds))
 
     # Data Augmentation
-    train_ds_synth = deepcopy(train_ds)
-    train_ds_synth.dataset.data[0].transform = Compose([
-        AddChannel(),
-        RandFlip(prob=1, spatial_axis=2),
-        CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        ThresholdIntensity(threshold=-250, above=True, cval=-250),
-        ThresholdIntensity(threshold=500, above=False, cval=500),
-        HistogramNormalize(num_bins=751, min=0, max=1),
-        ToTensor(dtype=torch.float32)
-    ])
-    train_ds_synth.dataset.data[1].transform = Compose([
-        AddChannel(),
-        RandFlip(prob=1, spatial_axis=2),
-        CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        KeepLargestConnectedComponent(),
-        ToTensor(dtype=torch.float32)
-    ])
-    train_ds_aug = ConcatDataset((train_ds, train_ds_synth))
+    # aug_trans = [
+    #     # Rotation 180 deg
+    #     AugmentationTransforms(
+    #         img_transforms=Compose([
+    #             AddChannel(),
+    #             Rotate90(k=2, spatial_axes=(1, 2)),
+    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
+    #             ThresholdIntensity(threshold=-250, above=True, cval=-250),
+    #             ThresholdIntensity(threshold=500, above=False, cval=500),
+    #             HistogramNormalize(num_bins=751, min=0, max=1),
+    #             ToTensor(dtype=torch.float32)
+    #         ]),
+    #         seg_transforms=Compose([
+    #             AddChannel(),
+    #             Rotate90(k=2, spatial_axes=(1, 2)),
+    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
+    #             KeepLargestConnectedComponent(),
+    #             ToTensor(dtype=torch.float32)
+    #         ])
+    #     ),
+    #     # Flip lr
+    #     AugmentationTransforms(
+    #         img_transforms=Compose([
+    #             AddChannel(),
+    #             RandFlip(prob=1, spatial_axis=2),
+    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
+    #             ThresholdIntensity(threshold=-250, above=True, cval=-250),
+    #             ThresholdIntensity(threshold=500, above=False, cval=500),
+    #             HistogramNormalize(num_bins=751, min=0, max=1),
+    #             ToTensor(dtype=torch.float32)
+    #         ]),
+    #         seg_transforms=Compose([
+    #             AddChannel(),
+    #             RandFlip(prob=1, spatial_axis=2),
+    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
+    #             KeepLargestConnectedComponent(),
+    #             ToTensor(dtype=torch.float32)
+    #         ])
+    #     ),
+    #     # Flip lr + Rotation 180 deg
+    #     AugmentationTransforms(
+    #         img_transforms=Compose([
+    #             AddChannel(),
+    #             RandFlip(prob=1, spatial_axis=2),
+    #             Rotate90(k=2, spatial_axes=(1, 2)),
+    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
+    #             ThresholdIntensity(threshold=-250, above=True, cval=-250),
+    #             ThresholdIntensity(threshold=500, above=False, cval=500),
+    #             HistogramNormalize(num_bins=751, min=0, max=1),
+    #             ToTensor(dtype=torch.float32)
+    #         ]),
+    #         seg_transforms=Compose([
+    #             AddChannel(),
+    #             RandFlip(prob=1, spatial_axis=2),
+    #             Rotate90(k=2, spatial_axes=(1, 2)),
+    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
+    #             KeepLargestConnectedComponent(),
+    #             ToTensor(dtype=torch.float32)
+    #         ])
+    #     )
+    # ]
+    #
+    # augmentation = Augmentation(augmentation_transforms=aug_trans)
+    # train_ds_augmented = augmentation.get_augmented_dataset(train_ds)
 
     # Data Loader
     train_loader = DataLoader(
-        dataset=train_ds_aug,
+        dataset=train_ds,
         num_workers=num_workers,
         batch_size=batch_size,
-        pin_memory=True
+        pin_memory=True,
+        shuffle=True
     )
     val_loader = DataLoader(
         dataset=val_ds,
         num_workers=num_workers,
-        batch_size=batch_size,
-        pin_memory=True
+        batch_size=1,
+        pin_memory=True,
+        shuffle=False
     )
 
     # Model
@@ -117,12 +166,12 @@ if __name__ == '__main__':
         dimensions=3,
         in_channels=1,
         out_channels=1,
-        channels=(64, 128, 256, 512, 1024),
+        channels=(8, 16, 32, 64, 128),    # ##
         strides=(2, 2, 2, 2),
-        dropout=0.2
+        dropout=0.2     # 0.2 avant exp8     ##0.5
     ).to(device)
 
-    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
+    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)     # weight_decay 1e-3 avant exp8  ##   1e-2
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=opt, gamma=0.99)
     loss = DiceLoss(sigmoid=True)
     metric = DiceMetric(include_background=True, reduction='mean')
@@ -184,7 +233,7 @@ if __name__ == '__main__':
         # Save Best Metric
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp5/best_model_parameters.pt')
+            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)
