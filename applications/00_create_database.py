@@ -1,5 +1,5 @@
 """
-    @file:              create_local_database.py
+    @file:              create_database.py
     @Author:            Maxence Larose
 
     @Creation Date:     06/2022

@@ -21,7 +21,9 @@ import yaml
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def configure_logging(path_to_configuration_file: str):
+def configure_logging(
+        path_to_configuration_file: str
+) -> None:
     now = datetime.now()
     logs_dir = f"logs/{now.strftime('%Y-%m-%d')}"
     logs_file = f"{logs_dir}/{now.strftime('%Y-%m-%d_%H-%M-%S')}.log"
