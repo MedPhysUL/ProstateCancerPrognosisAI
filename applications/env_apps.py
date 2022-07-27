@@ -1,3 +1,14 @@
+"""
+    @file:              env_apps.py
+    @Author:            Maxence Larose
+
+    @Creation Date:     06/2022
+    @Last modification: 07/2022
+
+    @Description:       This file contains everything needed to configure the application environment. The file should
+                        always be imported at the beginning of any application script.
+"""
+
 from datetime import datetime
 import logging
 import logging.config

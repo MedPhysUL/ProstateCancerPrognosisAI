@@ -5,7 +5,7 @@
     @Creation Date:     06/2022
     @Last modification: 07/2022
 
-    @Description:       A small script that shows how to create an HDF5 file database using a LocalDatabaseManager.
+    @Description:       This file shows how to create an HDF5 file database using a LocalDatabaseManager.
 """
 
 import env_apps
