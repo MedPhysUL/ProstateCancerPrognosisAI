@@ -20,7 +20,8 @@ from monai.transforms import (
     KeepLargestConnectedComponent,
     ThresholdIntensity,
     ToTensor,
-    HistogramNormalize
+    HistogramNormalize,
+    ScaleIntensityRange
 )
 from monai.utils import set_determinism
 import torch
@@ -36,7 +37,7 @@ if __name__ == "__main__":
     set_determinism(seed=1010710)
 
     writer = SummaryWriter(
-        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/vnet/runs/exp1'
+        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/vnet/runs/exp2'
     )
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -44,7 +45,7 @@ if __name__ == "__main__":
     num_val = 40
     batch_size = 1
     num_epochs = 500
-    lr = 1e-3
+    lr = 1e-4
 
     # Defining Transforms
     img_trans = Compose([
@@ -53,6 +54,7 @@ if __name__ == "__main__":
         # ThresholdIntensity(threshold=-250, above=True, cval=-250),
         # ThresholdIntensity(threshold=500, above=False, cval=500),
         # HistogramNormalize(num_bins=751, min=0, max=1),
+        ScaleIntensityRange(a_min=-250, a_max=500, b_max=1.0, b_min=0.0, clip=True),
         ToTensor(dtype=torch.float32)
     ])
     seg_trans = Compose([
@@ -90,12 +92,9 @@ if __name__ == "__main__":
     )
 
     # Model
-    net = VNet(
-        dropout_prob=0.2
-    ).to(device)
+    net = VNet(dropout_prob=0.9).to(device)
 
-    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
-    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=opt, gamma=0.99)
+    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-1)
     loss = DiceLoss(sigmoid=True)
     metric = DiceMetric(include_background=True, reduction='mean')
 
@@ -117,6 +116,7 @@ if __name__ == "__main__":
 
             opt.zero_grad()
             y_pred = net(batch_images)
+
             loss_train = loss(y_pred, batch_segs)
             loss_train.backward()
             opt.step()
@@ -125,8 +125,6 @@ if __name__ == "__main__":
 
         epoch_train_losses.append(np.average(batch_loss))
         writer.add_scalar('avg training loss per batch per epoch', epoch_train_losses[-1], epoch + 1)
-
-        lr_scheduler.step()
 
         net.eval()
         loss_val_list = []
@@ -145,8 +143,8 @@ if __name__ == "__main__":
                 loss_val_list.append(loss_val.item())
 
                 # Metric
-                # y_pred = torch.sigmoid(y_pred)
-                # y_pred = torch.round(y_pred)
+                y_pred = torch.sigmoid(y_pred)
+                y_pred = torch.round(y_pred)
 
                 pred_metric = metric(y_pred=y_pred, y=batch_segs)
                 metric_vals += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
@@ -158,7 +156,7 @@ if __name__ == "__main__":
         # Save Best Metric
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/vnet/runs/exp1/best_model_parameters.pt')
+            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/vnet/runs/exp2/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)

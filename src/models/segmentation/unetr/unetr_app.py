@@ -8,6 +8,8 @@
     @Description:       This file contains an implementation of a 3D UNETR.
 
 """
+from monai.losses import DiceLoss
+from monai.metrics import DiceMetric
 
 from src.models.segmentation.hdf_dataset import HDFDataset
 from monai.utils import set_determinism
@@ -20,11 +22,12 @@ from monai.transforms import (
     CenterSpatialCrop,
     ThresholdIntensity,
     KeepLargestConnectedComponent,
-    Compose
+    Compose, ScaleIntensityRange
 )
 from torch.utils.data import random_split
 from monai.networks.nets import UNETR
 from monai.data.dataloader import DataLoader
+import numpy as np
 
 if __name__ == '__main__':
     set_determinism(seed=1010710)
@@ -44,11 +47,16 @@ if __name__ == '__main__':
     img_trans = Compose([
         AddChannel(),
         CenterSpatialCrop(roi_size=(1000, 160, 160)),
+        ThresholdIntensity(threshold=-250, above=True, cval=-250),
+        ThresholdIntensity(threshold=500, above=False, cval=500),
+        HistogramNormalize(num_bins=751, min=0, max=1),
+        # ScaleIntensityRange(a_min=-250, a_max=500, b_max=1.0, b_min=0.0, clip=True),
         ToTensor(dtype=torch.float32)
     ])
     seg_trans = Compose([
         AddChannel(),
         CenterSpatialCrop(roi_size=(1000, 160, 160)),
+        KeepLargestConnectedComponent(),
         ToTensor(dtype=torch.float32)
     ])
 
@@ -58,6 +66,7 @@ if __name__ == '__main__':
         img_transform=img_trans,
         seg_transform=seg_trans
     )
+    print('Dataset is done.')
 
     # Train/Val Split
     train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
@@ -78,10 +87,87 @@ if __name__ == '__main__':
         shuffle=False
     )
 
-    # Model
     net = UNETR(
         in_channels=1,
         out_channels=1,
-
+        img_size=(160, 160, 160),
+        feature_size=16,
+        hidden_size=768,
+        mlp_dim=3072,
+        num_heads=12,
+        pos_embed='conv',   # perceptron?
+        norm_name='instance',
+        conv_block=True,
+        res_block=True,
+        dropout_rate=0.0
     ).to(device)
 
+    opt = torch.optim.Adam(net.parameters(), lr)     #, weight_decay=1e-3
+    loss = DiceLoss(sigmoid=True)
+    metric = DiceMetric(include_background=True, reduction='mean')
+
+    print('Starting training.')
+
+    epoch_train_losses = []
+    epoch_val_losses = []
+    epoch_val_metrics = []
+    best_metric = 0
+    for epoch in range(num_epochs):
+        net.train()
+        batch_loss = []
+
+        # Training
+        for batch in train_loader:
+            batch_images = batch[0].to(device)
+            batch_segs = batch[1].to(device)
+
+            opt.zero_grad()
+            y_pred = net(batch_images)
+
+            loss_train = loss(y_pred, batch_segs)
+            loss_train.backward()
+            opt.step()
+
+            batch_loss.append(loss_train.item())
+
+        epoch_train_losses.append(np.average(batch_loss))
+        writer.add_scalar('avg training loss per batch per epoch', epoch_train_losses[-1], epoch + 1)
+
+        net.eval()
+        loss_val_list = []
+        metric_vals = []
+
+        # Validation
+        with torch.no_grad():
+            for batch_images, batch_segs in val_loader:
+                batch_images = batch_images.to(device)
+                batch_segs = batch_segs.to(device)
+
+                y_pred = net(batch_images)
+
+                # Loss
+                loss_val = loss(y_pred, batch_segs)
+                loss_val_list.append(loss_val.item())
+
+                # Post-processing
+                y_pred = torch.sigmoid(y_pred)
+                y_pred = torch.round(y_pred)
+
+                # Metric
+                pred_metric = metric(y_pred=y_pred, y=batch_segs)
+                metric_vals += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
+
+        epoch_val_losses.append(np.average(loss_val_list))
+        epoch_val_metrics.append(np.average(metric_vals))
+        print(f"EPOCH {epoch + 1}, val metric : {epoch_val_metrics[-1]}")
+
+        # Save Best Metric
+        if epoch_val_metrics[-1] > best_metric:
+            best_metric = epoch_val_metrics[-1]
+            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unetr/runs/exp1/best_model_parameters.pt')
+
+        writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
+        writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)
+
+    writer.flush()
+    writer.close()

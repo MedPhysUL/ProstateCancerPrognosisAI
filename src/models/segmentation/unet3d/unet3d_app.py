@@ -46,21 +46,21 @@ if __name__ == '__main__':
     num_val = 40
     batch_size = 1    # 2 avant exp8     ##4
     num_epochs = 150
-    lr = 1e-3       # 1e-3 avant exp8  ##1e-3
+    lr = 1e-3       # 1e-3 avant exp8  ##1e-4
 
     # Defining Transforms
     img_trans = Compose([
         AddChannel(),
         CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        # ThresholdIntensity(threshold=-250, above=True, cval=-250),
-        # ThresholdIntensity(threshold=500, above=False, cval=500),
-        # HistogramNormalize(num_bins=751, min=0, max=1),
+        ThresholdIntensity(threshold=-250, above=True, cval=-250),
+        ThresholdIntensity(threshold=500, above=False, cval=500),
+        HistogramNormalize(num_bins=751, min=0, max=1),
         ToTensor(dtype=torch.float32)
     ])
     seg_trans = Compose([
         AddChannel(),
         CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        # KeepLargestConnectedComponent(),
+        KeepLargestConnectedComponent(),
         ToTensor(dtype=torch.float32)
     ])
 
@@ -168,7 +168,8 @@ if __name__ == '__main__':
         out_channels=1,
         channels=(8, 16, 32, 64, 128),    # ##
         strides=(2, 2, 2, 2),
-        dropout=0.2     # 0.2 avant exp8     ##0.5
+        dropout=0.2,     # 0.2 avant exp8     ##0.5
+        # num_res_units=1       y va falloir en mettre https://www.researchgate.net/figure/Comparison-with-vanilla-U-Net-U-Net-with-residual-blocks-U-Net-with-3D_fig2_327064986 ca lair meilleur
     ).to(device)
 
     opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)     # weight_decay 1e-3 avant exp8  ##   1e-2
