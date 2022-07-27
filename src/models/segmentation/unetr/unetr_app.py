@@ -6,34 +6,35 @@
     @Last modification: 07/2022
 
     @Description:       This file contains an implementation of a 3D UNETR.
-
 """
+
+from monai.data.dataloader import DataLoader
 from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
-
-from src.models.segmentation.hdf_dataset import HDFDataset
-from monai.utils import set_determinism
-from torch.utils.tensorboard import SummaryWriter
-import torch
+from monai.networks.nets import UNETR
 from monai.transforms import (
     AddChannel,
-    ToTensor,
-    HistogramNormalize,
     CenterSpatialCrop,
-    ThresholdIntensity,
+    Compose,
+    HistogramNormalize,
     KeepLargestConnectedComponent,
-    Compose, ScaleIntensityRange
+    ThresholdIntensity,
+    ToTensor
 )
-from torch.utils.data import random_split
-from monai.networks.nets import UNETR
-from monai.data.dataloader import DataLoader
+from monai.utils import set_determinism
 import numpy as np
+import torch
+from torch.utils.data import random_split
+from torch.utils.tensorboard import SummaryWriter
+
+from src.models.segmentation.hdf_dataset import HDFDataset
+
 
 if __name__ == '__main__':
     set_determinism(seed=1010710)
 
     writer = SummaryWriter(
-        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unetr/runs/exp1'
+        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unetr/runs/exp_delete'
     )
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -50,7 +51,6 @@ if __name__ == '__main__':
         ThresholdIntensity(threshold=-250, above=True, cval=-250),
         ThresholdIntensity(threshold=500, above=False, cval=500),
         HistogramNormalize(num_bins=751, min=0, max=1),
-        # ScaleIntensityRange(a_min=-250, a_max=500, b_max=1.0, b_min=0.0, clip=True),
         ToTensor(dtype=torch.float32)
     ])
     seg_trans = Compose([
@@ -66,7 +66,6 @@ if __name__ == '__main__':
         img_transform=img_trans,
         seg_transform=seg_trans
     )
-    print('Dataset is done.')
 
     # Train/Val Split
     train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
@@ -87,6 +86,7 @@ if __name__ == '__main__':
         shuffle=False
     )
 
+    # Model
     net = UNETR(
         in_channels=1,
         out_channels=1,
@@ -95,19 +95,18 @@ if __name__ == '__main__':
         hidden_size=768,
         mlp_dim=3072,
         num_heads=12,
-        pos_embed='conv',   # perceptron?
+        pos_embed='conv',
         norm_name='instance',
         conv_block=True,
         res_block=True,
         dropout_rate=0.0
     ).to(device)
 
-    opt = torch.optim.Adam(net.parameters(), lr)     #, weight_decay=1e-3
+    opt = torch.optim.Adam(net.parameters(), lr)
     loss = DiceLoss(sigmoid=True)
     metric = DiceMetric(include_background=True, reduction='mean')
 
-    print('Starting training.')
-
+    # Training Loop
     epoch_train_losses = []
     epoch_val_losses = []
     epoch_val_metrics = []
@@ -164,7 +163,7 @@ if __name__ == '__main__':
         # Save Best Metric
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unetr/runs/exp1/best_model_parameters.pt')
+            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unetr/runs/exp_delete/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)

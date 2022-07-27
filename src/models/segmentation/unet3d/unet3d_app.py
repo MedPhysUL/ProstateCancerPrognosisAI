@@ -6,10 +6,7 @@
     @Last modification: 07/2022
 
     @Description:       This file contains an implementation of a 3D U-Net.
-
 """
-
-from src.models.segmentation.hdf_dataset import HDFDataset
 
 from monai.data import DataLoader
 from monai.losses import DiceLoss
@@ -19,19 +16,21 @@ from monai.transforms import (
     AddChannel,
     CenterSpatialCrop,
     Compose,
-    KeepLargestConnectedComponent,
-    ThresholdIntensity,
-    ToTensor,
     HistogramNormalize,
-    Rotate90,
-    RandFlip,
+    KeepLargestConnectedComponent,
+    # RandFlip,
+    # Rotate90,
+    ThresholdIntensity,
+    ToTensor
 )
 from monai.utils import set_determinism
 import numpy as np
 import torch
 from torch.utils.data.dataset import random_split
 from torch.utils.tensorboard import SummaryWriter
-from src.data.processing.copy_items import Augmentation, AugmentationTransforms
+
+# from src.data.processing.copy_items import Augmentation, AugmentationTransforms
+from src.models.segmentation.hdf_dataset import HDFDataset
 
 
 if __name__ == '__main__':
@@ -44,9 +43,9 @@ if __name__ == '__main__':
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 40
-    batch_size = 1    # 2 avant exp8     ##4
+    batch_size = 1
     num_epochs = 150
-    lr = 1e-3       # 1e-3 avant exp8  ##1e-4
+    lr = 1e-3
 
     # Defining Transforms
     img_trans = Compose([
@@ -72,12 +71,7 @@ if __name__ == '__main__':
     )
 
     # Train/Val Split
-    # train_ds = ds[:-num_val]
-    # val_ds = ds[-num_val:]
     train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
-    print(type(train_ds))
-    print(type(val_ds))
-    print(len(train_ds))
 
     # Data Augmentation
     # aug_trans = [
@@ -166,22 +160,21 @@ if __name__ == '__main__':
         dimensions=3,
         in_channels=1,
         out_channels=1,
-        channels=(8, 16, 32, 64, 128),    # ##
+        channels=(64, 128, 256, 512, 1024),
         strides=(2, 2, 2, 2),
-        dropout=0.2,     # 0.2 avant exp8     ##0.5
-        # num_res_units=1       y va falloir en mettre https://www.researchgate.net/figure/Comparison-with-vanilla-U-Net-U-Net-with-residual-blocks-U-Net-with-3D_fig2_327064986 ca lair meilleur
+        dropout=0.2
     ).to(device)
 
-    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)     # weight_decay 1e-3 avant exp8  ##   1e-2
+    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=opt, gamma=0.99)
     loss = DiceLoss(sigmoid=True)
     metric = DiceMetric(include_background=True, reduction='mean')
 
+    # Training Loop
     epoch_train_losses = []
     epoch_val_losses = []
     epoch_val_metrics = []
     best_metric = 0
-
     for epoch in range(num_epochs):
         net.train()
         batch_loss = []
@@ -220,10 +213,11 @@ if __name__ == '__main__':
                 loss_val = loss(y_pred, batch_segs)
                 loss_val_list.append(loss_val.item())
 
-                # Metric
+                # Post-processing
                 y_pred = torch.sigmoid(y_pred)
                 y_pred = torch.round(y_pred)
 
+                # Metric
                 pred_metric = metric(y_pred=y_pred, y=batch_segs)
                 metric_vals += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
 

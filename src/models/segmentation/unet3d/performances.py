@@ -1,39 +1,44 @@
 """
-    @file:              best_and_worst.py
+    @file:              performances.py
     @Author:            Raphael Brodeur
 
     @Creation Date:     07/2022
     @Last modification: 07/2022
 
-    @Description:       Description.
+    @Description:       This file contains a script to assess the performance of a 3D U-Net.
 
 """
+import matplotlib.pyplot as plt
+from monai.data import DataLoader
+from monai.metrics import DiceMetric
+from monai.networks.nets import UNet
+from monai.transforms import (
+    AddChannel,
+    CenterSpatialCrop,
+    Compose,
+    HistogramNormalize,
+    KeepLargestConnectedComponent,
+    ThresholdIntensity,
+    ToTensor
+)
+from monai.utils import set_determinism
 import numpy as np
+import torch
+from torch.utils.data.dataset import random_split
 
 from src.models.segmentation.hdf_dataset import HDFDataset
 from src.visualization.viewer import Viewer
 
-from monai.data import DataLoader
-from monai.metrics import DiceMetric
-from monai.transforms import AddChannel, CenterSpatialCrop, Compose, ToTensor, ThresholdIntensity, HistogramNormalize,\
-    KeepLargestConnectedComponent
-from monai.networks.nets import UNet
-from monai.utils import set_determinism
-from torch.utils.data.dataset import random_split
-import torch
-import matplotlib.pyplot as plt
-
 if __name__ == '__main__':
-
-    # Setting Up Exp
     set_determinism(seed=1010710)
 
+    # Setting Up
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     metric = DiceMetric(include_background=True, reduction='mean')
     num_val = 40
     num_workers = 0
-    batch_size = 1
 
+    # Defining Transforms
     img_trans = Compose([
         AddChannel(),
         CenterSpatialCrop(roi_size=(1000, 160, 160)),
@@ -49,22 +54,25 @@ if __name__ == '__main__':
         ToTensor(dtype=torch.float32)
     ])
 
+    # Dataset
     ds = HDFDataset(
         path='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5',
         img_transform=img_trans,
         seg_transform=seg_trans
     )
 
-    # val_ds = ds[-num_val:]
+    # Train/Val Split
     train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
 
     val_loader = DataLoader(
         dataset=val_ds,
         num_workers=num_workers,
-        batch_size=batch_size,
-        pin_memory=True
+        batch_size=1,
+        pin_memory=True,
+        shuffle=False
     )
 
+    # Model
     net = UNet(
         dimensions=3,
         in_channels=1,
@@ -75,7 +83,7 @@ if __name__ == '__main__':
     ).to(device)
 
     # Load Best Parameters
-    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp7/best_model_parameters.pt'))
+    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete/best_model_parameters.pt'))
     net.eval()
 
     # Stats
@@ -143,28 +151,28 @@ if __name__ == '__main__':
                 Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
 
     # Show All
-    # with torch.no_grad():
-    #     for patient_img, patient_seg in val_loader:
-    #         img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
-    #         seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
-    #         patient_img = patient_img.to(device)
-    #         y_pred = net(patient_img)
-    #         y_pred = torch.sigmoid(y_pred)
-    #         y_pred = torch.round(y_pred)
-    #         print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
-    #         seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-    #         Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
+    with torch.no_grad():
+        for patient_img, patient_seg in val_loader:
+            img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+            seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+            patient_img = patient_img.to(device)
+            y_pred = net(patient_img)
+            y_pred = torch.sigmoid(y_pred)
+            y_pred = torch.round(y_pred)
+            print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
+            seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+            Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
 
-    # Tensorboard model graph
-    # from monai.utils import first
-    # from torch.utils.tensorboard import SummaryWriter
-    # writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp5')
-    # with torch.no_grad():
-    #     img, seg = first(val_loader)
-    #     img = img.to(device)
-    #     writer.add_graph(net, img)
-    # writer.flush()
-    # writer.close()
+    # Tensorboard Model Graph
+    from monai.utils import first
+    from torch.utils.tensorboard import SummaryWriter
+    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete')
+    with torch.no_grad():
+        img, seg = first(val_loader)
+        img = img.to(device)
+        writer.add_graph(net, img)
+    writer.flush()
+    writer.close()
 
     # Volume-Dice Plot
     metric_list = []

@@ -1,5 +1,3 @@
-# est-ce que sigmoid et asDiscrete est built-in?
-#
 """
     @file:              vnet_app.py
     @Author:            Raphael Brodeur
@@ -8,36 +6,36 @@
     @Last modification: 07/2022
 
     @Description:       This file contains an implementation of a 3D V-Net.
-
 """
 
-from src.models.segmentation.hdf_dataset import HDFDataset
-
-from monai.transforms import (
-    AddChannel,
-    CenterSpatialCrop,
-    Compose,
-    KeepLargestConnectedComponent,
-    ThresholdIntensity,
-    ToTensor,
-    HistogramNormalize,
-    ScaleIntensityRange
-)
-from monai.utils import set_determinism
-import torch
-from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data.dataset import random_split
 from monai.data import DataLoader
 from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
 from monai.networks.nets import VNet
+from monai.transforms import (
+    AddChannel,
+    CenterSpatialCrop,
+    Compose,
+    # HistogramNormalize,
+    KeepLargestConnectedComponent,
+    ScaleIntensityRange,
+    # ThresholdIntensity,
+    ToTensor
+)
+from monai.utils import set_determinism
 import numpy as np
+import torch
+from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data.dataset import random_split
+
+from src.models.segmentation.hdf_dataset import HDFDataset
+
 
 if __name__ == "__main__":
     set_determinism(seed=1010710)
 
     writer = SummaryWriter(
-        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/vnet/runs/exp2'
+        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/vnet/runs/exp_delete'
     )
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -60,7 +58,7 @@ if __name__ == "__main__":
     seg_trans = Compose([
         AddChannel(),
         CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        # KeepLargestConnectedComponent(),
+        KeepLargestConnectedComponent(),
         ToTensor(dtype=torch.float32)
     ])
 
@@ -70,7 +68,6 @@ if __name__ == "__main__":
         img_transform=img_trans,
         seg_transform=seg_trans
     )
-    print('Dataset is done.')
 
     # Train/Val Split
     train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
@@ -98,13 +95,11 @@ if __name__ == "__main__":
     loss = DiceLoss(sigmoid=True)
     metric = DiceMetric(include_background=True, reduction='mean')
 
-    print('Starting training.')
-
+    # Training Loop
     epoch_train_losses = []
     epoch_val_losses = []
     epoch_val_metrics = []
     best_metric = 0
-
     for epoch in range(num_epochs):
         net.train()
         batch_loss = []
@@ -142,10 +137,11 @@ if __name__ == "__main__":
                 loss_val = loss(y_pred, batch_segs)
                 loss_val_list.append(loss_val.item())
 
-                # Metric
+                # Post-processing
                 y_pred = torch.sigmoid(y_pred)
                 y_pred = torch.round(y_pred)
 
+                # Metric
                 pred_metric = metric(y_pred=y_pred, y=batch_segs)
                 metric_vals += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
 
@@ -156,7 +152,7 @@ if __name__ == "__main__":
         # Save Best Metric
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/vnet/runs/exp2/best_model_parameters.pt')
+            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/vnet/runs/exp_delete/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)
