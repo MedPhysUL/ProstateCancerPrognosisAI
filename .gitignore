@@ -5,3 +5,5 @@ settings/database.py
 *.pt
 *.json
 *.csv
+local_data/
+logs/
