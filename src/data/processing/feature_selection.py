@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
-from src.data.processing.single_task_dataset import SingleTaskDataset
+from src.data.processing.single_task_table_dataset import SingleTaskTableDataset
 
 
 class FeatureSelector:
@@ -62,7 +62,7 @@ class FeatureSelector:
 
     def __call__(
             self,
-            dataset: SingleTaskDataset,
+            dataset: SingleTaskTableDataset,
             records_path: Optional[str] = None,
             return_imp: bool = False
     ) -> Union[Tuple[Optional[List[str]], Optional[List[str]]], Tuple[Optional[List[str]], Optional[List[str]], dict]]:
@@ -71,7 +71,7 @@ class FeatureSelector:
 
         Parameters
         ----------
-        dataset : SingleTaskDataset
+        dataset : SingleTaskTableDataset
             Custom dataset.
         records_path : Optional[str]
             Paths used to store figures and importance table.
@@ -118,7 +118,7 @@ class FeatureSelector:
 
     def get_features_importance(
             self,
-            dataset: SingleTaskDataset
+            dataset: SingleTaskTableDataset
     ) -> pd.DataFrame:
         """
         Trains a random forest (with default sklearn hyperparameters) to solve any classification or regression
@@ -126,7 +126,7 @@ class FeatureSelector:
 
         Parameters
         ----------
-        dataset: SingleTaskDataset
+        dataset: SingleTaskTableDataset
             Custom dataset.
 
         Returns

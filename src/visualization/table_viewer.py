@@ -17,8 +17,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from src.data.processing.multi_task_dataset import MultiTaskDataset
-from src.data.processing.single_task_dataset import MaskType, SingleTaskDataset
+from src.data.processing.multi_task_table_dataset import MultiTaskTableDataset
+from src.data.processing.single_task_table_dataset import MaskType, SingleTaskTableDataset
 
 
 class TableViewer:
@@ -30,23 +30,23 @@ class TableViewer:
 
     def __init__(
             self,
-            dataset: Union[SingleTaskDataset, MultiTaskDataset]
+            dataset: Union[SingleTaskTableDataset, MultiTaskTableDataset]
     ):
         """
         Sets protected and public attributes of our table viewer.
 
         Parameters
         ----------
-        dataset : Union[SingleTaskDataset, MultiTaskDataset]
+        dataset : Union[SingleTaskTableDataset, MultiTaskTableDataset]
             Dataset.
         """
         sns.set_style("whitegrid")
         self.dataset = dataset
 
-        if isinstance(dataset, SingleTaskDataset):
+        if isinstance(dataset, SingleTaskTableDataset):
             self._datasets = [dataset]
             self._target_cols = [dataset.target_col]
-        elif isinstance(dataset, MultiTaskDataset):
+        elif isinstance(dataset, MultiTaskTableDataset):
             self._datasets = dataset.datasets
             self._target_cols = [ds.target_col for ds in self._datasets]
 
