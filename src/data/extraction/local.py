@@ -9,13 +9,15 @@
                         an HDF5 file containing the patients' images and their segmentations.
 """
 
+import os
 from typing import Dict, List, Optional, Sequence, Union
 
-from dicom2hdf import PatientsDataset, PatientWhoFailed
+from dicom2hdf import PatientsDatabase, PatientWhoFailed
 from dicom2hdf.processing.transforms import BaseTransform
+import h5py
 
 
-class LocalDatabaseManager(PatientsDataset):
+class LocalDatabaseManager(PatientsDatabase):
     """
     A LocalDatabaseManager class which is used to extract images contained in DICOM files and aggregate these images and
     some metadata into an HDF5 file. This file is then easier to parse than the original DICOM files to retrieve images
@@ -34,7 +36,38 @@ class LocalDatabaseManager(PatientsDataset):
         path_to_database : str
             Path to dataset.
         """
-        super().__init__(path_to_dataset=path_to_database)
+        super().__init__(path_to_database=path_to_database)
+
+    @property
+    def _database_exists(
+            self
+    ) -> bool:
+        """
+        Whether database exists.
+
+        Returns
+        -------
+        database_existence : bool
+            Whether database exists.
+        """
+        return os.path.exists(self.path_to_database)
+
+    def get_database(
+            self
+    ) -> h5py.File:
+        """
+        Gets h5py.File representing the database.
+
+        Returns
+        -------
+        database : h5py.File
+            Images and segmentations database.
+        """
+        if self._database_exists:
+            return h5py.File(self.path_to_database, mode="r")
+        else:
+            raise FileExistsError(
+                f"HDF5 file with path {self.path_to_database} doesn't exists. Use create_database before get_database.")
 
     def create_database(
             self,
@@ -42,7 +75,7 @@ class LocalDatabaseManager(PatientsDataset):
             series_descriptions: Optional[Union[str, Dict[str, List[str]]]] = None,
             transformations: Optional[Sequence[BaseTransform]] = None,
             erase_unused_dicom_files: bool = False,
-            overwrite_dataset: bool = False
+            overwrite_database: bool = False
     ) -> List[PatientWhoFailed]:
         """
         Creates an HDF dataset from multiple patients DICOM files.
@@ -61,8 +94,8 @@ class LocalDatabaseManager(PatientsDataset):
             A sequence of transformations to apply to images and segmentations.
         erase_unused_dicom_files: bool, default = False
             Whether to delete unused DICOM files or not. Use with caution.
-        overwrite_dataset : bool, default = False.
-            Overwrite existing dataset.
+        overwrite_database : bool, default = False.
+            Overwrite existing database.
 
         Returns
         -------
@@ -70,13 +103,13 @@ class LocalDatabaseManager(PatientsDataset):
             List of patients with one or more images not added to the HDF5 dataset due to the absence of the series in
             the patient record.
         """
-        patients_who_failed = self.create_hdf5_dataset(
+        patients_who_failed = self.create(
             path_to_patients_folder=path_to_patients_folder,
             tags_to_use_as_attributes=[(0x0008, 0x103E), (0x0020, 0x000E), (0x0008, 0x0060)],
             series_descriptions=series_descriptions,
             transforms=transformations,
             erase_unused_dicom_files=erase_unused_dicom_files,
-            overwrite_dataset=overwrite_dataset
+            overwrite_database=overwrite_database
         )
 
         return patients_who_failed
