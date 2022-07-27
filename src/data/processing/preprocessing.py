@@ -1,55 +1,76 @@
 """
-Filename: preprocessing.py
+    @file:              preprocessing.py
+    @Author:            Maxence Larose, Nicolas Raymond
 
-Author: Nicolas Raymond
+    @Creation Date:     05/2022
+    @Last modification: 05/2022
 
-Description: Defines all functions related to preprocessing
-
-Date of last modification : 2021/11/01
+    @Description:       This file contains a series of functions related to preprocessing tabular data.
 """
 
-from numpy import linspace, nan, quantile
-from pandas import DataFrame, Series
+from typing import List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
+
 from src.data.processing.transforms import ContinuousTransform as ConT
 from src.data.processing.transforms import CategoricalTransform as CaT
-from typing import Dict, List, Optional, Tuple
-
-ENCODING = ["ordinal", "one-hot"]
 
 
-def preprocess_continuous(df: DataFrame,
-                          mean: Optional[Series] = None,
-                          std: Optional[Series] = None) -> DataFrame:
+ENCODINGS = ["ordinal", "one-hot"]
+
+
+def preprocess_continuous(
+        df: pd.DataFrame,
+        mean: Optional[pd.Series] = None,
+        std: Optional[pd.Series] = None
+) -> pd.DataFrame:
     """
-    Applies all continuous transforms to a dataframe containing only continuous data
+    Applies all continuous transforms to a dataframe containing only continuous data.
 
-    Args:
-        df: pandas dataframe
-        mean: pandas series with mean
-        std: pandas series with standard deviations
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe containing all data.
+    mean : Optional[pd.Series]
+        Pandas series with mean.
+    std : Optional[pd.Series]
+        Pandas series with standard deviations
 
-    Returns: preprocessed dataframe
+    Returns
+    -------
+    preprocessed_dataframe : pd.DataFrame
+        Dataframe containing data on which all continuous transforms have been applied.
     """
     return ConT.normalize(ConT.fill_missing(df, mean), mean, std)
 
 
-def preprocess_categoricals(df: DataFrame,
-                            encoding: str = "ordinal",
-                            mode: Optional[Series] = None,
-                            encodings: Optional[dict] = None) -> Tuple[DataFrame, Optional[dict]]:
+def preprocess_categoricals(
+        df: pd.DataFrame,
+        encoding: str = "ordinal",
+        mode: Optional[pd.Series] = None,
+        encodings: Optional[dict] = None
+) -> Tuple[pd.DataFrame, Optional[dict]]:
     """
     Applies all categorical transforms to a dataframe containing only continuous data
 
-    Args:
-        df: pandas dataframe
-        encoding: one option in ("ordinal", "one-hot")
-        mode: panda series with modes of columns
-        encodings: dict of dict with integers to use as encoding for each category's values
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe containing all data.
+    encoding : str
+        One option in ("ordinal", "one-hot").
+    mode : Optional[pd.Series]
+        Pandas series with modes of columns.
+    encodings : Optional[dict]
+        Dict of dict with integers to use as encoding for each category's values
 
-    Returns:pandas dataframe, dict of encodings
+    Returns
+    -------
+    df, encodings : Tuple[pd.DataFrame, Optional[dict]]
+        Pandas dataframe, dictionary of encodings.
     """
-
-    if encoding not in ENCODING:
+    if encoding not in ENCODINGS:
         raise ValueError("Encoding option not available")
 
     # We ensure that all columns are considered as categories
@@ -63,63 +84,34 @@ def preprocess_categoricals(df: DataFrame,
         return CaT.one_hot_encode(df), None
 
 
-def preprocess_for_apriori(df: DataFrame,
-                           cont_cols: Optional[Dict[str, int]] = None,
-                           cat_cols: Optional[List[str]] = None) -> List[List[str]]:
+def create_groups(
+        df: pd.DataFrame,
+        cont_col: str,
+        nb_group: int
+) -> pd.DataFrame:
     """
-    Preprocess a dataframe to work with apriori algorithm
+    Change each value of the column cont_col for its belonging group computed using nb_group quantiles.
 
-    Args:
-        df: pandas dataframe
-        cont_cols: dictionary with name of continuous columns as key and number of groups
-                   we want to create as value.
-        cat_cols: list of categorical columns
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe containing all data.
+    cont_col : str
+        Name of the continuous column.
+    nb_group : int
+        Number of quantiles (group) wanted.
 
-    Returns: list of list
-    """
-
-    # Take the subset needed from the dataframe
-    df = df[list(cont_cols.keys()) + cat_cols]
-
-    # Change categorical variables
-    for c in cat_cols:
-        df.loc[:, c] = df[c].apply(func=lambda x: f"{c}_{x}")
-        df.loc[:, c] = df[c].apply(func=lambda x: x if x.split("_")[-1] != "None" else nan)
-
-    # Change numeric variables
-    for col, nb_group in cont_cols.items():
-        df = create_groups(df, col, nb_group)
-
-    # Extract list of list from dataframe
-    records = df.values.tolist()
-
-    # Remove nans from lists
-    for i, _ in enumerate(records):
-        records[i] = remove_nan(records[i])
-
-    return records
-
-
-def create_groups(df: DataFrame,
-                  cont_col: str,
-                  nb_group: int) -> DataFrame:
-    """
-    Change each value of the column cont_col for its belonging group
-    computed using nb_group quantiles
-
-    Args:
-        df: pandas dataframe
-        cont_col: name of the continuous column
-        nb_group: number of quantiles (group) wanted
-
-    Returns: dataframe with modified column
+    Returns
+    -------
+    df : pd.DataFrame
+        Dataframe with modified column.
     """
 
     if nb_group < 2:
         raise ValueError('Must have at least 2 groups')
 
     # We compute number needed to calculate quantiles
-    percentage = linspace(0, 1, nb_group+1)[1:-1]
+    percentage = np.linspace(0, 1, nb_group+1)[1:-1]
 
     # We sort values in an ascending way
     df = df.sort_values(by=cont_col)
@@ -134,7 +126,7 @@ def create_groups(df: DataFrame,
 
     # We compute quantiles
     for p in percentage:
-        quantiles.append(round(quantile(data, p), 2))
+        quantiles.append(round(np.quantile(data, p), 2))
 
     # We change row values
     j = turn_to_range(df, cont_col, 0, quantiles[0], group=f"{group} <= q1")
@@ -146,24 +138,34 @@ def create_groups(df: DataFrame,
     return df
 
 
-def turn_to_range(df: DataFrame,
-                  cont_col: str,
-                  start_index: int,
-                  quantile: float,
-                  group: str) -> int:
+def turn_to_range(
+        df: pd.DataFrame,
+        cont_col: str,
+        start_index: int,
+        quantile: float,
+        group: str
+) -> int:
     """
-    Changes categorical values of selected index into a string representing a range
+    Changes categorical values of selected index into a string representing a range.
 
-    Args:
-        df: pandas dataframe
-        cont_col: name of continuous column
-        start_index: index where to start the modification
-        quantile: quantile to reach
-        group: name of the group to be assigned
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe containing all data.
+    cont_col : str
+        Name of a continuous column.
+    start_index : int
+        Index where to start the modification.
+    quantile : float
+        Quantile to reach.
+    group : str
+        Name of the group to be assigned.
 
-    Returns: index where the quantile was exceeded
+    Returns
+    -------
+    Index : int
+        Index where the quantile was exceeded.
     """
-
     # We get the index of the column
     j = df.columns.get_loc(cont_col)
 
@@ -174,14 +176,21 @@ def turn_to_range(df: DataFrame,
             return i
 
 
-def remove_nan(record: List[str]) -> List:
+def remove_nan(
+        record: List[str]
+) -> List[str]:
     """
-    Removes nans from a record
+    Removes nans from a record.
 
-    Args:
-        record: list of str
+    Parameters
+    ----------
+    record : List[str]
+        List of strings.
 
-    Returns: curated list
+    Returns
+    -------
+    curated list : List[str]
+        List of strings.
     """
     record = [x for x in record if str(x) != 'nan']
 
