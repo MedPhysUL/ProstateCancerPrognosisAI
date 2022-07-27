@@ -1,11 +1,11 @@
 """
-    @file:              single_task_dataset.py
+    @file:              single_task_table_dataset.py
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     05/2022
     @Last modification: 07/2022
 
-    @Description:       This file contains a custom torch dataset named SingleTaskDataset.
+    @Description:       This file contains a custom torch dataset named SingleTaskTableDataset.
 """
 
 from __future__ import annotations
@@ -34,9 +34,9 @@ class MaskType:
         return iter([self.TRAIN, self.VALID, self.TEST])
 
 
-class SingleTaskDataset(Dataset):
+class SingleTaskTableDataset(Dataset):
     """
-    A custom dataset class used to perform single-task experiments.
+    A custom dataset class used to perform single-task experiments on tabular data.
     """
 
     def __init__(
@@ -72,7 +72,7 @@ class SingleTaskDataset(Dataset):
         to_tensor : bool
             Whether we want the features and targets in tensors. False for numpy arrays.
         """
-        super(SingleTaskDataset).__init__()
+        super(SingleTaskTableDataset).__init__()
 
         # Validation of inputs
         if cont_cols is None and cat_cols is None:
@@ -595,7 +595,7 @@ class SingleTaskDataset(Dataset):
             self,
             cont_cols: Optional[List[str]] = None,
             cat_cols: List[str] = None
-    ) -> SingleTaskDataset:
+    ) -> SingleTaskTableDataset:
         """
         Returns a subset of the current dataset using the given cont_cols and cat_cols.
 
@@ -608,12 +608,12 @@ class SingleTaskDataset(Dataset):
 
         Returns
         -------
-        sub_dataset : SingleTaskDataset
-            Instance of the ProstateCancerDataset class.
+        sub_dataset : SingleTaskTableDataset
+            Instance of the SingleTaskTableDataset class.
         """
         subset = self._retrieve_subset_from_original(cont_cols, cat_cols)
 
-        sub_dataset = SingleTaskDataset(
+        sub_dataset = SingleTaskTableDataset(
             df=subset,
             ids_col=self._ids_col,
             target_col=self._target_col,
@@ -629,7 +629,7 @@ class SingleTaskDataset(Dataset):
             self,
             data: pd.DataFrame,
             categorical: bool = False
-    ) -> SingleTaskDataset:
+    ) -> SingleTaskTableDataset:
         """
         Returns a superset of the current dataset by including the given data.
 
@@ -643,13 +643,13 @@ class SingleTaskDataset(Dataset):
 
         Returns
         -------
-        sub_dataset : SingleTaskDataset
-            Instance of the ProstateCancerDataset class.
+        sub_dataset : SingleTaskTableDataset
+            Instance of the SingleTaskTableDataset class.
         """
         # We build the augmented dataframe
         df, cont_cols, cat_cols = self._get_augmented_dataframe(data, categorical)
 
-        super_dataset = SingleTaskDataset(
+        super_dataset = SingleTaskTableDataset(
             df=df,
             ids_col=self._ids_col,
             target_col=self._target_col,

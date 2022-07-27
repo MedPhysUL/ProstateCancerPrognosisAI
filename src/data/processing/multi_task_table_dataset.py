@@ -5,7 +5,7 @@
     @Creation Date:     05/2022
     @Last modification: 07/2022
 
-    @Description:       This file contains a custom torch dataset named MultiTaskDataset.
+    @Description:       This file contains a custom torch dataset named MultiTaskTableDataset.
 """
 
 from typing import Dict, List, Optional, Sequence, Tuple, Union
@@ -15,20 +15,20 @@ import pandas as pd
 from torch import tensor
 from torch.utils.data import Dataset
 
-from src.data.processing.single_task_dataset import SingleTaskDataset
+from src.data.processing.single_task_table_dataset import SingleTaskTableDataset
 
 
-class MultiTaskDataset(Dataset):
+class MultiTaskTableDataset(Dataset):
     """
-    A custom dataset class used to perform multi-task experiments. Each MultiTaskDataset is composed of several
-    SingleTaskDatasets. All multi-task logic is integrated into the MultiTaskDataset object and only affects the
-    single-task datasets through masks updates. This class composition allows to cover the cases where some patients
-    have a missing label for one task while it is available for another.
+    A custom dataset class used to perform multi-task experiments on tabular data. Each MultiTaskTableDataset is
+    composed of several SingleTaskTableDataset. All multi-task logic is integrated into the MultiTaskTableDataset
+    object and only affects the single-task table datasets through masks updates. This class composition allows to
+    cover the cases where some patients have a missing label for one task while it is available for another.
     """
 
     def __init__(
             self,
-            datasets: Sequence[SingleTaskDataset],
+            datasets: Sequence[SingleTaskTableDataset],
             ids_to_row_idx: Dict[str, int]
     ):
         """
@@ -37,7 +37,7 @@ class MultiTaskDataset(Dataset):
         Parameters
         ----------
         datasets : Sequence[SingleTaskDataset]
-            Sequence of single task datasets. They need to have the same patient IDs column name.
+            Sequence of single-task table datasets. They need to have the same patient IDs column name.
         ids_to_row_idx : Dict[str, int]
             Dictionary that associates patient IDs with their corresponding row indices in the original dataframe.
         """
@@ -59,22 +59,12 @@ class MultiTaskDataset(Dataset):
             idx: Union[int, List[int]]
     ) -> List[List[Optional[Union[Tuple[np.array, np.array, np.array], Tuple[tensor, tensor, tensor]]]]]:
         """
-        Gets dataset items. NB if a given index (corresponding to a specific patient ID) is not available in a
-        specific dataset, the None keyword is returned at that specific location. The items are given in the following
-        format :
+        Gets dataset items. If a given index (corresponding to a specific patient ID) is not available in a specific
+        dataset, the None keyword is returned at that specific location.
 
-            items = [
-                  ┏━ x array of the item with index = 0 in dataset 0.
-                  ┃               ┏━ y array of the item with index = 1 in dataset 0.
-                  ┃               ┃          ┏━ Item with index = 2 is None in dataset 0.
-                [(x, y, idx), (x, y, idx), None, (x, y, idx), ...],              <------ Items from dataset 0.
-                [(x, y, idx), (x, y, idx), (x, y, idx), (x, y, idx), ...],       <------ Items from dataset 1.
-                ...
-            ]
-
-        NOTICE : You might want to access only the items of one of the single task datasets contained in the
-                 self.datasets list. To do this, just call the __getitem__ method of that particular dataset, and not
-                 the current __getitem__ which is used to access the items of all datasets at once.
+        NB : You might want to access only the items of one of the single-task table datasets contained in the
+             self.datasets list. To do this, just call the __getitem__ method of that particular dataset, and not the
+             current __getitem__ which is used to access the items of all datasets at once.
 
         Parameters
         ----------
@@ -84,7 +74,17 @@ class MultiTaskDataset(Dataset):
         Returns
         -------
         item : List[List[Optional[Union[Tuple[np.array, np.array, np.array], Tuple[tensor, tensor, tensor]]]]]
-            Item.
+            The items are given in the following format :
+
+                items = [
+                      ┏━ x array of the item with index = 0 in dataset 0.
+                      ┃               ┏━ y array of the item with index = 1 in dataset 0.
+                      ┃               ┃          ┏━ Item with index = 2 is None in dataset 0.
+                    [(x, y, idx), (x, y, idx), None, (x, y, idx), ...],              <------ Items from dataset 0.
+                    [(x, y, idx), (x, y, idx), (x, y, idx), (x, y, idx), ...],       <------ Items from dataset 1.
+                    ...
+                ]
+
         """
         item = []
         ids = self._convert_row_idx_to_ids(idx)
@@ -170,7 +170,7 @@ class MultiTaskDataset(Dataset):
         Gets list of target arrays. Those arrays may contain NaN as they are not filtered.
 
         WARNING! This method should not be used to access specific dataset.y values. Always iterate through
-        self.datasets to have access to the true underlying attributes of the single task datasets.
+        self.datasets to have access to the true underlying attributes of the single-task table datasets.
 
         Returns
         -------
@@ -195,7 +195,7 @@ class MultiTaskDataset(Dataset):
     ) -> None:
         """
         Updates the train, valid and test masks and then preprocesses the data available according to the current
-        statistics of the training data for each of the single task datasets respectively.
+        statistics of the training data for each of the single-task table datasets respectively.
 
         Parameters
         ----------

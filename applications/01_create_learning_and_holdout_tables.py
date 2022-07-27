@@ -10,9 +10,9 @@
 
 import pandas as pd
 
-from src.data.processing.multi_task_dataset import MultiTaskDataset
+from src.data.processing.multi_task_table_dataset import MultiTaskTableDataset
 from src.data.processing.sampling import RandomStratifiedSampler
-from src.data.processing.single_task_dataset import MaskType, SingleTaskDataset
+from src.data.processing.single_task_table_dataset import MaskType, SingleTaskTableDataset
 
 from constants import *
 
@@ -32,7 +32,7 @@ if __name__ == '__main__':
     single_task_datasets = []
     for target_col in target_cols:
         single_task_datasets.append(
-            SingleTaskDataset(
+            SingleTaskTableDataset(
                 df=df[df[target_col].notna()],
                 ids_col=ID,
                 target_col=target_col,
@@ -41,7 +41,7 @@ if __name__ == '__main__':
             )
         )
 
-    multi_task_dataset = MultiTaskDataset(
+    multi_task_dataset = MultiTaskTableDataset(
         datasets=single_task_datasets,
         ids_to_row_idx=dict(pd.Series(df.index, index=df[ID]))
     )

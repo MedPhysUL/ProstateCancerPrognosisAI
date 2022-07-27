@@ -20,8 +20,8 @@ from sklearn.model_selection import train_test_split
 from torch import tensor
 from tqdm import tqdm
 
-from src.data.processing.single_task_dataset import MaskType, SingleTaskDataset
-from src.data.processing.multi_task_dataset import MultiTaskDataset
+from src.data.processing.single_task_table_dataset import MaskType, SingleTaskTableDataset
+from src.data.processing.multi_task_table_dataset import MultiTaskTableDataset
 
 
 class RandomStratifiedSampler:
@@ -32,7 +32,7 @@ class RandomStratifiedSampler:
 
     def __init__(
             self,
-            dataset: Union[SingleTaskDataset, MultiTaskDataset],
+            dataset: Union[SingleTaskTableDataset, MultiTaskTableDataset],
             n_out_split: int,
             n_in_split: int,
             valid_size: float = 0.20,
@@ -46,7 +46,7 @@ class RandomStratifiedSampler:
 
         Parameters
         ----------
-        dataset : Union[SingleTaskDataset, MultiTaskDataset]
+        dataset : Union[SingleTaskTableDataset, MultiTaskTableDataset]
             Custom dataset.
         n_out_split : int
             Number of outer splits to produce.
@@ -78,14 +78,14 @@ class RandomStratifiedSampler:
 
         # Private attributes
         self.__unique_encodings = []
-        if isinstance(dataset, SingleTaskDataset):
+        if isinstance(dataset, SingleTaskTableDataset):
             self.__datasets = [dataset]
             self.__targets = [dataset.y]
             if self.__datasets[0].encodings is not None:
                 self.__unique_encodings = [{k: list(v.values()) for k, v in self.__datasets[0].encodings.items()}]
             else:
                 self.__unique_encodings = [{}]
-        elif isinstance(dataset, MultiTaskDataset):
+        elif isinstance(dataset, MultiTaskTableDataset):
             self.__datasets = dataset.datasets
             self.__targets = dataset.get_targets()
             for ds in self.__datasets:
