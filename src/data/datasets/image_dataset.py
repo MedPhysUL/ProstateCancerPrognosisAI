@@ -10,7 +10,7 @@
                         can be specified.
 """
 
-from typing import Callable, NamedTuple, Optional
+from typing import Callable, NamedTuple, Optional, Tuple
 
 from monai.data import ArrayDataset
 from monai.transforms import CropForeground, SpatialCrop
@@ -26,6 +26,9 @@ class ImageDataset(ArrayDataset):
     """
 
     class ZDimension(NamedTuple):
+        """
+        A tuple that specify the z-dimension crop.
+        """
         start: int
         stop: int
 
@@ -36,7 +39,7 @@ class ImageDataset(ArrayDataset):
             seg_transform: Optional[Callable] = None,
             z_dim: ZDimension = ZDimension(start=50, stop=210),
             organ: str = "Prostate"
-    ):
+    ) -> None:
         """
         Creates a dataset of various patients and their respective CT and segmentation map from a given local HDf5 file.
         Images and segmentation maps are rendered in shape (Z, X, Y).
@@ -52,7 +55,7 @@ class ImageDataset(ArrayDataset):
         z_dim : ZDimension
             A tuple that specify the z-dimension crop.
         organ : str
-            An organ whose segmentation is to be used.
+            The organ whose segmentation map is to be used.
         """
         db = database_manager.get_database()
         img_list, seg_list = [], []
@@ -60,20 +63,14 @@ class ImageDataset(ArrayDataset):
             if db[patient]['0'].attrs[database_manager.MODALITY] == "CT":
                 img = np.transpose(np.array(db[patient]['0'][database_manager.IMAGE]), (2, 0, 1))
                 seg = np.transpose(np.array(db[patient]['0']['0'][f"{organ}_label_map"]), (2, 0, 1))
-
-                img_cropped, seg_cropped = self._crop(img=img, seg=seg, z_dim=z_dim)
-
-                img_list.append(img_cropped)
-                seg_list.append(seg_cropped)
-
             else:
                 img = np.transpose(np.array(db[patient]['1'][database_manager.IMAGE]), (2, 0, 1))
                 seg = np.transpose(np.array(db[patient]['1']['0'][f"{organ}_label_map"]), (2, 0, 1))
 
-                img_cropped, seg_cropped = self._crop(img=img, seg=seg, z_dim=z_dim)
+            img_cropped, seg_cropped = self._crop(img=img, seg=seg, z_dim=z_dim)
 
-                img_list.append(img_cropped)
-                seg_list.append(seg_cropped)
+            img_list.append(img_cropped)
+            seg_list.append(seg_cropped)
 
         super().__init__(img=img_list, seg=seg_list, img_transform=img_transform, seg_transform=seg_transform)
 
@@ -82,9 +79,10 @@ class ImageDataset(ArrayDataset):
             img: np.ndarray,
             seg: np.ndarray,
             z_dim: ZDimension = None
-    ):
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Crops the foreground. A crop along Z can be specified.
+        Crops the foreground. A crop along Z can also be specified.
+
         Parameters
         ----------
         img : np.ndarray
@@ -96,16 +94,13 @@ class ImageDataset(ArrayDataset):
 
         Returns
         -------
-        img_cropped : np.ndarray
-            A cropped image array.
-        seg_cropped : np.ndarray
-            A cropped segmentation map array.
+        img_cropped, seg_cropped : Tuple[np.ndarray, np.ndarray]
+            A cropped image array and a cropped segmentation map array.
         """
         img_cropped, start, end = CropForeground(return_coords=True)(img)
         seg_cropped = SpatialCrop(roi_start=start, roi_end=end)(seg)
 
         if z_dim:
             img_cropped, seg_cropped = img_cropped[z_dim[0]: z_dim[1]], seg_cropped[z_dim[0]: z_dim[1]]
-            return img_cropped, seg_cropped
 
         return img_cropped, seg_cropped

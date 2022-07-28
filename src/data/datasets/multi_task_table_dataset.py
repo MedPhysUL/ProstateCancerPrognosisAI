@@ -15,7 +15,7 @@ import pandas as pd
 from torch import nan, tensor
 from torch.utils.data import Dataset
 
-from src.data.processing.single_task_table_dataset import SingleTaskTableDataset
+from src.data.datasets.single_task_table_dataset import SingleTaskTableDataset
 
 
 class MultiTaskTableDataset(Dataset):
@@ -59,7 +59,20 @@ class MultiTaskTableDataset(Dataset):
         else:
             self._row_idx_to_ids = {v: k for k, v in self.ids_to_row_idx.items()}
 
-    def __len__(self):
+    def __len__(
+            self
+    ) -> int:
+        """
+        The length of the MultiTaskTableDataset. It is quite hard to define as the single-task table datasets
+        contained in the self.datasets attribute generally do not have the same length. It is for this reason that the
+        length is rather defined as the total length of the dictionary that associates patient IDs with their
+        corresponding row indices in the original dataframe.
+
+        Returns
+        -------
+        length : int
+            Dataset length.
+        """
         return len(self.ids_to_row_idx)
 
     def __getitem__(
@@ -100,25 +113,15 @@ class MultiTaskTableDataset(Dataset):
         item = []
         ids = self._convert_row_idx_to_ids(idx)
 
-        # TODO : Rearrange item creation to fit updated docstring
-
-        for dataset in self.datasets:
-            ds_item = []
-            if isinstance(ids, str):
-                if ids in list(dataset.ids_to_row_idx.keys()):
-                    i = dataset.ids_to_row_idx[ids]
-                    ds_item.append(dataset[i])
+        for id_ in ids:
+            patient_item = []
+            for dataset in self.datasets:
+                if id_ in list(dataset.ids_to_row_idx.keys()):
+                    i = dataset.ids_to_row_idx[id_]
+                    patient_item.append(dataset[i])
                 else:
-                    ds_item.append(nan if self.to_tensor else np.nan)
-            else:
-                for id_ in ids:
-                    if id_ in list(dataset.ids_to_row_idx.keys()):
-                        i = dataset.ids_to_row_idx[id_]
-                        ds_item.append(dataset[i])
-                    else:
-                        ds_item.append(nan if self.to_tensor else np.nan)
-
-            item.append(ds_item)
+                    patient_item.append(nan if self.to_tensor else np.nan)
+            item.append(patient_item)
 
         return item
 
@@ -180,8 +183,8 @@ class MultiTaskTableDataset(Dataset):
 
     def _convert_row_idx_to_ids(
             self,
-            idx: Union[int, List[int]]
-    ) -> Union[str, List[str]]:
+            idx: List[int]
+    ) -> List[str]:
         """
         Converts row indexes to patient IDs.
 
@@ -196,7 +199,7 @@ class MultiTaskTableDataset(Dataset):
             Patient IDs.
         """
         if isinstance(idx, int):
-            return self._row_idx_to_ids[idx]
+            return [self._row_idx_to_ids[idx]]
         else:
             return [self._row_idx_to_ids[i] for i in idx]
 

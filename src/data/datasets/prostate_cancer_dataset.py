@@ -8,33 +8,22 @@
     @Description:       This file contains a custom torch dataset named ProstateCancerDataset.
 """
 
-from typing import List, NamedTuple, Optional, Tuple, Union
+from typing import List, NamedTuple, Optional, Sequence, Tuple, Union
 
 import numpy as np
-from torch import nan, tensor
+from torch import tensor
 from torch.utils.data import Dataset
 
-from src.data.processing.image_dataset import ImageDataset
-from src.data.processing.multi_task_table_dataset import MultiTaskTableDataset
+from src.data.datasets.empty_dataset import EmptyDataset
+from src.data.datasets.image_dataset import ImageDataset
+from src.data.datasets.multi_task_table_dataset import MultiTaskTableDataset
 
 
-class EmptyDataset(Dataset):
-
-    def __init__(
-            self,
-            to_tensor: bool = True
-    ):
-        self.to_tensor = to_tensor
-
-    def __getitem__(self, index):
-        if self.to_tensor:
-            return nan
-        else:
-            return np.nan
-
-
-class DataItem(NamedTuple):
-    image: tuple  # TODO : Improve typing
+class DataItems(NamedTuple):
+    """
+    Data items named tuple. This tuple is used to separate images/segmentations data from tabular data.
+    """
+    image: Tuple[Sequence]
     table: List[List[Optional[Union[Tuple[np.array, np.array, np.array], Tuple[tensor, tensor, tensor]]]]]
 
 
@@ -78,13 +67,21 @@ class ProstateCancerDataset(Dataset):
             self.image_dataset = image_dataset
             self._length = len(image_dataset)
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """
+        Dataset length.
+
+        Returns
+        -------
+        length : int
+            Length of the dataset.
+        """
         return self._length
 
     def __getitem__(
             self,
             index: Union[int, List[int]]
-    ):
+    ) -> DataItems:
         """
         Gets dataset items.
 
@@ -95,7 +92,7 @@ class ProstateCancerDataset(Dataset):
 
         Returns
         -------
-        items : DataItem
+        items : DataItems
             Data items from image and table datasets.
         """
-        return DataItem(image=self.image_dataset[index], table=self.table_dataset[index])
+        return DataItems(image=self.image_dataset[index], table=self.table_dataset[index])

@@ -27,8 +27,8 @@ import torch
 from torch.utils.data.dataset import random_split
 
 from src.data.extraction.local import LocalDatabaseManager
-from src.data.processing.image_dataset import ImageDataset
-from src.data.processing.prostate_cancer_dataset import ProstateCancerDataset
+from src.data.datasets.image_dataset import ImageDataset
+from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
 from src.models.segmentation.hdf_dataset import HDFDataset
 from src.visualization.image_viewer import ImageViewer
 

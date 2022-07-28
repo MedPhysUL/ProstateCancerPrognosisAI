@@ -10,8 +10,8 @@
 
 import pandas as pd
 
-from src.data.processing.multi_task_table_dataset import MultiTaskTableDataset
-from src.data.processing.single_task_table_dataset import SingleTaskTableDataset
+from src.data.datasets.multi_task_table_dataset import MultiTaskTableDataset
+from src.data.datasets.single_task_table_dataset import SingleTaskTableDataset
 from src.visualization.table_viewer import TableViewer
 
 from constants import *
