@@ -26,7 +26,7 @@ HOLDOUT_TABLE_PATH = os.path.join(DATA_PATH, "holdout_table.csv")
 
 RECORDS_PATH = os.path.join("local_data", "records")
 OUTLIERS_RECORDS_PATH = os.path.join(RECORDS_PATH, "outliers")
-DESCRIPTIVE_ANALYSIS_PATH = os.path.join(RECORDS_PATH, "descriptive_analysis")
+DESCRIPTIVE_ANALYSIS_PATH = os.path.join(RECORDS_PATH, "descriptive_analyses")
 
 # COLUMNS
 ID = "ID"
