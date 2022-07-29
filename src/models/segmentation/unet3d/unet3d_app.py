@@ -33,7 +33,6 @@ from torch.utils.tensorboard import SummaryWriter
 from src.data.extraction.local import LocalDatabaseManager
 from src.data.datasets.image_dataset import ImageDataset
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
-from src.models.segmentation.hdf_dataset import HDFDataset
 
 
 if __name__ == '__main__':
@@ -75,23 +74,14 @@ if __name__ == '__main__':
         seg_transform=seg_trans
     )
 
-    print("1")
     # Dataset
     ds = ProstateCancerDataset(
         image_dataset=image_dataset
     )
-    print("2")
+
     # Train/Val Split
     train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
-    print("3")
-    print(len(train_ds))
-    ################
-    # SHAPEEEEE
-    # print(np.shape(train_ds))       # (230, 2)  faque (patients, task ou img/seg)
-    # print(np.shape(train_ds[0]))    # (2,) task ou img/seg
-    # print(np.shape(train_ds[0][0]))     # (2,) task ou img/seg
-    # print(np.shape(train_ds[0][0][0]))  # torch.Size([1, 160, 160, 160]) (added, z, x, y)
-    ########################################
+
     # Data Augmentation
     # aug_trans = [
     #     # Rotation 180 deg
@@ -173,26 +163,6 @@ if __name__ == '__main__':
         pin_memory=True,
         shuffle=False
     )
-    print("5")
-    ##################################
-    # Shapeeeee
-    print(len(val_loader))  # 40
-    for i in val_loader:
-        # print(np.shape(i))      # (2,)
-        for j in i:
-            #print(np.shape(j))
-            # donne ca :
-            # (2,)
-            # torch.Size([1])
-            # hein
-            for k in j:
-                print(np.shape(k))
-                # donnce ca:
-                # torch.Size([1, 1, 160, 160, 160])
-                # torch.Size([1, 1, 160, 160, 160])
-                # torch.Size([])
-                # hein
-    #############################
 
     # Model
     net = UNet(
@@ -223,8 +193,7 @@ if __name__ == '__main__':
         for batch in train_loader:
             batch_images = batch.image[0].to(device)
             batch_segs = batch.image[1].to(device)
-            #print("Table dataset exists?", not all(batch.table.isnan()))
-            #print("7")
+            # print("Table dataset exists?", not all(batch.table.isnan()))
             opt.zero_grad()
             y_pred = net(batch_images)
             loss_train = loss(y_pred, batch_segs)
@@ -232,7 +201,7 @@ if __name__ == '__main__':
             opt.step()
 
             batch_loss.append(loss_train.item())
-            #print("8")
+
         epoch_train_losses.append(np.average(batch_loss))
         writer.add_scalar('avg training loss per batch per epoch', epoch_train_losses[-1], epoch + 1)
 
@@ -261,7 +230,6 @@ if __name__ == '__main__':
                 # Metric
                 pred_metric = metric(y_pred=y_pred, y=batch_segs)
                 metric_vals += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
-
         epoch_val_losses.append(np.average(loss_val_list))
         epoch_val_metrics.append(np.average(metric_vals))
         print(f"EPOCH {epoch + 1}, val metric : {epoch_val_metrics[-1]}")

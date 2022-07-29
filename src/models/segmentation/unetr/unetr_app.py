@@ -27,7 +27,8 @@ import torch
 from torch.utils.data import random_split
 from torch.utils.tensorboard import SummaryWriter
 
-from src.models.segmentation.hdf_dataset import HDFDataset
+from src.data.extraction.local import LocalDatabaseManager
+from src.data.datasets.prostate_cancer_dataset import ImageDataset, ProstateCancerDataset
 
 
 if __name__ == '__main__':
@@ -60,11 +61,18 @@ if __name__ == '__main__':
         ToTensor(dtype=torch.float32)
     ])
 
-    # Dataset
-    ds = HDFDataset(
-        path='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5',
+    # ImageDataset
+    image_dataset = ImageDataset(
+        database_manager=LocalDatabaseManager(
+            path_to_database='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5'
+        ),
         img_transform=img_trans,
         seg_transform=seg_trans
+    )
+
+    # Dataset
+    ds = ProstateCancerDataset(
+        image_dataset=image_dataset
     )
 
     # Train/Val Split
@@ -117,8 +125,8 @@ if __name__ == '__main__':
 
         # Training
         for batch in train_loader:
-            batch_images = batch[0].to(device)
-            batch_segs = batch[1].to(device)
+            batch_images = batch.image[0].to(device)
+            batch_segs = batch.image[1].to(device)
 
             opt.zero_grad()
             y_pred = net(batch_images)
@@ -138,9 +146,9 @@ if __name__ == '__main__':
 
         # Validation
         with torch.no_grad():
-            for batch_images, batch_segs in val_loader:
-                batch_images = batch_images.to(device)
-                batch_segs = batch_segs.to(device)
+            for batch in val_loader:
+                batch_images = batch.image[0].to(device)
+                batch_segs = batch.image[1].to(device)
 
                 y_pred = net(batch_images)
 
