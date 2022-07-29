@@ -26,8 +26,10 @@ import numpy as np
 import torch
 from torch.utils.data.dataset import random_split
 
-from src.models.segmentation.hdf_dataset import HDFDataset
-from src.visualization.viewer import Viewer
+from src.data.extraction.local import LocalDatabaseManager
+from src.data.datasets.image_dataset import ImageDataset
+from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
+from src.visualization.image_viewer import ImageViewer
 
 if __name__ == '__main__':
     set_determinism(seed=1010710)
@@ -53,12 +55,18 @@ if __name__ == '__main__':
         KeepLargestConnectedComponent(),
         ToTensor(dtype=torch.float32)
     ])
-
-    # Dataset
-    ds = HDFDataset(
-        path='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5',
+    # ImageDataset
+    image_dataset = ImageDataset(
+        database_manager=LocalDatabaseManager(
+            path_to_database='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5'
+        ),
         img_transform=img_trans,
         seg_transform=seg_trans
+    )
+
+    # Dataset
+    ds = ProstateCancerDataset(
+        image_dataset=image_dataset
     )
 
     # Train/Val Split
@@ -89,7 +97,10 @@ if __name__ == '__main__':
     # Stats
     metric_list = []
     with torch.no_grad():
-        for batch_images, batch_segs in val_loader:
+        for batch in val_loader:
+            batch_images = batch.image[0]
+            batch_segs = batch.image[1]
+
             batch_images = batch_images.to(device)
             batch_segs = batch_segs.to(device)
 
@@ -110,7 +121,9 @@ if __name__ == '__main__':
     # Show best-mid-worst
     patient_idx = -1
     with torch.no_grad():
-        for patient_img, patient_seg in val_loader:
+        for patient in val_loader:
+            patient_img = patient.image[0]
+            patient_seg = patient.image[1]
             patient_idx += 1
             print(patient_idx)
 
@@ -124,7 +137,7 @@ if __name__ == '__main__':
                 y_pred = torch.round(y_pred)
                 print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
                 seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-                Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
+                ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
 
             if patient_idx == np.argmin(metric_list):
                 print('Worst image', patient_idx)
@@ -136,7 +149,7 @@ if __name__ == '__main__':
                 y_pred = torch.round(y_pred)
                 print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
                 seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-                Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
+                ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
 
             if patient_idx == np.argsort(metric_list)[len(metric_list)//2]:
                 print('Median image', patient_idx)
@@ -148,11 +161,13 @@ if __name__ == '__main__':
                 y_pred = torch.round(y_pred)
                 print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
                 seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-                Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
+                ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
 
     # Show All
     with torch.no_grad():
-        for patient_img, patient_seg in val_loader:
+        for patient in val_loader:
+            patient_img = patient.image[0]
+            patient_seg = patient.image[1]
             img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
             seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
             patient_img = patient_img.to(device)
@@ -161,7 +176,7 @@ if __name__ == '__main__':
             y_pred = torch.round(y_pred)
             print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
             seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-            Viewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
+            ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
 
     # Tensorboard Model Graph
     from monai.utils import first
@@ -178,7 +193,10 @@ if __name__ == '__main__':
     metric_list = []
     volume_list = []
     with torch.no_grad():
-        for batch_images, batch_segs in val_loader:
+        for batch in val_loader:
+            batch_images = batch.image[0]
+            batch_segs = batch.image[1]
+
             batch_images = batch_images.to(device)
             batch_segs = batch_segs.to(device)
 

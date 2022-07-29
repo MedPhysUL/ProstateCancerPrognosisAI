@@ -10,9 +10,9 @@
 
 import pandas as pd
 
-from src.data.processing.multi_task_table_dataset import MultiTaskTableDataset
+from src.data.datasets.multi_task_table_dataset import MultiTaskTableDataset
+from src.data.datasets.single_task_table_dataset import MaskType, SingleTaskTableDataset
 from src.data.processing.sampling import RandomStratifiedSampler
-from src.data.processing.single_task_table_dataset import MaskType, SingleTaskTableDataset
 
 from constants import *
 

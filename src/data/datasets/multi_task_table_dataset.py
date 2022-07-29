@@ -12,10 +12,10 @@ from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from torch import tensor
+from torch import nan, tensor
 from torch.utils.data import Dataset
 
-from src.data.processing.single_task_table_dataset import SingleTaskTableDataset
+from src.data.datasets.single_task_table_dataset import SingleTaskTableDataset
 
 
 class MultiTaskTableDataset(Dataset):
@@ -45,14 +45,35 @@ class MultiTaskTableDataset(Dataset):
         self.ids_to_row_idx = ids_to_row_idx
 
         if not self._is_ids_cols_valid():
-            raise ValueError("Datasets in a multi-task learning setting need to have the same IDs column name.")
+            raise ValueError("Datasets in a multi-task learning setting need to have the same IDs column names.")
         else:
             self._ids_col = self.datasets[0].ids_col
+
+        if not self._is_to_tensor_valid():
+            raise ValueError("Datasets in a multi-task learning setting need to have the same to_tensor attributes.")
+        else:
+            self._to_tensor = self.datasets[0].to_tensor
 
         if not self._is_ids_to_row_idx_valid():
             raise ValueError("Each patient ID must be associated to a unique row index.")
         else:
             self._row_idx_to_ids = {v: k for k, v in self.ids_to_row_idx.items()}
+
+    def __len__(
+            self
+    ) -> int:
+        """
+        The length of the MultiTaskTableDataset. It is quite hard to define as the single-task table datasets
+        contained in the self.datasets attribute generally do not have the same length. It is for this reason that the
+        length is rather defined as the total length of the dictionary that associates patient IDs with their
+        corresponding row indices in the original dataframe.
+
+        Returns
+        -------
+        length : int
+            Dataset length.
+        """
+        return len(self.ids_to_row_idx)
 
     def __getitem__(
             self,
@@ -60,7 +81,8 @@ class MultiTaskTableDataset(Dataset):
     ) -> List[List[Optional[Union[Tuple[np.array, np.array, np.array], Tuple[tensor, tensor, tensor]]]]]:
         """
         Gets dataset items. If a given index (corresponding to a specific patient ID) is not available in a specific
-        dataset, the None keyword is returned at that specific location.
+        dataset, the torch.nan or np.nan keyword is returned at that specific location, depending on the value of the
+        self.to_tensor attribute.
 
         NB : You might want to access only the items of one of the single-task table datasets contained in the
              self.datasets list. To do this, just call the __getitem__ method of that particular dataset, and not the
@@ -76,38 +98,40 @@ class MultiTaskTableDataset(Dataset):
         item : List[List[Optional[Union[Tuple[np.array, np.array, np.array], Tuple[tensor, tensor, tensor]]]]]
             The items are given in the following format :
 
-                items = [
-                      ┏━ x array of the item with index = 0 in dataset 0.
-                      ┃               ┏━ y array of the item with index = 1 in dataset 0.
-                      ┃               ┃          ┏━ Item with index = 2 is None in dataset 0.
-                    [(x, y, idx), (x, y, idx), None, (x, y, idx), ...],              <------ Items from dataset 0.
-                    [(x, y, idx), (x, y, idx), (x, y, idx), (x, y, idx), ...],       <------ Items from dataset 1.
-                    ...
+                                 ┏━ Items from dataset #0.
+                                 ┃            ┏━ Items from dataset #1.
+                items = [        ┃            ┃
+                            [(x, y, idx), (x, y, idx),    ...    ],  <------ Patient #0.
+                            [(x, y, idx), (x, y, idx),    ...    ],  <------ Patient #1.
+                            [(x, y, idx),     nan    ,    ...    ],  <------ Patient #2. (Target #1 not available)
+                            [(x, y, idx), (x, y, idx),    ...    ],
+                            [    ...    ,    ...     ,    ...    ],
+                            [(x, y, idx), (x, y, idx),    ...    ]
                 ]
 
         """
         item = []
         ids = self._convert_row_idx_to_ids(idx)
 
-        for dataset in self.datasets:
-            ds_item = []
-            if isinstance(ids, str):
-                if ids in list(dataset.ids_to_row_idx.keys()):
-                    i = dataset.ids_to_row_idx[ids]
-                    ds_item.append(dataset[i])
+        for id_ in ids:
+            patient_item = []
+            for dataset in self.datasets:
+                if id_ in list(dataset.ids_to_row_idx.keys()):
+                    i = dataset.ids_to_row_idx[id_]
+                    patient_item.append(dataset[i])
                 else:
-                    ds_item.append(None)
-            else:
-                for id_ in ids:
-                    if id_ in list(dataset.ids_to_row_idx.keys()):
-                        i = dataset.ids_to_row_idx[id_]
-                        ds_item.append(dataset[i])
-                    else:
-                        ds_item.append(None)
-
-            item.append(ds_item)
+                    patient_item.append(nan if self.to_tensor else np.nan)
+            item.append(patient_item)
 
         return item
+
+    @property
+    def ids_col(self) -> str:
+        return self._ids_col
+
+    @property
+    def to_tensor(self) -> bool:
+        return self._to_tensor
 
     def _is_ids_cols_valid(
             self
@@ -121,6 +145,22 @@ class MultiTaskTableDataset(Dataset):
             Whether given datasets have valid IDs column name.
         """
         if all(ds.ids_col == self.datasets[0].ids_col for ds in self.datasets):
+            return True
+        else:
+            return False
+
+    def _is_to_tensor_valid(
+            self
+    ) -> bool:
+        """
+        Checks if all datasets have the same to_tensor attribute.
+
+        Returns
+        -------
+        validity : bool
+            Whether given datasets have valid to_tensor attribute.
+        """
+        if all(ds.to_tensor == self.datasets[0].to_tensor for ds in self.datasets):
             return True
         else:
             return False
@@ -143,8 +183,8 @@ class MultiTaskTableDataset(Dataset):
 
     def _convert_row_idx_to_ids(
             self,
-            idx: Union[int, List[int]]
-    ) -> Union[str, List[str]]:
+            idx: List[int]
+    ) -> List[str]:
         """
         Converts row indexes to patient IDs.
 
@@ -159,7 +199,7 @@ class MultiTaskTableDataset(Dataset):
             Patient IDs.
         """
         if isinstance(idx, int):
-            return self._row_idx_to_ids[idx]
+            return [self._row_idx_to_ids[idx]]
         else:
             return [self._row_idx_to_ids[i] for i in idx]
 

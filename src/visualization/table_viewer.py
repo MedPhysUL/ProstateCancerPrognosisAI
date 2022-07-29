@@ -17,8 +17,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from src.data.processing.multi_task_table_dataset import MultiTaskTableDataset
-from src.data.processing.single_task_table_dataset import MaskType, SingleTaskTableDataset
+from src.data.datasets.multi_task_table_dataset import MultiTaskTableDataset
+from src.data.datasets.single_task_table_dataset import MaskType, SingleTaskTableDataset
 
 
 class TableViewer:

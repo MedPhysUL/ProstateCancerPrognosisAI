@@ -30,7 +30,9 @@ from torch.utils.data.dataset import random_split
 from torch.utils.tensorboard import SummaryWriter
 
 # from src.data.processing.copy_items import Augmentation, AugmentationTransforms
-from src.models.segmentation.hdf_dataset import HDFDataset
+from src.data.extraction.local import LocalDatabaseManager
+from src.data.datasets.image_dataset import ImageDataset
+from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
 
 
 if __name__ == '__main__':
@@ -43,7 +45,7 @@ if __name__ == '__main__':
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 40
-    batch_size = 1
+    batch_size = 4
     num_epochs = 150
     lr = 1e-3
 
@@ -63,11 +65,18 @@ if __name__ == '__main__':
         ToTensor(dtype=torch.float32)
     ])
 
-    # Dataset
-    ds = HDFDataset(
-        path='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5',
+    # ImageDataset
+    image_dataset = ImageDataset(
+        database_manager=LocalDatabaseManager(
+            path_to_database='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5'
+        ),
         img_transform=img_trans,
         seg_transform=seg_trans
+    )
+
+    # Dataset
+    ds = ProstateCancerDataset(
+        image_dataset=image_dataset
     )
 
     # Train/Val Split
@@ -175,15 +184,16 @@ if __name__ == '__main__':
     epoch_val_losses = []
     epoch_val_metrics = []
     best_metric = 0
+    print("6")
     for epoch in range(num_epochs):
         net.train()
         batch_loss = []
 
         # Training
         for batch in train_loader:
-            batch_images = batch[0].to(device)
-            batch_segs = batch[1].to(device)
-
+            batch_images = batch.image[0].to(device)
+            batch_segs = batch.image[1].to(device)
+            # print("Table dataset exists?", not all(batch.table.isnan()))
             opt.zero_grad()
             y_pred = net(batch_images)
             loss_train = loss(y_pred, batch_segs)
@@ -203,9 +213,9 @@ if __name__ == '__main__':
 
         # Validation
         with torch.no_grad():
-            for batch_images, batch_segs in val_loader:
-                batch_images = batch_images.to(device)
-                batch_segs = batch_segs.to(device)
+            for batch in val_loader:
+                batch_images = batch.image[0].to(device)
+                batch_segs = batch.image[1].to(device)
 
                 y_pred = net(batch_images)
 
@@ -220,7 +230,6 @@ if __name__ == '__main__':
                 # Metric
                 pred_metric = metric(y_pred=y_pred, y=batch_segs)
                 metric_vals += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
-
         epoch_val_losses.append(np.average(loss_val_list))
         epoch_val_metrics.append(np.average(metric_vals))
         print(f"EPOCH {epoch + 1}, val metric : {epoch_val_metrics[-1]}")
@@ -235,3 +244,10 @@ if __name__ == '__main__':
 
     writer.flush()
     writer.close()
+
+'''
+        with torch.no_grad():
+            for batch_images, batch_segs in val_loader:
+                batch_images = batch_images.to(device)
+                batch_segs = batch_segs.to(device)
+'''

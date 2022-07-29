@@ -183,6 +183,10 @@ class SingleTaskTableDataset(Dataset):
         return self._test_mask
 
     @property
+    def to_tensor(self) -> bool:
+        return self._to_tensor
+
+    @property
     def train_mask(self) -> List[int]:
         return self._train_mask
 

@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
-from src.data.processing.single_task_table_dataset import SingleTaskTableDataset
+from src.data.datasets.single_task_table_dataset import SingleTaskTableDataset
 
 
 class FeatureSelector:

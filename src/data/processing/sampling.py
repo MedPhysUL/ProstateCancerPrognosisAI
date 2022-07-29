@@ -10,9 +10,7 @@
 """
 
 from copy import deepcopy
-from itertools import product
-from json import load
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -20,8 +18,8 @@ from sklearn.model_selection import train_test_split
 from torch import tensor
 from tqdm import tqdm
 
-from src.data.processing.single_task_table_dataset import MaskType, SingleTaskTableDataset
-from src.data.processing.multi_task_table_dataset import MultiTaskTableDataset
+from src.data.datasets.single_task_table_dataset import MaskType, SingleTaskTableDataset
+from src.data.datasets.multi_task_table_dataset import MultiTaskTableDataset
 
 
 class RandomStratifiedSampler:
@@ -380,6 +378,8 @@ class RandomStratifiedSampler:
 
 
 # ---------------------- THE FUNCTION extract_masks BE INCLUDED IN THE STRATIFIER SAMPLER CLASS ---------------------- #
+# from itertools import product
+# from json import load
 
 # def extract_masks(
 #         file_path: str,
