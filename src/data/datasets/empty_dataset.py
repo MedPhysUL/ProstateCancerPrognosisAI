@@ -37,7 +37,7 @@ class EmptyDataset(Dataset):
     def __getitem__(
             self,
             idx: Union[int, List[int]]
-    ) -> Union[float, nan, np.nan]:
+    ) -> float:
         """
         Gets dataset item. This method always returns NaN, regardless of the value of the index.
 
@@ -48,7 +48,7 @@ class EmptyDataset(Dataset):
 
         Returns
         -------
-        item : Union[float, nan, np.nan]
+        item : float
             NaN value.
         """
         if self.to_tensor:
