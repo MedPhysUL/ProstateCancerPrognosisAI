@@ -2,23 +2,24 @@
     @file:              performances.py
     @Author:            Raphael Brodeur
 
-    @Creation Date:     07/2022
-    @Last modification: 07/2022
+    @Creation Date:     08/2022
+    @Last modification: 08/2022
 
-    @Description:       This file contains a script to assess the performance of a 3D U-Net.
+    @Description:       This file contains a script to assess the performance of a V-Net.
 """
 
 import matplotlib.pyplot as plt
 from monai.data import DataLoader
 from monai.metrics import DiceMetric
-from monai.networks.nets import UNet
+from monai.networks.nets import VNet
 from monai.transforms import (
     AddChannel,
     CenterSpatialCrop,
     Compose,
-    HistogramNormalize,
+    # HistogramNormalize,
     KeepLargestConnectedComponent,
-    ThresholdIntensity,
+    ScaleIntensityRange,
+    # ThresholdIntensity,
     ToTensor
 )
 from monai.utils import set_determinism
@@ -30,6 +31,7 @@ from src.data.extraction.local import LocalDatabaseManager
 from src.data.datasets.image_dataset import ImageDataset
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
 from src.visualization.image_viewer import ImageViewer
+
 
 if __name__ == '__main__':
     set_determinism(seed=1010710)
@@ -44,9 +46,10 @@ if __name__ == '__main__':
     img_trans = Compose([
         AddChannel(),
         CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        ThresholdIntensity(threshold=-250, above=True, cval=-250),
-        ThresholdIntensity(threshold=500, above=False, cval=500),
-        HistogramNormalize(num_bins=751, min=0, max=1),
+        # ThresholdIntensity(threshold=-250, above=True, cval=-250),
+        # ThresholdIntensity(threshold=500, above=False, cval=500),
+        # HistogramNormalize(num_bins=751, min=0, max=1),
+        ScaleIntensityRange(a_min=-250, a_max=500, b_max=1.0, b_min=0.0, clip=True),
         ToTensor(dtype=torch.float32)
     ])
     seg_trans = Compose([
@@ -56,7 +59,7 @@ if __name__ == '__main__':
         ToTensor(dtype=torch.float32)
     ])
 
-    # ImageDataset
+    # Dataset
     image_dataset = ImageDataset(
         database_manager=LocalDatabaseManager(
             path_to_database='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5'
@@ -64,8 +67,6 @@ if __name__ == '__main__':
         img_transform=img_trans,
         seg_transform=seg_trans
     )
-
-    # Dataset
     ds = ProstateCancerDataset(
         image_dataset=image_dataset
     )
@@ -82,17 +83,10 @@ if __name__ == '__main__':
     )
 
     # Model
-    net = UNet(
-        dimensions=3,
-        in_channels=1,
-        out_channels=1,
-        channels=(64, 128, 256, 512, 1024),
-        strides=(2, 2, 2, 2),
-        dropout=0.2
-    ).to(device)
+    net = VNet().to(device)
 
     # Load Best Parameters
-    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete/best_model_parameters.pt'))
+    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/vnet/runs/exp_delete/best_model_parameters.pt'))
     net.eval()
 
     # Stats
@@ -182,7 +176,7 @@ if __name__ == '__main__':
     # Tensorboard Model Graph
     from monai.utils import first
     from torch.utils.tensorboard import SummaryWriter
-    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete')
+    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/vnet/runs/exp_delete')
     with torch.no_grad():
         img, seg = first(val_loader).image
         img = img.to(device)

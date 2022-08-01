@@ -5,13 +5,13 @@
     @Creation Date:     07/2022
     @Last modification: 07/2022
 
-    @Description:       This file contains a script to assess the performance of a 3D U-Net.
+    @Description:       This file contains a script to assess the performance of an UNETR.
 """
 
 import matplotlib.pyplot as plt
 from monai.data import DataLoader
 from monai.metrics import DiceMetric
-from monai.networks.nets import UNet
+from monai.networks.nets import UNETR
 from monai.transforms import (
     AddChannel,
     CenterSpatialCrop,
@@ -31,14 +31,14 @@ from src.data.datasets.image_dataset import ImageDataset
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
 from src.visualization.image_viewer import ImageViewer
 
+
 if __name__ == '__main__':
     set_determinism(seed=1010710)
 
-    # Setting Up
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     metric = DiceMetric(include_background=True, reduction='mean')
-    num_val = 40
     num_workers = 0
+    num_val = 40
 
     # Defining Transforms
     img_trans = Compose([
@@ -82,17 +82,23 @@ if __name__ == '__main__':
     )
 
     # Model
-    net = UNet(
-        dimensions=3,
+    net = UNETR(
         in_channels=1,
         out_channels=1,
-        channels=(64, 128, 256, 512, 1024),
-        strides=(2, 2, 2, 2),
-        dropout=0.2
+        img_size=(160, 160, 160),
+        feature_size=16,
+        hidden_size=768,
+        mlp_dim=3072,
+        num_heads=12,
+        pos_embed='conv',
+        norm_name='instance',
+        conv_block=True,
+        res_block=True,
+        dropout_rate=0.0
     ).to(device)
 
     # Load Best Parameters
-    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete/best_model_parameters.pt'))
+    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unetr/runs/exp_delete/best_model_parameters.pt'))
     net.eval()
 
     # Stats
@@ -182,7 +188,7 @@ if __name__ == '__main__':
     # Tensorboard Model Graph
     from monai.utils import first
     from torch.utils.tensorboard import SummaryWriter
-    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete')
+    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unetr/runs/exp_delete')
     with torch.no_grad():
         img, seg = first(val_loader).image
         img = img.to(device)
@@ -213,3 +219,4 @@ if __name__ == '__main__':
     print(volume_list)
     plt.scatter(x=volume_list, y=metric_list)
     plt.show()
+

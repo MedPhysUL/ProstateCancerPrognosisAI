@@ -230,6 +230,7 @@ if __name__ == '__main__':
                 # Metric
                 pred_metric = metric(y_pred=y_pred, y=batch_segs)
                 metric_vals += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
+
         epoch_val_losses.append(np.average(loss_val_list))
         epoch_val_metrics.append(np.average(metric_vals))
         print(f"EPOCH {epoch + 1}, val metric : {epoch_val_metrics[-1]}")
