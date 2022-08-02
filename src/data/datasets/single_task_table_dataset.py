@@ -864,9 +864,8 @@ class SingleTaskTableDataset(Dataset):
                 if c not in dataframe_columns:
                     raise ValueError(f"Column {c} is not part of the given dataframe")
 
-    def _get_scaling_factor(
-            self,
-            y_train: Union[tensor, np.array]
+    def get_scaling_factor(
+            self
     ) -> Optional[float]:
         """
         Computes the scaling factor that needs to be apply to the weight of samples in the class 1.
@@ -876,11 +875,6 @@ class SingleTaskTableDataset(Dataset):
         Which gives the solution:
             alpha = w*n0/(1-w)*n1
 
-        Parameters
-        ----------
-        y_train : Union[tensor, np.array]
-            (N, 1) tensor or array containing labels.
-
         Returns
         -------
         scaling_factor : Optional[float]
@@ -889,6 +883,8 @@ class SingleTaskTableDataset(Dataset):
         # If no weight was provided we return None
         if self.weight is None:
             return None
+        
+        y_train = self.y[self.train_mask]
 
         # Otherwise we return samples' weights in the appropriate format
         n1 = y_train.sum()              # number of samples with label 1
