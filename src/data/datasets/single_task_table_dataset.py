@@ -48,6 +48,8 @@ class SingleTaskTableDataset(Dataset):
             cat_cols: Optional[List[str]] = None,
             feature_selection_groups: Optional[List[List[str]]] = None,
             classification: bool = True,
+            classification_threshold: Optional[float] = None,
+            class_weight: Optional[float] = None,
             to_tensor: bool = False
     ):
         """
@@ -69,6 +71,10 @@ class SingleTaskTableDataset(Dataset):
             List with list of column names to consider together in group-wise feature selection.
         classification : bool
             Whether to consider the task as classification. False for regression.
+        classification_threshold : Optional[float]
+            The threshold used to classify a sample in class 1.
+        class_weight : Optional[float]
+            The weight attributed to class 1 (in [0, 1]).
         to_tensor : bool
             Whether we want the features and targets in tensors. False for numpy arrays.
         """
@@ -81,9 +87,14 @@ class SingleTaskTableDataset(Dataset):
         for columns in [cont_cols, cat_cols]:
             self._check_columns_validity(df, columns)
 
+        if class_weight is not None:
+            if not (0 < class_weight < 1):
+                raise ValueError("The class_weight parameter must be included in range [0, 1]")
+
         # Set default protected attributes
         self._cat_cols, self._cat_idx = cat_cols, []
         self._classification = classification
+        self._class_weight = class_weight
         self._cont_cols, self._cont_idx = cont_cols, []
         self._ids_col = ids_col
         self._ids = list(df[ids_col].values)
@@ -91,6 +102,10 @@ class SingleTaskTableDataset(Dataset):
         self._n = df.shape[0]
         self._original_data = df
         self._target_col = target_col
+        if classification and (classification_threshold is None):
+            self._thresh = 0.5
+        else:
+            self._thresh = classification_threshold
         self._to_tensor = to_tensor
         self._train_mask, self._valid_mask, self._test_mask = [], None, []
         self._x_cat, self._x_cont = None, None
@@ -122,6 +137,22 @@ class SingleTaskTableDataset(Dataset):
             self,
             idx: Union[int, List[int]]
     ) -> Union[Tuple[np.array, np.array, np.array], Tuple[tensor, tensor, tensor]]:
+        """
+        Gets dataset item.
+
+        Parameters
+        ----------
+        idx : Union[int, List[int]]
+            Indices of data to get.
+
+        Returns
+        -------
+        item : Union[Tuple[np.array, np.array, np.array], Tuple[tensor, tensor, tensor]]
+            Items are tuples (x, y, idx) where
+                - x : (N,D) tensor or array with D-dimensional samples
+                - y : (N,) tensor or array with classification labels
+                - idx : (N,) tensor or array with idx of samples according to the whole dataset
+        """
         return self.x[idx], self.y[idx], idx
 
     @property
@@ -183,6 +214,14 @@ class SingleTaskTableDataset(Dataset):
         return self._test_mask
 
     @property
+    def thresh(self) -> Optional[float]:
+        return self._thresh
+
+    @thresh.setter
+    def thresh(self, thresh: Optional[float]) -> None:
+        self._thresh = thresh
+
+    @property
     def to_tensor(self) -> bool:
         return self._to_tensor
 
@@ -193,6 +232,10 @@ class SingleTaskTableDataset(Dataset):
     @property
     def valid_mask(self) -> Optional[List[int]]:
         return self._valid_mask
+
+    @property
+    def class_weight(self) -> Optional[float]:
+        return self._class_weight
 
     @property
     def x(self) -> pd.DataFrame:
@@ -820,3 +863,31 @@ class SingleTaskTableDataset(Dataset):
             for c in columns:
                 if c not in dataframe_columns:
                     raise ValueError(f"Column {c} is not part of the given dataframe")
+
+    def get_scaling_factor(
+            self
+    ) -> Optional[float]:
+        """
+        Computes the scaling factor that needs to be apply to the weight of samples in the class 1.
+
+        We need to find alpha that satisfies :
+            (alpha*n1)/n0 = w/(1-w)
+        Which gives the solution:
+            alpha = w*n0/(1-w)*n1
+
+        Returns
+        -------
+        scaling_factor : Optional[float]
+            Positive scaling factor.
+        """
+        # If no weight was provided we return None
+        if self._class_weight is None:
+            return None
+
+        y_train = self.y[self.train_mask]
+
+        # Otherwise we return samples' weights in the appropriate format
+        n1 = y_train.sum()              # number of samples with label 1
+        n0 = y_train.shape[0] - n1      # number of samples with label 0
+
+        return (n0/n1)*(self._class_weight/(1-self._class_weight))
