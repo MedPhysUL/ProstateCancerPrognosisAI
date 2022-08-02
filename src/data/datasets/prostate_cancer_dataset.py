@@ -50,22 +50,26 @@ class ProstateCancerDataset(Dataset):
         """
         if (image_dataset is None) and (table_dataset is None):
             raise AssertionError("At least one image dataset or one table dataset must be provided.")
-
-        if table_dataset is None:
+        elif table_dataset is None:
             self.table_dataset = EmptyDataset()
             self.image_dataset = image_dataset
-            self._length = len(image_dataset)
+            self._n = len(image_dataset)
         elif image_dataset is None:
             self.table_dataset = table_dataset
             self.image_dataset = EmptyDataset(to_tensor=table_dataset.to_tensor)
-            self._length = len(table_dataset)
+            self._n = len(table_dataset)
         else:
-            tab_length, img_length = len(table_dataset), len(image_dataset)
-            assert tab_length == img_length, f"Length of image dataset and table dataset must be equal. Image length " \
-                                             f": {img_length}. Table length : {tab_length}."
+            tab_n, img_n = len(table_dataset), len(image_dataset)
+            assert tab_n == img_n, f"Length of image dataset and table dataset must be equal. Image length{img_n}. " \
+                                   f"Table length : {tab_n}."
             self.table_dataset = table_dataset
             self.image_dataset = image_dataset
-            self._length = len(image_dataset)
+            self._n = len(image_dataset)
+
+        self._train_mask, self._valid_mask, self._test_mask = [], None, []
+
+        # We update current training mask with all the data
+        self.update_masks(list(range(self._n)), [], [])
 
     def __len__(self) -> int:
         """
@@ -76,7 +80,7 @@ class ProstateCancerDataset(Dataset):
         length : int
             Length of the dataset.
         """
-        return self._length
+        return self._n
 
     def __getitem__(
             self,
@@ -96,3 +100,39 @@ class ProstateCancerDataset(Dataset):
             Data items from image and table datasets.
         """
         return DataItems(image=self.image_dataset[index], table=self.table_dataset[index])
+
+    @property
+    def test_mask(self) -> List[int]:
+        return self._test_mask
+
+    @property
+    def train_mask(self) -> List[int]:
+        return self._train_mask
+
+    @property
+    def valid_mask(self) -> Optional[List[int]]:
+        return self._valid_mask
+
+    def update_masks(
+            self,
+            train_mask: List[int],
+            test_mask: List[int],
+            valid_mask: Optional[List[int]] = None
+    ) -> None:
+        """
+        Updates the train, valid and test masks.
+
+        Parameters
+        ----------
+        train_mask : List[int]
+            List of idx in the training set.
+        test_mask : List[int]
+            List of idx in the test set.
+        valid_mask : Optional[List[int]]
+            List of idx in the valid set.
+        """
+        # We set the new masks values
+        self._train_mask, self._test_mask = train_mask, test_mask
+        self._valid_mask = valid_mask if valid_mask is not None else []
+
+        self.table_dataset.update_masks(train_mask=train_mask, test_mask=test_mask, valid_mask=valid_mask)
