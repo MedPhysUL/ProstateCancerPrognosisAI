@@ -1,25 +1,24 @@
 """
-    @file:              unet3d_app.py
+    @file:              attention_unet_app.py
     @Author:            Raphael Brodeur
 
-    @Creation Date:     05/2022
-    @Last modification: 07/2022
+    @Creation Date:     08/2022
+    @Last modification: 08/2022
 
-    @Description:       This file contains an implementation of a 3D U-Net.
+    @Description:       Description.
 """
 
 from monai.data import DataLoader
 from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
-from monai.networks.nets import UNet
+from monai.networks.nets import AttentionUnet
 from monai.transforms import (
     AddChannel,
     CenterSpatialCrop,
     Compose,
     HistogramNormalize,
     KeepLargestConnectedComponent,
-    # RandFlip,
-    # Rotate90,
+    ScaleIntensityRange,
     ThresholdIntensity,
     ToTensor
 )
@@ -39,7 +38,7 @@ if __name__ == '__main__':
     set_determinism(seed=1010710)
 
     writer = SummaryWriter(
-        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete'
+        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/attention_unet/runs/exp_delete'
     )
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -82,72 +81,6 @@ if __name__ == '__main__':
     # Train/Val Split
     train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
 
-    # Data Augmentation
-    # aug_trans = [
-    #     # Rotation 180 deg
-    #     AugmentationTransforms(
-    #         img_transforms=Compose([
-    #             AddChannel(),
-    #             Rotate90(k=2, spatial_axes=(1, 2)),
-    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
-    #             ThresholdIntensity(threshold=-250, above=True, cval=-250),
-    #             ThresholdIntensity(threshold=500, above=False, cval=500),
-    #             HistogramNormalize(num_bins=751, min=0, max=1),
-    #             ToTensor(dtype=torch.float32)
-    #         ]),
-    #         seg_transforms=Compose([
-    #             AddChannel(),
-    #             Rotate90(k=2, spatial_axes=(1, 2)),
-    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
-    #             KeepLargestConnectedComponent(),
-    #             ToTensor(dtype=torch.float32)
-    #         ])
-    #     ),
-    #     # Flip lr
-    #     AugmentationTransforms(
-    #         img_transforms=Compose([
-    #             AddChannel(),
-    #             RandFlip(prob=1, spatial_axis=2),
-    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
-    #             ThresholdIntensity(threshold=-250, above=True, cval=-250),
-    #             ThresholdIntensity(threshold=500, above=False, cval=500),
-    #             HistogramNormalize(num_bins=751, min=0, max=1),
-    #             ToTensor(dtype=torch.float32)
-    #         ]),
-    #         seg_transforms=Compose([
-    #             AddChannel(),
-    #             RandFlip(prob=1, spatial_axis=2),
-    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
-    #             KeepLargestConnectedComponent(),
-    #             ToTensor(dtype=torch.float32)
-    #         ])
-    #     ),
-    #     # Flip lr + Rotation 180 deg
-    #     AugmentationTransforms(
-    #         img_transforms=Compose([
-    #             AddChannel(),
-    #             RandFlip(prob=1, spatial_axis=2),
-    #             Rotate90(k=2, spatial_axes=(1, 2)),
-    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
-    #             ThresholdIntensity(threshold=-250, above=True, cval=-250),
-    #             ThresholdIntensity(threshold=500, above=False, cval=500),
-    #             HistogramNormalize(num_bins=751, min=0, max=1),
-    #             ToTensor(dtype=torch.float32)
-    #         ]),
-    #         seg_transforms=Compose([
-    #             AddChannel(),
-    #             RandFlip(prob=1, spatial_axis=2),
-    #             Rotate90(k=2, spatial_axes=(1, 2)),
-    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
-    #             KeepLargestConnectedComponent(),
-    #             ToTensor(dtype=torch.float32)
-    #         ])
-    #     )
-    # ]
-    #
-    # augmentation = Augmentation(augmentation_transforms=aug_trans)
-    # train_ds_augmented = augmentation.get_augmented_dataset(train_ds)
-
     # Data Loader
     train_loader = DataLoader(
         dataset=train_ds,
@@ -164,14 +97,13 @@ if __name__ == '__main__':
         shuffle=False
     )
 
-    # Model
-    net = UNet(
-        dimensions=3,
+    # Module
+    net = AttentionUnet(
+        spatial_dims=3,
         in_channels=1,
         out_channels=1,
-        channels=(64, 128, 256, 512, 1024),
-        strides=(2, 2, 2, 2),
-        dropout=0.2
+        channels=(8, 16, 32, 64, 128),
+        strides=(2, 2, 2, 2)
     ).to(device)
 
     opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
@@ -237,7 +169,7 @@ if __name__ == '__main__':
         # Save Best Metric
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete/best_model_parameters.pt')
+            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/attention_unet/runs/exp_delete/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)
