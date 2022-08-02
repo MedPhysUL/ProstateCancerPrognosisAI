@@ -138,13 +138,13 @@ class BaseModel(ABC):
         """
         raise NotImplementedError
 
-    def find_optimal_threshold(
+    def fix_thresholds_to_optimal_values(
             self,
             dataset: ProstateCancerDataset,
             metric: BinaryClassificationMetric
     ) -> None:
         """
-        Finds the optimal classification threshold for a binary classification task according to a given metric.
+        Fix all classification thresholds to their optimal values according to a given metric.
 
         Parameters
         ----------
