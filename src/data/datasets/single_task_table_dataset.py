@@ -49,7 +49,7 @@ class SingleTaskTableDataset(Dataset):
             feature_selection_groups: Optional[List[List[str]]] = None,
             classification: bool = True,
             classification_threshold: Optional[float] = None,
-            weight: Optional[float] = None,
+            class_weight: Optional[float] = None,
             to_tensor: bool = False
     ):
         """
@@ -71,9 +71,9 @@ class SingleTaskTableDataset(Dataset):
             List with list of column names to consider together in group-wise feature selection.
         classification : bool
             Whether to consider the task as classification. False for regression.
-        classification_threshold : float
+        classification_threshold : Optional[float]
             The threshold used to classify a sample in class 1.
-        weight : Optional[float]
+        class_weight : Optional[float]
             The weight attributed to class 1 (in [0, 1]).
         to_tensor : bool
             Whether we want the features and targets in tensors. False for numpy arrays.
@@ -87,13 +87,14 @@ class SingleTaskTableDataset(Dataset):
         for columns in [cont_cols, cat_cols]:
             self._check_columns_validity(df, columns)
 
-        if weight is not None:
-            if not (0 < weight < 1):
-                raise ValueError("The weight parameter must be included in range [0, 1]")
+        if class_weight is not None:
+            if not (0 < class_weight < 1):
+                raise ValueError("The class_weight parameter must be included in range [0, 1]")
 
         # Set default protected attributes
         self._cat_cols, self._cat_idx = cat_cols, []
         self._classification = classification
+        self._class_weight = class_weight
         self._cont_cols, self._cont_idx = cont_cols, []
         self._ids_col = ids_col
         self._ids = list(df[ids_col].values)
@@ -109,7 +110,6 @@ class SingleTaskTableDataset(Dataset):
         self._train_mask, self._valid_mask, self._test_mask = [], None, []
         self._x_cat, self._x_cont = None, None
         self._y = self._initialize_targets(df[target_col], classification, to_tensor)
-        self._weight = weight
 
         # Define protected feature "getter" method
         self._x = self._define_feature_getter(cont_cols, cat_cols, to_tensor)
@@ -234,8 +234,8 @@ class SingleTaskTableDataset(Dataset):
         return self._valid_mask
 
     @property
-    def weight(self) -> Optional[float]:
-        return self._weight
+    def class_weight(self) -> Optional[float]:
+        return self._class_weight
 
     @property
     def x(self) -> pd.DataFrame:
@@ -881,13 +881,13 @@ class SingleTaskTableDataset(Dataset):
             Positive scaling factor.
         """
         # If no weight was provided we return None
-        if self.weight is None:
+        if self._class_weight is None:
             return None
-        
+
         y_train = self.y[self.train_mask]
 
         # Otherwise we return samples' weights in the appropriate format
         n1 = y_train.sum()              # number of samples with label 1
         n0 = y_train.shape[0] - n1      # number of samples with label 0
 
-        return (n0/n1)*(self._weight/(1-self._weight))
+        return (n0/n1)*(self._class_weight/(1-self._class_weight))
