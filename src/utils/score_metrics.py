@@ -13,7 +13,7 @@ from enum import Enum
 from typing import Tuple, Union
 
 import numpy as np
-from torch import from_numpy, is_tensor, tensor, zeros
+from torch import from_numpy, is_tensor, Tensor, zeros
 
 
 class TaskType(Enum):
@@ -145,17 +145,17 @@ class RegressionMetric(Metric):
 
     def __call__(
             self,
-            pred: Union[np.array, tensor],
-            targets: Union[np.array, tensor]
+            pred: Union[np.array, Tensor],
+            targets: Union[np.array, Tensor]
     ) -> float:
         """
         Converts inputs to tensors than computes the metric and applies rounding.
 
         Parameters
         ----------
-        pred : Union[np.array, tensor]
+        pred : Union[np.array, Tensor]
             (N,) tensor or array with predicted labels.
-        targets : Union[np.array, tensor]
+        targets : Union[np.array, Tensor]
             (N,) tensor or array with ground truth
 
         Returns
@@ -170,22 +170,22 @@ class RegressionMetric(Metric):
 
     @staticmethod
     def convert_to_tensors(
-            pred: Union[np.array, tensor],
-            targets: Union[np.array, tensor]
-    ) -> Tuple[tensor, tensor]:
+            pred: Union[np.array, Tensor],
+            targets: Union[np.array, Tensor]
+    ) -> Tuple[Tensor, Tensor]:
         """
         Converts inputs to tensors.
 
         Parameters
         ----------
-        pred : Union[np.array, tensor]
+        pred : Union[np.array, Tensor]
             (N,) tensor or array containing predictions.
-        targets : Union[np.array, tensor]
+        targets : Union[np.array, Tensor]
             (N,) tensor or array containing ground truth.
 
         Returns
         -------
-        pred, targets : Tuple[tensor, tensor]
+        pred, targets : Tuple[Tensor, Tensor]
             (N,) tensor, (N,) tensor
         """
         if not is_tensor(pred):
@@ -196,17 +196,18 @@ class RegressionMetric(Metric):
     @abstractmethod
     def compute_metric(
             self,
-            pred: tensor,
-            targets: tensor
+            pred: Tensor,
+            targets: Tensor
     ) -> float:
         """
         Computes the metric score.
 
         Parameters
         ----------
-        pred : tensor
+        pred : Tensor
             (N,) tensor with predicted labels
-        targets : tensor (N,) tensor with ground truth
+        targets : Tensor
+            (N,) tensor with ground truth
 
         Returns
         -------
@@ -243,8 +244,8 @@ class BinaryClassificationMetric(Metric):
 
     def __call__(
             self,
-            pred: Union[np.array, tensor],
-            targets: Union[np.array, tensor],
+            pred: Union[np.array, Tensor],
+            targets: Union[np.array, Tensor],
             thresh: float = 0.5
     ) -> float:
         """
@@ -253,9 +254,9 @@ class BinaryClassificationMetric(Metric):
 
         Parameters
         ----------
-        pred : Union[np.array, tensor]
+        pred : Union[np.array, Tensor]
             (N,) tensor or array with predicted labels.
-        targets : Union[np.array, tensor]
+        targets : Union[np.array, Tensor]
             (N,) tensor or array with ground truth
         thresh : float
             The threshold used to classify a sample in class 1.
@@ -272,22 +273,22 @@ class BinaryClassificationMetric(Metric):
 
     @staticmethod
     def convert_to_tensors(
-            pred: Union[np.array, tensor],
-            targets: Union[np.array, tensor]
-    ) -> Tuple[tensor, tensor]:
+            pred: Union[np.array, Tensor],
+            targets: Union[np.array, Tensor]
+    ) -> Tuple[Tensor, Tensor]:
         """
         Converts predictions to float (since they are probabilities) and ground truth to long.
 
         Parameters
         ----------
-        pred : Union[np.array, tensor]
+        pred : Union[np.array, Tensor]
             (N,) tensor with predicted probabilities of being in class 1.
-        targets : Union[np.array, tensor]
+        targets : Union[np.array, Tensor]
             (N,) tensor with ground truth.
 
         Returns
         -------
-        pred, targets : Tuple[tensor, tensor]
+        pred, targets : Tuple[Tensor, Tensor]
             (N,) tensor, (N,) tensor
         """
         if not is_tensor(pred):
@@ -297,25 +298,25 @@ class BinaryClassificationMetric(Metric):
 
     @staticmethod
     def get_confusion_matrix(
-            pred_proba: tensor,
-            targets: tensor,
+            pred_proba: Tensor,
+            targets: Tensor,
             thresh: float
-    ) -> tensor:
+    ) -> Tensor:
         """
         Gets the confusion matrix.
 
         Parameters
         ----------
-        pred_proba : tensor
+        pred_proba : Tensor
             (N,) tensor with with predicted probabilities of being in class 1.
-        targets : tensor
+        targets : Tensor
             (N,) tensor with ground truth.
         thresh : float
             Probability threshold that must be reach by a sample to be classified into class 1.
 
         Returns
         -------
-        confusion_matrix : tensor
+        confusion_matrix : Tensor
             (2,2) tensor
         """
         # We initialize an empty confusion matrix
@@ -331,8 +332,8 @@ class BinaryClassificationMetric(Metric):
     @abstractmethod
     def compute_metric(
             self,
-            pred: tensor,
-            targets: tensor,
+            pred: Tensor,
+            targets: Tensor,
             thresh: float
     ) -> float:
         """
@@ -340,9 +341,9 @@ class BinaryClassificationMetric(Metric):
 
         Parameters
         ----------
-        pred : tensor
+        pred : Tensor
             (N,) tensor with predicted probabilities of being in class 1.
-        targets : tensor
+        targets : Tensor
             (N,) tensor with ground truth.
         thresh : float
             Probability threshold that must be reach by a sample to be classified into class 1.

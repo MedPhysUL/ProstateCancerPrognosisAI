@@ -10,6 +10,8 @@
 
 import os
 
+from src.utils.tasks import Classification
+
 # SEED
 SEED = 1010710
 
@@ -63,3 +65,6 @@ COLUMNS_TYPES = {
     PN: CATEGORICAL_TYPE,
     BCR: CATEGORICAL_TYPE
 }
+
+# TASKS
+TASKS = [Classification(target_col=PN), Classification(target_col=BCR)]

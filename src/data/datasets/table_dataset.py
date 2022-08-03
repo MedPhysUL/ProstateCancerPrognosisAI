@@ -1,11 +1,14 @@
 """
-    @file:              single_task_table_dataset.py
+    @file:              table_dataset.py
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     05/2022
     @Last modification: 07/2022
 
-    @Description:       This file contains a custom torch dataset named SingleTaskTableDataset.
+    @Description:       This file contains a custom torch dataset named TableDataset. We follow
+                        https://ieeexplore.ieee.org/document/8892612 setting for multi-output learning. This class
+                        allows to cover the cases where some patients have a missing label for one task (or should I
+                        say, output) while it is available for another.
 """
 
 from __future__ import annotations
@@ -13,11 +16,12 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from torch import cat, from_numpy, tensor
+from torch import cat, from_numpy, stack, Tensor
 from torch.utils.data import Dataset
 
 from src.data.processing.transforms import CategoricalTransform as CaT
 from src.data.processing.preprocessing import preprocess_categoricals, preprocess_continuous
+from src.utils.tasks import Classification, Task
 
 
 class MaskType:
@@ -34,22 +38,19 @@ class MaskType:
         return iter([self.TRAIN, self.VALID, self.TEST])
 
 
-class SingleTaskTableDataset(Dataset):
+class TableDataset(Dataset):
     """
-    A custom dataset class used to perform single-task experiments on tabular data.
+    A custom dataset class used to perform experiments on tabular data.
     """
 
     def __init__(
             self,
             df: pd.DataFrame,
             ids_col: str,
-            target_col: str,
+            tasks: List[Task],
             cont_cols: Optional[List[str]] = None,
             cat_cols: Optional[List[str]] = None,
             feature_selection_groups: Optional[List[List[str]]] = None,
-            classification: bool = True,
-            classification_threshold: Optional[float] = None,
-            class_weight: Optional[float] = None,
             to_tensor: bool = False
     ):
         """
@@ -61,24 +62,18 @@ class SingleTaskTableDataset(Dataset):
             Dataframe with the original data.
         ids_col : str
             Name of the column containing the patient ids.
-        target_col : str
-            Names of columns containing targets.
+        tasks : List[Task]
+            List of tasks.
         cont_cols : Optional[List[str]]
             List of column names associated with continuous data.
         cat_cols : Optional[List[str]]
             List of column names associated with categorical data.
         feature_selection_groups : Optional[List[List[str]]]
             List with list of column names to consider together in group-wise feature selection.
-        classification : bool
-            Whether to consider the task as classification. False for regression.
-        classification_threshold : Optional[float]
-            The threshold used to classify a sample in class 1.
-        class_weight : Optional[float]
-            The weight attributed to class 1 (in [0, 1]).
         to_tensor : bool
             Whether we want the features and targets in tensors. False for numpy arrays.
         """
-        super(SingleTaskTableDataset).__init__()
+        super(TableDataset).__init__()
 
         # Validation of inputs
         if cont_cols is None and cat_cols is None:
@@ -87,29 +82,20 @@ class SingleTaskTableDataset(Dataset):
         for columns in [cont_cols, cat_cols]:
             self._check_columns_validity(df, columns)
 
-        if class_weight is not None:
-            if not (0 < class_weight < 1):
-                raise ValueError("The class_weight parameter must be included in range [0, 1]")
-
         # Set default protected attributes
         self._cat_cols, self._cat_idx = cat_cols, []
-        self._classification = classification
-        self._class_weight = class_weight
+        self._tasks = tasks
         self._cont_cols, self._cont_idx = cont_cols, []
         self._ids_col = ids_col
         self._ids = list(df[ids_col].values)
         self._ids_to_row_idx = {id_: i for i, id_ in enumerate(self._ids)}
         self._n = df.shape[0]
         self._original_data = df
-        self._target_col = target_col
-        if classification and (classification_threshold is None):
-            self._thresh = 0.5
-        else:
-            self._thresh = classification_threshold
+        self._target_cols = [task.target_col for task in tasks]
         self._to_tensor = to_tensor
         self._train_mask, self._valid_mask, self._test_mask = [], None, []
         self._x_cat, self._x_cont = None, None
-        self._y = self._initialize_targets(df[target_col], classification, to_tensor)
+        self._y = self._initialize_targets(self._tasks, to_tensor)
 
         # Define protected feature "getter" method
         self._x = self._define_feature_getter(cont_cols, cat_cols, to_tensor)
@@ -136,9 +122,10 @@ class SingleTaskTableDataset(Dataset):
     def __getitem__(
             self,
             idx: Union[int, List[int]]
-    ) -> Union[Tuple[np.array, np.array, np.array], Tuple[tensor, tensor, tensor]]:
+    ) -> Union[Tuple[np.array, np.array, np.array], Tuple[Tensor, Tensor, Tensor]]:
         """
-        Gets dataset item.
+        Gets dataset item. In the multi-output learning setting, the output variables, i.e the targets, share the same
+        training features (See https://ieeexplore.ieee.org/document/8892612).
 
         Parameters
         ----------
@@ -148,16 +135,12 @@ class SingleTaskTableDataset(Dataset):
         Returns
         -------
         item : Union[Tuple[np.array, np.array, np.array], Tuple[tensor, tensor, tensor]]
-            Items are tuples (x, y, idx) where
-                - x : (N,D) tensor or array with D-dimensional samples
-                - y : (N,) tensor or array with classification labels
-                - idx : (N,) tensor or array with idx of samples according to the whole dataset
+            The returned item is a tuple (x, y, idx) where
+                - x : (N,D) tensor or array with D-dimensional samples where D is the number of features.
+                - y : (N,T) tensor or array with T-dimensional targets where T is the number of tasks.
+                - idx : (N,) tensor or array with idx of samples according to the whole dataset.
         """
         return self.x[idx], self.y[idx], idx
-
-    @property
-    def classification(self) -> bool:
-        return self._classification
 
     @property
     def cat_cols(self) -> List[str]:
@@ -206,20 +189,16 @@ class SingleTaskTableDataset(Dataset):
         return self._original_data
 
     @property
-    def target_col(self) -> str:
-        return self._target_col
+    def target_cols(self) -> List[str]:
+        return self._target_cols
+
+    @property
+    def tasks(self) -> List[Task]:
+        return self._tasks
 
     @property
     def test_mask(self) -> List[int]:
         return self._test_mask
-
-    @property
-    def thresh(self) -> Optional[float]:
-        return self._thresh
-
-    @thresh.setter
-    def thresh(self, thresh: Optional[float]) -> None:
-        self._thresh = thresh
 
     @property
     def to_tensor(self) -> bool:
@@ -234,23 +213,19 @@ class SingleTaskTableDataset(Dataset):
         return self._valid_mask
 
     @property
-    def class_weight(self) -> Optional[float]:
-        return self._class_weight
-
-    @property
-    def x(self) -> pd.DataFrame:
+    def x(self) -> Union[Tensor, np.array]:
         return self._x()
 
     @property
-    def x_cat(self) -> Optional[Union[np.array, tensor]]:
+    def x_cat(self) -> Optional[Union[np.array, Tensor]]:
         return self._x_cat
 
     @property
-    def x_cont(self) -> Optional[Union[np.array, tensor]]:
+    def x_cont(self) -> Optional[Union[np.array, Tensor]]:
         return self._x_cont
 
     @property
-    def y(self) -> np.array:
+    def y(self) -> Union[np.array, Tensor]:
         return self._y
 
     def _categorical_setter(
@@ -431,7 +406,7 @@ class SingleTaskTableDataset(Dataset):
             self._cat_idx = list(range(len(cat_cols)))
 
             # Only categorical feature extracted by the getter
-            def x() -> Union[tensor, np.array]:
+            def x() -> Union[Tensor, np.array]:
                 return self.x_cat
 
         elif cat_cols is None:
@@ -440,7 +415,7 @@ class SingleTaskTableDataset(Dataset):
             self._cont_idx = list(range(len(cont_cols)))
 
             # Only continuous features extracted by the getter
-            def x() -> Union[tensor, np.array]:
+            def x() -> Union[Tensor, np.array]:
                 return self.x_cont
 
         else:
@@ -452,10 +427,10 @@ class SingleTaskTableDataset(Dataset):
 
             # Continuous and categorical features extracted by the getter
             if not to_tensor:
-                def x() -> Union[tensor, np.array]:
+                def x() -> Union[Tensor, np.array]:
                     return np.concatenate((self.x_cont, self.x_cat), axis=1)
             else:
-                def x() -> Union[tensor, np.array]:
+                def x() -> Union[Tensor, np.array]:
                     return cat((self.x_cont, self.x_cat), dim=1)
 
         return x
@@ -616,7 +591,7 @@ class SingleTaskTableDataset(Dataset):
         if cat_cols is not None:
             selected_cols += cat_cols
 
-        return self.original_data[[self._ids_col, self._target_col] + selected_cols].copy()
+        return self.original_data[[self._ids_col] + self._target_cols + selected_cols].copy()
 
     def get_imputed_dataframe(
             self
@@ -642,7 +617,7 @@ class SingleTaskTableDataset(Dataset):
             self,
             cont_cols: Optional[List[str]] = None,
             cat_cols: List[str] = None
-    ) -> SingleTaskTableDataset:
+    ) -> TableDataset:
         """
         Returns a subset of the current dataset using the given cont_cols and cat_cols.
 
@@ -655,18 +630,17 @@ class SingleTaskTableDataset(Dataset):
 
         Returns
         -------
-        sub_dataset : SingleTaskTableDataset
-            Instance of the SingleTaskTableDataset class.
+        sub_dataset : TableDataset
+            Instance of the TableDataset class.
         """
         subset = self._retrieve_subset_from_original(cont_cols, cat_cols)
 
-        sub_dataset = SingleTaskTableDataset(
+        sub_dataset = TableDataset(
             df=subset,
             ids_col=self._ids_col,
-            target_col=self._target_col,
+            tasks=self._tasks,
             cont_cols=cont_cols,
             cat_cols=cat_cols,
-            classification=self.classification,
             to_tensor=self._to_tensor
         )
 
@@ -676,7 +650,7 @@ class SingleTaskTableDataset(Dataset):
             self,
             data: pd.DataFrame,
             categorical: bool = False
-    ) -> SingleTaskTableDataset:
+    ) -> TableDataset:
         """
         Returns a superset of the current dataset by including the given data.
 
@@ -690,19 +664,18 @@ class SingleTaskTableDataset(Dataset):
 
         Returns
         -------
-        sub_dataset : SingleTaskTableDataset
-            Instance of the SingleTaskTableDataset class.
+        sub_dataset : TableDataset
+            Instance of the TableDataset class.
         """
         # We build the augmented dataframe
         df, cont_cols, cat_cols = self._get_augmented_dataframe(data, categorical)
 
-        super_dataset = SingleTaskTableDataset(
+        super_dataset = TableDataset(
             df=df,
             ids_col=self._ids_col,
-            target_col=self._target_col,
+            tasks=self._tasks,
             cont_cols=cont_cols,
             cat_cols=cat_cols,
-            classification=self.classification,
             to_tensor=self._to_tensor
         )
 
@@ -726,7 +699,7 @@ class SingleTaskTableDataset(Dataset):
     def get_one_hot_encodings(
             self,
             cat_cols: List[str]
-    ) -> Union[np.array, tensor]:
+    ) -> Union[np.array, Tensor]:
         """
         Returns one hot encodings associated to the specified categorical columns.
 
@@ -737,7 +710,7 @@ class SingleTaskTableDataset(Dataset):
 
         Returns
         -------
-        one_hot_encodings : Union[np.array, tensor]
+        one_hot_encodings : Union[np.array, Tensor]
             One hot vector of categorical columns.
         """
         # We check if the column names specified are categorical
@@ -808,40 +781,45 @@ class SingleTaskTableDataset(Dataset):
             if c not in cols:
                 raise ValueError(f"Column name {c} is not part of the {col_type} columns")
 
-    @staticmethod
     def _initialize_targets(
-            targets_column: pd.Series,
-            classification: bool,
+            self,
+            tasks: List[Task],
             target_to_tensor: bool
-    ) -> Union[np.array, tensor]:
+    ) -> Union[np.array, Tensor]:
         """
-        Sets the targets according to the task and the choice of container
+        Sets the targets according to the task and the choice of container.
 
         Parameters
         ----------
-        targets_column : pd.Series
-            Column of the dataframe containing the targets.
-        classification : bool
-            True for classification task, false for regression.
+        tasks : List[Task]
+            List of tasks.
         target_to_tensor : bool
             True if we want the targets to be in a tensor, false for numpy array.
 
         Returns
         -------
-        targets : Union[List[np.array], List[tensor]]
+        targets : Union[np.array, Tensor]
             Targets in a proper format.
         """
-        # Set targets protected attribute according to task
-        t = targets_column.to_numpy(dtype=float)
-        if (not classification) and target_to_tensor:
-            t = from_numpy(t).float()
-        elif classification:
-            if target_to_tensor:
-                t = from_numpy(t).long()
-            else:
-                t = t.astype(int)
+        targets = []
+        for task in tasks:
+            # Set targets protected attribute according to task
+            t = self.original_data[task.target_col].to_numpy(dtype=float)
 
-        return t.squeeze()
+            if (not isinstance(task, Classification)) and target_to_tensor:
+                t = from_numpy(t).float()
+            elif isinstance(task, Classification):
+                if target_to_tensor:
+                    t = from_numpy(t).long()
+                else:
+                    t = t.astype(int)
+
+            targets.append(t)
+
+        if target_to_tensor:
+            return stack(targets, dim=1)
+        else:
+            return np.stack(targets, axis=1)
 
     @staticmethod
     def _check_columns_validity(
@@ -863,31 +841,3 @@ class SingleTaskTableDataset(Dataset):
             for c in columns:
                 if c not in dataframe_columns:
                     raise ValueError(f"Column {c} is not part of the given dataframe")
-
-    def get_scaling_factor(
-            self
-    ) -> Optional[float]:
-        """
-        Computes the scaling factor that needs to be apply to the weight of samples in the class 1.
-
-        We need to find alpha that satisfies :
-            (alpha*n1)/n0 = w/(1-w)
-        Which gives the solution:
-            alpha = w*n0/(1-w)*n1
-
-        Returns
-        -------
-        scaling_factor : Optional[float]
-            Positive scaling factor.
-        """
-        # If no weight was provided we return None
-        if self._class_weight is None:
-            return None
-
-        y_train = self.y[self.train_mask]
-
-        # Otherwise we return samples' weights in the appropriate format
-        n1 = y_train.sum()              # number of samples with label 1
-        n0 = y_train.shape[0] - n1      # number of samples with label 0
-
-        return (n0/n1)*(self._class_weight/(1-self._class_weight))

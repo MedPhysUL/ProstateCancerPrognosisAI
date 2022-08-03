@@ -62,13 +62,13 @@ class SAM(torch.optim.Optimizer):
 
     def _grad_norm(
             self
-    ) -> torch.tensor:
+    ) -> torch.Tensor:
         """
         Computes gradients norm.
 
         Returns
         -------
-        norm : torch.tensor
+        norm : torch.Tensor
             Gradient norm.
         """
         # put everything on the same device, in case of model parallelism
@@ -121,14 +121,14 @@ class SAM(torch.optim.Optimizer):
 
     def load_state_dict(
             self,
-            state_dict: OrderedDict[str, torch.tensor]
+            state_dict: OrderedDict[str, torch.Tensor]
     ) -> None:
         """
         Loads parameters dictionary.
 
         Parameters
         ----------
-        state_dict : OrderedDict[str, torch.tensor]
+        state_dict : OrderedDict[str, torch.Tensor]
             Ordered dictionary with parameters
         """
         super().load_state_dict(state_dict)

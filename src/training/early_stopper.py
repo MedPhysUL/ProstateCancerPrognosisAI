@@ -13,7 +13,7 @@ from typing import OrderedDict
 from uuid import uuid4
 
 import numpy as np
-from torch import load, save, tensor
+from torch import load, save, Tensor
 from torch.nn import Module
 
 from src.utils.score_metrics import Direction
@@ -96,7 +96,7 @@ class EarlyStopper:
 
     def get_best_params(
             self
-    ) -> OrderedDict[str, tensor]:
+    ) -> OrderedDict[str, Tensor]:
         """
         Returns the saved best parameters.
 

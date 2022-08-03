@@ -17,8 +17,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from src.data.datasets.multi_task_table_dataset import MultiTaskTableDataset
-from src.data.datasets.single_task_table_dataset import MaskType, SingleTaskTableDataset
+from src.data.datasets.table_dataset import MaskType, TableDataset
 
 
 class TableViewer:
@@ -30,25 +29,20 @@ class TableViewer:
 
     def __init__(
             self,
-            dataset: Union[SingleTaskTableDataset, MultiTaskTableDataset]
+            dataset: TableDataset
     ):
         """
         Sets protected and public attributes of our table viewer.
 
         Parameters
         ----------
-        dataset : Union[SingleTaskTableDataset, MultiTaskTableDataset]
+        dataset : TableDataset
             Dataset.
         """
         sns.set_style("whitegrid")
         self.dataset = dataset
 
-        if isinstance(dataset, SingleTaskTableDataset):
-            self._datasets = [dataset]
-            self._target_cols = [dataset.target_col]
-        elif isinstance(dataset, MultiTaskTableDataset):
-            self._datasets = dataset.datasets
-            self._target_cols = [ds.target_col for ds in self._datasets]
+        self._target_cols = dataset.target_cols
 
         self._nonempty_masks = self._get_nonempty_masks()
         self._original_dataframes = self._get_original_dataframes()
@@ -66,10 +60,20 @@ class TableViewer:
             List of nonempty masks dictionaries (one for each of the datasets contained in self._datasets).
         """
         nonempty_masks = []
-        for ds in self._datasets:
-            available_masks = ds.train_mask, ds.valid_mask, ds.test_mask
-            available_masks_names = MaskType.TRAIN, MaskType.VALID, MaskType.TEST
-            nonempty_masks.append({name: mask for mask, name in zip(available_masks, available_masks_names) if mask})
+        masks = [self.dataset.train_mask, self.dataset.valid_mask, self.dataset.test_mask]
+        masks_names = [MaskType.TRAIN, MaskType.VALID, MaskType.TEST]
+
+        available_masks = [(name, mask) for name, mask in zip(masks_names, masks) if mask]
+
+        for task_idx, task in enumerate(self.dataset.tasks):
+            filtered_masks = deepcopy(available_masks)
+            for i, (name, mask) in enumerate(filtered_masks):
+                nonmissing_targets_idx = task.get_idx_of_nonmissing_targets(self.dataset.y[mask, task_idx])
+                filtered_masks[i] = (name, np.array(mask)[nonmissing_targets_idx].tolist())
+
+            nonempty_masks.append(
+                {name: mask for name, mask in filtered_masks}
+            )
 
         return nonempty_masks
 
@@ -86,11 +90,11 @@ class TableViewer:
         """
         original_dataframes = []
 
-        for idx, ds in enumerate(self._datasets):
+        for idx, task in enumerate(self.dataset.tasks):
             original_dataframes.append(
                 pd.concat(
                     objs=[
-                        ds.original_data.iloc[mask].assign(Sets=name) for name, mask in
+                        self.dataset.original_data.iloc[mask].assign(Sets=name) for name, mask in
                         self._nonempty_masks[idx].items()
                     ],
                     ignore_index=True
@@ -112,11 +116,11 @@ class TableViewer:
         """
         imputed_dataframes = []
 
-        for idx, ds in enumerate(self._datasets):
+        for idx, task in enumerate(self.dataset.tasks):
             imputed_dataframes.append(
                 pd.concat(
                     objs=[
-                        ds.get_imputed_dataframe().iloc[mask].assign(Sets=name) for name, mask in
+                        self.dataset.get_imputed_dataframe().iloc[mask].assign(Sets=name) for name, mask in
                         self._nonempty_masks[idx].items()
                     ],
                     ignore_index=True
@@ -256,12 +260,13 @@ class TableViewer:
             Whether to show figures.
         """
         for i, target_col in enumerate(self._target_cols):
-            fig, axes = plt.subplots(ncols=len(self._datasets), squeeze=False)
+            fig, axes = plt.subplots(ncols=len(self.dataset.tasks), squeeze=False)
             for idx, (name, mask) in enumerate(self._nonempty_masks[i].items()):
                 if mask:
+                    filtered_df = self._original_dataframes[i].loc[self._original_dataframes[i]["Sets"] == name]
                     self._visualize_class_distribution(
                         axes=axes[0, idx],
-                        targets=self._original_dataframes[i].iloc[mask][target_col],
+                        targets=filtered_df[target_col],
                         label_names={f"{target_col}_0": 0, f"{target_col}_1": 1},
                         title=name
                     )
@@ -287,8 +292,10 @@ class TableViewer:
         show : bool
             Whether to show figures.
         """
-        for ds, original_df, imputed_df in zip(self._datasets, self._original_dataframes, self._imputed_dataframes):
-            for cont_col in ds.cont_cols:
+        for task, original_df, imputed_df in zip(
+                self.dataset.tasks, self._original_dataframes, self._imputed_dataframes
+        ):
+            for cont_col in self.dataset.cont_cols:
                 for df, path in zip([original_df, imputed_df], [self.ORIGINAL_DF_PATH, self.IMPUTED_DF_PATH]):
                     fig, axes = plt.subplots()
                     sns.boxplot(
@@ -302,7 +309,7 @@ class TableViewer:
                     if path_to_save:
                         plt.savefig(
                             os.path.join(*[
-                                path_to_save, ds.target_col, self.FIGURES_PATH, path, f"{cont_col}.png"
+                                path_to_save, task.target_col, self.FIGURES_PATH, path, f"{cont_col}.png"
                             ]),
                             dpi=300
                         )
@@ -325,8 +332,10 @@ class TableViewer:
         show : bool
             Whether to show figures.
         """
-        for ds, original_df, imputed_df in zip(self._datasets, self._original_dataframes, self._imputed_dataframes):
-            for cat_col in ds.cat_cols:
+        for task, original_df, imputed_df in zip(
+                self.dataset.tasks, self._original_dataframes, self._imputed_dataframes
+        ):
+            for cat_col in self.dataset.cat_cols:
                 for df, path in zip([original_df, imputed_df], [self.ORIGINAL_DF_PATH, self.IMPUTED_DF_PATH]):
                     df_copy = deepcopy(df)
                     df_copy[cat_col] = df_copy[cat_col].astype("category")
@@ -359,7 +368,7 @@ class TableViewer:
                     if path_to_save:
                         plt.savefig(
                             os.path.join(*[
-                                path_to_save, ds.target_col, self.FIGURES_PATH, path, f"{cat_col}.png"
+                                path_to_save, task.target_col, self.FIGURES_PATH, path, f"{cat_col}.png"
                             ]),
                             dpi=300
                         )
