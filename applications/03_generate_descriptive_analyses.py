@@ -10,8 +10,7 @@
 
 import pandas as pd
 
-from src.data.datasets.multi_task_table_dataset import MultiTaskTableDataset
-from src.data.datasets.single_task_table_dataset import SingleTaskTableDataset
+from src.data.datasets.table_dataset import TableDataset
 from src.visualization.table_viewer import TableViewer
 
 from constants import *
@@ -29,29 +28,18 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------------------------------------------------- #
     #                                            Descriptive analysis                                             #
     # ----------------------------------------------------------------------------------------------------------- #
-    target_cols = [PN, BCR]
-
-    single_task_datasets = []
-    for target_col in target_cols:
-        single_task_datasets.append(
-            SingleTaskTableDataset(
-                df=df[df[target_col].notna()],
-                ids_col=ID,
-                target_col=target_col,
-                cont_cols=[AGE, PSA],
-                cat_cols=[GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
-            )
-        )
-
-    multi_task_dataset = MultiTaskTableDataset(
-        datasets=single_task_datasets,
-        ids_to_row_idx=dict(pd.Series(df.index, index=df[ID]))
+    table_dataset = TableDataset(
+        df=df,
+        ids_col=ID,
+        tasks=TASKS,
+        cont_cols=[AGE, PSA],
+        cat_cols=[GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
     )
 
-    multi_task_dataset.update_masks(
+    table_dataset.update_masks(
         train_mask=list(range(len(learning_df))),
         test_mask=list(range(len(learning_df), len(learning_df) + len(holdout_df)))
     )
 
-    table_viewer = TableViewer(dataset=multi_task_dataset)
+    table_viewer = TableViewer(dataset=table_dataset)
     table_viewer.visualize(path_to_save=DESCRIPTIVE_ANALYSIS_PATH)

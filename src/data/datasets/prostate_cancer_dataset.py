@@ -11,12 +11,12 @@
 from typing import List, NamedTuple, Optional, Sequence, Tuple, Union
 
 import numpy as np
-from torch import tensor
+from torch import Tensor
 from torch.utils.data import Dataset
 
 from src.data.datasets.empty_dataset import EmptyDataset
 from src.data.datasets.image_dataset import ImageDataset
-from src.data.datasets.multi_task_table_dataset import MultiTaskTableDataset
+from src.data.datasets.table_dataset import TableDataset
 
 
 class DataItems(NamedTuple):
@@ -24,19 +24,19 @@ class DataItems(NamedTuple):
     Data items named tuple. This tuple is used to separate images/segmentations data from tabular data.
     """
     image: Tuple[Sequence]
-    table: List[List[Optional[Union[Tuple[np.array, np.array, np.array], Tuple[tensor, tensor, tensor]]]]]
+    table: Union[Tuple[np.array, np.array, np.array], Tuple[Tensor, Tensor, Tensor]]
 
 
 class ProstateCancerDataset(Dataset):
     """
     A custom dataset class used to perform multi-task experiments on tabular AND images data at once. Each
-    ProstateCancerDataset contains an ImageDataset and a MultiTaskTableDataset.
+    ProstateCancerDataset contains an ImageDataset and a TableDataset.
     """
 
     def __init__(
             self,
             image_dataset: Optional[ImageDataset] = None,
-            table_dataset: Optional[MultiTaskTableDataset] = None
+            table_dataset: Optional[TableDataset] = None
     ):
         """
         Sets protected and public attributes of our custom dataset class.
@@ -45,8 +45,8 @@ class ProstateCancerDataset(Dataset):
         ----------
         image_dataset : Optional[ImageDataset]
             An ImageDataset.
-        table_dataset : Optional[MultiTaskTableDataset]
-            A MultiTaskTableDataset.
+        table_dataset : Optional[TableDataset]
+            A TableDataset.
         """
         if (image_dataset is None) and (table_dataset is None):
             raise AssertionError("At least one image dataset or one table dataset must be provided.")

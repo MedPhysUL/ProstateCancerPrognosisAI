@@ -10,8 +10,7 @@
 
 import pandas as pd
 
-from src.data.datasets.multi_task_table_dataset import MultiTaskTableDataset
-from src.data.datasets.single_task_table_dataset import MaskType, SingleTaskTableDataset
+from src.data.datasets.table_dataset import MaskType, TableDataset
 from src.data.processing.sampling import RandomStratifiedSampler
 
 from constants import *
@@ -29,28 +28,19 @@ if __name__ == '__main__':
 
     df = df[[ID] + feature_cols + target_cols]
 
-    single_task_datasets = []
-    for target_col in target_cols:
-        single_task_datasets.append(
-            SingleTaskTableDataset(
-                df=df[df[target_col].notna()],
-                ids_col=ID,
-                target_col=target_col,
-                cont_cols=[AGE, PSA],
-                cat_cols=[GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
-            )
-        )
-
-    multi_task_dataset = MultiTaskTableDataset(
-        datasets=single_task_datasets,
-        ids_to_row_idx=dict(pd.Series(df.index, index=df[ID]))
+    table_dataset = TableDataset(
+        df=df,
+        ids_col=ID,
+        tasks=TASKS,
+        cont_cols=[AGE, PSA],
+        cat_cols=[GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
     )
 
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                 Sampling                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
     rss = RandomStratifiedSampler(
-        dataset=multi_task_dataset,
+        dataset=table_dataset,
         n_out_split=1,
         n_in_split=0,
         valid_size=0,

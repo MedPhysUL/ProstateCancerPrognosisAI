@@ -8,10 +8,10 @@
     @Description:       This file contains a custom EmptyDataset class.
 """
 
-from typing import List, Union
+from typing import List, Union, Tuple
 
 import numpy as np
-from torch import nan
+from torch import nan, Tensor
 from torch.utils.data import Dataset
 
 
@@ -37,7 +37,7 @@ class EmptyDataset(Dataset):
     def __getitem__(
             self,
             idx: Union[int, List[int]]
-    ) -> float:
+    ) -> Union[Tuple[np.array, np.array, np.array], Tuple[Tensor, Tensor, Tensor]]:
         """
         Gets dataset item. This method always returns NaN, regardless of the value of the index.
 
@@ -48,7 +48,7 @@ class EmptyDataset(Dataset):
 
         Returns
         -------
-        item : float
+        item : Union[Tuple[np.array, np.array, np.array], Tuple[Tensor, Tensor, Tensor]]
             NaN value.
         """
         if self.to_tensor:

@@ -13,11 +13,12 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
-from torch import tensor
+from torch import Tensor
 
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
 from src.utils.hyperparameters import HP
 from src.utils.score_metrics import BinaryClassificationMetric, Direction
+from src.utils.tasks import Classification
 
 
 class BaseModel(ABC):
@@ -89,7 +90,7 @@ class BaseModel(ABC):
             self,
             dataset: ProstateCancerDataset,
             mask: Optional[List[int]] = None
-    ) -> Union[tensor, np.array]:
+    ) -> Union[Tensor, np.array]:
         """
         Returns predictions for all samples in a particular set (default = test). For classification tasks, it returns
         the probability of belonging to class 1. For regression tasks, it returns the predicted real-valued target.
@@ -103,8 +104,8 @@ class BaseModel(ABC):
 
         Returns
         -------
-        predictions : Union[tensor, np.array]
-            (T, N,) tensor or array where T is the number of tasks and N is the number of samples.
+        predictions : Union[Tensor, np.array]
+            (N,T) tensor or array where N is the number of samples and T is the number of tasks.
         """
         raise NotImplementedError
 
@@ -126,14 +127,14 @@ class BaseModel(ABC):
     @abstractmethod
     def _update_pos_scaling_factor(
             self,
-            y_train: Union[tensor, np.array]
+            y_train: Union[Tensor, np.array]
     ) -> None:
         """
         Updates the scaling factor that needs to be apply to samples in class 1.
 
         Parameters
         ----------
-        y_train : Union[tensor, np.array]
+        y_train : Union[Tensor, np.array]
             (N, 1) tensor or array containing labels.
         """
         raise NotImplementedError
@@ -153,23 +154,27 @@ class BaseModel(ABC):
         metric : BinaryClassificationMetric
             Binary classification metric used to find optimal threshold
         """
+        table_ds = dataset.table_dataset
+
         # We predict targets (or proba) on the training set
         predictions = self.predict(dataset, dataset.train_mask)
+        targets = table_ds.y[dataset.train_mask]
 
-        for single_task_table_dataset, pred in zip(dataset.table_dataset.datasets, predictions):
-            if single_task_table_dataset.classification:
-
+        for task_idx, task in enumerate(table_ds.tasks):
+            if isinstance(task, Classification):
                 # For multiple threshold values we calculate the metric
                 thresholds = np.linspace(start=0.01, stop=0.95, num=95)
-                scores = np.array(
-                    [
-                        metric(pred, single_task_table_dataset.y[single_task_table_dataset.train_mask], t)
-                        for t in thresholds
-                    ]
-                )
+
+                # Get targets and predictions for current task
+                task_targets, task_pred = targets[:, task_idx], predictions[:, task_idx]
+                nonmissing_targets_idx = task.get_idx_of_nonmissing_targets(task_targets)
+                task_targets, task_pred = task_targets[nonmissing_targets_idx], task_pred[nonmissing_targets_idx]
+
+                # Calculate scores
+                scores = np.array([metric(task_pred, task_targets, t) for t in thresholds])
 
                 # We save the optimal threshold
                 if metric.direction == Direction.MINIMIZE:
-                    single_task_table_dataset.thresh = thresholds[np.argmin(scores)]
+                    task.threshold = thresholds[np.argmin(scores)]
                 else:
-                    single_task_table_dataset.thresh = thresholds[np.argmax(scores)]
+                    task.threshold = thresholds[np.argmax(scores)]
