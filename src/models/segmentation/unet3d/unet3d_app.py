@@ -20,6 +20,7 @@ from monai.transforms import (
     KeepLargestConnectedComponent,
     # RandFlip,
     # Rotate90,
+    ScaleIntensityRange,
     ThresholdIntensity,
     ToTensor
 )
@@ -45,8 +46,8 @@ if __name__ == '__main__':
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 40
-    batch_size = 4
-    num_epochs = 150
+    batch_size = 1
+    num_epochs = 500
     lr = 1e-3
 
     # Defining Transforms
@@ -166,11 +167,12 @@ if __name__ == '__main__':
 
     # Model
     net = UNet(
-        dimensions=3,
+        spatial_dims=3,
         in_channels=1,
         out_channels=1,
         channels=(64, 128, 256, 512, 1024),
         strides=(2, 2, 2, 2),
+        num_res_units=2,
         dropout=0.2
     ).to(device)
 

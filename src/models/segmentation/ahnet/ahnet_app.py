@@ -1,50 +1,48 @@
 """
-    @file:              swin_unetr_app.py
+    @file:              ahnet_app.py
     @Author:            Raphael Brodeur
 
     @Creation Date:     08/2022
     @Last modification: 08/2022
 
-    @Description:       This file contains an implementation of a 3D U-Net.
+    @Description:       This file contains an implementation of an anisotropic hybrid network.
 """
 
-from monai.data import DataLoader
+from monai.data.dataloader import DataLoader
 from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
-from monai.networks.nets import SwinUNETR
+from monai.networks.nets import AHNet
 from monai.transforms import (
     AddChannel,
     CenterSpatialCrop,
     Compose,
     HistogramNormalize,
     KeepLargestConnectedComponent,
-    ScaleIntensityRange,
     ThresholdIntensity,
     ToTensor
 )
 from monai.utils import set_determinism
 import numpy as np
 import torch
-from torch.utils.data.dataset import random_split
+from torch.utils.data import random_split
 from torch.utils.tensorboard import SummaryWriter
 
 from src.data.extraction.local import LocalDatabaseManager
-from src.data.datasets.image_dataset import ImageDataset
-from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
+from src.data.datasets.prostate_cancer_dataset import ImageDataset, ProstateCancerDataset
 
 
 if __name__ == '__main__':
     set_determinism(seed=1010710)
 
     writer = SummaryWriter(
-        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/swin_unetr/runs/exp1'
+        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/ahnet/runs/exp_delete'
     )
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 40
     batch_size = 1
-    num_epochs = 500
+    num_epochs = 150
     lr = 1e-3
 
     # Defining Transforms
@@ -54,7 +52,6 @@ if __name__ == '__main__':
         ThresholdIntensity(threshold=-250, above=True, cval=-250),
         ThresholdIntensity(threshold=500, above=False, cval=500),
         HistogramNormalize(num_bins=751, min=0, max=1),
-        # ScaleIntensityRange(a_min=-250, a_max=500, b_max=1.0, b_min=0.0, clip=True),
         ToTensor(dtype=torch.float32)
     ])
     seg_trans = Compose([
@@ -98,14 +95,9 @@ if __name__ == '__main__':
     )
 
     # Model
-    net = SwinUNETR(
-        img_size=(160, 160, 160),
-        in_channels=1,
-        out_channels=1
-    ).to(device)
+    net = AHNet().to(device)
 
-    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
-    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=opt, gamma=0.99)
+    opt = torch.optim.Adam(net.parameters(), lr)
     loss = DiceLoss(sigmoid=True)
     metric = DiceMetric(include_background=True, reduction='mean')
 
@@ -122,9 +114,12 @@ if __name__ == '__main__':
         for batch in train_loader:
             batch_images = batch.image[0].to(device)
             batch_segs = batch.image[1].to(device)
-
+            #
+            print(np.shape(batch_images))
+            #
             opt.zero_grad()
             y_pred = net(batch_images)
+
             loss_train = loss(y_pred, batch_segs)
             loss_train.backward()
             opt.step()
@@ -133,8 +128,6 @@ if __name__ == '__main__':
 
         epoch_train_losses.append(np.average(batch_loss))
         writer.add_scalar('avg training loss per batch per epoch', epoch_train_losses[-1], epoch + 1)
-
-        lr_scheduler.step()
 
         net.eval()
         loss_val_list = []
@@ -167,7 +160,7 @@ if __name__ == '__main__':
         # Save Best Metric
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/swin_unetr/runs/exp1/best_model_parameters.pt')
+            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/ahnet/runs/exp_delete/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)

@@ -76,7 +76,7 @@ if __name__ == '__main__':
     val_loader = DataLoader(
         dataset=val_ds,
         num_workers=num_workers,
-        batch_size=1,
+        batch_size=2,
         pin_memory=True,
         shuffle=False
     )
@@ -88,11 +88,12 @@ if __name__ == '__main__':
         out_channels=1,
         channels=(64, 128, 256, 512, 1024),
         strides=(2, 2, 2, 2),
+        num_res_units=1,
         dropout=0.2
     ).to(device)
 
     # Load Best Parameters
-    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete/best_model_parameters.pt'))
+    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete2/best_model_parameters.pt'))
     net.eval()
 
     # Stats
@@ -120,96 +121,96 @@ if __name__ == '__main__':
     print('moyenne:', np.average(metric_list))
 
     # Show best-mid-worst
-    patient_idx = -1
-    with torch.no_grad():
-        for patient in val_loader:
-            patient_img = patient.image[0]
-            patient_seg = patient.image[1]
-            patient_idx += 1
-            print(patient_idx)
-
-            if patient_idx == np.argmax(metric_list):
-                print('Best image', patient_idx)
-                img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
-                seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
-                patient_img = patient_img.to(device)
-                y_pred = net(patient_img)
-                y_pred = torch.sigmoid(y_pred)
-                y_pred = torch.round(y_pred)
-                print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
-                seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-                ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
-
-            if patient_idx == np.argmin(metric_list):
-                print('Worst image', patient_idx)
-                img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
-                seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
-                patient_img = patient_img.to(device)
-                y_pred = net(patient_img)
-                y_pred = torch.sigmoid(y_pred)
-                y_pred = torch.round(y_pred)
-                print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
-                seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-                ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
-
-            if patient_idx == np.argsort(metric_list)[len(metric_list)//2]:
-                print('Median image', patient_idx)
-                img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
-                seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
-                patient_img = patient_img.to(device)
-                y_pred = net(patient_img)
-                y_pred = torch.sigmoid(y_pred)
-                y_pred = torch.round(y_pred)
-                print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
-                seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-                ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
+    # patient_idx = -1
+    # with torch.no_grad():
+    #     for patient in val_loader:
+    #         patient_img = patient.image[0]
+    #         patient_seg = patient.image[1]
+    #         patient_idx += 1
+    #         print(patient_idx)
+    #
+    #         if patient_idx == np.argmax(metric_list):
+    #             print('Best image', patient_idx)
+    #             img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+    #             seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+    #             patient_img = patient_img.to(device)
+    #             y_pred = net(patient_img)
+    #             y_pred = torch.sigmoid(y_pred)
+    #             y_pred = torch.round(y_pred)
+    #             print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
+    #             seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+    #             ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
+    #
+    #         if patient_idx == np.argmin(metric_list):
+    #             print('Worst image', patient_idx)
+    #             img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+    #             seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+    #             patient_img = patient_img.to(device)
+    #             y_pred = net(patient_img)
+    #             y_pred = torch.sigmoid(y_pred)
+    #             y_pred = torch.round(y_pred)
+    #             print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
+    #             seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+    #             ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
+    #
+    #         if patient_idx == np.argsort(metric_list)[len(metric_list)//2]:
+    #             print('Median image', patient_idx)
+    #             img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+    #             seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+    #             patient_img = patient_img.to(device)
+    #             y_pred = net(patient_img)
+    #             y_pred = torch.sigmoid(y_pred)
+    #             y_pred = torch.round(y_pred)
+    #             print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
+    #             seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+    #             ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
 
     # Show All
-    with torch.no_grad():
-        for patient in val_loader:
-            patient_img = patient.image[0]
-            patient_seg = patient.image[1]
-            img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
-            seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
-            patient_img = patient_img.to(device)
-            y_pred = net(patient_img)
-            y_pred = torch.sigmoid(y_pred)
-            y_pred = torch.round(y_pred)
-            print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
-            seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-            ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
+    # with torch.no_grad():
+    #     for patient in val_loader:
+    #         patient_img = patient.image[0]
+    #         patient_seg = patient.image[1]
+    #         img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+    #         seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+    #         patient_img = patient_img.to(device)
+    #         y_pred = net(patient_img)
+    #         y_pred = torch.sigmoid(y_pred)
+    #         y_pred = torch.round(y_pred)
+    #         print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
+    #         seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+    #         ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
 
     # Tensorboard Model Graph
-    from monai.utils import first
-    from torch.utils.tensorboard import SummaryWriter
-    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete')
-    with torch.no_grad():
-        img, seg = first(val_loader).image
-        img = img.to(device)
-        writer.add_graph(net, img)
-    writer.flush()
-    writer.close()
+    # from monai.utils import first
+    # from torch.utils.tensorboard import SummaryWriter
+    # writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete2')
+    # with torch.no_grad():
+    #     img, seg = first(val_loader).image
+    #     img = img.to(device)
+    #     writer.add_graph(net, img)
+    # writer.flush()
+    # writer.close()
 
     # Volume-Dice Plot
-    metric_list = []
-    volume_list = []
-    with torch.no_grad():
-        for batch in val_loader:
-            batch_images = batch.image[0]
-            batch_segs = batch.image[1]
-
-            batch_images = batch_images.to(device)
-            batch_segs = batch_segs.to(device)
-
-            y_pred = net(batch_images)
-            y_pred = torch.sigmoid(y_pred)
-            y_pred = torch.round(y_pred)
-
-            pred_metric = metric(y_pred=y_pred, y=batch_segs)
-            metric_list += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
-
-            volume_list += [np.count_nonzero(batch_segs.cpu())]
-    print(metric_list)
-    print(volume_list)
-    plt.scatter(x=volume_list, y=metric_list)
-    plt.show()
+    # metric_list = []
+    # volume_list = []
+    # with torch.no_grad():
+    #     for batch in val_loader:
+    #         batch_images = batch.image[0]
+    #         batch_segs = batch.image[1]
+    #
+    #         batch_images = batch_images.to(device)
+    #         batch_segs = batch_segs.to(device)
+    #
+    #         y_pred = net(batch_images)
+    #         y_pred = torch.sigmoid(y_pred)
+    #         y_pred = torch.round(y_pred)
+    #
+    #         pred_metric = metric(y_pred=y_pred, y=batch_segs)
+    #         metric_list += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
+    #
+    #         volume_list += [np.count_nonzero(batch_segs.cpu())]
+    # print(metric_list)
+    # print(volume_list)
+    # plt.scatter(x=volume_list, y=metric_list)
+    # plt.show()

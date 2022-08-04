@@ -92,7 +92,7 @@ if __name__ == '__main__':
     ).to(device)
 
     # Load Best Parameters
-    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/swin_unetr/runs/exp_delete/best_model_parameters.pt'))
+    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/swin_unetr/runs/exp1/best_model_parameters.pt'))
     net.eval()
 
     # Stats
@@ -182,7 +182,7 @@ if __name__ == '__main__':
     # Tensorboard Model Graph
     from monai.utils import first
     from torch.utils.tensorboard import SummaryWriter
-    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/swin_unetr/runs/exp_delete')
+    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/swin_unetr/runs/exp1')
     with torch.no_grad():
         img, seg = first(val_loader).image
         img = img.to(device)
