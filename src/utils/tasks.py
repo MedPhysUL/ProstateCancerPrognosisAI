@@ -9,10 +9,25 @@
 """
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import List, Optional, Union
 
 import numpy as np
 from torch import isnan, Tensor, where
+
+from src.utils.score_metrics import BinaryClassificationMetric, Metric, RegressionMetric, SegmentationMetric
+
+
+class TaskType(Enum):
+    """
+    Custom enum for task types.
+    """
+    REGRESSION = "regression"
+    CLASSIFICATION = "classification"
+    SEGMENTATION = "segmentation"
+
+    def __iter__(self):
+        return iter([self.REGRESSION, self.CLASSIFICATION, self.SEGMENTATION])
 
 
 class Task(ABC):
@@ -22,6 +37,51 @@ class Task(ABC):
 
     def __init__(
             self,
+            metric: Metric
+    ):
+        """
+        Sets protected attributes.
+
+        Parameters
+        ----------
+        metric : Metric
+            A score metric.
+        """
+        self._metric = metric
+
+    @property
+    def metric(self) -> Metric:
+        return self._metric
+
+
+class ImagingTask(Task, ABC):
+    """
+    An abstract class representing a task to do on imaging data.
+    """
+
+    def __init__(
+            self,
+            metric: Metric
+    ):
+        """
+        Sets protected attributes.
+
+        Parameters
+        ----------
+        metric : Metric
+            A score metric.
+        """
+        super().__init__(metric=metric)
+
+
+class TableTask(Task, ABC):
+    """
+    An abstract class representing a task to do on table data.
+    """
+
+    def __init__(
+            self,
+            metric: Metric,
             target_col: str
     ):
         """
@@ -29,10 +89,14 @@ class Task(ABC):
 
         Parameters
         ----------
+        metric : Metric
+            A score metric.
         target_col : str
             Name of the column containing the targets associated to this task.
         """
         self._target_col = target_col
+
+        super().__init__(metric=metric)
 
     @property
     def target_col(self) -> str:
@@ -59,15 +123,15 @@ class Task(ABC):
         raise NotImplementedError
 
 
-class Classification(Task):
+class ClassificationTask(TableTask):
     """
     A class used to define a Classification task.
     """
 
     def __init__(
             self,
+            metric: BinaryClassificationMetric,
             target_col: str,
-            threshold: float = 0.5,
             weight: float = None
     ):
         """
@@ -75,30 +139,19 @@ class Classification(Task):
 
         Parameters
         ----------
+        metric : BinaryClassificationMetric
+            A score metric.
         target_col : str
             Name of the column containing the targets associated to this task.
-        threshold : Optional[float]
-            The threshold used to classify a sample in class 1.
         weight : Optional[float]
             The weight attributed to class 1 (in [0, 1]).
         """
-        super().__init__(target_col=target_col)
-
-        self._threshold = threshold
-
+        super().__init__(metric=metric, target_col=target_col)
         if weight is not None:
             if not (0 < weight < 1):
                 raise ValueError("The weight parameter must be included in range [0, 1]")
 
         self._weight = weight
-
-    @property
-    def threshold(self) -> float:
-        return self._threshold
-
-    @threshold.setter
-    def threshold(self, threshold) -> None:
-        self._threshold = threshold
 
     @property
     def weight(self) -> Optional[float]:
@@ -159,13 +212,14 @@ class Classification(Task):
         return (n0/n1)*(self.weight/(1-self.weight))
 
 
-class Regression(Task):
+class RegressionTask(TableTask):
     """
-    A class used to define a Classification task.
+    A class used to define a Regression task.
     """
 
     def __init__(
             self,
+            metric: RegressionMetric,
             target_col: str
     ):
         """
@@ -173,10 +227,12 @@ class Regression(Task):
 
         Parameters
         ----------
+        metric : RegressionMetric
+            A score metric.
         target_col : str
             Name of the column containing the targets associated to this task.
         """
-        super().__init__(target_col=target_col)
+        super().__init__(metric=metric, target_col=target_col)
 
     def get_idx_of_nonmissing_targets(
             self,
@@ -201,3 +257,35 @@ class Regression(Task):
             idx = np.where(~np.isnan(y))
 
         return idx[0].tolist()
+
+
+class SegmentationTask(ImagingTask):
+    """
+    A class used to define a Segmentation task.
+    """
+
+    def __init__(
+            self,
+            metric: SegmentationMetric,
+            organ: str
+    ):
+        """
+        Sets protected attributes.
+
+        Parameters
+        ----------
+        metric : SegmentationMetric
+            A score metric.
+        organ : str
+            Segmented organ.
+        """
+        self._organ = organ
+        super().__init__(metric=metric)
+
+    @property
+    def organ(self) -> str:
+        return self._organ
+
+    @property
+    def task_type(self) -> TaskType:
+        return TaskType.SEGMENTATION

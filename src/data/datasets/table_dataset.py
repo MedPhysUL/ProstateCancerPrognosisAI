@@ -21,7 +21,7 @@ from torch.utils.data import Dataset
 
 from src.data.processing.transforms import CategoricalTransform as CaT
 from src.data.processing.preprocessing import preprocess_categoricals, preprocess_continuous
-from src.utils.tasks import Classification, Task
+from src.utils.tasks import ClassificationTask, TableTask
 
 
 class MaskType:
@@ -47,7 +47,7 @@ class TableDataset(Dataset):
             self,
             df: pd.DataFrame,
             ids_col: str,
-            tasks: List[Task],
+            tasks: List[TableTask],
             cont_cols: Optional[List[str]] = None,
             cat_cols: Optional[List[str]] = None,
             feature_selection_groups: Optional[List[List[str]]] = None,
@@ -62,7 +62,7 @@ class TableDataset(Dataset):
             Dataframe with the original data.
         ids_col : str
             Name of the column containing the patient ids.
-        tasks : List[Task]
+        tasks : List[TableTask]
             List of tasks.
         cont_cols : Optional[List[str]]
             List of column names associated with continuous data.
@@ -193,7 +193,7 @@ class TableDataset(Dataset):
         return self._target_cols
 
     @property
-    def tasks(self) -> List[Task]:
+    def tasks(self) -> List[TableTask]:
         return self._tasks
 
     @property
@@ -783,7 +783,7 @@ class TableDataset(Dataset):
 
     def _initialize_targets(
             self,
-            tasks: List[Task],
+            tasks: List[TableTask],
             target_to_tensor: bool
     ) -> Union[np.array, Tensor]:
         """
@@ -791,7 +791,7 @@ class TableDataset(Dataset):
 
         Parameters
         ----------
-        tasks : List[Task]
+        tasks : List[TableTask]
             List of tasks.
         target_to_tensor : bool
             True if we want the targets to be in a tensor, false for numpy array.
@@ -806,9 +806,9 @@ class TableDataset(Dataset):
             # Set targets protected attribute according to task
             t = self.original_data[task.target_col].to_numpy(dtype=float)
 
-            if (not isinstance(task, Classification)) and target_to_tensor:
+            if (not isinstance(task, ClassificationTask)) and target_to_tensor:
                 t = from_numpy(t).float()
-            elif isinstance(task, Classification):
+            elif isinstance(task, ClassificationTask):
                 if target_to_tensor:
                     t = from_numpy(t).long()
                 else:

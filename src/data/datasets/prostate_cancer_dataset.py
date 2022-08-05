@@ -8,22 +8,23 @@
     @Description:       This file contains a custom torch dataset named ProstateCancerDataset.
 """
 
-from typing import List, NamedTuple, Optional, Sequence, Tuple, Union
+from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 from torch import Tensor
-from torch.utils.data import Dataset
+from torch.utils.data import Subset, Dataset
 
 from src.data.datasets.empty_dataset import EmptyDataset
 from src.data.datasets.image_dataset import ImageDataset
 from src.data.datasets.table_dataset import TableDataset
+from src.utils.tasks import Task
 
 
 class DataItems(NamedTuple):
     """
     Data items named tuple. This tuple is used to separate images/segmentations data from tabular data.
     """
-    image: Tuple[Sequence]
+    imaging: Union[Subset, Dict[str, np.ndarray]]
     table: Union[Tuple[np.array, np.array, np.array], Tuple[Tensor, Tensor, Tensor]]
 
 
@@ -99,7 +100,16 @@ class ProstateCancerDataset(Dataset):
         items : DataItems
             Data items from image and table datasets.
         """
-        return DataItems(image=self.image_dataset[index], table=self.table_dataset[index])
+        return DataItems(imaging=self.image_dataset[index], table=self.table_dataset[index])
+
+    @property
+    def tasks(self) -> List[Task]:
+        if isinstance(self.table_dataset, EmptyDataset):
+            return self.image_dataset.tasks
+        elif isinstance(self.image_dataset, EmptyDataset):
+            return self.table_dataset.tasks
+        else:
+            return self.table_dataset.tasks + self.image_dataset.tasks
 
     @property
     def test_mask(self) -> List[int]:

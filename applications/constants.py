@@ -10,7 +10,8 @@
 
 import os
 
-from src.utils.tasks import Classification
+from src.utils.score_metrics import AUC
+from src.utils.tasks import ClassificationTask
 
 # SEED
 SEED = 1010710
@@ -67,4 +68,4 @@ COLUMNS_TYPES = {
 }
 
 # TASKS
-TASKS = [Classification(target_col=PN), Classification(target_col=BCR)]
+TASKS = [ClassificationTask(target_col=PN, metric=AUC()), ClassificationTask(target_col=BCR, metric=AUC())]
