@@ -13,14 +13,13 @@ from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
 from monai.networks.nets import AttentionUnet
 from monai.transforms import (
-    AddChannel,
-    CenterSpatialCrop,
+    AddChanneld,
+    CenterSpatialCropd,
     Compose,
-    HistogramNormalize,
-    KeepLargestConnectedComponent,
-    ScaleIntensityRange,
-    ThresholdIntensity,
-    ToTensor
+    HistogramNormalized,
+    KeepLargestConnectedComponentd,
+    ThresholdIntensityd,
+    ToTensord
 )
 from monai.utils import set_determinism
 import numpy as np
@@ -45,23 +44,18 @@ if __name__ == '__main__':
     num_workers = 0
     num_val = 40
     batch_size = 4
-    num_epochs = 150
+    num_epochs = 500
     lr = 1e-3
 
     # Defining Transforms
-    img_trans = Compose([
-        AddChannel(),
-        CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        ThresholdIntensity(threshold=-250, above=True, cval=-250),
-        ThresholdIntensity(threshold=500, above=False, cval=500),
-        HistogramNormalize(num_bins=751, min=0, max=1),
-        ToTensor(dtype=torch.float32)
-    ])
-    seg_trans = Compose([
-        AddChannel(),
-        CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        KeepLargestConnectedComponent(),
-        ToTensor(dtype=torch.float32)
+    trans = Compose([
+        AddChanneld(keys=['img', 'seg']),
+        CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
+        ThresholdIntensityd(keys=['img'], threshold=-250, above=True, cval=-250),
+        ThresholdIntensityd(keys=['img'], threshold=500, above=False, cval=500),
+        HistogramNormalized(keys=['img'], num_bins=751, min=0, max=1),
+        KeepLargestConnectedComponentd(keys=['seg']),
+        ToTensord(keys=['img', 'seg'], dtype=torch.float32)
     ])
 
     # ImageDataset
@@ -69,8 +63,7 @@ if __name__ == '__main__':
         database_manager=LocalDatabaseManager(
             path_to_database='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5'
         ),
-        img_transform=img_trans,
-        seg_transform=seg_trans
+        transform=trans
     )
 
     # Dataset
@@ -102,8 +95,9 @@ if __name__ == '__main__':
         spatial_dims=3,
         in_channels=1,
         out_channels=1,
-        channels=(8, 16, 32, 64, 128),
-        strides=(2, 2, 2, 2)
+        channels=(64, 128, 256, 512, 1024),
+        strides=(2, 2, 2, 2),
+        dropout=0.2
     ).to(device)
 
     opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
@@ -122,8 +116,8 @@ if __name__ == '__main__':
 
         # Training
         for batch in train_loader:
-            batch_images = batch.image[0].to(device)
-            batch_segs = batch.image[1].to(device)
+            batch_images = batch.image['img'].to(device)
+            batch_segs = batch.image['seg'].to(device)
 
             opt.zero_grad()
             y_pred = net(batch_images)
@@ -145,8 +139,8 @@ if __name__ == '__main__':
         # Validation
         with torch.no_grad():
             for batch in val_loader:
-                batch_images = batch.image[0].to(device)
-                batch_segs = batch.image[1].to(device)
+                batch_images = batch.image['img'].to(device)
+                batch_segs = batch.image['seg'].to(device)
 
                 y_pred = net(batch_images)
 
