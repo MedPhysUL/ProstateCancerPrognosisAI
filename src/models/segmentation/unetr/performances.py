@@ -13,13 +13,13 @@ from monai.data import DataLoader
 from monai.metrics import DiceMetric
 from monai.networks.nets import UNETR
 from monai.transforms import (
-    AddChannel,
-    CenterSpatialCrop,
+    AddChanneld,
+    CenterSpatialCropd,
     Compose,
-    HistogramNormalize,
-    KeepLargestConnectedComponent,
-    ThresholdIntensity,
-    ToTensor
+    HistogramNormalized,
+    KeepLargestConnectedComponentd,
+    ThresholdIntensityd,
+    ToTensord
 )
 from monai.utils import set_determinism
 import numpy as np
@@ -41,19 +41,14 @@ if __name__ == '__main__':
     num_val = 40
 
     # Defining Transforms
-    img_trans = Compose([
-        AddChannel(),
-        CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        ThresholdIntensity(threshold=-250, above=True, cval=-250),
-        ThresholdIntensity(threshold=500, above=False, cval=500),
-        HistogramNormalize(num_bins=751, min=0, max=1),
-        ToTensor(dtype=torch.float32)
-    ])
-    seg_trans = Compose([
-        AddChannel(),
-        CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        KeepLargestConnectedComponent(),
-        ToTensor(dtype=torch.float32)
+    trans = Compose([
+        AddChanneld(keys=['img', 'seg']),
+        CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
+        ThresholdIntensityd(keys=['img'], threshold=-250, above=True, cval=-250),
+        ThresholdIntensityd(keys=['img'], threshold=500, above=False, cval=500),
+        HistogramNormalized(keys=['img'], num_bins=751, min=0, max=1),
+        KeepLargestConnectedComponentd(keys=['seg']),
+        ToTensord(keys=['img', 'seg'], dtype=torch.float32)
     ])
 
     # ImageDataset
@@ -61,8 +56,7 @@ if __name__ == '__main__':
         database_manager=LocalDatabaseManager(
             path_to_database='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5'
         ),
-        img_transform=img_trans,
-        seg_transform=seg_trans
+        transform=trans
     )
 
     # Dataset
@@ -90,23 +84,23 @@ if __name__ == '__main__':
         hidden_size=768,
         mlp_dim=3072,
         num_heads=12,
-        pos_embed='conv',
+        pos_embed='perceptron',
         norm_name='instance',
         conv_block=True,
         res_block=True,
-        dropout_rate=0.0
+        dropout_rate=0.5
     ).to(device)
 
     # Load Best Parameters
-    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unetr/runs/exp_delete/best_model_parameters.pt'))
+    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unetr/runs/exp5/best_model_parameters.pt'))
     net.eval()
 
     # Stats
     metric_list = []
     with torch.no_grad():
         for batch in val_loader:
-            batch_images = batch.image[0]
-            batch_segs = batch.image[1]
+            batch_images = batch.image['img']
+            batch_segs = batch.image['seg']
 
             batch_images = batch_images.to(device)
             batch_segs = batch_segs.to(device)
@@ -129,8 +123,8 @@ if __name__ == '__main__':
     patient_idx = -1
     with torch.no_grad():
         for patient in val_loader:
-            patient_img = patient.image[0]
-            patient_seg = patient.image[1]
+            patient_img = patient.image['img']
+            patient_seg = patient.image['seg']
             patient_idx += 1
             print(patient_idx)
 
@@ -171,26 +165,26 @@ if __name__ == '__main__':
                 ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
 
     # Show All
-    with torch.no_grad():
-        for patient in val_loader:
-            patient_img = patient.image[0]
-            patient_seg = patient.image[1]
-            img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
-            seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
-            patient_img = patient_img.to(device)
-            y_pred = net(patient_img)
-            y_pred = torch.sigmoid(y_pred)
-            y_pred = torch.round(y_pred)
-            print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
-            seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-            ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
+    # with torch.no_grad():
+    #     for patient in val_loader:
+    #         patient_img = patient.image['img']
+    #         patient_seg = patient.image['seg']
+    #         img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+    #         seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+    #         patient_img = patient_img.to(device)
+    #         y_pred = net(patient_img)
+    #         y_pred = torch.sigmoid(y_pred)
+    #         y_pred = torch.round(y_pred)
+    #         print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
+    #         seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+    #         ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
 
     # Tensorboard Model Graph
     from monai.utils import first
     from torch.utils.tensorboard import SummaryWriter
-    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unetr/runs/exp_delete')
+    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unetr/runs/exp5')
     with torch.no_grad():
-        img, seg = first(val_loader).image
+        img = first(val_loader)[0]['img']
         img = img.to(device)
         writer.add_graph(net, img)
     writer.flush()
@@ -201,8 +195,8 @@ if __name__ == '__main__':
     volume_list = []
     with torch.no_grad():
         for batch in val_loader:
-            batch_images = batch.image[0]
-            batch_segs = batch.image[1]
+            batch_images = batch.image['img']
+            batch_segs = batch.image['seg']
 
             batch_images = batch_images.to(device)
             batch_segs = batch_segs.to(device)
@@ -215,6 +209,7 @@ if __name__ == '__main__':
             metric_list += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
 
             volume_list += [np.count_nonzero(batch_segs.cpu())]
+
     print(metric_list)
     print(volume_list)
     plt.scatter(x=volume_list, y=metric_list)

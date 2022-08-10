@@ -91,28 +91,28 @@ if __name__ == '__main__':
     net.eval()
 
     # Stats
-    # metric_list = []
-    # with torch.no_grad():
-    #     for batch in val_loader:
-    #         batch_images = batch.image['img']
-    #         batch_segs = batch.image['seg']
-    #
-    #         batch_images = batch_images.to(device)
-    #         batch_segs = batch_segs.to(device)
-    #
-    #         y_pred = net(batch_images)
-    #         y_pred = torch.sigmoid(y_pred)
-    #         y_pred = torch.round(y_pred)
-    #
-    #         pred_metric = metric(y_pred=y_pred, y=batch_segs)
-    #         metric_list += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
-    #
-    # print('les metriques des images de validation:', metric_list)
-    # print('max:', metric_list[np.argmax(metric_list)], 'at index:', np.argmax(metric_list))
-    # print('min:', metric_list[np.argmin(metric_list)], 'at index:', np.argmin(metric_list))
-    # print('mediane:', metric_list[np.argsort(metric_list)[len(metric_list)//2]], 'at:', np.argsort(metric_list)[len(metric_list)//2])
-    # print('np.mediane', np.median(metric_list))
-    # print('moyenne:', np.average(metric_list))
+    metric_list = []
+    with torch.no_grad():
+        for batch in val_loader:
+            batch_images = batch.image['img']
+            batch_segs = batch.image['seg']
+
+            batch_images = batch_images.to(device)
+            batch_segs = batch_segs.to(device)
+
+            y_pred = net(batch_images)
+            y_pred = torch.sigmoid(y_pred)
+            y_pred = torch.round(y_pred)
+
+            pred_metric = metric(y_pred=y_pred, y=batch_segs)
+            metric_list += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
+
+    print('les metriques des images de validation:', metric_list)
+    print('max:', metric_list[np.argmax(metric_list)], 'at index:', np.argmax(metric_list))
+    print('min:', metric_list[np.argmin(metric_list)], 'at index:', np.argmin(metric_list))
+    print('mediane:', metric_list[np.argsort(metric_list)[len(metric_list)//2]], 'at:', np.argsort(metric_list)[len(metric_list)//2])
+    print('np.mediane', np.median(metric_list))
+    print('moyenne:', np.average(metric_list))
 
     # Show best-mid-worst
     # patient_idx = -1
@@ -175,36 +175,43 @@ if __name__ == '__main__':
     #         ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
 
     # Tensorboard Model Graph
-    from monai.utils import first
-    from torch.utils.tensorboard import SummaryWriter
-    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp11')
-    with torch.no_grad():
-        img = first(val_loader)[0]['img']
-        img = img.to(device)
-        writer.add_graph(net, img)
-    writer.flush()
-    writer.close()
+    # from monai.utils import first
+    # from torch.utils.tensorboard import SummaryWriter
+    # writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp11')
+    # with torch.no_grad():
+    #     img = first(val_loader)[0]['img']
+    #     img = img.to(device)
+    #     writer.add_graph(net, img)
+    # writer.flush()
+    # writer.close()
 
     # Volume-Dice Plot
-    metric_list = []
-    volume_list = []
-    with torch.no_grad():
-        for batch in val_loader:
-            batch_images = batch.image['img']
-            batch_segs = batch.image['seg']
+    # metric_list = []
+    # volume_list = []
+    # with torch.no_grad():
+    #     for batch in val_loader:
+    #         batch_images = batch.image['img']
+    #         batch_segs = batch.image['seg']
+    #
+    #         batch_images = batch_images.to(device)
+    #         batch_segs = batch_segs.to(device)
+    #
+    #         y_pred = net(batch_images)
+    #         y_pred = torch.sigmoid(y_pred)
+    #         y_pred = torch.round(y_pred)
+    #
+    #         pred_metric = metric(y_pred=y_pred, y=batch_segs)
+    #         metric_list += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
+    #
+    #         volume_list += [np.count_nonzero(batch_segs.cpu())]
+    # print(metric_list)
+    # print(volume_list)
+    # plt.scatter(x=volume_list, y=metric_list)
+    # plt.show()
 
-            batch_images = batch_images.to(device)
-            batch_segs = batch_segs.to(device)
-
-            y_pred = net(batch_images)
-            y_pred = torch.sigmoid(y_pred)
-            y_pred = torch.round(y_pred)
-
-            pred_metric = metric(y_pred=y_pred, y=batch_segs)
-            metric_list += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
-
-            volume_list += [np.count_nonzero(batch_segs.cpu())]
-    print(metric_list)
-    print(volume_list)
-    plt.scatter(x=volume_list, y=metric_list)
-    plt.show()
+    # Test ca marche pas staffaire la
+    # for name, _ in net.named_modules():
+    #     print(name)
+    # from monai.visualize import CAM
+    # cam = CAM(nn_module=net, target_layers='model.2.1.residual', fc_layers='model.2.1')
+    # result = cam(x=torch.rand((1, 1, 160, 160, 160), dtype=torch.float32).to(device))
