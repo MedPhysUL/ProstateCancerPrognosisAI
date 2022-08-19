@@ -43,9 +43,9 @@ if __name__ == '__main__':
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 40
-    batch_size = 4
+    batch_size = 2
     num_epochs = 500
-    lr = 1e-3
+    lr = 1e-4
 
     # Defining Transforms
     trans = Compose([
@@ -95,12 +95,12 @@ if __name__ == '__main__':
         spatial_dims=3,
         in_channels=1,
         out_channels=1,
-        channels=(64, 128, 256, 512, 1024),
+        channels=(16, 32, 64, 128, 256),
         strides=(2, 2, 2, 2),
-        dropout=0.2
+        dropout=0.8
     ).to(device)
 
-    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
+    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-1)
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=opt, gamma=0.99)
     loss = DiceLoss(sigmoid=True)
     metric = DiceMetric(include_background=True, reduction='mean')

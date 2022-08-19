@@ -1,64 +1,60 @@
 """
-    @file:              ahnet_app.py
+    @file:              unet3d_app.py
     @Author:            Raphael Brodeur
 
-    @Creation Date:     08/2022
-    @Last modification: 08/2022
+    @Creation Date:     05/2022
+    @Last modification: 07/2022
 
-    @Description:       This file contains an implementation of an anisotropic hybrid network.
+    @Description:       This file contains an implementation of a 3D U-Net.
 """
 
-from monai.data.dataloader import DataLoader
+from monai.data import DataLoader
 from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
-from monai.networks.nets import AHNet
+from monai.networks.nets import SegResNet
 from monai.transforms import (
-    AddChannel,
-    CenterSpatialCrop,
+    AddChanneld,
+    CenterSpatialCropd,
     Compose,
-    HistogramNormalize,
-    KeepLargestConnectedComponent,
-    ThresholdIntensity,
-    ToTensor
+    HistogramNormalized,
+    KeepLargestConnectedComponentd,
+    ThresholdIntensityd,
+    ToTensord
 )
 from monai.utils import set_determinism
 import numpy as np
 import torch
-from torch.utils.data import random_split
+from torch.utils.data.dataset import random_split
 from torch.utils.tensorboard import SummaryWriter
 
 from src.data.extraction.local import LocalDatabaseManager
-from src.data.datasets.prostate_cancer_dataset import ImageDataset, ProstateCancerDataset
+from src.data.datasets.image_dataset import ImageDataset
+from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
 
 
 if __name__ == '__main__':
     set_determinism(seed=1010710)
 
     writer = SummaryWriter(
-        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/ahnet/runs/exp_delete'
+        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/segresnet/runs/exp5'
     )
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 40
-    batch_size = 1
-    num_epochs = 150
+    batch_size = 4
+    num_epochs = 500
     lr = 1e-3
 
     # Defining Transforms
-    img_trans = Compose([
-        AddChannel(),
-        CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        ThresholdIntensity(threshold=-250, above=True, cval=-250),
-        ThresholdIntensity(threshold=500, above=False, cval=500),
-        HistogramNormalize(num_bins=751, min=0, max=1),
-        ToTensor(dtype=torch.float32)
-    ])
-    seg_trans = Compose([
-        AddChannel(),
-        CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        KeepLargestConnectedComponent(),
-        ToTensor(dtype=torch.float32)
+    trans = Compose([
+        AddChanneld(keys=['img', 'seg']),
+        CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
+        ThresholdIntensityd(keys=['img'], threshold=-250, above=True, cval=-250),
+        ThresholdIntensityd(keys=['img'], threshold=500, above=False, cval=500),
+        HistogramNormalized(keys=['img'], num_bins=751, min=0, max=1),
+        KeepLargestConnectedComponentd(keys=['seg']),
+        ToTensord(keys=['img', 'seg'], dtype=torch.float32)
     ])
 
     # ImageDataset
@@ -66,8 +62,7 @@ if __name__ == '__main__':
         database_manager=LocalDatabaseManager(
             path_to_database='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5'
         ),
-        img_transform=img_trans,
-        seg_transform=seg_trans
+        transform=trans,
     )
 
     # Dataset
@@ -94,10 +89,21 @@ if __name__ == '__main__':
         shuffle=False
     )
 
-    # Model
-    net = AHNet().to(device)
+    # Live Data Augmentation
+    # train_loader.dataset.dataset.image_dataset.transform = Compose([
+    #     AddChanneld(keys=['img', 'seg']),
+    #     CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
+    #     ToTensord(keys=['img', 'seg'], dtype=torch.float32)
+    # ])
 
-    opt = torch.optim.Adam(net.parameters(), lr)
+    # Model
+    net = SegResNet(
+        out_channels=1,
+        dropout_prob=0.2
+    ).to(device)
+
+    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
+    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=opt, gamma=0.99)
     loss = DiceLoss(sigmoid=True)
     metric = DiceMetric(include_background=True, reduction='mean')
 
@@ -112,14 +118,11 @@ if __name__ == '__main__':
 
         # Training
         for batch in train_loader:
-            batch_images = batch.image[0].to(device)
-            batch_segs = batch.image[1].to(device)
-            #
-            print(np.shape(batch_images))
-            #
+            batch_images = batch.image['img'].to(device)
+            batch_segs = batch.image['seg'].to(device)
+
             opt.zero_grad()
             y_pred = net(batch_images)
-
             loss_train = loss(y_pred, batch_segs)
             loss_train.backward()
             opt.step()
@@ -129,6 +132,8 @@ if __name__ == '__main__':
         epoch_train_losses.append(np.average(batch_loss))
         writer.add_scalar('avg training loss per batch per epoch', epoch_train_losses[-1], epoch + 1)
 
+        lr_scheduler.step()
+
         net.eval()
         loss_val_list = []
         metric_vals = []
@@ -136,8 +141,8 @@ if __name__ == '__main__':
         # Validation
         with torch.no_grad():
             for batch in val_loader:
-                batch_images = batch.image[0].to(device)
-                batch_segs = batch.image[1].to(device)
+                batch_images = batch.image['img'].to(device)
+                batch_segs = batch.image['seg'].to(device)
 
                 y_pred = net(batch_images)
 
@@ -160,7 +165,7 @@ if __name__ == '__main__':
         # Save Best Metric
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/ahnet/runs/exp_delete/best_model_parameters.pt')
+            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/segresnet/runs/exp5/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)

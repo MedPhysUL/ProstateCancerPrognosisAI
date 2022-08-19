@@ -92,7 +92,7 @@ if __name__ == '__main__':
     ).to(device)
 
     # Load Best Parameters
-    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unetr/runs/exp5/best_model_parameters.pt'))
+    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unetr/runs/exp1/best_model_parameters.pt'))
     net.eval()
 
     # Stats
@@ -180,15 +180,15 @@ if __name__ == '__main__':
     #         ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
 
     # Tensorboard Model Graph
-    from monai.utils import first
-    from torch.utils.tensorboard import SummaryWriter
-    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unetr/runs/exp5')
-    with torch.no_grad():
-        img = first(val_loader)[0]['img']
-        img = img.to(device)
-        writer.add_graph(net, img)
-    writer.flush()
-    writer.close()
+    # from monai.utils import first
+    # from torch.utils.tensorboard import SummaryWriter
+    # writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unetr/runs/exp1')
+    # with torch.no_grad():
+    #     img = first(val_loader)[0]['img']
+    #     img = img.to(device)
+    #     writer.add_graph(net, img)
+    # writer.flush()
+    # writer.close()
 
     # Volume-Dice Plot
     metric_list = []

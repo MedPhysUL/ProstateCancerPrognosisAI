@@ -91,9 +91,9 @@ if __name__ == "__main__":
     )
 
     # Model
-    net = VNet(dropout_prob=0.2).to(device)
+    net = VNet(dropout_prob=0.8).to(device)
 
-    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
+    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-1)
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=opt, gamma=0.99)
     loss = DiceLoss(sigmoid=True)
     metric = DiceMetric(include_background=True, reduction='mean')

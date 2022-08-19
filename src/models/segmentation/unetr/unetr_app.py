@@ -41,7 +41,7 @@ if __name__ == '__main__':
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 40
-    batch_size = 2
+    batch_size = 4
     num_epochs = 500
     lr = 1e-3
 
