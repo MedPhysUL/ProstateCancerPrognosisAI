@@ -106,18 +106,6 @@ if __name__ == '__main__':
         KeepLargestConnectedComponentd(keys=['seg']),
         ToTensord(keys=['img', 'seg'], dtype=torch.float32)
     ])
-    val_loader_augmented = deepcopy(val_loader)
-    val_loader_augmented.dataset.dataset.image_dataset.transform = Compose([
-        AddChanneld(keys=['img', 'seg']),
-        CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
-        RandFlipd(keys=['img', 'seg'], prob=0.5, spatial_axis=2),
-        RandRotate90d(keys=['img', 'seg'], prob=0.25, max_k=3),
-        ThresholdIntensityd(keys=['img'], threshold=-250, above=True, cval=-250),
-        ThresholdIntensityd(keys=['img'], threshold=500, above=False, cval=500),
-        HistogramNormalized(keys=['img'], num_bins=751, min=0, max=1),
-        KeepLargestConnectedComponentd(keys=['seg']),
-        ToTensord(keys=['img', 'seg'], dtype=torch.float32)
-    ])
 
     # Model
     net = UNet(
