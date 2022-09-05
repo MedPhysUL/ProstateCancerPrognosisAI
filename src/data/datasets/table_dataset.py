@@ -24,7 +24,7 @@ from src.data.processing.preprocessing import preprocess_categoricals, preproces
 from src.utils.tasks import ClassificationTask, TableTask
 
 
-class DataElement(NamedTuple):
+class DataModel(NamedTuple):
     """
     Data element named tuple. This tuple is used to separate features (x) and targets (y) where
         - x : D-dimensional dictionary containing (N, ) tensor or array where D is the number of features.
@@ -132,7 +132,7 @@ class TableDataset(Dataset):
     def __getitem__(
             self,
             idx: Union[int, List[int]]
-    ) -> DataElement:
+    ) -> DataModel:
         """
         Gets dataset item. In the multi-output learning setting, the output variables, i.e the targets, share the same
         training features (See https://ieeexplore.ieee.org/document/8892612).
@@ -144,13 +144,13 @@ class TableDataset(Dataset):
 
         Returns
         -------
-        item : DataElement
+        item : DataModel
             A data element.
         """
         x = dict((col, self.x[idx, i]) for i, col in enumerate(self.features_cols))
         y = dict((col, self.y[idx, i]) for i, col in enumerate(self.target_cols))
 
-        return DataElement(x=x, y=y)
+        return DataModel(x=x, y=y)
 
     @property
     def cat_cols(self) -> List[str]:

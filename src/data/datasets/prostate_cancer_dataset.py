@@ -14,7 +14,7 @@ from torch.utils.data import Dataset, Subset
 
 from src.data.datasets.empty_dataset import DatasetType, EmptyDataset
 from src.data.datasets.image_dataset import ImageDataset
-from src.data.datasets.table_dataset import DataElement, TableDataset
+from src.data.datasets.table_dataset import DataModel, TableDataset
 from src.utils.tasks import Task
 
 
@@ -78,7 +78,7 @@ class ProstateCancerDataset(Dataset):
     def __getitem__(
             self,
             index: Union[int, List[int]]
-    ) -> Union[DataElement, Subset]:
+    ) -> Union[DataModel, Subset]:
         """
         Gets dataset items.
 
@@ -89,7 +89,7 @@ class ProstateCancerDataset(Dataset):
 
         Returns
         -------
-        items : Union[DataElement, Subset]
+        items : Union[DataModel, Subset]
             Data items from image and table datasets.
         """
         if isinstance(index, int):
@@ -102,7 +102,7 @@ class ProstateCancerDataset(Dataset):
                 else:
                     x_imaging[key] = item
 
-            return DataElement(
+            return DataModel(
                 x=dict(**self.table_dataset[index].x, **x_imaging),
                 y=dict(**self.table_dataset[index].y, **y_imaging)
             )

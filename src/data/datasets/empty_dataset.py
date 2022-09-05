@@ -13,7 +13,7 @@ from typing import Dict, List, Union
 
 from torch.utils.data import Dataset
 
-from src.data.datasets.table_dataset import DataElement
+from src.data.datasets.table_dataset import DataModel
 
 
 class DatasetType(IntEnum):
@@ -49,7 +49,7 @@ class EmptyDataset(Dataset):
     def __getitem__(
             self,
             idx: Union[int, List[int]]
-    ) -> Union[Dict, DataElement]:
+    ) -> Union[Dict, DataModel]:
         """
         Gets dataset item. This method always returns NaN, regardless of the value of the index.
 
@@ -60,10 +60,10 @@ class EmptyDataset(Dataset):
 
         Returns
         -------
-        item : Union[Dict, DataElement]
+        item : Union[Dict, DataModel]
             Empty dict or data element.
         """
         if self.dataset_type == self.dataset_type.TABLE:
-            return DataElement(x={}, y={})
+            return DataModel(x={}, y={})
         elif self.dataset_type == self.dataset_type.IMAGE:
             return {}

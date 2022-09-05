@@ -11,7 +11,7 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from src.utils.score_metrics import BinaryClassificationMetric, Metric, Reduction, RegressionMetric, SegmentationMetric
+from src.utils.score_metrics import BinaryClassificationMetric, Metric, RegressionMetric, SegmentationMetric
 
 
 class TaskType(Enum):

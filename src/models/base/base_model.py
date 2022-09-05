@@ -16,7 +16,7 @@ from monai.data import DataLoader
 import numpy as np
 from torch import FloatTensor, Tensor
 
-from src.data.datasets.prostate_cancer_dataset import DataElement, ProstateCancerDataset
+from src.data.datasets.prostate_cancer_dataset import DataModel, ProstateCancerDataset
 from src.utils.hyperparameters import HP
 from src.utils.reductions import Identity
 from src.utils.score_metrics import Direction
@@ -88,8 +88,8 @@ class BaseModel(ABC):
     @abstractmethod
     def predict(
             self,
-            x: DataElement.x
-    ) -> DataElement.y:
+            x: DataModel.x
+    ) -> DataModel.y:
         """
         Returns predictions for all samples in a particular batch. For classification tasks, it returns the probability
         of belonging to class 1. For regression tasks, it returns the predicted real-valued target. For segmentation
@@ -102,7 +102,7 @@ class BaseModel(ABC):
 
         Returns
         -------
-        predictions : DataElement.y
+        predictions : DataModel.y
             Predictions.
         """
         raise NotImplementedError
@@ -139,15 +139,15 @@ class BaseModel(ABC):
 
     def score(
             self,
-            predictions: DataElement.y,
-            targets: DataElement.y
+            predictions: DataModel.y,
+            targets: DataModel.y
     ) -> Dict[str, float]:
         """
         Returns the scores for all samples in a particular batch.
 
         Parameters
         ----------
-        predictions : DataElement.y
+        predictions : DataModel.y
             Batch data items.
         targets : DataElement.y
             Batch data items.

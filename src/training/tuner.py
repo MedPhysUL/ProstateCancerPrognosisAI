@@ -14,22 +14,20 @@ from os.path import join
 from time import strftime
 from typing import Any, Callable, Dict, List, Optional, Union, Tuple
 
-from monai.data import DataLoader
-import numpy as np
 from optuna import create_study
 from optuna.logging import FATAL, set_verbosity
-from optuna.importance import get_param_importances, FanovaImportanceEvaluator
+from optuna.importance import FanovaImportanceEvaluator, get_param_importances
 from optuna.pruners import NopPruner
 from optuna.samplers import TPESampler
 from optuna.study import Study
-from optuna.trial import Trial, FrozenTrial
+from optuna.trial import FrozenTrial, Trial
 from optuna.visualization import plot_parallel_coordinate, plot_param_importances, plot_optimization_history
 import ray
 from torch import mean, tensor
 
 from src.data.datasets.table_dataset import MaskType
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
-from src.models.base.base_model import BaseModel, Score
+from src.models.base.base_model import BaseModel
 from src.utils.hyperparameters import CategoricalHP, Distribution, HP, NumericalContinuousHP, NumericalIntHP, Range
 
 
