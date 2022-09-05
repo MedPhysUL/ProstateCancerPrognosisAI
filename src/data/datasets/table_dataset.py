@@ -22,6 +22,7 @@ from torch.utils.data import Dataset
 from src.data.processing.transforms import CategoricalTransform as CaT
 from src.data.processing.preprocessing import preprocess_categoricals, preprocess_continuous
 from src.utils.tasks import ClassificationTask, TableTask
+from src.data.processing.tools import MaskType
 
 
 class DataModel(NamedTuple):
@@ -32,20 +33,6 @@ class DataModel(NamedTuple):
     """
     x: Dict[str, Union[np.ndarray, Tensor]]
     y: Dict[str, Union[np.ndarray, Tensor]]
-
-
-class MaskType:
-    """
-    Stores the constant related to mask types
-    """
-
-    TRAIN: str = "Train"
-    VALID: str = "Valid"
-    TEST: str = "Test"
-    INNER: str = "Inner"
-
-    def __iter__(self):
-        return iter([self.TRAIN, self.VALID, self.TEST])
 
 
 class TableDataset(Dataset):
