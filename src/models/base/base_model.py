@@ -10,15 +10,22 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, NamedTuple, Optional, Union
 
+from monai.data import DataLoader
 import numpy as np
-from torch import Tensor
+from torch import FloatTensor, Tensor
 
-from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
+from src.data.datasets.prostate_cancer_dataset import DataModel, ProstateCancerDataset
 from src.utils.hyperparameters import HP
-from src.utils.score_metrics import BinaryClassificationMetric, Direction
-from src.utils.tasks import Classification
+from src.utils.reductions import Identity
+from src.utils.score_metrics import Direction
+from src.utils.tasks import Task, TaskType
+
+
+class Output(NamedTuple):
+    predictions: List = []
+    targets: List = []
 
 
 class BaseModel(ABC):
@@ -40,22 +47,15 @@ class BaseModel(ABC):
             there is a call to the fit method.
         """
         self._train_params = train_params if train_params is not None else {}
+        self._tasks = None
+
+    @property
+    def tasks(self) -> Optional[List[Task]]:
+        return self._tasks
 
     @property
     def train_params(self) -> Dict[str, Any]:
         return self._train_params
-
-    @staticmethod
-    def is_encoder() -> bool:
-        """
-        Whether the class is used to create an Encoder.
-
-        Returns
-        -------
-        is_encoder : bool
-            Whether the class is used to create an Encoder.
-        """
-        return False
 
     @staticmethod
     @abstractmethod
@@ -83,29 +83,27 @@ class BaseModel(ABC):
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
         """
-        raise NotImplementedError
+        self._tasks = dataset.tasks
 
     @abstractmethod
     def predict(
             self,
-            dataset: ProstateCancerDataset,
-            mask: Optional[List[int]] = None
-    ) -> Union[Tensor, np.array]:
+            x: DataModel.x
+    ) -> DataModel.y:
         """
-        Returns predictions for all samples in a particular set (default = test). For classification tasks, it returns
-        the probability of belonging to class 1. For regression tasks, it returns the predicted real-valued target.
+        Returns predictions for all samples in a particular batch. For classification tasks, it returns the probability
+        of belonging to class 1. For regression tasks, it returns the predicted real-valued target. For segmentation
+        tasks, it returns the predicted segmentation map.
 
         Parameters
         ----------
-        dataset : ProstateCancerDataset
-            A prostate cancer dataset.
-        mask : Optional[List[int]]
-            List of dataset idx for which we want to predict target/probabilities.
+        x : DataElement.x
+            Batch data items.
 
         Returns
         -------
-        predictions : Union[Tensor, np.array]
-            (N,T) tensor or array where N is the number of samples and T is the number of tasks.
+        predictions : DataModel.y
+            Predictions.
         """
         raise NotImplementedError
 
@@ -139,10 +137,87 @@ class BaseModel(ABC):
         """
         raise NotImplementedError
 
-    def fix_thresholds_to_optimal_values(
+    def score(
+            self,
+            predictions: DataModel.y,
+            targets: DataModel.y
+    ) -> Dict[str, float]:
+        """
+        Returns the scores for all samples in a particular batch.
+
+        Parameters
+        ----------
+        predictions : DataModel.y
+            Batch data items.
+        targets : DataElement.y
+            Batch data items.
+
+        Returns
+        -------
+        scores : Dict[str, float]
+            Score for each tasks.
+        """
+        scores = {}
+        for task in self.tasks:
+            scores[task.name] = task.metric(predictions[task.name], targets[task.name])
+
+        return scores
+
+    def score_dataset(
             self,
             dataset: ProstateCancerDataset,
-            metric: BinaryClassificationMetric
+            mask: List[int]
+    ) -> Dict[str, float]:
+        """
+        Returns the score of all samples in a particular subset of the dataset, determined using a mask parameter.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
+        mask : List[int]
+            A list of dataset idx for which we want to obtain the mean score.
+
+        Returns
+        -------
+        scores : Dict[str, float]
+            Score for each tasks.
+        """
+        subset = dataset[mask]
+        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
+
+        scores = {}
+        segmentation_scores_dict = {
+            task.name: [] for task in self.tasks if task.task_type == TaskType.SEGMENTATION
+        }
+        non_segmentation_outputs_dict = {
+            task.name: Output() for task in self.tasks if task.task_type != TaskType.SEGMENTATION
+        }
+
+        for x, targets in data_loader:
+            predictions = self.predict(x)
+
+            for task in self.tasks:
+                pred, target = predictions[task.name], targets[task.name]
+
+                if task.task_type == TaskType.SEGMENTATION:
+                    segmentation_scores_dict[task.name].append(task.metric(pred, target, Identity()))
+                else:
+                    non_segmentation_outputs_dict[task.name].predictions.append(pred)
+                    non_segmentation_outputs_dict[task.name].targets.append(target)
+
+        for task in self.tasks:
+            if task.task_type == TaskType.SEGMENTATION:
+                scores[task.name] = task.metric.reduction(FloatTensor(segmentation_scores_dict[task.name]))
+            else:
+                output = non_segmentation_outputs_dict[task.name]
+                scores[task.name] = task.metric(output.predictions, output.targets)
+
+        return scores
+
+    def fix_thresholds_to_optimal_values(
+            self,
+            dataset: ProstateCancerDataset
     ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
@@ -151,30 +226,30 @@ class BaseModel(ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
-        metric : BinaryClassificationMetric
-            Binary classification metric used to find optimal threshold
         """
-        table_ds = dataset.table_dataset
+        subset = dataset[dataset.train_mask]
+        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
 
-        # We predict targets (or proba) on the training set
-        predictions = self.predict(dataset, dataset.train_mask)
-        targets = table_ds.y[dataset.train_mask]
+        thresholds = np.linspace(start=0.01, stop=0.95, num=95)
 
-        for task_idx, task in enumerate(table_ds.tasks):
-            if isinstance(task, Classification):
-                # For multiple threshold values we calculate the metric
-                thresholds = np.linspace(start=0.01, stop=0.95, num=95)
+        classification_tasks = [task for task in self.tasks if task.task_type == TaskType.CLASSIFICATION]
+        outputs_dict = {task.name: Output() for task in classification_tasks}
 
-                # Get targets and predictions for current task
-                task_targets, task_pred = targets[:, task_idx], predictions[:, task_idx]
-                nonmissing_targets_idx = task.get_idx_of_nonmissing_targets(task_targets)
-                task_targets, task_pred = task_targets[nonmissing_targets_idx], task_pred[nonmissing_targets_idx]
+        for x, targets in data_loader:
+            predictions = self.predict(x)
 
-                # Calculate scores
-                scores = np.array([metric(task_pred, task_targets, t) for t in thresholds])
+            for task in classification_tasks:
+                pred, target = predictions[task.name], targets[task.name]
 
-                # We save the optimal threshold
-                if metric.direction == Direction.MINIMIZE:
-                    task.threshold = thresholds[np.argmin(scores)]
-                else:
-                    task.threshold = thresholds[np.argmax(scores)]
+                outputs_dict[task.name].predictions.append(pred)
+                outputs_dict[task.name].targets.append(target)
+
+        for task in classification_tasks:
+            output = outputs_dict[task.name]
+            scores = np.array([task.metric(output.predictions, output.targets, t) for t in thresholds])
+
+            # We set the threshold to the optimal threshold
+            if task.metric.direction == Direction.MINIMIZE:
+                task.metric.threshold = thresholds[np.argmin(scores)]
+            else:
+                task.metric.threshold = thresholds[np.argmax(scores)]

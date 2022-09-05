@@ -10,16 +10,17 @@
                         can be specified.
 """
 
-from typing import Callable, NamedTuple, Optional, Tuple
+from typing import Callable, Dict, List, NamedTuple, Optional, Set, Tuple
 
-from monai.data import ArrayDataset
+from monai.data import Dataset
 from monai.transforms import CropForeground, SpatialCrop
 import numpy as np
 
 from src.data.extraction.local import LocalDatabaseManager
+from src.utils.tasks import SegmentationTask
 
 
-class ImageDataset(ArrayDataset):
+class ImageDataset(Dataset):
     """
     A class used to create a dataset of various patients and their respective CT and segmentation map from a given local
     HDF5 file. The rendered images are in shape (Z, X, Y).
@@ -35,10 +36,10 @@ class ImageDataset(ArrayDataset):
     def __init__(
             self,
             database_manager: LocalDatabaseManager,
-            img_transform: Optional[Callable] = None,
-            seg_transform: Optional[Callable] = None,
-            z_dim: ZDimension = ZDimension(start=50, stop=210),
-            organ: str = "Prostate"
+            tasks: List[SegmentationTask],
+            modalities: Set[str],
+            transforms: Optional[Callable] = None,
+            z_dim: ZDimension = ZDimension(start=50, stop=210)
     ) -> None:
         """
         Creates a dataset of various patients and their respective CT and segmentation map from a given local HDf5 file.
@@ -48,46 +49,63 @@ class ImageDataset(ArrayDataset):
         ----------
         database_manager : LocalDatabaseManager
             A database manager that is used to interact with the HDF5 file that contains all the patients' folders.
-        img_transform : Optional[Callable]
-            A single or a sequence of transforms to apply to the image.
-        seg_transform : Optional[Callable]
-            A single or a sequence of transforms to apply to the segmentation.
+        tasks : List[SegmentationTask]
+            Task to perform.
+        transforms : Optional[Callable]
+            A single or a sequence of transforms to apply to images and segmentations (depending on transform keys).
         z_dim : ZDimension
             A tuple that specify the z-dimension crop.
-        organ : str
-            The organ whose segmentation map is to be used.
         """
+        self._tasks = tasks
+
         db = database_manager.get_database()
+
         img_list, seg_list = [], []
         for patient in db.keys():
-            if db[patient]['0'].attrs[database_manager.MODALITY] == "CT":
-                img = np.transpose(np.array(db[patient]['0'][database_manager.IMAGE]), (2, 0, 1))
-                seg = np.transpose(np.array(db[patient]['0']['0'][f"{organ}_label_map"]), (2, 0, 1))
-            else:
-                img = np.transpose(np.array(db[patient]['1'][database_manager.IMAGE]), (2, 0, 1))
-                seg = np.transpose(np.array(db[patient]['1']['0'][f"{organ}_label_map"]), (2, 0, 1))
+            print(f"Loading {patient}.")
+            img_dict, seg_dict = {}, {}
+            for series_number in db[patient].keys():
+                series = db[patient][series_number]
+                for modality in modalities:
+                    if series.attrs[database_manager.MODALITY] == modality:
+                        img_dict[modality] = self._transpose(series[database_manager.IMAGE])
 
-            img_cropped, seg_cropped = self._crop(img=img, seg=seg, z_dim=z_dim)
+                        for task in tasks:
+                            if modality == task.modality:
+                                seg_dict[task.organ] = self._transpose(series["0"][f"{task.organ}_label_map"])
 
-            img_list.append(img_cropped)
-            seg_list.append(seg_cropped)
+            img_dict, seg_dict = self._crop(img_dict=img_dict, seg_dict=seg_dict, z_dim=z_dim)
 
-        super().__init__(img=img_list, seg=seg_list, img_transform=img_transform, seg_transform=seg_transform)
+            img_list.append(img_dict)
+            seg_list.append(seg_dict)
+
+        super().__init__(
+            data=[dict(img_dict, **seg_dict) for img_dict, seg_dict in zip(img_list, seg_list)],
+            transform=transforms
+        )
+
+    @property
+    def tasks(self) -> List[SegmentationTask]:
+        return self._tasks
+
+    @staticmethod
+    def _transpose(data) -> np.array:
+        return np.transpose(np.array(data), (2, 0, 1))
 
     @staticmethod
     def _crop(
-            img: np.ndarray,
-            seg: np.ndarray,
+            img_dict: Dict[str, np.array],
+            seg_dict: Dict[str, np.array],
             z_dim: ZDimension = None
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         """
         Crops the foreground. A crop along Z can also be specified.
 
         Parameters
         ----------
-        img : np.ndarray
+         img_dict: Dict[str, np.array]
             An image array in shape (Z, X, Y).
-        seg : np.ndarray
+        seg_dict: Dict[str, np.array]
             A segmentation map array in shape (Z, X, Y).
         z_dim : ZDimension
             Lower bound and upper bound of the crop to apply along Z.
@@ -97,10 +115,20 @@ class ImageDataset(ArrayDataset):
         img_cropped, seg_cropped : Tuple[np.ndarray, np.ndarray]
             A cropped image array and a cropped segmentation map array.
         """
-        img_cropped, start, end = CropForeground(return_coords=True)(img)
-        seg_cropped = SpatialCrop(roi_start=start, roi_end=end)(seg)
+        img_dict["CT"], start, end = CropForeground(return_coords=True)(img_dict["CT"])
+
+        for name, seg in seg_dict.items():
+            seg_dict[name] = SpatialCrop(roi_start=start, roi_end=end)(seg)
+
+        for name, img in img_dict.items():
+            if name != "CT":
+                img_dict[name] = SpatialCrop(roi_start=start, roi_end=end)(img)
 
         if z_dim:
-            img_cropped, seg_cropped = img_cropped[z_dim[0]: z_dim[1]], seg_cropped[z_dim[0]: z_dim[1]]
+            for name, img in img_dict.items():
+                img_dict[name] = img[z_dim[0]: z_dim[1]]
 
-        return img_cropped, seg_cropped
+            for name, seg in seg_dict.items():
+                seg_dict[name] = seg[z_dim[0]: z_dim[1], :, :]
+
+        return img_dict, seg_dict

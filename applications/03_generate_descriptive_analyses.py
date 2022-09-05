@@ -31,7 +31,7 @@ if __name__ == '__main__':
     table_dataset = TableDataset(
         df=df,
         ids_col=ID,
-        tasks=TASKS,
+        tasks=TABLE_TASKS,
         cont_cols=[AGE, PSA],
         cat_cols=[GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
     )

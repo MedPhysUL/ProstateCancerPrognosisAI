@@ -9,10 +9,21 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Union
+from enum import Enum
 
-import numpy as np
-from torch import isnan, Tensor, where
+from src.utils.score_metrics import BinaryClassificationMetric, Metric, RegressionMetric, SegmentationMetric
+
+
+class TaskType(Enum):
+    """
+    Custom enum for task types.
+    """
+    REGRESSION = "regression"
+    CLASSIFICATION = "classification"
+    SEGMENTATION = "segmentation"
+
+    def __iter__(self):
+        return iter([self.REGRESSION, self.CLASSIFICATION, self.SEGMENTATION])
 
 
 class Task(ABC):
@@ -22,6 +33,41 @@ class Task(ABC):
 
     def __init__(
             self,
+            metric: Metric
+    ):
+        """
+        Sets protected attributes.
+
+        Parameters
+        ----------
+        metric : Metric
+            A score metric.
+        """
+        self._metric = metric
+
+    @property
+    def metric(self) -> Metric:
+        return self._metric
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def task_type(self) -> TaskType:
+        raise NotImplementedError
+
+
+class TableTask(Task, ABC):
+    """
+    An abstract class representing a task to do on table data.
+    """
+
+    def __init__(
+            self,
+            metric: Metric,
             target_col: str
     ):
         """
@@ -29,143 +75,28 @@ class Task(ABC):
 
         Parameters
         ----------
+        metric : Metric
+            A score metric.
         target_col : str
             Name of the column containing the targets associated to this task.
         """
         self._target_col = target_col
 
+        super().__init__(metric=metric)
+
     @property
     def target_col(self) -> str:
         return self._target_col
 
-    @abstractmethod
-    def get_idx_of_nonmissing_targets(
-            self,
-            y: Union[Tensor, np.array]
-    ) -> List[int]:
-        """
-        Gets the idx of the nonmissing targets in the given array or tensor.
 
-        Parameters
-        ----------
-        y : Union[Tensor, np.array]
-            (N,) tensor or array with targets.
-
-        Returns
-        -------
-        idx : List[int]
-            Indices.
-        """
-        raise NotImplementedError
-
-
-class Classification(Task):
+class ClassificationTask(TableTask):
     """
     A class used to define a Classification task.
     """
 
     def __init__(
             self,
-            target_col: str,
-            threshold: float = 0.5,
-            weight: float = None
-    ):
-        """
-        Sets protected attributes.
-
-        Parameters
-        ----------
-        target_col : str
-            Name of the column containing the targets associated to this task.
-        threshold : Optional[float]
-            The threshold used to classify a sample in class 1.
-        weight : Optional[float]
-            The weight attributed to class 1 (in [0, 1]).
-        """
-        super().__init__(target_col=target_col)
-
-        self._threshold = threshold
-
-        if weight is not None:
-            if not (0 < weight < 1):
-                raise ValueError("The weight parameter must be included in range [0, 1]")
-
-        self._weight = weight
-
-    @property
-    def threshold(self) -> float:
-        return self._threshold
-
-    @threshold.setter
-    def threshold(self, threshold) -> None:
-        self._threshold = threshold
-
-    @property
-    def weight(self) -> Optional[float]:
-        return self._weight
-
-    def get_idx_of_nonmissing_targets(
-            self,
-            y: Union[Tensor, np.array]
-    ) -> List[int]:
-        """
-        Gets the idx of the nonmissing targets in the given array or tensor.
-
-        Parameters
-        ----------
-        y : Union[Tensor, np.array]
-            (N,) tensor or array with targets.
-
-        Returns
-        -------
-        idx : List[int]
-            Index.
-        """
-        if isinstance(y, Tensor):
-            idx = where(y >= 0)
-        else:
-            idx = np.where(y >= 0)
-
-        return idx[0].tolist()
-
-    def get_scaling_factor(
-            self,
-            y_train: Union[np.array, Tensor]
-    ) -> float:
-        """
-        Computes the scaling factor that needs to be apply to the weight of samples in the class 1.
-
-        We need to find alpha that satisfies :
-            (alpha*n1)/n0 = w/(1-w)
-        Which gives the solution:
-            alpha = w*n0/(1-w)*n1
-
-        Parameters
-        ----------
-        y_train : Union[Tensor, np.array]
-            (N_train, ) tensor or array with targets used for training (Ex : y_train = ds.y[ds.train_mask, task_idx]).
-
-        Returns
-        -------
-        scaling_factor : float]
-            Positive scaling factors.
-        """
-        y_train = y_train[self.get_idx_of_nonmissing_targets(y_train)]
-
-        # Otherwise we return samples' weights in the appropriate format
-        n1 = y_train.sum()              # number of samples with label 1
-        n0 = y_train.shape[0] - n1      # number of samples with label 0
-
-        return (n0/n1)*(self.weight/(1-self.weight))
-
-
-class Regression(Task):
-    """
-    A class used to define a Classification task.
-    """
-
-    def __init__(
-            self,
+            metric: BinaryClassificationMetric,
             target_col: str
     ):
         """
@@ -173,31 +104,92 @@ class Regression(Task):
 
         Parameters
         ----------
+        metric : BinaryClassificationMetric
+            A score metric.
         target_col : str
             Name of the column containing the targets associated to this task.
         """
-        super().__init__(target_col=target_col)
+        super().__init__(metric=metric, target_col=target_col)
 
-    def get_idx_of_nonmissing_targets(
+    @property
+    def name(self) -> str:
+        return f"{self._target_col}_classification"
+
+    @property
+    def task_type(self) -> TaskType:
+        return TaskType.CLASSIFICATION
+
+
+class RegressionTask(TableTask):
+    """
+    A class used to define a Regression task.
+    """
+
+    def __init__(
             self,
-            y: Union[Tensor, np.array]
-    ) -> List[int]:
+            metric: RegressionMetric,
+            target_col: str
+    ):
         """
-        Gets the idx of the nonmissing targets in the given array or tensor.
+        Sets protected attributes.
 
         Parameters
         ----------
-        y : Union[Tensor, np.array]
-            (N,) tensor or array with targets.
-
-        Returns
-        -------
-        idx : List[int]
-            Index.
+        metric : RegressionMetric
+            A score metric.
+        target_col : str
+            Name of the column containing the targets associated to this task.
         """
-        if isinstance(y, Tensor):
-            idx = where(~isnan(y))
-        else:
-            idx = np.where(~np.isnan(y))
+        super().__init__(metric=metric, target_col=target_col)
 
-        return idx[0].tolist()
+    @property
+    def name(self) -> str:
+        return f"{self._target_col}_regression"
+
+    @property
+    def task_type(self) -> TaskType:
+        return TaskType.REGRESSION
+
+
+class SegmentationTask(Task):
+    """
+    A class used to define a Segmentation task.
+    """
+
+    def __init__(
+            self,
+            metric: SegmentationMetric,
+            organ: str,
+            modality: str
+    ):
+        """
+        Sets protected attributes.
+
+        Parameters
+        ----------
+        metric : SegmentationMetric
+            A score metric.
+        organ : str
+            Segmented organ.
+        modality : str
+            Modality on which segmentation was performed.
+        """
+        self._organ = organ
+        self._modality = modality
+        super().__init__(metric=metric)
+
+    @property
+    def organ(self) -> str:
+        return self._organ
+
+    @property
+    def modality(self) -> str:
+        return self._modality
+
+    @property
+    def name(self) -> str:
+        return f"{self._organ}_segmentation"
+
+    @property
+    def task_type(self) -> TaskType:
+        return TaskType.SEGMENTATION
