@@ -14,6 +14,8 @@ from os.path import join
 from time import strftime
 from typing import Any, Callable, Dict, List, Optional, Union, Tuple
 
+from monai.data import DataLoader
+import numpy as np
 from optuna import create_study
 from optuna.logging import FATAL, set_verbosity
 from optuna.importance import get_param_importances, FanovaImportanceEvaluator
@@ -276,7 +278,8 @@ class Objective:
             model.fix_thresholds_to_optimal_values(dts)
 
             # We calculate the scores on the different tasks
-            scores = [score.value for score in model.score(dts)]
+            test_set_scores = model.score_dataset(dataset=dts, mask=dts.test_mask)
+            scores = list(test_set_scores.values())
 
             return scores
 

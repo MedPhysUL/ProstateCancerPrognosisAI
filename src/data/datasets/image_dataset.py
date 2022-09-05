@@ -17,7 +17,7 @@ from monai.transforms import CropForeground, SpatialCrop
 import numpy as np
 
 from src.data.extraction.local import LocalDatabaseManager
-from src.utils.tasks import ImagingTask, SegmentationTask
+from src.utils.tasks import SegmentationTask
 
 
 class ImageDataset(Dataset):
@@ -38,7 +38,7 @@ class ImageDataset(Dataset):
             database_manager: LocalDatabaseManager,
             tasks: List[SegmentationTask],
             modalities: Set[str],
-            transform: Optional[Callable] = None,
+            transforms: Optional[Callable] = None,
             z_dim: ZDimension = ZDimension(start=50, stop=210)
     ) -> None:
         """
@@ -51,7 +51,7 @@ class ImageDataset(Dataset):
             A database manager that is used to interact with the HDF5 file that contains all the patients' folders.
         tasks : List[SegmentationTask]
             Task to perform.
-        transform : Optional[Callable]
+        transforms : Optional[Callable]
             A single or a sequence of transforms to apply to images and segmentations (depending on transform keys).
         z_dim : ZDimension
             A tuple that specify the z-dimension crop.
@@ -62,6 +62,7 @@ class ImageDataset(Dataset):
 
         img_list, seg_list = [], []
         for patient in db.keys():
+            print(f"Loading {patient}.")
             img_dict, seg_dict = {}, {}
             for series_number in db[patient].keys():
                 series = db[patient][series_number]
@@ -69,8 +70,8 @@ class ImageDataset(Dataset):
                     if series.attrs[database_manager.MODALITY] == modality:
                         img_dict[modality] = self._transpose(series[database_manager.IMAGE])
 
-                        if modality == "CT":
-                            for task in tasks:
+                        for task in tasks:
+                            if modality == task.modality:
                                 seg_dict[task.organ] = self._transpose(series["0"][f"{task.organ}_label_map"])
 
             img_dict, seg_dict = self._crop(img_dict=img_dict, seg_dict=seg_dict, z_dim=z_dim)
@@ -80,11 +81,11 @@ class ImageDataset(Dataset):
 
         super().__init__(
             data=[dict(img_dict, **seg_dict) for img_dict, seg_dict in zip(img_list, seg_list)],
-            transform=transform
+            transform=transforms
         )
 
     @property
-    def tasks(self) -> List[ImagingTask]:
+    def tasks(self) -> List[SegmentationTask]:
         return self._tasks
 
     @staticmethod
@@ -128,6 +129,6 @@ class ImageDataset(Dataset):
                 img_dict[name] = img[z_dim[0]: z_dim[1]]
 
             for name, seg in seg_dict.items():
-                seg[name] = seg[z_dim[0]: z_dim[1]]
+                seg_dict[name] = seg[z_dim[0]: z_dim[1], :, :]
 
         return img_dict, seg_dict

@@ -10,8 +10,8 @@
 
 import os
 
-from src.utils.score_metrics import AUC
-from src.utils.tasks import ClassificationTask
+from src.utils.score_metrics import AUC, DICE
+from src.utils.tasks import ClassificationTask, SegmentationTask
 
 # SEED
 SEED = 1010710
@@ -67,5 +67,9 @@ COLUMNS_TYPES = {
     BCR: CATEGORICAL_TYPE
 }
 
+# SET OF MODALITIES
+MODALITIES = {"CT"}
+
 # TASKS
-TASKS = [ClassificationTask(target_col=PN, metric=AUC()), ClassificationTask(target_col=BCR, metric=AUC())]
+TABLE_TASKS = [ClassificationTask(target_col=PN, metric=AUC()), ClassificationTask(target_col=BCR, metric=AUC())]
+IMAGE_TASKS = [SegmentationTask(metric=DICE(), organ="Prostate", modality="CT")]

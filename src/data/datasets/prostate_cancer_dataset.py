@@ -8,24 +8,14 @@
     @Description:       This file contains a custom torch dataset named ProstateCancerDataset.
 """
 
-from typing import Dict, List, NamedTuple, Optional, Tuple, Union
+from typing import List, Optional, Union
 
-import numpy as np
-from torch import Tensor
-from torch.utils.data import Subset, Dataset
+from torch.utils.data import Dataset, Subset
 
-from src.data.datasets.empty_dataset import EmptyDataset
+from src.data.datasets.empty_dataset import DatasetType, EmptyDataset
 from src.data.datasets.image_dataset import ImageDataset
-from src.data.datasets.table_dataset import TableDataset
+from src.data.datasets.table_dataset import DataElement, TableDataset
 from src.utils.tasks import Task
-
-
-class DataItems(NamedTuple):
-    """
-    Data items named tuple. This tuple is used to separate images/segmentations data from tabular data.
-    """
-    imaging: Union[Subset, Dict[str, np.ndarray]]
-    table: Union[Tuple[np.array, np.array, np.array], Tuple[Tensor, Tensor, Tensor]]
 
 
 class ProstateCancerDataset(Dataset):
@@ -52,17 +42,19 @@ class ProstateCancerDataset(Dataset):
         if (image_dataset is None) and (table_dataset is None):
             raise AssertionError("At least one image dataset or one table dataset must be provided.")
         elif table_dataset is None:
-            self.table_dataset = EmptyDataset()
+            self.table_dataset = EmptyDataset(DatasetType.TABLE)
             self.image_dataset = image_dataset
             self._n = len(image_dataset)
         elif image_dataset is None:
             self.table_dataset = table_dataset
-            self.image_dataset = EmptyDataset(to_tensor=table_dataset.to_tensor)
+            self.image_dataset = EmptyDataset(DatasetType.IMAGE)
             self._n = len(table_dataset)
         else:
             tab_n, img_n = len(table_dataset), len(image_dataset)
-            assert tab_n == img_n, f"Length of image dataset and table dataset must be equal. Image length{img_n}. " \
-                                   f"Table length : {tab_n}."
+            assert tab_n == img_n, f"Length of image dataset and table dataset must be equal. Image length : {img_n}" \
+                                   f". Table length : {tab_n}."
+            assert not set(table_dataset.tasks).intersection(image_dataset.tasks), f"Tasks in table and image " \
+                                                                                   f"datasets should not overlap."
             self.table_dataset = table_dataset
             self.image_dataset = image_dataset
             self._n = len(image_dataset)
@@ -86,7 +78,7 @@ class ProstateCancerDataset(Dataset):
     def __getitem__(
             self,
             index: Union[int, List[int]]
-    ) -> DataItems:
+    ) -> Union[DataElement, Subset]:
         """
         Gets dataset items.
 
@@ -97,10 +89,27 @@ class ProstateCancerDataset(Dataset):
 
         Returns
         -------
-        items : DataItems
+        items : Union[DataElement, Subset]
             Data items from image and table datasets.
         """
-        return DataItems(imaging=self.image_dataset[index], table=self.table_dataset[index])
+        if isinstance(index, int):
+            imaging_dict = self.image_dataset[index]
+
+            y_imaging, x_imaging = {}, {}
+            for key, item in imaging_dict.items():
+                if key in [task.name for task in self.image_dataset.tasks]:
+                    y_imaging[key] = item
+                else:
+                    x_imaging[key] = item
+
+            return DataElement(
+                x=dict(**self.table_dataset[index].x, **x_imaging),
+                y=dict(**self.table_dataset[index].y, **y_imaging)
+            )
+        elif isinstance(index, list):
+            return Subset(dataset=self, indices=index)
+        else:
+            raise ValueError("Index has to be integer or list.")
 
     @property
     def tasks(self) -> List[Task]:
@@ -145,4 +154,5 @@ class ProstateCancerDataset(Dataset):
         self._train_mask, self._test_mask = train_mask, test_mask
         self._valid_mask = valid_mask if valid_mask is not None else []
 
-        self.table_dataset.update_masks(train_mask=train_mask, test_mask=test_mask, valid_mask=valid_mask)
+        if isinstance(self.table_dataset, TableDataset):
+            self.table_dataset.update_masks(train_mask=train_mask, test_mask=test_mask, valid_mask=valid_mask)

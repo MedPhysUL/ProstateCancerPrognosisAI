@@ -8,11 +8,11 @@
     @Description:       This file contains a custom torch dataset named TableDataset. We follow
                         https://ieeexplore.ieee.org/document/8892612 setting for multi-output learning. This class
                         allows to cover the cases where some patients have a missing label for one task (or should I
-                        say, output) while it is available for another.
+                        say, for one output) while it is available for another.
 """
 
 from __future__ import annotations
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -22,6 +22,16 @@ from torch.utils.data import Dataset
 from src.data.processing.transforms import CategoricalTransform as CaT
 from src.data.processing.preprocessing import preprocess_categoricals, preprocess_continuous
 from src.utils.tasks import ClassificationTask, TableTask
+
+
+class DataElement(NamedTuple):
+    """
+    Data element named tuple. This tuple is used to separate features (x) and targets (y) where
+        - x : D-dimensional dictionary containing (N, ) tensor or array where D is the number of features.
+        - y : T-dimensional dictionary containing (N, ) tensor or array where T is the number of tasks.
+    """
+    x: Dict[str, Union[np.ndarray, Tensor]]
+    y: Dict[str, Union[np.ndarray, Tensor]]
 
 
 class MaskType:
@@ -122,7 +132,7 @@ class TableDataset(Dataset):
     def __getitem__(
             self,
             idx: Union[int, List[int]]
-    ) -> Union[Tuple[np.array, np.array, np.array], Tuple[Tensor, Tensor, Tensor]]:
+    ) -> DataElement:
         """
         Gets dataset item. In the multi-output learning setting, the output variables, i.e the targets, share the same
         training features (See https://ieeexplore.ieee.org/document/8892612).
@@ -134,13 +144,13 @@ class TableDataset(Dataset):
 
         Returns
         -------
-        item : Union[Tuple[np.array, np.array, np.array], Tuple[tensor, tensor, tensor]]
-            The returned item is a tuple (x, y, idx) where
-                - x : (N,D) tensor or array with D-dimensional samples where D is the number of features.
-                - y : (N,T) tensor or array with T-dimensional targets where T is the number of tasks.
-                - idx : (N,) tensor or array with idx of samples according to the whole dataset.
+        item : DataElement
+            A data element.
         """
-        return self.x[idx], self.y[idx], idx
+        x = dict((col, self.x[idx, i]) for i, col in enumerate(self.features_cols))
+        y = dict((col, self.y[idx, i]) for i, col in enumerate(self.target_cols))
+
+        return DataElement(x=x, y=y)
 
     @property
     def cat_cols(self) -> List[str]:
@@ -167,6 +177,10 @@ class TableDataset(Dataset):
     @property
     def encodings(self) -> Dict[str, Dict[str, int]]:
         return self._encodings
+
+    @property
+    def features_cols(self) -> List[str]:
+        return self.cont_cols + self.cat_cols
 
     @property
     def feature_selection_idx_groups(self) -> Dict[int, Dict[str, List]]:
