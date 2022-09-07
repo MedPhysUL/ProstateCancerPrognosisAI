@@ -35,7 +35,7 @@ class ImageDataset(Dataset):
     def __init__(
             self,
             database_manager: LocalDatabaseManager,
-            tep: bool = False,
+            include_tep: bool = False,
             transform: Optional[Callable] = None,
             z_dim: ZDimension = ZDimension(start=50, stop=210)
     ) -> None:
@@ -57,21 +57,22 @@ class ImageDataset(Dataset):
         db = database_manager.get_database()
         img_list, seg_list, tep_list = [], [], []
         for patient in db.keys():
+            print(patient)
             if db[patient]['0'].attrs[database_manager.MODALITY] == "CT":
                 img = np.transpose(np.array(db[patient]['0'][database_manager.IMAGE]), (2, 0, 1))
                 seg = np.transpose(np.array(db[patient]['0']['0']["Prostate_label_map"]), (2, 0, 1))
 
-                if tep:
-                    tep = np.transpose(np.array(db[patient]['1'][database_manager.IMAGE]), (2, 0, 1))
+                if include_tep:
+                    tep = np.transpose(np.array(db[patient]['1'][database_manager.IMAGE], dtype=np.float32), (2, 0, 1))
 
             else:
                 img = np.transpose(np.array(db[patient]['1'][database_manager.IMAGE]), (2, 0, 1))
                 seg = np.transpose(np.array(db[patient]['1']['0']["Prostate_label_map"]), (2, 0, 1))
 
-                if tep:
-                    tep = np.transpose(np.array(db[patient]['0'][database_manager.IMAGE]), (2, 0, 1))
+                if include_tep:
+                    tep = np.transpose(np.array(db[patient]['0'][database_manager.IMAGE], dtype=np.float32), (2, 0, 1))
 
-            if tep:
+            if include_tep:
                 img_cropped, seg_cropped, tep_cropped = self._crop(img=img, seg=seg, tep=tep, z_dim=z_dim)
 
                 img_list.append(img_cropped)
@@ -84,7 +85,7 @@ class ImageDataset(Dataset):
                 img_list.append(img_cropped)
                 seg_list.append(seg_cropped)
 
-        if tep:
+        if include_tep:
             super().__init__(
                 data=[{'img': img, 'seg': seg, 'tep': tep} for img, seg, tep in zip(img_list, seg_list, tep_list)],
                 transform=transform
@@ -126,7 +127,7 @@ class ImageDataset(Dataset):
         if z_dim:
             img_cropped, seg_cropped = img_cropped[z_dim[0]: z_dim[1]], seg_cropped[z_dim[0]: z_dim[1]]
 
-        if tep:
+        if tep is not None:
             tep_cropped = SpatialCrop(roi_start=start, roi_end=end)(tep)
 
             if z_dim:
