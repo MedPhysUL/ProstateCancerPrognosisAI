@@ -68,7 +68,7 @@ class Loss(ABC):
             reduction: Optional[Union[LossReduction, str]] = None
     ) -> Tensor:
         """
-        Gets metric value.
+        Gets loss value.
 
         Parameters
         ----------
@@ -79,7 +79,7 @@ class Loss(ABC):
 
         Returns
         -------
-        metric : Tensor
+        loss : Tensor
             (1, 1) tensor.
         """
         if reduction is None:
