@@ -15,9 +15,9 @@ from typing import List, Optional, Tuple, Union
 from monai.metrics import DiceMetric
 import numpy as np
 from sklearn.metrics import roc_auc_score
-from torch import from_numpy, isnan, is_tensor, Tensor, where, zeros
+from torch import from_numpy, isnan, is_tensor, mean, pow, prod, sum, Tensor, where, zeros
 
-from src.utils.reductions import GeometricMean, Identity, Mean, Reduction
+from src.utils.reductions import MetricReduction
 
 
 class Direction(Enum):
@@ -38,9 +38,9 @@ class Metric(ABC):
 
     def __init__(
             self,
-            direction: Direction,
+            direction: Union[Direction, str],
             name: str,
-            reduction: Optional[Reduction],
+            reduction: Union[MetricReduction, str],
             n_digits: int = 5
     ):
         """
@@ -48,25 +48,19 @@ class Metric(ABC):
 
         Parameters
         ----------
-        direction : Direction
+        direction : Union[Direction, str]
             Whether the metric needs to be "maximize" or "minimize".
         name : str
             Name of the metric.
-        reduction : Optional[Reduction]
+        reduction : Union[MetricReduction, str]
             Reduction method to use.
         n_digits : int
             Number of digits kept.
         """
-        if direction not in Direction:
-            raise ValueError(f"direction must be in {list(i.value for i in Direction)}")
-
-        if reduction is None:
-            reduction = Identity()
-
         # Protected attributes
-        self._direction = direction
+        self._direction = Direction(direction).value
         self._name = name
-        self._reduction = reduction
+        self._reduction = MetricReduction(reduction).value
         self._n_digits = n_digits
 
     @abstractmethod
@@ -86,15 +80,52 @@ class Metric(ABC):
         raise NotImplementedError
 
     @property
-    def direction(self) -> Direction:
+    def direction(self) -> str:
         return self._direction
 
     @property
     def name(self) -> str:
-        return f"{self._reduction.name}_{self._name}"
+        return f"{self._reduction.value}_{self._name}"
+
+    def perform_reduction(
+            self,
+            x: Union[float, Tensor],
+            reduction: Optional[Union[MetricReduction, str]] = None
+    ) -> float:
+        """
+        Gets metric value.
+
+        Parameters
+        ----------
+        x : Union[float, Tensor]
+            Float or (N, 1) tensor.
+        reduction : Optional[Union[MetricReduction, str]]
+            Reduction method to use. If None, we use self.reduction.
+
+        Returns
+        -------
+        metric : float
+            Rounded metric score.
+        """
+        if reduction is None:
+            reduction = self.reduction
+        else:
+            reduction = MetricReduction(reduction).value
+
+        if reduction == MetricReduction.NONE.value:
+            if isinstance(x, float):
+                return x
+            else:
+                return x.item()
+        elif reduction == MetricReduction.MEAN.value:
+            return mean(x).item()
+        elif reduction == MetricReduction.SUM.value:
+            return sum(x).item()
+        elif reduction == MetricReduction.GEOMETRIC_MEAN.value:
+            return pow(prod(x), exponent=(1 / x.shape[0])).item()
 
     @property
-    def reduction(self) -> Optional[Reduction]:
+    def reduction(self) -> str:
         return self._reduction
 
     @property
@@ -109,9 +140,9 @@ class RegressionMetric(Metric):
 
     def __init__(
             self,
-            direction: Direction,
+            direction: Union[Direction, str],
             name: str,
-            reduction: Optional[Reduction] = None,
+            reduction: Union[MetricReduction, str],
             n_digits: int = 5
     ):
         """
@@ -119,11 +150,11 @@ class RegressionMetric(Metric):
 
         Parameters
         ----------
-        direction : Direction
+        direction : Union[Direction, str]
             Whether the metric needs to be "maximize" or "minimize".
         name : str
             Name of the metric.
-        reduction : Optional[Reduction]
+        reduction : Union[MetricReduction, str]
             Reduction method to use.
         n_digits : int
             Number of digits kept.
@@ -156,7 +187,7 @@ class RegressionMetric(Metric):
         if not is_tensor(pred):
             pred, targets = self.convert_to_tensors(pred, targets)
 
-        return round(self._reduction(self._compute_metric(pred, targets)), self.n_digits)
+        return round(self.perform_reduction(self._compute_metric(pred, targets)), self.n_digits)
 
     @staticmethod
     def get_idx_of_nonmissing_targets(
@@ -226,7 +257,7 @@ class RegressionMetric(Metric):
         Returns
         -------
         metric_score : Union[float, Tensor]
-            Score.
+            Score as a float or a (N, 1) tensor.
         """
         raise NotImplementedError
 
@@ -238,10 +269,11 @@ class BinaryClassificationMetric(Metric):
 
     def __init__(
             self,
-            direction: Direction,
+            direction: Union[Direction, str],
             name: str,
-            reduction: Optional[Reduction] = None,
-            weight: float = None,
+            reduction: Union[MetricReduction, str],
+            threshold: float = 0.5,
+            weight: float = 0.5,
             n_digits: int = 5
     ):
         """
@@ -249,25 +281,35 @@ class BinaryClassificationMetric(Metric):
 
         Parameters
         ----------
-        direction : Direction
+        direction : Union[Direction, str]
             Whether the metric needs to be "maximize" or "minimize".
         name : str
             Name of the metric.
-        reduction : Optional[Reduction]
+        reduction : Union[MetricReduction, str]
             Reduction method to use.
-        weight : Optional[float]
+        threshold : float
+            The threshold used to classify a sample in class 1.
+        weight : float
             The weight attributed to class 1 (in [0, 1]).
         n_digits : int
             Number of digits kept.
         """
-        self._threshold = 0.5
-        if weight is not None:
-            if not (0 < weight < 1):
-                raise ValueError("The weight parameter must be included in range [0, 1]")
+        if not (0 < weight < 1):
+            raise ValueError("The weight parameter must be included in range [0, 1]")
 
+        self._scaling_factor = None
+        self._threshold = threshold
         self._weight = weight
 
         super().__init__(direction=direction, name=name, reduction=reduction, n_digits=n_digits)
+
+    @property
+    def scaling_factor(self) -> Optional[float]:
+        return self._scaling_factor
+
+    @scaling_factor.setter
+    def scaling_factor(self, scaling_factor: float):
+        self._scaling_factor = scaling_factor
 
     @property
     def threshold(self) -> float:
@@ -278,7 +320,7 @@ class BinaryClassificationMetric(Metric):
         self._threshold = threshold
 
     @property
-    def weight(self) -> Optional[float]:
+    def weight(self) -> float:
         return self._weight
 
     def __call__(
@@ -314,7 +356,7 @@ class BinaryClassificationMetric(Metric):
         if not is_tensor(pred):
             pred, targets = self.convert_to_tensors(pred, targets)
 
-        return round(self._reduction(self._compute_metric(pred, targets, thresh)), self.n_digits)
+        return round(self.perform_reduction(self._compute_metric(pred, targets, thresh)), self.n_digits)
 
     @staticmethod
     def get_idx_of_nonmissing_targets(
@@ -359,7 +401,7 @@ class BinaryClassificationMetric(Metric):
 
         Returns
         -------
-        scaling_factor : float]
+        scaling_factor : float
             Positive scaling factors.
         """
         y_train = y_train[self.get_idx_of_nonmissing_targets(y_train)]
@@ -453,7 +495,7 @@ class BinaryClassificationMetric(Metric):
         Returns
         -------
         metric_score : Union[float, Tensor]
-            Metric score.
+            Score as a float or a (N, 1) tensor.
         """
         raise NotImplementedError
 
@@ -465,9 +507,9 @@ class SegmentationMetric(Metric):
 
     def __init__(
             self,
-            direction: Direction,
+            direction: Union[Direction, str],
             name: str,
-            reduction: Reduction = Mean(),
+            reduction: Union[MetricReduction, str],
             n_digits: int = 5
     ):
         """
@@ -475,11 +517,11 @@ class SegmentationMetric(Metric):
 
         Parameters
         ----------
-        direction : Direction
+        direction : Union[Direction, str]
             Whether the metric needs to be "maximize" or "minimize".
         name : str
             Name of the metric.
-        reduction : Reduction
+        reduction : Union[MetricReduction, str]
             Reduction method to use.
         n_digits : int
             Number of digits kept.
@@ -490,7 +532,7 @@ class SegmentationMetric(Metric):
             self,
             pred: Union[np.array, Tensor],
             targets: Union[np.array, Tensor],
-            reduction: Optional[Reduction] = None,
+            reduction: Optional[Union[MetricReduction, str]] = None
     ) -> float:
         """
         Converts inputs to tensors than computes the metric and applies rounding.
@@ -501,23 +543,18 @@ class SegmentationMetric(Metric):
             (N, X, Y, Z) tensor or array with predicted labels.
         targets : Union[np.array, Tensor]
             (N, X, Y, Z) tensor or array with ground truth
-        reduction : Optional[Reduction]
-            Reduction method to use.
+        reduction : Optional[Union[MetricReduction, str]]
+            Reduction method to use. If None, we use self.reduction.
 
         Returns
         -------
         metric : float
             Rounded metric score.
         """
-        if reduction is None:
-            reduction = self._reduction
-        else:
-            reduction = reduction
-
         if not is_tensor(pred):
             pred, targets = self.convert_to_tensors(pred, targets)
 
-        return round(reduction(self._compute_metric(pred, targets)), self.n_digits)
+        return round(self._compute_metric(pred, targets, reduction), self.n_digits)
 
     @staticmethod
     def convert_to_tensors(
@@ -549,21 +586,24 @@ class SegmentationMetric(Metric):
             self,
             pred: Tensor,
             targets: Tensor,
-    ) -> Tensor:
+            reduction: Optional[Union[MetricReduction, str]]
+    ) -> float:
         """
         Computes the metric score.
 
         Parameters
         ----------
         pred : Tensor
-            (N, X, Y, Z) tensor with predicted labels
+            (B, C, X, Y, Z) tensor with predicted labels
         targets : Tensor
-            (N, X, Y, Z) tensor with ground truth
+            (B, C, X, Y, Z) tensor with ground truth
+        reduction : Optional[Union[MetricReduction, str]]
+            Reduction method to use.
 
         Returns
         -------
-        metric_score : Tensor
-            Score.
+        metric_score : float
+            Score as a float.
         """
         raise NotImplementedError
 
@@ -585,7 +625,7 @@ class AUC(BinaryClassificationMetric):
         n_digits : int
             Number of digits kept for the score.
         """
-        super().__init__(direction=Direction.MAXIMIZE, name="AUC", n_digits=n_digits)
+        super().__init__(direction=Direction.MAXIMIZE, name="AUC", reduction=MetricReduction.NONE, n_digits=n_digits)
 
     def _compute_metric(
             self,
@@ -620,7 +660,8 @@ class BinaryAccuracy(BinaryClassificationMetric):
 
     def __init__(
             self,
-            n_digits: int = 5
+            n_digits: int = 5,
+            reduction: Union[MetricReduction, str] = MetricReduction.MEAN
     ):
         """
         Sets protected attributes using parent's constructor.
@@ -629,8 +670,13 @@ class BinaryAccuracy(BinaryClassificationMetric):
         ----------
         n_digits : int
             Number of digits kept for the score.
+        reduction : Union[MetricReduction, str]
+            Reduction method to use.
         """
-        super().__init__(direction=Direction.MAXIMIZE, name="Accuracy", reduction=Mean(), n_digits=n_digits)
+        super().__init__(direction=Direction.MAXIMIZE, name="Accuracy", reduction=reduction, n_digits=n_digits)
+
+        if self.reduction not in (MetricReduction.MEAN.value, MetricReduction.SUM.value):
+            raise ValueError(f"Unsupported reduction: {self.reduction}, available options are ['mean', 'sum'].")
 
     def _compute_metric(
             self,
@@ -639,7 +685,7 @@ class BinaryAccuracy(BinaryClassificationMetric):
             thresh: float
     ) -> Tensor:
         """
-        Returns the AUC for ROC curve.
+        Returns the binary accuracy.
 
         Parameters
         ----------
@@ -653,7 +699,7 @@ class BinaryAccuracy(BinaryClassificationMetric):
         Returns
         -------
         metric : Tensor
-            Score.
+            (N, 1) tensor.
         """
         pred_labels = (pred >= thresh).float()
 
@@ -667,23 +713,24 @@ class BinaryBalancedAccuracy(BinaryClassificationMetric):
 
     def __init__(
             self,
-            reduction: Reduction = Mean(),
-            n_digits: int = 5
+            n_digits: int = 5,
+            reduction: Union[MetricReduction, str] = MetricReduction.MEAN
     ):
         """
         Sets protected attributes using parent's constructor.
 
         Parameters
         ----------
-        reduction : Reduction
-            "Mean()" for (TPR + TNR)/2 or "GeometricMean()" for sqrt(TPR*TNR)
         n_digits : int
             Number of digits kept for the score.
+        reduction : Union[MetricReduction, str]
+            "Mean" for (TPR + TNR)/2 or "GeometricMean" for sqrt(TPR*TNR)
         """
-        if not isinstance(reduction, (Mean, GeometricMean)):
-            raise ValueError(f"Reduction must be in {[Mean, GeometricMean]}.")
-
         super().__init__(direction=Direction.MAXIMIZE, name="BalancedAcc", reduction=reduction, n_digits=n_digits)
+
+        if self.reduction not in (MetricReduction.MEAN.value, MetricReduction.GEOMETRIC_MEAN.value):
+            raise ValueError(f"Unsupported reduction: {self.reduction}, available options are "
+                             f"['mean', 'geometric_mean'].")
 
     def _compute_metric(
             self,
@@ -706,7 +753,7 @@ class BinaryBalancedAccuracy(BinaryClassificationMetric):
         Returns
         -------
         metric : Tensor
-            Score.
+            (N, 1) tensor.
         """
         # We get confusion matrix
         conf_mat = self.get_confusion_matrix(pred, targets, thresh)
@@ -717,48 +764,54 @@ class BinaryBalancedAccuracy(BinaryClassificationMetric):
         return correct_rates
 
 
-class DICE(SegmentationMetric):
+class DICEMetric(SegmentationMetric):
     """
     Callable class that computes the DICE.
     """
 
     def __init__(
             self,
-            reduction: Reduction = Mean(),
-            n_digits: int = 5
+            n_digits: int = 5,
+            reduction: Union[MetricReduction, str] = MetricReduction.MEAN
     ) -> None:
         """
         Sets protected attributes using parent's constructor.
 
         Parameters
         ----------
-        reduction : Reduction
-            Reduction method to use.
         n_digits : int
             Number of digits kept for the score.
+        reduction :  Union[MetricReduction, str]
+            Reduction method to use.
         """
-        super().__init__(direction=Direction.MAXIMIZE, name="DICE", reduction=reduction, n_digits=n_digits)
+        super().__init__(direction=Direction.MAXIMIZE, name="DICEMetric", reduction=reduction, n_digits=n_digits)
+
+        if self.reduction not in (MetricReduction.MEAN.value, MetricReduction.SUM.value):
+            raise ValueError(f"Unsupported reduction: {self.reduction}, available options are ['mean', 'sum'].")
 
     def _compute_metric(
             self,
             pred: Tensor,
             targets: Tensor,
-    ) -> Tensor:
+            reduction: Optional[Union[MetricReduction, str]]
+    ) -> float:
         """
         Returns the average of the DICE score.
 
         Parameters
         ----------
         pred : Tensor
-            (N,) tensor with predicted probabilities of being in class 1
+            (B, C, X, Y, Z) tensor with predicted labels
         targets : Tensor
-            (N,) tensor with ground truth
+            (B, C, X, Y, Z) tensor with ground truth
+        reduction : Optional[Union[MetricReduction, str]]
+            Reduction method to use.
 
         Returns
         -------
-        metric : Tensor
-            Score.
+        metric : float
+            Score as a float.
         """
-        metric = DiceMetric()
+        metric = DiceMetric(reduction="mean")
 
-        return metric(y_pred=pred, y=targets)  # .cpu().data.numpy().flatten().tolist()
+        return self.perform_reduction(metric(y_pred=pred, y=targets), reduction)

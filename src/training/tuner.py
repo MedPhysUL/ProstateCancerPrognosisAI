@@ -380,7 +380,7 @@ class Tuner:
         study : Study
             Study object.
         """
-        directions = [task.metric.direction.value for task in self._objective.dataset.tasks]
+        directions = [task.metric.direction for task in self._objective.dataset.tasks]
 
         study = create_study(
             directions=directions,

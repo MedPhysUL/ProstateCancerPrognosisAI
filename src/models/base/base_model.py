@@ -18,7 +18,7 @@ from torch import FloatTensor, Tensor
 
 from src.data.datasets.prostate_cancer_dataset import DataModel, ProstateCancerDataset
 from src.utils.hyperparameters import HP
-from src.utils.reductions import Identity
+from src.utils.reductions import MetricReduction
 from src.utils.score_metrics import Direction
 from src.utils.tasks import Task, TaskType
 
@@ -201,14 +201,14 @@ class BaseModel(ABC):
                 pred, target = predictions[task.name], targets[task.name]
 
                 if task.task_type == TaskType.SEGMENTATION:
-                    segmentation_scores_dict[task.name].append(task.metric(pred, target, Identity()))
+                    segmentation_scores_dict[task.name].append(task.metric(pred, target, MetricReduction.NONE))
                 else:
                     non_segmentation_outputs_dict[task.name].predictions.append(pred)
                     non_segmentation_outputs_dict[task.name].targets.append(target)
 
         for task in self.tasks:
             if task.task_type == TaskType.SEGMENTATION:
-                scores[task.name] = task.metric.reduction(FloatTensor(segmentation_scores_dict[task.name]))
+                scores[task.name] = task.metric.perform_reduction(FloatTensor(segmentation_scores_dict[task.name]))
             else:
                 output = non_segmentation_outputs_dict[task.name]
                 scores[task.name] = task.metric(output.predictions, output.targets)
@@ -249,7 +249,7 @@ class BaseModel(ABC):
             scores = np.array([task.metric(output.predictions, output.targets, t) for t in thresholds])
 
             # We set the threshold to the optimal threshold
-            if task.metric.direction == Direction.MINIMIZE:
+            if task.metric.direction == Direction.MINIMIZE.value:
                 task.metric.threshold = thresholds[np.argmin(scores)]
             else:
                 task.metric.threshold = thresholds[np.argmax(scores)]
