@@ -8,14 +8,37 @@
     @Description:       This file contains a custom torch dataset named ProstateCancerDataset.
 """
 
-from typing import List, Optional, Union
+from typing import Dict, List, NamedTuple, Optional, Union
 
+import numpy as np
+from torch import Tensor
 from torch.utils.data import Dataset, Subset
 
 from src.data.datasets.empty_dataset import DatasetType, EmptyDataset
 from src.data.datasets.image_dataset import ImageDataset
-from src.data.datasets.table_dataset import DataModel, TableDataset
+from src.data.datasets.table_dataset import TableDataset
 from src.utils.tasks import Task
+
+
+class FeaturesModel(NamedTuple):
+    """
+    Features element named tuple. This tuple is used to separate images and table features where
+        - image : I-dimensional dictionary containing (N, ) tensor or array where I is the number of images used as
+                  features.
+        - table : D-dimensional dictionary containing (N, ) tensor or array where D is the number of table features.
+    """
+    image: Dict[str, Union[Tensor]] = {}
+    table: Dict[str, Union[np.ndarray, Tensor]] = {}
+
+
+class DataModel(NamedTuple):
+    """
+    Data element named tuple. This tuple is used to separate features (x) and targets (y) where
+        - x : D-dimensional dictionary containing (N, ) tensor or array where D is the number of features.
+        - y : T-dimensional dictionary containing (N, ) tensor or array where T is the number of tasks.
+    """
+    x: FeaturesModel
+    y: Dict[str, Union[np.ndarray, Tensor]]
 
 
 class ProstateCancerDataset(Dataset):
@@ -103,7 +126,7 @@ class ProstateCancerDataset(Dataset):
                     x_imaging[key] = item
 
             return DataModel(
-                x=dict(**self.table_dataset[index].x, **x_imaging),
+                x=FeaturesModel(image=x_imaging, table=self.table_dataset[index].x),
                 y=dict(**self.table_dataset[index].y, **y_imaging)
             )
         elif isinstance(index, list):
