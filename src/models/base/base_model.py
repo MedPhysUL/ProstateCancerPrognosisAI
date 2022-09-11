@@ -122,21 +122,6 @@ class BaseModel(ABC):
         """
         raise NotImplementedError
 
-    @abstractmethod
-    def _update_pos_scaling_factor(
-            self,
-            y_train: Union[Tensor, np.array]
-    ) -> None:
-        """
-        Updates the scaling factor that needs to be apply to samples in class 1.
-
-        Parameters
-        ----------
-        y_train : Union[Tensor, np.array]
-            (N, 1) tensor or array containing labels.
-        """
-        raise NotImplementedError
-
     def score(
             self,
             predictions: DataModel.y,

@@ -545,6 +545,9 @@ class TableDataset(Dataset):
         return df, cont_cols, cat_cols
 
     def _set_scaling_factors(self):
+        """
+        Sets scaling factor of all classification tasks.
+        """
         for idx, task in enumerate(self.tasks):
             if task.task_type == TaskType.CLASSIFICATION:
                 scaling_factor = task.metric.get_scaling_factor(y_train=self.y[self.train_mask, idx])
