@@ -21,7 +21,7 @@ from torch.utils.data import Dataset
 
 from src.data.processing.transforms import CategoricalTransform as CaT
 from src.data.processing.preprocessing import preprocess_categoricals, preprocess_continuous
-from src.utils.tasks import ClassificationTask, TableTask
+from src.utils.tasks import ClassificationTask, TableTask, TaskType
 from src.data.processing.tools import MaskType
 
 
@@ -154,6 +154,10 @@ class TableDataset(Dataset):
         return None
 
     @property
+    def tasks(self) -> List[TableTask]:
+        return self._tasks
+
+    @property
     def cont_cols(self) -> List[str]:
         return self._cont_cols
 
@@ -192,10 +196,6 @@ class TableDataset(Dataset):
     @property
     def target_cols(self) -> List[str]:
         return self._target_cols
-
-    @property
-    def tasks(self) -> List[TableTask]:
-        return self._tasks
 
     @property
     def test_mask(self) -> List[int]:
@@ -544,6 +544,15 @@ class TableDataset(Dataset):
 
         return df, cont_cols, cat_cols
 
+    def _set_scaling_factors(self):
+        for idx, task in enumerate(self.tasks):
+            if task.task_type == TaskType.CLASSIFICATION:
+                scaling_factor = task.metric.get_scaling_factor(y_train=self.y[self.train_mask, idx])
+                task.metric.scaling_factor = scaling_factor
+
+                if task.criterion:
+                    task.criterion.scaling_factor = scaling_factor
+
     def _numerical_setter(
             self,
             mu: pd.Series,
@@ -755,6 +764,9 @@ class TableDataset(Dataset):
         # We update the data that will be available via __get_item__
         self._set_numerical(mu, std)
         self._set_categorical(modes)
+
+        # We set the classification tasks scaling factors
+        self._set_scaling_factors()
 
     def _valid_columns_type(
             self,
