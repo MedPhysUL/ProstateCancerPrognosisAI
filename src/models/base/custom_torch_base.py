@@ -12,20 +12,27 @@
 
 
 from abc import ABC, abstractmethod
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
+
 # from dgl import DGLGraph
-from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
-from src.data.processing.tools import MaskType
-# from src.data.processing.gnn_datasets import PetaleKGNNDataset
-# from src.models.blocks.mlp_blocks import EntityEmbeddingBlock
-from src.training.early_stopper import EarlyStopper
-from src.training.optimizer import SAM
-from src.utils.score_metrics import Metric
-from src.visualization.tools import visualize_epoch_progression
 from torch import tensor, Tensor
 from torch.nn import BatchNorm1d, Module
 from torch.optim import Adam
 from torch.utils.data import DataLoader, SubsetRandomSampler
-from typing import Any, Callable, List, Optional, Tuple, Union
+
+from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
+from src.data.processing.tools import MaskType
+# from src.data.processing.gnn_datasets import PetaleKGNNDataset
+# from src.models.blocks.mlp_blocks import EntityEmbeddingBlock
+from src.training.early_stopper import EarlyStopper, EarlyStopperType
+from src.training.optimizer import SAM
+from src.utils.multi_task_losses import MultiTaskLoss
+from src.visualization.tools import visualize_epoch_progression
+
+
+class Evaluation(NamedTuple):
+    losses: Dict[str, List[float]]
+    scores: Dict[str, List[float]]
 
 
 class TorchCustomModel(Module, ABC):
@@ -35,10 +42,9 @@ class TorchCustomModel(Module, ABC):
 
     def __init__(
             self,
-            criterion: Callable,
-            criterion_name: str,
-            eval_metric: Metric,
+            criterion: MultiTaskLoss,
             output_size: int,
+            path_to_model: str,
             alpha: float = 0,
             beta: float = 0,
             num_cont_col: Optional[int] = None,
@@ -53,12 +59,10 @@ class TorchCustomModel(Module, ABC):
 
         Parameters
         ----------
-        criterion : Callable
+        criterion : MultiTaskLoss
             Loss function of our model.
-        criterion_name : str
-            Name of the loss function.
-        eval_metric : Metric
-            Evaluation metric of our model (Ex. accuracy, mean absolute error).
+        path_to_model : str
+            Path to save model.
         alpha : float
             L1 penalty coefficient.
         beta : float
@@ -87,12 +91,9 @@ class TorchCustomModel(Module, ABC):
         self._alpha = alpha
         self._beta = beta
         self._criterion = criterion
-        self._criterion_name = criterion_name
-        self._eval_metric = eval_metric
-        self._evaluations = {
-            i: {self._criterion_name: [], self._eval_metric.name: []} for i in [MaskType.TRAIN, MaskType.VALID]
-        }
+        self._evaluations: Dict[str, Evaluation] = {}
         self._input_size = num_cont_col if num_cont_col is not None else 0
+        self._path_to_model = path_to_model
         self._optimizer = None
         self._output_size = output_size
         self._verbose = verbose
@@ -124,12 +125,23 @@ class TorchCustomModel(Module, ABC):
     def output_size(self) -> int:
         return self._output_size
 
-    def _create_validation_objects(
-            self,
+    def _init_evaluations_dictionary(self) -> None:
+        """
+        Initialize evaluations dictionary.
+        """
+        tasks = self._criterion.tasks
+
+        for i in [MaskType.TRAIN, MaskType.VALID]:
+            self._evaluations[i] = Evaluation(
+                losses=dict(**{self._criterion.name: []}, **{task.criterion.name: [] for task in tasks}),
+                scores={task.metric.name: [] for task in tasks}
+            )
+
+    @staticmethod
+    def _create_validation_loader(
             dataset: ProstateCancerDataset,
-            valid_batch_size: Optional[int],
-            patience: int
-    ) -> Tuple[EarlyStopper, DataLoader]:
+            valid_batch_size: Optional[int]
+    ) -> DataLoader:
         """
         Creates the objects needed for validation during the training process.
 
@@ -139,13 +151,11 @@ class TorchCustomModel(Module, ABC):
             Prostate cancer dataset used to feed the dataloader.
         valid_batch_size : Optional[int]
             Size of the batches in the valid loader (None = one single batch).
-        patience : int
-            Number of consecutive epochs without improvement allowed.
 
         Returns
         -------
-        validation_tuples : Tuple[EarlyStopper, DataLoader]
-            Validation objects.
+        validation_loader : DataLoader
+            Validation loader.
         """
         # We create the valid dataloader (if valid size != 0)
         valid_size, valid_data, early_stopper = len(dataset.valid_mask), None, None
@@ -162,10 +172,7 @@ class TorchCustomModel(Module, ABC):
                 sampler=SubsetRandomSampler(dataset.valid_mask)
             )
 
-            # We create the early stopper
-            early_stopper = EarlyStopper(patience, self._eval_metric.direction)
-
-        return early_stopper, valid_data
+        return valid_data
 
     def _disable_running_stats(self) -> None:
         """
@@ -291,78 +298,51 @@ class TorchCustomModel(Module, ABC):
 
         return update_progress
 
-    def print_early_stopping_message(
-            self,
-            epoch: int,
-            patience: int,
-            best_validation_score: float
-    ) -> None:
-        """
-        Prints a message when early stopping occurs.
-
-        Parameters
-        ----------
-        epoch : int
-            Number of training epochs done
-        patience : int
-            Number of consecutive epochs without improvement allowed
-        best_validation_score : float
-            Best validation score obtained
-        """
-        print(
-            f"\nEarly stopping occurred at epoch {epoch} with best_epoch = {epoch - patience}"
-            f" and best_val_{self._eval_metric.name} = {round(best_validation_score, 4)}"
-        )
-
     def _update_evaluations_progress(
             self,
-            loss: float,
-            score: float,
-            nb_batch: int,
+            losses: Dict[str, float],
+            scores: Dict[str, float],
             mask_type: str
-    ) -> float:
+    ) -> Dict[str, float]:
         """
         Adds epoch score and loss to the evaluations history.
 
         Parameters
         ----------
-        loss : float
-            Epoch loss.
-        score : float
-            Epoch score.
-        nb_batch : int
-            Nb of batches.
+        losses: Dict[str, float]
+            Epoch losses.
+        scores: Dict[str, float]
+            Epoch scores.
         mask_type : str
             "train" of "valid".
 
         Returns
         -------
-        loss : float
-            Mean epoch loss or mean epoch score.
+        losses or scores : Dict[str, float]
+            Mean epoch losses or mean epoch scores.
         """
-        # We compute the loss average per batch
-        loss /= nb_batch
-        score /= nb_batch
-
         # We update the evaluations history
-        self._evaluations[mask_type][self._criterion_name].append(loss)
-        self._evaluations[mask_type][self._eval_metric.name].append(score)
+        for name, loss in losses.items():
+            self._evaluations[mask_type].losses[name].append(loss)
+
+        for name, score in scores.items():
+            self._evaluations[mask_type].scores[name].append(score)
 
         # We return a value according to the mask type
         if mask_type == MaskType.VALID:
-            return score
+            return scores
 
-        return loss
+        return losses
 
     def fit(
             self,
             dataset: ProstateCancerDataset,
+            early_stopper: EarlyStopper,
             lr: float,
             rho: float = 0,
             batch_size: Optional[int] = 55,
             valid_batch_size: Optional[int] = None,
-            max_epochs: int = 200,
-            patience: int = 15
+            max_epochs: int = 200
     ) -> None:
         """
         Fits the model to the training data.
@@ -371,6 +351,8 @@ class TorchCustomModel(Module, ABC):
         ----------
         dataset : ProstateCancerDataset
             Prostate cancer dataset used to feed the dataloaders.
+        early_stopper : EarlyStopper
+            Early stopper.
         lr : float
             Learning rate
         rho : float
@@ -382,14 +364,24 @@ class TorchCustomModel(Module, ABC):
             Size of the batches in the valid loader (None = one single batch).
         max_epochs : int
             Maximum number of epochs for training.
-        patience : int
-            Number of consecutive epochs without improvement allowed.
         """
+        # We assume that the tasks in the dataset are the tasks on which we need to calculate the loss.
+        self._criterion.tasks = dataset.tasks
+
+        # We setup the early stopper depending on its type.
+        if early_stopper.early_stopper_type == EarlyStopperType.METRIC:
+            early_stopper.tasks = dataset.tasks
+        elif early_stopper.early_stopper_type == EarlyStopperType.LOSS:
+            early_stopper.criterion = self._criterion
+
+        # We create an empty evaluations dictionary that logs losses and metrics values.
+        self._init_evaluations_dictionary()
+
         # We create the training objects
         train_data = self._create_train_dataloader(dataset, batch_size)
 
         # We create the objects needed for validation (data loader, early stopper)
-        early_stopper, valid_data = self._create_validation_objects(dataset, valid_batch_size, patience)
+        valid_data = self._create_validation_loader(dataset, valid_batch_size)
 
         # We init the update function
         update_progress = self._generate_progress_func(max_epochs)
@@ -416,7 +408,7 @@ class TorchCustomModel(Module, ABC):
 
             # We calculate valid score and apply early stopping if needed
             if self._execute_valid_step(valid_data, early_stopper):
-                self.print_early_stopping_message(epoch, patience, early_stopper.best_val_score)
+                early_stopper.print_early_stopping_message(epoch)
                 break
 
         if early_stopper is not None:
@@ -465,17 +457,22 @@ class TorchCustomModel(Module, ABC):
         save_path : Optional[str]
             Path were the figures will be saved.
         """
-        # Extraction of data
-        train_loss = self._evaluations[MaskType.TRAIN][self._criterion_name]
-        train_metric = self._evaluations[MaskType.TRAIN][self._eval_metric.name]
-        valid_loss = self._evaluations[MaskType.VALID][self._criterion_name]
-        valid_metric = self._evaluations[MaskType.VALID][self._eval_metric.name]
+        train_history, valid_history, progression_type = [], [], []
+        for train, valid in zip(self._evaluations[MaskType.TRAIN], self._evaluations[MaskType.VALID]):
+            for name, train_loss in train.losses.items():
+                train_history.append(train_loss)
+                valid_history.append(valid.losses[name])
+                progression_type.append(name)
+            for name, train_score in train.scores.items():
+                train_history.append(train_score)
+                valid_history.append(valid.scores[name])
+                progression_type.append(name)
 
         # Figure construction
         visualize_epoch_progression(
-            train_history=[train_loss, train_metric],
-            valid_history=[valid_loss, valid_metric],
-            progression_type=[self._criterion_name, self._eval_metric.name],
+            train_history=train_history,
+            valid_history=valid_history,
+            progression_type=progression_type,
             path=save_path
         )
 
@@ -502,10 +499,13 @@ class TorchCustomModel(Module, ABC):
         # Creation of training loader
         train_size = len(dataset.train_mask)
         batch_size = min(train_size, batch_size) if batch_size is not None else train_size
-        train_data = DataLoader(dataset,
-                                batch_size=batch_size,
-                                sampler=SubsetRandomSampler(dataset.train_mask),
-                                drop_last=(train_size % batch_size) == 1)
+
+        train_data = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            sampler=SubsetRandomSampler(dataset.train_mask),
+            drop_last=(train_size % batch_size) == 1
+        )
 
         return train_data
 
@@ -563,6 +563,8 @@ class TorchCustomModel(Module, ABC):
         ----------
         valid_data : Optional[Union[DataLoader, Tuple[DataLoader, ProstateCancerDataset]]]
             Valid dataloader or tuple (valid loader, dataset).
+        early_stopper : EarlyStopper
+            Early stopper.
 
         Returns
         -------
