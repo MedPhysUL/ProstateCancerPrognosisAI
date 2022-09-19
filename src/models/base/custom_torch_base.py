@@ -371,7 +371,9 @@ class TorchCustomModel(Module, ABC):
         self._tasks, self._criterion.tasks = dataset.tasks, dataset.tasks
 
         # We setup the early stopper depending on its type.
-        if early_stopper.early_stopper_type == EarlyStopperType.MULTITASK_LOSS:
+        if early_stopper.early_stopper_type == EarlyStopperType.METRIC:
+            early_stopper.tasks = dataset.tasks
+        elif early_stopper.early_stopper_type == EarlyStopperType.LOSS:
             early_stopper.criterion = self._criterion
 
         # We create an empty evaluations dictionary that logs losses and metrics values.
