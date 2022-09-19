@@ -9,6 +9,7 @@
 """
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from os import path, remove
 from typing import List, OrderedDict, Union
 from uuid import uuid4
@@ -17,8 +18,20 @@ import numpy as np
 from torch import load, save, Tensor
 from torch.nn import Module
 
+from src.utils.multi_task_losses import MultiTaskLoss
 from src.utils.score_metrics import Direction
 from src.utils.tasks import Task
+
+
+class EarlyStopperType(Enum):
+    """
+    Custom enum for early stopper types.
+    """
+    METRIC = "metric"
+    LOSS = "loss"
+
+    def __iter__(self):
+        return iter([self.METRIC, self.LOSS])
 
 
 class EarlyStopper(ABC):
@@ -35,8 +48,8 @@ class EarlyStopper(ABC):
         ----------
         path_to_model : str
             Path to save model.
-        patience: int
-            Number of epochs without improvement.
+        patience : int
+            Number of consecutive epochs without improvement allowed.
         """
         # Set public attribute
         self.patience = patience
@@ -44,6 +57,11 @@ class EarlyStopper(ABC):
         self.counter = 0
         self.best_model = None
         self.file_path = path.join(path_to_model, f"{uuid4()}.pt")
+
+    @property
+    @abstractmethod
+    def early_stopper_type(self) -> EarlyStopperType:
+        raise NotImplementedError
 
     @abstractmethod
     def __call__(
@@ -60,6 +78,21 @@ class EarlyStopper(ABC):
             New validation loss or new validation scores for each tasks.
         model : Module
             Current model for which we've seen the score.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def print_early_stopping_message(
+            self,
+            epoch: int
+    ) -> None:
+        """
+        Prints a message when early stopping occurs.
+
+        Parameters
+        ----------
+        epoch : int
+            Number of training epochs done
         """
         raise NotImplementedError
 
@@ -89,7 +122,6 @@ class MetricEarlyStopper(EarlyStopper):
 
     def __init__(
             self,
-            tasks: List[Task],
             path_to_model: str,
             patience: int
     ) -> None:
@@ -98,21 +130,53 @@ class MetricEarlyStopper(EarlyStopper):
 
         Parameters
         ----------
-        tasks : List[Task]
-            List of tasks.
         path_to_model : str
             Path to save model.
-        patience: int
-            Number of epochs without improvement.
+        patience : int
+            Number of consecutive epochs without improvement allowed.
         """
         super().__init__(path_to_model=path_to_model, patience=patience)
 
-        self._tasks = tasks
-        self._best_val_scores = [np.inf if t.metric.direction == Direction.MINIMIZE.value else -np.inf for t in tasks]
+        self._tasks = []
+        self._best_val_scores = []
 
     @property
     def best_val_scores(self) -> List[float]:
         return self._best_val_scores
+
+    @property
+    def early_stopper_type(self) -> EarlyStopperType:
+        return EarlyStopperType.METRIC
+
+    @property
+    def tasks(self) -> List[Task]:
+        return self._tasks
+
+    @tasks.setter
+    def tasks(self, tasks: List[Task]):
+        if not self._best_val_scores:
+            self._best_val_scores = [
+                np.inf if t.metric.direction == Direction.MINIMIZE.value else -np.inf for t in tasks
+            ]
+
+        self._tasks = tasks
+
+    def print_early_stopping_message(
+            self,
+            epoch: int
+    ) -> None:
+        """
+        Prints a message when early stopping occurs.
+
+        Parameters
+        ----------
+        epoch : int
+            Number of training epochs done
+        """
+        print(f"\nEarly stopping occurred at epoch {epoch} with best_epoch = {epoch - self.patience}")
+
+        for score, task in zip(self.best_val_scores, self._tasks):
+            print(f"Task ({task.name}) (metric {task.metric.name}), Score :{round(score, 4)}")
 
     def __call__(
             self,
@@ -169,17 +233,45 @@ class LossEarlyStopper(EarlyStopper):
         ----------
         path_to_model : str
             Path to save model.
-        patience: int
-            Number of epochs without improvement.
+        patience : int
+            Number of consecutive epochs without improvement allowed.
         """
         super().__init__(path_to_model=path_to_model, patience=patience)
 
+        self._criterion = None
         self.is_better = lambda x, y: x < y
         self._best_val_loss = np.inf
 
     @property
     def best_val_loss(self) -> float:
         return self._best_val_loss
+
+    @property
+    def criterion(self) -> MultiTaskLoss:
+        return self._criterion
+
+    @criterion.setter
+    def criterion(self, criterion: MultiTaskLoss):
+        self._criterion = criterion
+
+    @property
+    def early_stopper_type(self) -> EarlyStopperType:
+        return EarlyStopperType.LOSS
+
+    def print_early_stopping_message(
+            self,
+            epoch: int
+    ) -> None:
+        """
+        Prints a message when early stopping occurs.
+
+        Parameters
+        ----------
+        epoch : int
+            Number of training epochs done
+        """
+        print(f"\nEarly stopping occurred at epoch {epoch} with best_epoch = {epoch - self.patience}")
+        print(f"Criterion {self.criterion.name}), Loss :{round(self.best_val_loss, 4)}")
 
     def __call__(
             self,
