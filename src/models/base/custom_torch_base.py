@@ -101,6 +101,7 @@ class TorchCustomModel(Module, ABC):
         self._alpha = alpha
         self._beta = beta
         self._criterion = criterion
+        self._dataset: Optional[ProstateCancerDataset] = None
         self._evaluations: Dict[str, Evaluation] = {}
         self._input_size = num_cont_col if num_cont_col is not None else 0
         self._path_to_model = path_to_model
@@ -367,11 +368,16 @@ class TorchCustomModel(Module, ABC):
         max_epochs : int
             Maximum number of epochs for training.
         """
+        # We set the dataset
+        self._dataset = dataset
+
         # We assume that the tasks in the dataset are the tasks on which we need to calculate the loss.
         self._tasks, self._criterion.tasks = dataset.tasks, dataset.tasks
 
         # We setup the early stopper depending on its type.
-        if early_stopper.early_stopper_type == EarlyStopperType.MULTITASK_LOSS:
+        if early_stopper.early_stopper_type == EarlyStopperType.METRIC:
+            early_stopper.tasks = dataset.tasks
+        elif early_stopper.early_stopper_type == EarlyStopperType.MULTITASK_LOSS:
             early_stopper.criterion = self._criterion
 
         # We create an empty evaluations dictionary that logs losses and metrics values.
@@ -625,24 +631,25 @@ class TorchCustomModel(Module, ABC):
         classification_tasks = [task for task in self.tasks if task.task_type == TaskType.CLASSIFICATION]
         outputs_dict = {task.name: Output() for task in classification_tasks}
 
-        for x, targets in data_loader:
-            predictions = self.predict(x)
+        with no_grad():
+            for x, targets in data_loader:
+                predictions = self.predict(x)
+
+                for task in classification_tasks:
+                    pred, target = predictions[task.name], targets[task.name]
+
+                    outputs_dict[task.name].predictions.append(pred)
+                    outputs_dict[task.name].targets.append(target)
 
             for task in classification_tasks:
-                pred, target = predictions[task.name], targets[task.name]
+                output = outputs_dict[task.name]
+                scores = np.array([task.metric(output.predictions, output.targets, t) for t in thresholds])
 
-                outputs_dict[task.name].predictions.append(pred)
-                outputs_dict[task.name].targets.append(target)
-
-        for task in classification_tasks:
-            output = outputs_dict[task.name]
-            scores = np.array([task.metric(output.predictions, output.targets, t) for t in thresholds])
-
-            # We set the threshold to the optimal threshold
-            if task.metric.direction == Direction.MINIMIZE.value:
-                task.metric.threshold = thresholds[np.argmin(scores)]
-            else:
-                task.metric.threshold = thresholds[np.argmax(scores)]
+                # We set the threshold to the optimal threshold
+                if task.metric.direction == Direction.MINIMIZE.value:
+                    task.metric.threshold = thresholds[np.argmin(scores)]
+                else:
+                    task.metric.threshold = thresholds[np.argmax(scores)]
 
     @staticmethod
     def _create_train_dataloader(
