@@ -19,6 +19,8 @@ from torch import load, save, Tensor
 from torch.nn import Module
 
 from src.utils.multi_task_losses import MultiTaskLoss
+from src.utils.score_metrics import Direction
+from src.utils.tasks import Task
 
 
 class EarlyStopperType(Enum):
