@@ -5,7 +5,7 @@
     @Creation Date:     04/2022
     @Last modification: 09/2022
 
-    @Description:       This file is used to define the abstract classes used as wrappers for custom torch models.
+    @Description:       This file is used to define an abstract class used as wrapper for custom torch models.
 """
 
 import os
