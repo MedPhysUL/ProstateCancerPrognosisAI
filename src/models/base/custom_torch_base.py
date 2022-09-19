@@ -15,10 +15,12 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 
 # from dgl import DGLGraph
-from torch import tensor, Tensor
+from monai.data import DataLoader
+import numpy as np
+from torch import FloatTensor, no_grad, tensor, Tensor
 from torch.nn import BatchNorm1d, Module
 from torch.optim import Adam
-from torch.utils.data import DataLoader, SubsetRandomSampler
+from torch.utils.data import SubsetRandomSampler
 
 from src.data.datasets.prostate_cancer_dataset import DataModel, ProstateCancerDataset
 from src.data.processing.tools import MaskType
@@ -27,7 +29,15 @@ from src.data.processing.tools import MaskType
 from src.training.early_stopper import EarlyStopper, EarlyStopperType
 from src.training.optimizer import SAM
 from src.utils.multi_task_losses import MultiTaskLoss
+from src.utils.reductions import MetricReduction
+from src.utils.score_metrics import Direction
+from src.utils.tasks import Task, TaskType
 from src.visualization.tools import visualize_epoch_progression
+
+
+class Output(NamedTuple):
+    predictions: List = []
+    targets: List = []
 
 
 class Evaluation(NamedTuple):
@@ -96,6 +106,7 @@ class TorchCustomModel(Module, ABC):
         self._path_to_model = path_to_model
         self._optimizer = None
         self._output_size = output_size
+        self._tasks = None
         self._verbose = verbose
 
         # Settings of protected attributes related to entity embedding
@@ -125,16 +136,18 @@ class TorchCustomModel(Module, ABC):
     def output_size(self) -> int:
         return self._output_size
 
+    @property
+    def tasks(self) -> Optional[List[Task]]:
+        return self._tasks
+
     def _init_evaluations_dictionary(self) -> None:
         """
         Initialize evaluations dictionary.
         """
-        tasks = self._criterion.tasks
-
         for i in [MaskType.TRAIN, MaskType.VALID]:
             self._evaluations[i] = Evaluation(
-                losses=dict(**{self._criterion.name: []}, **{task.criterion.name: [] for task in tasks}),
-                scores={task.metric.name: [] for task in tasks}
+                losses=dict(**{self._criterion.name: []}, **{task.criterion.name: [] for task in self._tasks}),
+                scores={task.metric.name: [] for task in self._tasks}
             )
 
     @staticmethod
@@ -303,7 +316,7 @@ class TorchCustomModel(Module, ABC):
             losses: Dict[str, float],
             scores: Dict[str, float],
             mask_type: str
-    ) -> Dict[str, float]:
+    ):
         """
         Adds epoch score and loss to the evaluations history.
 
@@ -315,11 +328,6 @@ class TorchCustomModel(Module, ABC):
             Epoch scores.
         mask_type : str
             "train" of "valid".
-
-        Returns
-        -------
-        losses or scores : Dict[str, float]
-            Mean epoch losses or mean epoch scores.
         """
         # We update the evaluations history
         for name, loss in losses.items():
@@ -327,12 +335,6 @@ class TorchCustomModel(Module, ABC):
 
         for name, score in scores.items():
             self._evaluations[mask_type].scores[name].append(score)
-
-        # We return a value according to the mask type
-        if mask_type == MaskType.VALID:
-            return scores
-
-        return losses
 
     def fit(
             self,
@@ -366,7 +368,7 @@ class TorchCustomModel(Module, ABC):
             Maximum number of epochs for training.
         """
         # We assume that the tasks in the dataset are the tasks on which we need to calculate the loss.
-        self._criterion.tasks = dataset.tasks
+        self._tasks, self._criterion.tasks = dataset.tasks, dataset.tasks
 
         # We setup the early stopper depending on its type.
         if early_stopper.early_stopper_type == EarlyStopperType.METRIC:
@@ -495,8 +497,154 @@ class TorchCustomModel(Module, ABC):
             train_history=train_history,
             valid_history=valid_history,
             progression_type=progression_type,
-            path=save_path
+            path=save_path if save_path else self._path_to_model
         )
+
+    def losses(
+            self,
+            predictions: DataModel.y,
+            targets: DataModel.y
+    ) -> Dict[str, float]:
+        """
+        Returns the losses for all samples in a particular batch.
+
+        Parameters
+        ----------
+        predictions : DataModel.y
+            Batch data items.
+        targets : DataElement.y
+            Batch data items.
+
+        Returns
+        -------
+        losses : Dict[str, float]
+            Loss for each tasks.
+        """
+        with no_grad():
+            losses = {}
+            for task in self._tasks:
+                losses[task.name] = task.criterion(predictions[task.name], targets[task.name]).item()
+
+        return losses
+
+    def scores(
+            self,
+            predictions: DataModel.y,
+            targets: DataModel.y
+    ) -> Dict[str, float]:
+        """
+        Returns the scores for all samples in a particular batch.
+
+        Parameters
+        ----------
+        predictions : DataModel.y
+            Batch data items.
+        targets : DataElement.y
+            Batch data items.
+
+        Returns
+        -------
+        scores : Dict[str, float]
+            Score for each tasks.
+        """
+        with no_grad():
+            scores = {}
+            for task in self._tasks:
+                scores[task.name] = task.metric(predictions[task.name], targets[task.name])
+
+        return scores
+
+    def scores_dataset(
+            self,
+            dataset: ProstateCancerDataset,
+            mask: List[int]
+    ) -> Dict[str, float]:
+        """
+        Returns the score of all samples in a particular subset of the dataset, determined using a mask parameter.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
+        mask : List[int]
+            A list of dataset idx for which we want to obtain the mean score.
+
+        Returns
+        -------
+        scores : Dict[str, float]
+            Score for each tasks.
+        """
+        subset = dataset[mask]
+        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
+
+        scores = {}
+        segmentation_scores_dict = {
+            task.name: [] for task in self.tasks if task.task_type == TaskType.SEGMENTATION
+        }
+        non_segmentation_outputs_dict = {
+            task.name: Output() for task in self.tasks if task.task_type != TaskType.SEGMENTATION
+        }
+
+        with no_grad():
+            for x, targets in data_loader:
+                predictions = self.predict(x)
+
+                for task in self.tasks:
+                    pred, target = predictions[task.name], targets[task.name]
+
+                    if task.task_type == TaskType.SEGMENTATION:
+                        segmentation_scores_dict[task.name].append(task.metric(pred, target, MetricReduction.NONE))
+                    else:
+                        non_segmentation_outputs_dict[task.name].predictions.append(pred)
+                        non_segmentation_outputs_dict[task.name].targets.append(target)
+
+            for task in self.tasks:
+                if task.task_type == TaskType.SEGMENTATION:
+                    scores[task.name] = task.metric.perform_reduction(FloatTensor(segmentation_scores_dict[task.name]))
+                else:
+                    output = non_segmentation_outputs_dict[task.name]
+                    scores[task.name] = task.metric(output.predictions, output.targets)
+
+        return scores
+
+    def fix_thresholds_to_optimal_values(
+            self,
+            dataset: ProstateCancerDataset
+    ) -> None:
+        """
+        Fix all classification thresholds to their optimal values according to a given metric.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
+        """
+        subset = dataset[dataset.train_mask]
+        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
+
+        thresholds = np.linspace(start=0.01, stop=0.95, num=95)
+
+        classification_tasks = [task for task in self.tasks if task.task_type == TaskType.CLASSIFICATION]
+        outputs_dict = {task.name: Output() for task in classification_tasks}
+
+        for x, targets in data_loader:
+            predictions = self.predict(x)
+
+            for task in classification_tasks:
+                pred, target = predictions[task.name], targets[task.name]
+
+                outputs_dict[task.name].predictions.append(pred)
+                outputs_dict[task.name].targets.append(target)
+
+        for task in classification_tasks:
+            output = outputs_dict[task.name]
+            scores = np.array([task.metric(output.predictions, output.targets, t) for t in thresholds])
+
+            # We set the threshold to the optimal threshold
+            if task.metric.direction == Direction.MINIMIZE.value:
+                task.metric.threshold = thresholds[np.argmin(scores)]
+            else:
+                task.metric.threshold = thresholds[np.argmax(scores)]
 
     @staticmethod
     def _create_train_dataloader(

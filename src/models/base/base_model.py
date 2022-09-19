@@ -10,22 +10,10 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, NamedTuple, Optional
-
-from monai.data import DataLoader
-import numpy as np
-from torch import FloatTensor
+from typing import Any, Dict, List, Optional
 
 from src.data.datasets.prostate_cancer_dataset import DataModel, ProstateCancerDataset
 from src.utils.hyperparameters import HP
-from src.utils.reductions import MetricReduction
-from src.utils.score_metrics import Direction
-from src.utils.tasks import Task, TaskType
-
-
-class Output(NamedTuple):
-    predictions: List = []
-    targets: List = []
 
 
 class BaseModel(ABC):
@@ -47,11 +35,6 @@ class BaseModel(ABC):
             there is a call to the fit method.
         """
         self._train_params = train_params if train_params is not None else {}
-        self._tasks = None
-
-    @property
-    def tasks(self) -> Optional[List[Task]]:
-        return self._tasks
 
     @property
     def train_params(self) -> Dict[str, Any]:
@@ -83,7 +66,30 @@ class BaseModel(ABC):
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
         """
-        self._tasks = dataset.tasks
+        raise NotImplementedError
+
+    @abstractmethod
+    def losses(
+            self,
+            predictions: DataModel.y,
+            targets: DataModel.y
+    ) -> Dict[str, float]:
+        """
+        Returns the losses for all samples in a particular batch.
+
+        Parameters
+        ----------
+        predictions : DataModel.y
+            Batch data items.
+        targets : DataElement.y
+            Batch data items.
+
+        Returns
+        -------
+        losses : Dict[str, float]
+            Loss for each tasks.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def predict(
@@ -122,7 +128,8 @@ class BaseModel(ABC):
         """
         raise NotImplementedError
 
-    def score(
+    @abstractmethod
+    def scores(
             self,
             predictions: DataModel.y,
             targets: DataModel.y
@@ -142,13 +149,10 @@ class BaseModel(ABC):
         scores : Dict[str, float]
             Score for each tasks.
         """
-        scores = {}
-        for task in self.tasks:
-            scores[task.name] = task.metric(predictions[task.name], targets[task.name])
+        raise NotImplementedError
 
-        return scores
-
-    def score_dataset(
+    @abstractmethod
+    def scores_dataset(
             self,
             dataset: ProstateCancerDataset,
             mask: List[int]
@@ -168,38 +172,9 @@ class BaseModel(ABC):
         scores : Dict[str, float]
             Score for each tasks.
         """
-        subset = dataset[mask]
-        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
+        raise NotImplementedError
 
-        scores = {}
-        segmentation_scores_dict = {
-            task.name: [] for task in self.tasks if task.task_type == TaskType.SEGMENTATION
-        }
-        non_segmentation_outputs_dict = {
-            task.name: Output() for task in self.tasks if task.task_type != TaskType.SEGMENTATION
-        }
-
-        for x, targets in data_loader:
-            predictions = self.predict(x)
-
-            for task in self.tasks:
-                pred, target = predictions[task.name], targets[task.name]
-
-                if task.task_type == TaskType.SEGMENTATION:
-                    segmentation_scores_dict[task.name].append(task.metric(pred, target, MetricReduction.NONE))
-                else:
-                    non_segmentation_outputs_dict[task.name].predictions.append(pred)
-                    non_segmentation_outputs_dict[task.name].targets.append(target)
-
-        for task in self.tasks:
-            if task.task_type == TaskType.SEGMENTATION:
-                scores[task.name] = task.metric.perform_reduction(FloatTensor(segmentation_scores_dict[task.name]))
-            else:
-                output = non_segmentation_outputs_dict[task.name]
-                scores[task.name] = task.metric(output.predictions, output.targets)
-
-        return scores
-
+    @abstractmethod
     def fix_thresholds_to_optimal_values(
             self,
             dataset: ProstateCancerDataset
@@ -212,29 +187,4 @@ class BaseModel(ABC):
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
         """
-        subset = dataset[dataset.train_mask]
-        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
-
-        thresholds = np.linspace(start=0.01, stop=0.95, num=95)
-
-        classification_tasks = [task for task in self.tasks if task.task_type == TaskType.CLASSIFICATION]
-        outputs_dict = {task.name: Output() for task in classification_tasks}
-
-        for x, targets in data_loader:
-            predictions = self.predict(x)
-
-            for task in classification_tasks:
-                pred, target = predictions[task.name], targets[task.name]
-
-                outputs_dict[task.name].predictions.append(pred)
-                outputs_dict[task.name].targets.append(target)
-
-        for task in classification_tasks:
-            output = outputs_dict[task.name]
-            scores = np.array([task.metric(output.predictions, output.targets, t) for t in thresholds])
-
-            # We set the threshold to the optimal threshold
-            if task.metric.direction == Direction.MINIMIZE.value:
-                task.metric.threshold = thresholds[np.argmin(scores)]
-            else:
-                task.metric.threshold = thresholds[np.argmax(scores)]
+        raise NotImplementedError
