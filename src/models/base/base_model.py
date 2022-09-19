@@ -10,11 +10,11 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, NamedTuple, Optional, Union
+from typing import Any, Dict, List, NamedTuple, Optional
 
 from monai.data import DataLoader
 import numpy as np
-from torch import FloatTensor, Tensor
+from torch import FloatTensor
 
 from src.data.datasets.prostate_cancer_dataset import DataModel, ProstateCancerDataset
 from src.utils.hyperparameters import HP
