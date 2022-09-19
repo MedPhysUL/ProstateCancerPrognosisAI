@@ -5,7 +5,8 @@
     @Creation Date:     05/2022
     @Last modification: 08/2022
 
-    @Description:       This file is used to define the Objective and Tuner classes used for hyperparameter tuning.
+    @Description:       This file is used to define the Objective and Tuner classes used for hyperparameter tuning
+                        using https://dl.acm.org/doi/10.1145/3377930.3389817.
 """
 
 from copy import deepcopy
@@ -379,7 +380,7 @@ class Tuner:
         study : Study
             Study object.
         """
-        directions = [task.metric.direction.value for task in self._objective.dataset.tasks]
+        directions = [task.metric.direction for task in self._objective.dataset.tasks]
 
         study = create_study(
             directions=directions,

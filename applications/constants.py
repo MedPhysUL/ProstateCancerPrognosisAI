@@ -10,7 +10,8 @@
 
 import os
 
-from src.utils.score_metrics import AUC, DICE
+from src.utils.score_metrics import AUC, DICEMetric
+from src.utils.losses import DICELoss
 from src.utils.tasks import ClassificationTask, SegmentationTask
 
 # SEED
@@ -72,4 +73,4 @@ MODALITIES = {"CT"}
 
 # TASKS
 TABLE_TASKS = [ClassificationTask(target_col=PN, metric=AUC()), ClassificationTask(target_col=BCR, metric=AUC())]
-IMAGE_TASKS = [SegmentationTask(metric=DICE(), organ="Prostate", modality="CT")]
+IMAGE_TASKS = [SegmentationTask(criterion=DICELoss(), metric=DICEMetric(), organ="Prostate", modality="CT")]

@@ -21,10 +21,11 @@ from torch.utils.data import Dataset
 
 from src.data.processing.transforms import CategoricalTransform as CaT
 from src.data.processing.preprocessing import preprocess_categoricals, preprocess_continuous
-from src.utils.tasks import ClassificationTask, TableTask
+from src.utils.tasks import ClassificationTask, TableTask, TaskType
+from src.data.processing.tools import MaskType
 
 
-class DataModel(NamedTuple):
+class TableDataModel(NamedTuple):
     """
     Data element named tuple. This tuple is used to separate features (x) and targets (y) where
         - x : D-dimensional dictionary containing (N, ) tensor or array where D is the number of features.
@@ -32,20 +33,6 @@ class DataModel(NamedTuple):
     """
     x: Dict[str, Union[np.ndarray, Tensor]]
     y: Dict[str, Union[np.ndarray, Tensor]]
-
-
-class MaskType:
-    """
-    Stores the constant related to mask types
-    """
-
-    TRAIN: str = "Train"
-    VALID: str = "Valid"
-    TEST: str = "Test"
-    INNER: str = "Inner"
-
-    def __iter__(self):
-        return iter([self.TRAIN, self.VALID, self.TEST])
 
 
 class TableDataset(Dataset):
@@ -132,7 +119,7 @@ class TableDataset(Dataset):
     def __getitem__(
             self,
             idx: Union[int, List[int]]
-    ) -> DataModel:
+    ) -> TableDataModel:
         """
         Gets dataset item. In the multi-output learning setting, the output variables, i.e the targets, share the same
         training features (See https://ieeexplore.ieee.org/document/8892612).
@@ -144,13 +131,13 @@ class TableDataset(Dataset):
 
         Returns
         -------
-        item : DataModel
+        item : TableDataModel
             A data element.
         """
         x = dict((col, self.x[idx, i]) for i, col in enumerate(self.features_cols))
         y = dict((col, self.y[idx, i]) for i, col in enumerate(self.target_cols))
 
-        return DataModel(x=x, y=y)
+        return TableDataModel(x=x, y=y)
 
     @property
     def cat_cols(self) -> List[str]:
@@ -165,6 +152,10 @@ class TableDataset(Dataset):
         if self._encodings is not None:
             return [len(self._encodings[c].items()) for c in self._cat_cols]
         return None
+
+    @property
+    def tasks(self) -> List[TableTask]:
+        return self._tasks
 
     @property
     def cont_cols(self) -> List[str]:
@@ -205,10 +196,6 @@ class TableDataset(Dataset):
     @property
     def target_cols(self) -> List[str]:
         return self._target_cols
-
-    @property
-    def tasks(self) -> List[TableTask]:
-        return self._tasks
 
     @property
     def test_mask(self) -> List[int]:
@@ -557,6 +544,18 @@ class TableDataset(Dataset):
 
         return df, cont_cols, cat_cols
 
+    def _set_scaling_factors(self):
+        """
+        Sets scaling factor of all classification tasks.
+        """
+        for idx, task in enumerate(self.tasks):
+            if task.task_type == TaskType.CLASSIFICATION:
+                scaling_factor = task.metric.get_scaling_factor(y_train=self.y[self.train_mask, idx])
+                task.metric.scaling_factor = scaling_factor
+
+                if task.criterion:
+                    task.criterion.scaling_factor = scaling_factor
+
     def _numerical_setter(
             self,
             mu: pd.Series,
@@ -768,6 +767,9 @@ class TableDataset(Dataset):
         # We update the data that will be available via __get_item__
         self._set_numerical(mu, std)
         self._set_categorical(modes)
+
+        # We set the classification tasks scaling factors
+        self._set_scaling_factors()
 
     def _valid_columns_type(
             self,

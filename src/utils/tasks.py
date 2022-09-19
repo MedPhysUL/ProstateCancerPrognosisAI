@@ -10,8 +10,10 @@
 
 from abc import ABC, abstractmethod
 from enum import Enum
+from typing import Optional, Union
 
 from src.utils.score_metrics import BinaryClassificationMetric, Metric, RegressionMetric, SegmentationMetric
+from src.utils.losses import BinaryClassificationLoss, Loss, RegressionLoss, SegmentationLoss
 
 
 class TaskType(Enum):
@@ -33,7 +35,8 @@ class Task(ABC):
 
     def __init__(
             self,
-            metric: Metric
+            metric: Metric,
+            criterion: Optional[Loss] = None
     ):
         """
         Sets protected attributes.
@@ -42,8 +45,15 @@ class Task(ABC):
         ----------
         metric : Metric
             A score metric.
+        criterion : Optional[Callable]
+            A loss function.
         """
         self._metric = metric
+        self._criterion = criterion
+
+    @property
+    def criterion(self) -> Optional[Loss]:
+        return self._criterion
 
     @property
     def metric(self) -> Metric:
@@ -68,7 +78,8 @@ class TableTask(Task, ABC):
     def __init__(
             self,
             metric: Metric,
-            target_col: str
+            target_col: str,
+            criterion: Optional[Union[BinaryClassificationLoss, RegressionLoss]] = None
     ):
         """
         Sets protected attributes.
@@ -79,10 +90,12 @@ class TableTask(Task, ABC):
             A score metric.
         target_col : str
             Name of the column containing the targets associated to this task.
+        criterion : Optional[Union[BinaryClassificationLoss, RegressionLoss]]
+            A loss function.
         """
         self._target_col = target_col
 
-        super().__init__(metric=metric)
+        super().__init__(criterion=criterion, metric=metric)
 
     @property
     def target_col(self) -> str:
@@ -97,7 +110,8 @@ class ClassificationTask(TableTask):
     def __init__(
             self,
             metric: BinaryClassificationMetric,
-            target_col: str
+            target_col: str,
+            criterion: Optional[BinaryClassificationLoss] = None
     ):
         """
         Sets protected attributes.
@@ -108,8 +122,10 @@ class ClassificationTask(TableTask):
             A score metric.
         target_col : str
             Name of the column containing the targets associated to this task.
+        criterion : Optional[BinaryClassificationLoss]
+            A loss function.
         """
-        super().__init__(metric=metric, target_col=target_col)
+        super().__init__(metric=metric, target_col=target_col, criterion=criterion)
 
     @property
     def name(self) -> str:
@@ -128,7 +144,8 @@ class RegressionTask(TableTask):
     def __init__(
             self,
             metric: RegressionMetric,
-            target_col: str
+            target_col: str,
+            criterion: Optional[RegressionLoss] = None
     ):
         """
         Sets protected attributes.
@@ -139,8 +156,10 @@ class RegressionTask(TableTask):
             A score metric.
         target_col : str
             Name of the column containing the targets associated to this task.
+        criterion : Optional[RegressionLoss]
+            A loss function.
         """
-        super().__init__(metric=metric, target_col=target_col)
+        super().__init__(metric=metric, target_col=target_col, criterion=criterion)
 
     @property
     def name(self) -> str:
@@ -158,6 +177,7 @@ class SegmentationTask(Task):
 
     def __init__(
             self,
+            criterion: SegmentationLoss,
             metric: SegmentationMetric,
             organ: str,
             modality: str
@@ -167,6 +187,8 @@ class SegmentationTask(Task):
 
         Parameters
         ----------
+        criterion : SegmentationLoss
+            A loss function.
         metric : SegmentationMetric
             A score metric.
         organ : str
@@ -176,7 +198,7 @@ class SegmentationTask(Task):
         """
         self._organ = organ
         self._modality = modality
-        super().__init__(metric=metric)
+        super().__init__(criterion=criterion, metric=metric)
 
     @property
     def organ(self) -> str:

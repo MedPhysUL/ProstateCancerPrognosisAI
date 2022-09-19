@@ -45,8 +45,6 @@ class SAM(torch.optim.Optimizer):
             Neighborhood size.
         adaptive : bool
             True to use Adaptive Sharpness-Aware Minimization (ASAM).
-        **kwargs : dict
-            Other parameters related to base optimizer
         """
 
         if rho < 0:

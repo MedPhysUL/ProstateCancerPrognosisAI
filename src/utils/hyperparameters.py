@@ -9,6 +9,26 @@
 """
 
 
+class Distribution:
+    """
+    Stores possible types of distribution.
+    """
+    INT: str = "int"                # Int uniform
+    UNIFORM: str = "uniform"
+    CATEGORICAL: str = "categorical"
+
+
+class Range:
+    """
+    Stores possible hyperparameters' range types.
+    """
+    MIN: str = "min"
+    MAX: str = "max"
+    STEP: str = "step"
+    VALUES: str = "values"
+    VALUE: str = "value"
+
+
 class HP:
     """
     A class that represents an hyperparameter.
@@ -95,23 +115,3 @@ class NumericalContinuousHP(HP):
             Name of the hyperparameter.
         """
         super().__init__(name=name, distribution=Distribution.UNIFORM)
-
-
-class Distribution:
-    """
-    Stores possible types of distribution.
-    """
-    INT: str = "int"                # Int uniform
-    UNIFORM: str = "uniform"
-    CATEGORICAL: str = "categorical"
-
-
-class Range:
-    """
-    Stores possible hyperparameters' range types.
-    """
-    MIN: str = "min"
-    MAX: str = "max"
-    STEP: str = "step"
-    VALUES: str = "values"
-    VALUE: str = "value"
