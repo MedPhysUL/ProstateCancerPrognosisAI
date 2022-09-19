@@ -163,7 +163,7 @@ class TorchWrapper(BaseModel):
         scores : Dict[str, float]
             Score for each tasks.
         """
-        return self._model.score(predictions, targets)
+        return self._model.scores(predictions, targets)
 
     def scores_dataset(
             self,
@@ -185,7 +185,7 @@ class TorchWrapper(BaseModel):
         scores : Dict[str, float]
             Score for each tasks.
         """
-        return self._model.score_dataset(dataset, mask)
+        return self._model.scores_dataset(dataset, mask)
 
     def fix_thresholds_to_optimal_values(
             self,
