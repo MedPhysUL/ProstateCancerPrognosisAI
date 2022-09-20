@@ -25,7 +25,7 @@ from torch.utils.data import SubsetRandomSampler
 from src.data.datasets.prostate_cancer_dataset import DataModel, ProstateCancerDataset
 from src.data.processing.tools import MaskType
 # from src.data.processing.gnn_datasets import PetaleKGNNDataset
-# from src.models.blocks.mlp_blocks import EntityEmbeddingBlock
+from src.models.base.blocks.embeddings import EntityEmbeddingBlock
 from src.training.early_stopper import EarlyStopper, EarlyStopperType
 from src.training.optimizer import SAM
 from src.utils.multi_task_losses import MultiTaskLoss
@@ -57,11 +57,6 @@ class TorchCustomModel(Module, ABC):
             path_to_model: str,
             alpha: float = 0,
             beta: float = 0,
-            num_cont_col: Optional[int] = None,
-            cat_idx: Optional[List[int]] = None,
-            cat_sizes: Optional[List[int]] = None,
-            cat_emb_sizes: Optional[List[int]] = None,
-            additional_input_args: Optional[List[Any]] = None,
             verbose: bool = False
     ) -> None:
         """
@@ -77,23 +72,9 @@ class TorchCustomModel(Module, ABC):
             L1 penalty coefficient.
         beta : float
             L2 penalty coefficient.
-        num_cont_col : Optional[int]
-            Number of numerical continuous columns in the dataset, cont idx are assumed to be range(num_cont_col).
-        cat_idx : Optional[List[int]]
-            Idx of categorical columns in the dataset.
-        cat_sizes : Optional[List[int]]
-            List of integer representing the size of each categorical column.
-        cat_emb_sizes : Optional[List[int]]
-            List of integer representing the size of each categorical embedding.
-        additional_input_args : Optional[List[Any]]
-            List of arguments that must be also considered when validating input arguments.
         verbose : bool
             True if we want to print the training progress.
         """
-        # We validate input arguments (check if there are continuous or categorical inputs)
-        additional_input_args = additional_input_args if additional_input_args is not None else []
-        self._validate_input_args([num_cont_col, cat_sizes, *additional_input_args])
-
         # Call of parent's constructor
         Module.__init__(self)
 
@@ -102,36 +83,43 @@ class TorchCustomModel(Module, ABC):
         self._beta = beta
         self._criterion = criterion
         self._dataset: Optional[ProstateCancerDataset] = None
+        self._embedding_block = None
         self._evaluations: Dict[str, Evaluation] = {}
-        self._input_size = num_cont_col if num_cont_col is not None else 0
         self._path_to_model = path_to_model
         self._optimizer = None
         self._output_size = output_size
         self._tasks = None
         self._verbose = verbose
 
-        # Settings of protected attributes related to entity embedding
-        self._cat_idx = cat_idx if cat_idx is not None else []
-        self._cont_idx = list(range(num_cont_col))
-        self._embedding_block = None
-
         # Initialization of a protected method
         self._update_weights = None
 
-        # # We set the embedding layers
-        # if len(cat_idx) != 0 and cat_sizes is not None:
-        #
-        #     # We check embedding sizes (if nothing provided -> emb_sizes = cat_sizes - 1)
-        #     if cat_emb_sizes is None:
-        #         cat_emb_sizes = [s - 1 for s in cat_sizes]
-        #         if 0 in cat_emb_sizes:
-        #             raise ValueError('One categorical variable as a single modality')
-        #
-        #     # We create the embedding layers
-        #     self._embedding_block = EntityEmbeddingBlock(cat_sizes, cat_emb_sizes, cat_idx)
-        #
-        #     # We sum the length of all embeddings
-        #     self._input_size += self._embedding_block.output_size
+    @property
+    def embedding_block(self) -> EntityEmbeddingBlock:
+        embedding_block = None
+
+        # We set the embedding layers
+        if len(self._dataset.table_dataset.cat_idx) != 0 and self._dataset.table_dataset.cat_sizes is not None:
+
+            # We check embedding sizes (if nothing provided -> emb_sizes = cat_sizes - 1)
+            cat_emb_sizes = [s - 1 for s in self._dataset.table_dataset.cat_sizes]
+            if 0 in cat_emb_sizes:
+                raise ValueError('One categorical variable as a single modality')
+
+            embedding_block = EntityEmbeddingBlock(
+                cat_sizes=self._dataset.table_dataset.cat_sizes,
+                cat_emb_sizes=cat_emb_sizes,
+                cat_idx=self._dataset.table_dataset.cat_idx
+            )
+
+        return embedding_block
+
+    @property
+    def input_size(self) -> int:
+        if self.embedding_block:
+            return len(self._dataset.table_dataset.cont_cols) + self.embedding_block.output_size
+        else:
+            return len(self._dataset.table_dataset.cont_cols)
 
     @property
     def output_size(self) -> int:
@@ -202,10 +190,9 @@ class TorchCustomModel(Module, ABC):
 
     def _sam_weight_update(
             self,
-            x: List[Union[DGLGraph, Tensor]],
-            y: Tensor,
-            pos_idx: Optional[List[int]] = None
-    ) -> Tuple[Tensor, float]:
+            x: DataModel.x,
+            y: DataModel.y
+    ) -> Tuple[DataModel.y, float]:
         """
         Executes a weights update using Sharpness-Aware Minimization (SAM) optimizer.
 
@@ -216,22 +203,18 @@ class TorchCustomModel(Module, ABC):
 
         Parameters
         ----------
-        x : Union[DGLGraph, Tensor]
-            A list of arguments taken for the forward pass (DGLGraph and (N', D) tensor with batch inputs).
-        y : Tensor
-            (N',) ground truth associated to a batch.
-        pos_idx : Optional[List[int]]
-            Dictionary that maps the original dataset's idx to their current position in the mask used for the forward
-            pass (used only with GNNs)
+        x : DataModel.x
+            Batch data items.
+        y : DataModel.y
+            Batch data items.
 
         Returns
         -------
-        (pred, loss) : Tuple[Tensor, float]
-            Tuple of a (N',) tensor with predictions and training loss.
+        (pred, loss) : Tuple[DataModel.y, float]
+            Tuple of a dictionary of tensors with predictions and training loss.
         """
         # We compute the predictions
         pred = self(*x)
-        pred = pred if pos_idx is None else pred[pos_idx]
 
         # First forward-backward pass
         loss = self.loss(pred, y)
@@ -241,7 +224,6 @@ class TorchCustomModel(Module, ABC):
         # Second forward-backward pass
         self._disable_running_stats()
         second_pred = self(*x)
-        second_pred = second_pred if pos_idx is None else second_pred[pos_idx]
         self.loss(second_pred, y).backward()
         self._optimizer.second_step()
 
@@ -252,31 +234,26 @@ class TorchCustomModel(Module, ABC):
 
     def _basic_weight_update(
             self,
-            x: List[Union[DGLGraph, Tensor]],
-            y: Tensor,
-            pos_idx: Optional[List[int]] = None
-    ) -> Tuple[Tensor, float]:
+            x: DataModel.x,
+            y: DataModel.y
+    ) -> Tuple[DataModel.y, float]:
         """
         Executes a weights update without using Sharpness-Aware Minimization (SAM).
 
         Parameters
         ----------
-        x : List[Union[DGLGraph, Tensor]]
-            A list of arguments taken for the forward pass (DGLGraph and (N', D) tensor with batch inputs).
-        y : Tensor
-            (N',) ground truth associated to a batch.
-        pos_idx : Optional[List[int]]
-            Dictionary that maps the original dataset's idx to their current position in the mask used for the forward
-            pass (used only with GNNs).
+        x : DataModel.x
+            Batch data items.
+        y : DataModel.y
+            Batch data items.
 
         Returns
         -------
-        (pred, loss) : Tuple[Tensor, float]
-            Tuple of a (N',) tensor with predictions and training loss.
+        (pred, loss) : Tuple[DataModel.y, float]
+            Tuple of a dictionary of tensors with predictions and training loss.
         """
         # We compute the predictions
         pred = self(*x)
-        pred = pred if pos_idx is None else pred[pos_idx]
 
         # We execute a single forward-backward pass
         loss = self.loss(pred, y)
@@ -425,18 +402,19 @@ class TorchCustomModel(Module, ABC):
 
     def loss(
             self,
-            pred: Tensor,
-            y: Tensor
+            pred: DataModel.y,
+            y: DataModel.y,
     ) -> Tensor:
         """
         Calls the criterion and add the elastic penalty.
 
         Parameters
         ----------
-        pred : Tensor
-            (N, C) tensor if classification with C classes, (N,) tensor for regression.
-        y : Tensor
-            (N,) tensor with targets.
+        pred : DataModel.y
+            Predictions.
+        y: DataModel.y
+            Targets.
+
         Returns
         -------
         loss : Tensor
@@ -449,7 +427,7 @@ class TorchCustomModel(Module, ABC):
             l2_penalty = l2_penalty + w.pow(2).sum()
 
         # Computation of loss reduction + elastic penalty
-        return self._criterion(pred, y.float()) + self._alpha * l1_penalty + self._beta * l2_penalty
+        return self._criterion(pred, y) + self._alpha * l1_penalty + self._beta * l2_penalty
 
     @abstractmethod
     def predict(
@@ -589,6 +567,9 @@ class TorchCustomModel(Module, ABC):
             task.name: Output() for task in self.tasks if task.task_type != TaskType.SEGMENTATION
         }
 
+        # Set model for evaluation
+        self.eval()
+
         with no_grad():
             for x, targets in data_loader:
                 predictions = self.predict(x)
@@ -631,6 +612,9 @@ class TorchCustomModel(Module, ABC):
         classification_tasks = [task for task in self.tasks if task.task_type == TaskType.CLASSIFICATION]
         outputs_dict = {task.name: Output() for task in classification_tasks}
 
+        # Set model for evaluation
+        self.eval()
+        
         with no_grad():
             for x, targets in data_loader:
                 predictions = self.predict(x)
@@ -683,27 +667,6 @@ class TorchCustomModel(Module, ABC):
         )
 
         return train_data
-
-    @staticmethod
-    def _validate_input_args(
-            input_args: List[Any]
-    ) -> None:
-        """
-        Checks if all arguments related to inputs are None. If not, the inputs are valid.
-
-        Parameters
-        ----------
-        input_args : List[Any]
-            A list of arguments related to inputs.
-        """
-        valid = False
-        for arg in input_args:
-            if arg is not None:
-                valid = True
-                break
-
-        if not valid:
-            raise ValueError("There must be continuous columns or categorical columns")
 
     @abstractmethod
     def _execute_train_step(
