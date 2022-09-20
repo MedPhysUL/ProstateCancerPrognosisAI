@@ -106,4 +106,4 @@ class MeanLoss(MultiTaskLoss):
         loss : Tensor
             (1, 1) tensor.
         """
-        return mean(tensor([task.criterion(predictions[task.name], targets[task.name]) for task in self.tasks]))
+        return mean(tensor([task.criterion(predictions[task.name], targets[task.name].float()) for task in self.tasks]))
