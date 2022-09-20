@@ -26,7 +26,7 @@ from src.utils.multi_task_losses import MultiTaskLoss
 from src.utils.tasks import TaskType
 
 
-class MLP(TorchCustomModel):
+class MLPBaseModel(TorchCustomModel):
     """
     Multilayer perceptron model with entity embedding for categorical variables.
     """

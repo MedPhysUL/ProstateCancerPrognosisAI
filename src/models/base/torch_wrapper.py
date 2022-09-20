@@ -9,7 +9,7 @@
 """
 
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from torch import save
 
@@ -26,7 +26,8 @@ class TorchWrapper(BaseModel):
 
     def __init__(
             self,
-            model: TorchCustomModel,
+            model_constructor: Callable,
+            model_params: Dict[str, Any],
             train_params: Optional[Dict[str, Any]] = None
     ):
         """
@@ -34,13 +35,17 @@ class TorchWrapper(BaseModel):
 
         Parameters
         ----------
-        model : TorchCustomModel
+        model_constructor : TorchCustomModel
+            Model inheriting from TorchCustomModel.
+        model_params : Dict[str, Any]
             Parameters used to initialize the classification model inheriting from TorchCustomModel.
         train_params : Optional[Dict[str, Any]]
             Training parameters proper to model for fit function.
         """
         # Initialization of model
-        self._model = model
+        self._model_constructor = model_constructor
+        self._model_params = model_params
+        self._model = self._model_constructor(**model_params)
 
         super().__init__(train_params=train_params)
 
