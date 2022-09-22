@@ -8,7 +8,7 @@
     @Description:       This file is used to define the regression and classification wrappers for MLP models.
 """
 
-from typing import Callable, Dict, List, Optional
+from typing import List, Optional
 
 from src.models.base.torch_wrapper import TorchWrapper
 from src.models.base.mlp_base_model import MLPBaseModel
