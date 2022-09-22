@@ -41,6 +41,7 @@ class MLPBaseModel(TorchCustomModel):
             dropout: float = 0,
             alpha: float = 0,
             beta: float = 0,
+            calculate_epoch_score: bool = True,
             verbose: bool = False
     ):
         """
@@ -64,6 +65,8 @@ class MLPBaseModel(TorchCustomModel):
             L1 penalty coefficient
         beta : float
             L2 penalty coefficient
+        calculate_epoch_score : bool
+            Whether we want to calculate the score at each training epoch.
         verbose : bool
             True if we want trace of the training progress
         """
@@ -75,6 +78,7 @@ class MLPBaseModel(TorchCustomModel):
             path_to_model=path_to_model,
             alpha=alpha,
             beta=beta,
+            calculate_epoch_score=calculate_epoch_score,
             verbose=verbose
         )
 
@@ -123,15 +127,17 @@ class MLPBaseModel(TorchCustomModel):
 
             # We update the losses history
             epoch_losses[self._criterion.name].append(loss.item())
-            losses = self.losses(pred, y)
-            for name, loss in losses.items():
-                epoch_losses[name].append(loss)
+            for name, single_task_loss in self._criterion.single_task_losses:
+                epoch_losses[name].append(single_task_loss)
 
         epoch_losses = {name: np.mean(loss) for name, loss in epoch_losses.items()}
 
-        # We get the scores values
-        self.fix_thresholds_to_optimal_values(dataset=self._dataset)
-        epoch_scores = self.scores_dataset(dataset=self._dataset, mask=self._dataset.train_mask)
+        if self._calculate_epoch_score:
+            # We get the scores values
+            self.fix_thresholds_to_optimal_values(dataset=self._dataset)
+            epoch_scores = self.scores_dataset(dataset=self._dataset, mask=self._dataset.train_mask)
+        else:
+            epoch_scores = {}
 
         # We update evaluations history
         self._update_evaluations_progress(
@@ -178,14 +184,15 @@ class MLPBaseModel(TorchCustomModel):
 
                 # We update the losses history
                 epoch_losses[self._criterion.name].append(loss.item())
+                for name, single_task_loss in self._criterion.single_task_losses:
+                    epoch_losses[name].append(single_task_loss)
 
-                losses = self.losses(output, y)
-                for name, loss in losses.items():
-                    epoch_losses[name].append(loss)
-
-        # We get the scores values
         epoch_losses = {name: np.mean(loss) for name, loss in epoch_losses.items()}
-        epoch_scores = self.scores_dataset(dataset=self._dataset, mask=self._dataset.valid_mask)
+
+        if self._calculate_epoch_score:
+            epoch_scores = self.scores_dataset(dataset=self._dataset, mask=self._dataset.valid_mask)
+        else:
+            epoch_scores = {}
 
         # We update evaluations history
         self._update_evaluations_progress(
@@ -230,7 +237,7 @@ class MLPBaseModel(TorchCustomModel):
 
         # We extract continuous data
         if len(self._dataset.table_dataset.cont_idx) != 0:
-            new_x_table.append(x_table[:, self._cont_idx])
+            new_x_table.append(x_table[:, self._dataset.table_dataset.cont_idx])
 
         # We perform entity embeddings on categorical features
         if len(self._dataset.table_dataset.cat_idx) != 0:

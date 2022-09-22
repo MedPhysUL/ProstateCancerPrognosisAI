@@ -57,6 +57,7 @@ class TorchCustomModel(Module, ABC):
             path_to_model: str,
             alpha: float = 0,
             beta: float = 0,
+            calculate_epoch_score: bool = True,
             verbose: bool = False
     ) -> None:
         """
@@ -72,6 +73,8 @@ class TorchCustomModel(Module, ABC):
             L1 penalty coefficient.
         beta : float
             L2 penalty coefficient.
+        calculate_epoch_score : bool
+            Whether we want to calculate the score at each training epoch.
         verbose : bool
             True if we want to print the training progress.
         """
@@ -81,6 +84,7 @@ class TorchCustomModel(Module, ABC):
         # Settings of general protected attributes
         self._alpha = alpha
         self._beta = beta
+        self._calculate_epoch_score = calculate_epoch_score
         self._criterion = criterion
         self._dataset: Optional[ProstateCancerDataset] = None
         self._embedding_block = None
@@ -482,33 +486,6 @@ class TorchCustomModel(Module, ABC):
             path=save_path if save_path else self._path_to_model
         )
 
-    def losses(
-            self,
-            predictions: DataModel.y,
-            targets: DataModel.y
-    ) -> Dict[str, float]:
-        """
-        Returns the losses for all samples in a particular batch.
-
-        Parameters
-        ----------
-        predictions : DataModel.y
-            Batch data items.
-        targets : DataElement.y
-            Batch data items.
-
-        Returns
-        -------
-        losses : Dict[str, float]
-            Loss for each tasks.
-        """
-        with no_grad():
-            losses = {}
-            for task in self._tasks:
-                losses[task.name] = task.criterion(predictions[task.name], targets[task.name]).item()
-
-        return losses
-
     def scores(
             self,
             predictions: DataModel.y,
@@ -614,7 +591,7 @@ class TorchCustomModel(Module, ABC):
 
         # Set model for evaluation
         self.eval()
-        
+
         with no_grad():
             for x, targets in data_loader:
                 predictions = self.predict(x)
