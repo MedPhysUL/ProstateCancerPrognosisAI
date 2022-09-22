@@ -315,8 +315,9 @@ class TorchCustomModel(Module, ABC):
         for name, loss in losses.items():
             self._evaluations[mask_type].losses[name].append(loss)
 
-        for name, score in scores.items():
-            self._evaluations[mask_type].scores[name].append(score)
+        if self._calculate_epoch_score:
+            for name, score in scores.items():
+                self._evaluations[mask_type].scores[name].append(score)
 
     def fit(
             self,
@@ -473,10 +474,12 @@ class TorchCustomModel(Module, ABC):
                 train_history.append(train_loss)
                 valid_history.append(valid.losses[name])
                 progression_type.append(name)
-            for name, train_score in train.scores.items():
-                train_history.append(train_score)
-                valid_history.append(valid.scores[name])
-                progression_type.append(name)
+
+            if self._calculate_epoch_score:
+                for name, train_score in train.scores.items():
+                    train_history.append(train_score)
+                    valid_history.append(valid.scores[name])
+                    progression_type.append(name)
 
         # Figure construction
         visualize_epoch_progression(
