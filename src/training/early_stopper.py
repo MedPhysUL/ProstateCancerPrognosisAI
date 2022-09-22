@@ -27,11 +27,11 @@ class EarlyStopperType(Enum):
     """
     Custom enum for early stopper types.
     """
-    METRIC = "metric"
-    LOSS = "loss"
+    METRIC = "Metric"
+    MULTITASK_LOSS = "MultiTaskLoss"
 
     def __iter__(self):
-        return iter([self.METRIC, self.LOSS])
+        return iter([self.METRIC, self.MULTITASK_LOSS])
 
 
 class EarlyStopper(ABC):
@@ -127,7 +127,6 @@ class MetricEarlyStopper(EarlyStopper):
     ) -> None:
         """
         Sets protected attributes of early stopper and defines comparison methods according to the given tasks.
-
         Parameters
         ----------
         path_to_model : str
@@ -167,7 +166,6 @@ class MetricEarlyStopper(EarlyStopper):
     ) -> None:
         """
         Prints a message when early stopping occurs.
-
         Parameters
         ----------
         epoch : int
@@ -185,7 +183,6 @@ class MetricEarlyStopper(EarlyStopper):
     ) -> None:
         """
         Compares current best validation score against the given one and updates the EarlyStopper's attributes.
-
         Parameters
         ----------
         val_scores : List[float]
@@ -219,7 +216,7 @@ class MetricEarlyStopper(EarlyStopper):
             self.counter = 0
 
 
-class LossEarlyStopper(EarlyStopper):
+class MultiTaskLossEarlyStopper(EarlyStopper):
 
     def __init__(
             self,

@@ -9,7 +9,7 @@
 """
 
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from torch import save
 
@@ -26,7 +26,7 @@ class TorchWrapper(BaseModel):
 
     def __init__(
             self,
-            model_constructor: TorchCustomModel,
+            model_constructor: Callable,
             model_params: Dict[str, Any],
             train_params: Optional[Dict[str, Any]] = None
     ):
@@ -36,7 +36,7 @@ class TorchWrapper(BaseModel):
         Parameters
         ----------
         model_constructor : TorchCustomModel
-            Function used to create the classification model inheriting from TorchCustomModel.
+            Model inheriting from TorchCustomModel.
         model_params : Dict[str, Any]
             Parameters used to initialize the classification model inheriting from TorchCustomModel.
         train_params : Optional[Dict[str, Any]]
@@ -45,7 +45,7 @@ class TorchWrapper(BaseModel):
         # Initialization of model
         self._model_constructor = model_constructor
         self._model_params = model_params
-        self._model = None
+        self._model = self._model_constructor(**model_params)
 
         super().__init__(train_params=train_params)
 
@@ -65,11 +65,30 @@ class TorchWrapper(BaseModel):
         dataset: ProstateCancerDataset
             A dataset.
         """
-        # We set the tasks
-        self._tasks = dataset.tasks
-
         # Call the fit method
         self._model.fit(dataset, **self.train_params)
+
+    def losses(
+            self,
+            predictions: DataModel.y,
+            targets: DataModel.y
+    ) -> Dict[str, float]:
+        """
+        Returns the losses for all samples in a particular batch.
+
+        Parameters
+        ----------
+        predictions : DataModel.y
+            Batch data items.
+        targets : DataElement.y
+            Batch data items.
+
+        Returns
+        -------
+        losses : Dict[str, float]
+            Loss for each tasks.
+        """
+        return self._model.losses(predictions, targets)
 
     def plot_evaluations(
             self,
@@ -128,3 +147,61 @@ class TorchWrapper(BaseModel):
             list of hyperparameters
         """
         raise NotImplementedError
+
+    def scores(
+            self,
+            predictions: DataModel.y,
+            targets: DataModel.y
+    ) -> Dict[str, float]:
+        """
+        Returns the scores for all samples in a particular batch.
+
+        Parameters
+        ----------
+        predictions : DataModel.y
+            Batch data items.
+        targets : DataElement.y
+            Batch data items.
+
+        Returns
+        -------
+        scores : Dict[str, float]
+            Score for each tasks.
+        """
+        return self._model.scores(predictions, targets)
+
+    def scores_dataset(
+            self,
+            dataset: ProstateCancerDataset,
+            mask: List[int]
+    ) -> Dict[str, float]:
+        """
+        Returns the score of all samples in a particular subset of the dataset, determined using a mask parameter.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
+        mask : List[int]
+            A list of dataset idx for which we want to obtain the mean score.
+
+        Returns
+        -------
+        scores : Dict[str, float]
+            Score for each tasks.
+        """
+        return self._model.scores_dataset(dataset, mask)
+
+    def fix_thresholds_to_optimal_values(
+            self,
+            dataset: ProstateCancerDataset
+    ) -> None:
+        """
+        Fix all classification thresholds to their optimal values according to a given metric.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
+        """
+        return self._model.fix_thresholds_to_optimal_values(dataset)

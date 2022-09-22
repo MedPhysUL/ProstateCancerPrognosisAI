@@ -14,7 +14,7 @@
 
 
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from torch import mean, tensor, Tensor
 
@@ -41,16 +41,50 @@ class MultiTaskLoss(ABC):
         """
         # Protected attributes
         self._name = name
+        self._single_task_losses = None
         self._tasks = None
 
-    @abstractmethod
     def __call__(
             self,
-            *args,
-            **kwargs
+            predictions: DataModel.y,
+            targets: DataModel.y
     ) -> Tensor:
         """
         Gets loss value.
+
+        Parameters
+        ----------
+        predictions : DataModel.y
+            Batch data items.
+        targets : DataElement.y
+            Batch data items.
+
+        Returns
+        -------
+        loss : Tensor
+            (1, 1) tensor.
+        """
+        losses = {task.name: task.criterion(predictions[task.name], targets[task.name]) for task in self._tasks}
+        self._single_task_losses = {name: loss.item() for name, loss in losses.items()}
+
+        return self._compute_loss(losses)
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @abstractmethod
+    def _compute_loss(
+            self,
+            single_task_losses: Dict[str, Tensor]
+    ) -> Tensor:
+        """
+        Gets loss value.
+
+        Parameters
+        ----------
+        single_task_losses : Dict[str, Tensor]
+            Dictionary of single task losses.
 
         Returns
         -------
@@ -60,8 +94,8 @@ class MultiTaskLoss(ABC):
         raise NotImplementedError
 
     @property
-    def name(self) -> str:
-        return self._name
+    def single_task_losses(self) -> Optional[Dict[str, float]]:
+        return self._single_task_losses
 
     @property
     def tasks(self) -> Optional[List[Task]]:
@@ -85,25 +119,21 @@ class MeanLoss(MultiTaskLoss):
         """
         super().__init__(name="MeanLoss")
 
-    @abstractmethod
-    def __call__(
+    def _compute_loss(
             self,
-            predictions: DataModel.y,
-            targets: DataModel.y
+            single_task_losses: Dict[str, Tensor]
     ) -> Tensor:
         """
         Gets loss value.
 
         Parameters
         ----------
-        predictions : DataModel.y
-            Batch data items.
-        targets : DataElement.y
-            Batch data items.
+        single_task_losses : Dict[str, Tensor]
+            Dictionary of single task losses.
 
         Returns
         -------
         loss : Tensor
             (1, 1) tensor.
         """
-        return mean(tensor([task.criterion(predictions[task.name], targets[task.name]) for task in self.tasks]))
+        return mean(tensor([single_task_losses[task.name] for task in self.tasks]))
