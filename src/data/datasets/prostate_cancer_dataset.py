@@ -64,11 +64,11 @@ class ProstateCancerDataset(Dataset):
         """
         if (image_dataset is None) and (table_dataset is None):
             raise AssertionError("At least one image dataset or one table dataset must be provided.")
-        elif table_dataset is None:
+        elif table_dataset is None or isinstance(table_dataset, EmptyDataset):
             self.table_dataset = EmptyDataset(DatasetType.TABLE)
             self.image_dataset = image_dataset
             self._n = len(image_dataset)
-        elif image_dataset is None:
+        elif image_dataset is None or isinstance(image_dataset, EmptyDataset):
             self.table_dataset = table_dataset
             self.image_dataset = EmptyDataset(DatasetType.IMAGE)
             self._n = len(table_dataset)
