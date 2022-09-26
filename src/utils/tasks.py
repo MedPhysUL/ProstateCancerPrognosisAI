@@ -44,7 +44,7 @@ class Task(ABC):
         Parameters
         ----------
         metric : Metric
-            A score metric.
+            A score metric. This metric is used for Optuna hyperparameters optimization.
         criterion : Optional[Callable]
             A loss function.
         """
@@ -87,7 +87,7 @@ class TableTask(Task, ABC):
         Parameters
         ----------
         metric : Metric
-            A score metric.
+            A score metric. This metric is used for Optuna hyperparameters optimization.
         target_col : str
             Name of the column containing the targets associated to this task.
         criterion : Optional[Union[BinaryClassificationLoss, RegressionLoss]]
@@ -119,7 +119,7 @@ class ClassificationTask(TableTask):
         Parameters
         ----------
         metric : BinaryClassificationMetric
-            A score metric.
+            A score metric. This metric is used for Optuna hyperparameters optimization.
         target_col : str
             Name of the column containing the targets associated to this task.
         criterion : Optional[BinaryClassificationLoss]
@@ -153,7 +153,7 @@ class RegressionTask(TableTask):
         Parameters
         ----------
         metric : RegressionMetric
-            A score metric.
+            A score metric. This metric is used for Optuna hyperparameters optimization.
         target_col : str
             Name of the column containing the targets associated to this task.
         criterion : Optional[RegressionLoss]
@@ -190,7 +190,7 @@ class SegmentationTask(Task):
         criterion : SegmentationLoss
             A loss function.
         metric : SegmentationMetric
-            A score metric.
+            A score metric. This metric is used for Optuna hyperparameters optimization.
         organ : str
             Segmented organ.
         modality : str
