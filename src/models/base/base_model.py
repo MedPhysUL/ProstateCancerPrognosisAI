@@ -132,8 +132,9 @@ class BaseModel(ABC):
     def scores(
             self,
             predictions: DataModel.y,
-            targets: DataModel.y
-    ) -> Dict[str, float]:
+            targets: DataModel.y,
+            include_evaluation_metrics: bool = False
+    ) -> Dict[str, Dict[str, float]]:
         """
         Returns the scores for all samples in a particular batch.
 
@@ -143,11 +144,13 @@ class BaseModel(ABC):
             Batch data items.
         targets : DataElement.y
             Batch data items.
+        include_evaluation_metrics: bool
+            Whether to fix the thresholds of evaluation metrics or not.
 
         Returns
         -------
-        scores : Dict[str, float]
-            Score for each tasks.
+        scores : Dict[str, Dict[str, float]]
+            Score for each tasks and each metrics.
         """
         raise NotImplementedError
 
@@ -155,8 +158,9 @@ class BaseModel(ABC):
     def scores_dataset(
             self,
             dataset: ProstateCancerDataset,
-            mask: List[int]
-    ) -> Dict[str, float]:
+            mask: List[int],
+            include_evaluation_metrics: bool = False
+    ) -> Dict[str, Dict[str, float]]:
         """
         Returns the score of all samples in a particular subset of the dataset, determined using a mask parameter.
 
@@ -166,11 +170,13 @@ class BaseModel(ABC):
             A prostate cancer dataset.
         mask : List[int]
             A list of dataset idx for which we want to obtain the mean score.
+        include_evaluation_metrics: bool
+            Whether to calculate the scores with the evaluation metrics or not.
 
         Returns
         -------
-        scores : Dict[str, float]
-            Score for each tasks.
+        scores : Dict[str, Dict[str, float]]
+            Score for each tasks and each metrics.
         """
         raise NotImplementedError
 
@@ -187,7 +193,7 @@ class BaseModel(ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
-        include_evaluation_metrics: bool = False
-            Whether to fix the thresholds of evaluation metrics or not.
+        include_evaluation_metrics: bool
+            Whether to calculate the scores with the evaluation metrics or not.
         """
         raise NotImplementedError

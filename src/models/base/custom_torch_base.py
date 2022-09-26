@@ -492,8 +492,9 @@ class TorchCustomModel(Module, ABC):
     def scores(
             self,
             predictions: DataModel.y,
-            targets: DataModel.y
-    ) -> Dict[str, float]:
+            targets: DataModel.y,
+            include_evaluation_metrics: bool = False
+    ) -> Dict[str, Dict[str, float]]:
         """
         Returns the scores for all samples in a particular batch.
 
@@ -503,24 +504,34 @@ class TorchCustomModel(Module, ABC):
             Batch data items.
         targets : DataElement.y
             Batch data items.
+        include_evaluation_metrics: bool
+            Whether to calculate the scores with the evaluation metrics or not.
 
         Returns
         -------
-        scores : Dict[str, float]
-            Score for each tasks.
+        scores : Dict[str, Dict[str, float]]
+            Score for each tasks and each metrics.
         """
         with no_grad():
             scores = {}
             for task in self._tasks:
-                scores[task.name] = task.optimization_metric(predictions[task.name], targets[task.name])
+                scores[task.name] = {}
+                metrics = [task.optimization_metric]
+
+                if include_evaluation_metrics and task.evaluation_metrics:
+                    metrics = metrics + task.evaluation_metrics
+
+                for metric in metrics:
+                    scores[task.name][metric.name] = metric(predictions[task.name], targets[task.name])
 
         return scores
 
     def scores_dataset(
             self,
             dataset: ProstateCancerDataset,
-            mask: List[int]
-    ) -> Dict[str, float]:
+            mask: List[int],
+            include_evaluation_metrics: bool = False
+    ) -> Dict[str, Dict[str, float]]:
         """
         Returns the score of all samples in a particular subset of the dataset, determined using a mask parameter.
 
@@ -530,19 +541,30 @@ class TorchCustomModel(Module, ABC):
             A prostate cancer dataset.
         mask : List[int]
             A list of dataset idx for which we want to obtain the mean score.
+        include_evaluation_metrics: bool
+            Whether to calculate the scores with the evaluation metrics or not.
 
         Returns
         -------
-        scores : Dict[str, float]
-            Score for each tasks.
+        scores : Dict[str, Dict[str, float]]
+            Score for each tasks and each metrics.
         """
         subset = dataset[mask]
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
 
-        scores = {}
-        segmentation_scores_dict = {
-            task.name: [] for task in self.tasks if task.task_type == TaskType.SEGMENTATION
-        }
+        scores = {task.name: {} for task in self.tasks}
+        segmentation_scores_dict = {}
+        for task in self.tasks:
+            if task.task_type == TaskType.SEGMENTATION:
+                segmentation_scores_dict[task.name] = {}
+
+                metrics = [task.optimization_metric]
+                if include_evaluation_metrics and task.evaluation_metrics:
+                    metrics = metrics + task.evaluation_metrics
+
+                for metric in metrics:
+                    segmentation_scores_dict[task.name][metric.name] = []
+
         non_segmentation_outputs_dict = {
             task.name: Output() for task in self.tasks if task.task_type != TaskType.SEGMENTATION
         }
@@ -558,17 +580,32 @@ class TorchCustomModel(Module, ABC):
                     pred, target = predictions[task.name], targets[task.name]
 
                     if task.task_type == TaskType.SEGMENTATION:
-                        segmentation_scores_dict[task.name].append(task.optimization_metric(pred, target, MetricReduction.NONE))
+                        metrics = [task.optimization_metric]
+                        if include_evaluation_metrics and task.evaluation_metrics:
+                            metrics = metrics + task.evaluation_metrics
+
+                        for metric in metrics:
+                            segmentation_scores_dict[task.name][metric.name].append(
+                                metric(pred, target, MetricReduction.NONE)
+                            )
                     else:
                         non_segmentation_outputs_dict[task.name].predictions.append(pred)
                         non_segmentation_outputs_dict[task.name].targets.append(target)
 
             for task in self.tasks:
+                metrics = [task.optimization_metric]
+                if include_evaluation_metrics and task.evaluation_metrics:
+                    metrics = metrics + task.evaluation_metrics
+
                 if task.task_type == TaskType.SEGMENTATION:
-                    scores[task.name] = task.optimization_metric.perform_reduction(FloatTensor(segmentation_scores_dict[task.name]))
+                    for metric in metrics:
+                        scores[task.name][metric.name] = metric.perform_reduction(
+                            FloatTensor(segmentation_scores_dict[task.name][metric.name])
+                        )
                 else:
                     output = non_segmentation_outputs_dict[task.name]
-                    scores[task.name] = task.optimization_metric(output.predictions, output.targets)
+                    for metric in metrics:
+                        scores[task.name][metric.name] = metric(output.predictions, output.targets)
 
         return scores
 
