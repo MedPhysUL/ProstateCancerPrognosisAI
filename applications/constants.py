@@ -72,5 +72,10 @@ COLUMNS_TYPES = {
 MODALITIES = {"CT"}
 
 # TASKS
-TABLE_TASKS = [ClassificationTask(target_col=PN, metric=AUC()), ClassificationTask(target_col=BCR, metric=AUC())]
-IMAGE_TASKS = [SegmentationTask(criterion=DICELoss(), metric=DICEMetric(), organ="Prostate", modality="CT")]
+TABLE_TASKS = [
+    ClassificationTask(target_col=PN, optimization_metric=AUC()),
+    ClassificationTask(target_col=BCR, optimization_metric=AUC())
+]
+IMAGE_TASKS = [
+    SegmentationTask(criterion=DICELoss(), optimization_metric=DICEMetric(), organ="Prostate", modality="CT")
+]

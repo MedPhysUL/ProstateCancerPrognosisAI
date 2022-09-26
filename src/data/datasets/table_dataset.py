@@ -550,8 +550,8 @@ class TableDataset(Dataset):
         """
         for idx, task in enumerate(self.tasks):
             if task.task_type == TaskType.CLASSIFICATION:
-                scaling_factor = task.metric.get_scaling_factor(y_train=self.y[self.train_mask, idx])
-                task.metric.scaling_factor = scaling_factor
+                scaling_factor = task.optimization_metric.get_scaling_factor(y_train=self.y[self.train_mask, idx])
+                task.optimization_metric.scaling_factor = scaling_factor
 
                 if task.criterion:
                     task.criterion.scaling_factor = scaling_factor

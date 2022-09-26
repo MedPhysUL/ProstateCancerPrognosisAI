@@ -35,7 +35,7 @@ class Task(ABC):
 
     def __init__(
             self,
-            metric: Metric,
+            optimization_metric: Metric,
             criterion: Optional[Loss] = None
     ):
         """
@@ -43,12 +43,12 @@ class Task(ABC):
 
         Parameters
         ----------
-        metric : Metric
+        optimization_metric : Metric
             A score metric. This metric is used for Optuna hyperparameters optimization.
         criterion : Optional[Callable]
             A loss function.
         """
-        self._metric = metric
+        self._optimization_metric = optimization_metric
         self._criterion = criterion
 
     @property
@@ -56,8 +56,8 @@ class Task(ABC):
         return self._criterion
 
     @property
-    def metric(self) -> Metric:
-        return self._metric
+    def optimization_metric(self) -> Metric:
+        return self._optimization_metric
 
     @property
     @abstractmethod
@@ -77,7 +77,7 @@ class TableTask(Task, ABC):
 
     def __init__(
             self,
-            metric: Metric,
+            optimization_metric: Metric,
             target_col: str,
             criterion: Optional[Union[BinaryClassificationLoss, RegressionLoss]] = None
     ):
@@ -86,7 +86,7 @@ class TableTask(Task, ABC):
 
         Parameters
         ----------
-        metric : Metric
+        optimization_metric : Metric
             A score metric. This metric is used for Optuna hyperparameters optimization.
         target_col : str
             Name of the column containing the targets associated to this task.
@@ -95,7 +95,7 @@ class TableTask(Task, ABC):
         """
         self._target_col = target_col
 
-        super().__init__(criterion=criterion, metric=metric)
+        super().__init__(criterion=criterion, optimization_metric=optimization_metric)
 
     @property
     def target_col(self) -> str:
@@ -109,7 +109,7 @@ class ClassificationTask(TableTask):
 
     def __init__(
             self,
-            metric: BinaryClassificationMetric,
+            optimization_metric: BinaryClassificationMetric,
             target_col: str,
             criterion: Optional[BinaryClassificationLoss] = None
     ):
@@ -118,14 +118,14 @@ class ClassificationTask(TableTask):
 
         Parameters
         ----------
-        metric : BinaryClassificationMetric
+        optimization_metric : BinaryClassificationMetric
             A score metric. This metric is used for Optuna hyperparameters optimization.
         target_col : str
             Name of the column containing the targets associated to this task.
         criterion : Optional[BinaryClassificationLoss]
             A loss function.
         """
-        super().__init__(metric=metric, target_col=target_col, criterion=criterion)
+        super().__init__(optimization_metric=optimization_metric, target_col=target_col, criterion=criterion)
 
     @property
     def name(self) -> str:
@@ -143,7 +143,7 @@ class RegressionTask(TableTask):
 
     def __init__(
             self,
-            metric: RegressionMetric,
+            optimization_metric: RegressionMetric,
             target_col: str,
             criterion: Optional[RegressionLoss] = None
     ):
@@ -152,14 +152,14 @@ class RegressionTask(TableTask):
 
         Parameters
         ----------
-        metric : RegressionMetric
+        optimization_metric : RegressionMetric
             A score metric. This metric is used for Optuna hyperparameters optimization.
         target_col : str
             Name of the column containing the targets associated to this task.
         criterion : Optional[RegressionLoss]
             A loss function.
         """
-        super().__init__(metric=metric, target_col=target_col, criterion=criterion)
+        super().__init__(optimization_metric=optimization_metric, target_col=target_col, criterion=criterion)
 
     @property
     def name(self) -> str:
@@ -178,7 +178,7 @@ class SegmentationTask(Task):
     def __init__(
             self,
             criterion: SegmentationLoss,
-            metric: SegmentationMetric,
+            optimization_metric: SegmentationMetric,
             organ: str,
             modality: str
     ):
@@ -189,7 +189,7 @@ class SegmentationTask(Task):
         ----------
         criterion : SegmentationLoss
             A loss function.
-        metric : SegmentationMetric
+        optimization_metric : SegmentationMetric
             A score metric. This metric is used for Optuna hyperparameters optimization.
         organ : str
             Segmented organ.
@@ -198,7 +198,7 @@ class SegmentationTask(Task):
         """
         self._organ = organ
         self._modality = modality
-        super().__init__(criterion=criterion, metric=metric)
+        super().__init__(criterion=criterion, optimization_metric=optimization_metric)
 
     @property
     def organ(self) -> str:

@@ -140,7 +140,7 @@ class TorchCustomModel(Module, ABC):
         for i in [MaskType.TRAIN, MaskType.VALID]:
             self._evaluations[i] = Evaluation(
                 losses=dict(**{self._criterion.name: []}, **{task.criterion.name: [] for task in self._tasks}),
-                scores={task.metric.name: [] for task in self._tasks}
+                scores={task.optimization_metric.name: [] for task in self._tasks}
             )
 
     @staticmethod
@@ -512,7 +512,7 @@ class TorchCustomModel(Module, ABC):
         with no_grad():
             scores = {}
             for task in self._tasks:
-                scores[task.name] = task.metric(predictions[task.name], targets[task.name])
+                scores[task.name] = task.optimization_metric(predictions[task.name], targets[task.name])
 
         return scores
 
@@ -558,17 +558,17 @@ class TorchCustomModel(Module, ABC):
                     pred, target = predictions[task.name], targets[task.name]
 
                     if task.task_type == TaskType.SEGMENTATION:
-                        segmentation_scores_dict[task.name].append(task.metric(pred, target, MetricReduction.NONE))
+                        segmentation_scores_dict[task.name].append(task.optimization_metric(pred, target, MetricReduction.NONE))
                     else:
                         non_segmentation_outputs_dict[task.name].predictions.append(pred)
                         non_segmentation_outputs_dict[task.name].targets.append(target)
 
             for task in self.tasks:
                 if task.task_type == TaskType.SEGMENTATION:
-                    scores[task.name] = task.metric.perform_reduction(FloatTensor(segmentation_scores_dict[task.name]))
+                    scores[task.name] = task.optimization_metric.perform_reduction(FloatTensor(segmentation_scores_dict[task.name]))
                 else:
                     output = non_segmentation_outputs_dict[task.name]
-                    scores[task.name] = task.metric(output.predictions, output.targets)
+                    scores[task.name] = task.optimization_metric(output.predictions, output.targets)
 
         return scores
 
@@ -607,13 +607,13 @@ class TorchCustomModel(Module, ABC):
 
             for task in classification_tasks:
                 output = outputs_dict[task.name]
-                scores = np.array([task.metric(output.predictions, output.targets, t) for t in thresholds])
+                scores = np.array([task.optimization_metric(output.predictions, output.targets, t) for t in thresholds])
 
                 # We set the threshold to the optimal threshold
-                if task.metric.direction == Direction.MINIMIZE.value:
-                    task.metric.threshold = thresholds[np.argmin(scores)]
+                if task.optimization_metric.direction == Direction.MINIMIZE.value:
+                    task.optimization_metric.threshold = thresholds[np.argmin(scores)]
                 else:
-                    task.metric.threshold = thresholds[np.argmax(scores)]
+                    task.optimization_metric.threshold = thresholds[np.argmax(scores)]
 
     @staticmethod
     def _create_train_dataloader(

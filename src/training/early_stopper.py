@@ -155,7 +155,7 @@ class MetricEarlyStopper(EarlyStopper):
     def tasks(self, tasks: List[Task]):
         if not self._best_val_scores:
             self._best_val_scores = [
-                np.inf if t.metric.direction == Direction.MINIMIZE.value else -np.inf for t in tasks
+                np.inf if t.optimization_metric.direction == Direction.MINIMIZE.value else -np.inf for t in tasks
             ]
 
         self._tasks = tasks
@@ -174,7 +174,7 @@ class MetricEarlyStopper(EarlyStopper):
         print(f"\nEarly stopping occurred at epoch {epoch} with best_epoch = {epoch - self.patience}")
 
         for score, task in zip(self.best_val_scores, self._tasks):
-            print(f"Task ({task.name}) (metric {task.metric.name}), Score :{round(score, 4)}")
+            print(f"Task ({task.name}) (metric {task.optimization_metric.name}), Score :{round(score, 4)}")
 
     def __call__(
             self,
@@ -192,7 +192,7 @@ class MetricEarlyStopper(EarlyStopper):
         """
         new_scores_is_better = []
         for i, task, val_score, best_score in enumerate(zip(self._tasks, val_scores, self._best_val_scores)):
-            if task.metric.direction == Direction.MINIMIZE.value:
+            if task.optimization_metric.direction == Direction.MINIMIZE.value:
                 new_score_is_better = val_score < best_score
             else:
                 new_score_is_better = val_score > best_score
