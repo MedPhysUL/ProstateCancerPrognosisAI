@@ -10,7 +10,7 @@
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 from src.utils.score_metrics import BinaryClassificationMetric, Metric, RegressionMetric, SegmentationMetric
 from src.utils.losses import BinaryClassificationLoss, Loss, RegressionLoss, SegmentationLoss
@@ -36,7 +36,8 @@ class Task(ABC):
     def __init__(
             self,
             optimization_metric: Metric,
-            criterion: Optional[Loss] = None
+            criterion: Optional[Loss] = None,
+            evaluation_metrics: List[Metric] = None
     ):
         """
         Sets protected attributes.
@@ -47,13 +48,20 @@ class Task(ABC):
             A score metric. This metric is used for Optuna hyperparameters optimization.
         criterion : Optional[Callable]
             A loss function.
+        evaluation_metrics : List[Metric]
+            A list of metrics to evaluate the trained models.
         """
         self._optimization_metric = optimization_metric
         self._criterion = criterion
+        self._evaluation_metrics = evaluation_metrics
 
     @property
     def criterion(self) -> Optional[Loss]:
         return self._criterion
+
+    @property
+    def evaluation_metrics(self) -> Optional[Metric]:
+        return self._evaluation_metrics
 
     @property
     def optimization_metric(self) -> Metric:
@@ -79,7 +87,8 @@ class TableTask(Task, ABC):
             self,
             optimization_metric: Metric,
             target_col: str,
-            criterion: Optional[Union[BinaryClassificationLoss, RegressionLoss]] = None
+            criterion: Optional[Union[BinaryClassificationLoss, RegressionLoss]] = None,
+            evaluation_metrics: List[Metric] = None
     ):
         """
         Sets protected attributes.
@@ -92,10 +101,16 @@ class TableTask(Task, ABC):
             Name of the column containing the targets associated to this task.
         criterion : Optional[Union[BinaryClassificationLoss, RegressionLoss]]
             A loss function.
+        evaluation_metrics : List[Metric]
+            A list of metrics to evaluate the trained models.
         """
         self._target_col = target_col
 
-        super().__init__(criterion=criterion, optimization_metric=optimization_metric)
+        super().__init__(
+            criterion=criterion,
+            optimization_metric=optimization_metric,
+            evaluation_metrics=evaluation_metrics
+        )
 
     @property
     def target_col(self) -> str:
@@ -111,7 +126,8 @@ class ClassificationTask(TableTask):
             self,
             optimization_metric: BinaryClassificationMetric,
             target_col: str,
-            criterion: Optional[BinaryClassificationLoss] = None
+            criterion: Optional[BinaryClassificationLoss] = None,
+            evaluation_metrics: List[BinaryClassificationMetric] = None
     ):
         """
         Sets protected attributes.
@@ -124,8 +140,15 @@ class ClassificationTask(TableTask):
             Name of the column containing the targets associated to this task.
         criterion : Optional[BinaryClassificationLoss]
             A loss function.
+        evaluation_metrics : List[BinaryClassificationMetric]
+            A list of metrics to evaluate the trained models.
         """
-        super().__init__(optimization_metric=optimization_metric, target_col=target_col, criterion=criterion)
+        super().__init__(
+            optimization_metric=optimization_metric,
+            target_col=target_col,
+            criterion=criterion,
+            evaluation_metrics=evaluation_metrics
+        )
 
     @property
     def name(self) -> str:
@@ -145,7 +168,8 @@ class RegressionTask(TableTask):
             self,
             optimization_metric: RegressionMetric,
             target_col: str,
-            criterion: Optional[RegressionLoss] = None
+            criterion: Optional[RegressionLoss] = None,
+            evaluation_metrics: List[RegressionMetric] = None
     ):
         """
         Sets protected attributes.
@@ -158,8 +182,15 @@ class RegressionTask(TableTask):
             Name of the column containing the targets associated to this task.
         criterion : Optional[RegressionLoss]
             A loss function.
+        evaluation_metrics : List[RegressionMetric]
+            A list of metrics to evaluate the trained models.
         """
-        super().__init__(optimization_metric=optimization_metric, target_col=target_col, criterion=criterion)
+        super().__init__(
+            optimization_metric=optimization_metric,
+            target_col=target_col,
+            criterion=criterion,
+            evaluation_metrics=evaluation_metrics
+        )
 
     @property
     def name(self) -> str:
@@ -180,7 +211,8 @@ class SegmentationTask(Task):
             criterion: SegmentationLoss,
             optimization_metric: SegmentationMetric,
             organ: str,
-            modality: str
+            modality: str,
+            evaluation_metrics: List[SegmentationMetric] = None
     ):
         """
         Sets protected attributes.
@@ -195,10 +227,16 @@ class SegmentationTask(Task):
             Segmented organ.
         modality : str
             Modality on which segmentation was performed.
+        evaluation_metrics : List[SegmentationMetric]
+            A list of metrics to evaluate the trained models.
         """
         self._organ = organ
         self._modality = modality
-        super().__init__(criterion=criterion, optimization_metric=optimization_metric)
+        super().__init__(
+            criterion=criterion,
+            optimization_metric=optimization_metric,
+            evaluation_metrics=evaluation_metrics
+        )
 
     @property
     def organ(self) -> str:
