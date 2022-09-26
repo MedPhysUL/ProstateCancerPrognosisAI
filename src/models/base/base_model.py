@@ -114,6 +114,33 @@ class BaseModel(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def predict_dataset(
+            self,
+            dataset: ProstateCancerDataset,
+            mask: List[int],
+    ) -> DataModel.y:
+        """
+        Returns predictions for all samples in a particular subset of the dataset, determined using a mask parameter.
+        For classification tasks, it returns the probability of belonging to class 1. For regression tasks, it returns
+        the predicted real-valued target.
+
+        NOTE : It doesn't return segmentation map as it will bust the computer's RAM.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
+        mask : List[int]
+            A list of dataset idx for which we want to obtain the predictions.
+
+        Returns
+        -------
+        predictions : DataModel.y
+            Predictions (except segmentation map).
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def save_model(
             self,
             path: str
@@ -132,8 +159,9 @@ class BaseModel(ABC):
     def scores(
             self,
             predictions: DataModel.y,
-            targets: DataModel.y
-    ) -> Dict[str, float]:
+            targets: DataModel.y,
+            include_evaluation_metrics: bool = False
+    ) -> Dict[str, Dict[str, float]]:
         """
         Returns the scores for all samples in a particular batch.
 
@@ -143,11 +171,13 @@ class BaseModel(ABC):
             Batch data items.
         targets : DataElement.y
             Batch data items.
+        include_evaluation_metrics: bool
+            Whether to fix the thresholds of evaluation metrics or not.
 
         Returns
         -------
-        scores : Dict[str, float]
-            Score for each tasks.
+        scores : Dict[str, Dict[str, float]]
+            Score for each tasks and each metrics.
         """
         raise NotImplementedError
 
@@ -155,8 +185,9 @@ class BaseModel(ABC):
     def scores_dataset(
             self,
             dataset: ProstateCancerDataset,
-            mask: List[int]
-    ) -> Dict[str, float]:
+            mask: List[int],
+            include_evaluation_metrics: bool = False
+    ) -> Dict[str, Dict[str, float]]:
         """
         Returns the score of all samples in a particular subset of the dataset, determined using a mask parameter.
 
@@ -166,18 +197,21 @@ class BaseModel(ABC):
             A prostate cancer dataset.
         mask : List[int]
             A list of dataset idx for which we want to obtain the mean score.
+        include_evaluation_metrics: bool
+            Whether to calculate the scores with the evaluation metrics or not.
 
         Returns
         -------
-        scores : Dict[str, float]
-            Score for each tasks.
+        scores : Dict[str, Dict[str, float]]
+            Score for each tasks and each metrics.
         """
         raise NotImplementedError
 
     @abstractmethod
     def fix_thresholds_to_optimal_values(
             self,
-            dataset: ProstateCancerDataset
+            dataset: ProstateCancerDataset,
+            include_evaluation_metrics: bool = False
     ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
@@ -186,5 +220,7 @@ class BaseModel(ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
+        include_evaluation_metrics: bool
+            Whether to calculate the scores with the evaluation metrics or not.
         """
         raise NotImplementedError

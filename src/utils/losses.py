@@ -317,6 +317,36 @@ class BinaryClassificationLoss(Loss):
 
         return idx[0].tolist()
 
+    def get_scaling_factor(
+            self,
+            y_train: Union[np.array, Tensor]
+    ) -> float:
+        """
+        Computes the scaling factor that needs to be apply to the weight of samples in the class 1.
+
+        We need to find alpha that satisfies :
+            (alpha*n1)/n0 = w/(1-w)
+        Which gives the solution:
+            alpha = w*n0/(1-w)*n1
+
+        Parameters
+        ----------
+        y_train : Union[Tensor, np.array]
+            (N_train, ) tensor or array with targets used for training.
+
+        Returns
+        -------
+        scaling_factor : float
+            Positive scaling factors.
+        """
+        y_train = y_train[self.get_idx_of_nonmissing_targets(y_train)]
+
+        # Otherwise we return samples' weights in the appropriate format
+        n1 = y_train.sum()              # number of samples with label 1
+        n0 = y_train.shape[0] - n1      # number of samples with label 0
+
+        return (n0/n1)*(self.weight/(1-self.weight))
+
     @staticmethod
     def convert_to_tensors(
             pred: Union[np.array, Tensor],

@@ -278,7 +278,9 @@ class Objective:
 
             # We calculate the scores on the different tasks
             test_set_scores = model.score_dataset(dataset=dts, mask=dts.test_mask)
-            scores = list(test_set_scores.values())
+
+            # We retrieve the score associated to the optimization metric
+            scores = [test_set_scores[task.name][task.optimization_metric.name] for task in dts.tasks]
 
             return scores
 
@@ -380,7 +382,7 @@ class Tuner:
         study : Study
             Study object.
         """
-        directions = [task.metric.direction for task in self._objective.dataset.tasks]
+        directions = [task.optimization_metric.direction for task in self._objective.dataset.tasks]
 
         study = create_study(
             directions=directions,

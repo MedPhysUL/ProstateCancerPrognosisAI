@@ -10,7 +10,7 @@
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 from src.utils.score_metrics import BinaryClassificationMetric, Metric, RegressionMetric, SegmentationMetric
 from src.utils.losses import BinaryClassificationLoss, Loss, RegressionLoss, SegmentationLoss
@@ -35,29 +35,37 @@ class Task(ABC):
 
     def __init__(
             self,
-            metric: Metric,
-            criterion: Optional[Loss] = None
+            optimization_metric: Metric,
+            criterion: Optional[Loss] = None,
+            evaluation_metrics: List[Metric] = None
     ):
         """
         Sets protected attributes.
 
         Parameters
         ----------
-        metric : Metric
-            A score metric.
+        optimization_metric : Metric
+            A score metric. This metric is used for Optuna hyperparameters optimization.
         criterion : Optional[Callable]
             A loss function.
+        evaluation_metrics : List[Metric]
+            A list of metrics to evaluate the trained models.
         """
-        self._metric = metric
+        self._optimization_metric = optimization_metric
         self._criterion = criterion
+        self._evaluation_metrics = evaluation_metrics
 
     @property
     def criterion(self) -> Optional[Loss]:
         return self._criterion
 
     @property
-    def metric(self) -> Metric:
-        return self._metric
+    def evaluation_metrics(self) -> Optional[List[Metric]]:
+        return self._evaluation_metrics
+
+    @property
+    def optimization_metric(self) -> Metric:
+        return self._optimization_metric
 
     @property
     @abstractmethod
@@ -77,25 +85,32 @@ class TableTask(Task, ABC):
 
     def __init__(
             self,
-            metric: Metric,
+            optimization_metric: Metric,
             target_col: str,
-            criterion: Optional[Union[BinaryClassificationLoss, RegressionLoss]] = None
+            criterion: Optional[Union[BinaryClassificationLoss, RegressionLoss]] = None,
+            evaluation_metrics: List[Metric] = None
     ):
         """
         Sets protected attributes.
 
         Parameters
         ----------
-        metric : Metric
-            A score metric.
+        optimization_metric : Metric
+            A score metric. This metric is used for Optuna hyperparameters optimization.
         target_col : str
             Name of the column containing the targets associated to this task.
         criterion : Optional[Union[BinaryClassificationLoss, RegressionLoss]]
             A loss function.
+        evaluation_metrics : List[Metric]
+            A list of metrics to evaluate the trained models.
         """
         self._target_col = target_col
 
-        super().__init__(criterion=criterion, metric=metric)
+        super().__init__(
+            criterion=criterion,
+            optimization_metric=optimization_metric,
+            evaluation_metrics=evaluation_metrics
+        )
 
     @property
     def target_col(self) -> str:
@@ -109,23 +124,31 @@ class ClassificationTask(TableTask):
 
     def __init__(
             self,
-            metric: BinaryClassificationMetric,
+            optimization_metric: BinaryClassificationMetric,
             target_col: str,
-            criterion: Optional[BinaryClassificationLoss] = None
+            criterion: Optional[BinaryClassificationLoss] = None,
+            evaluation_metrics: List[BinaryClassificationMetric] = None
     ):
         """
         Sets protected attributes.
 
         Parameters
         ----------
-        metric : BinaryClassificationMetric
-            A score metric.
+        optimization_metric : BinaryClassificationMetric
+            A score metric. This metric is used for Optuna hyperparameters optimization.
         target_col : str
             Name of the column containing the targets associated to this task.
         criterion : Optional[BinaryClassificationLoss]
             A loss function.
+        evaluation_metrics : List[BinaryClassificationMetric]
+            A list of metrics to evaluate the trained models.
         """
-        super().__init__(metric=metric, target_col=target_col, criterion=criterion)
+        super().__init__(
+            optimization_metric=optimization_metric,
+            target_col=target_col,
+            criterion=criterion,
+            evaluation_metrics=evaluation_metrics
+        )
 
     @property
     def name(self) -> str:
@@ -143,23 +166,31 @@ class RegressionTask(TableTask):
 
     def __init__(
             self,
-            metric: RegressionMetric,
+            optimization_metric: RegressionMetric,
             target_col: str,
-            criterion: Optional[RegressionLoss] = None
+            criterion: Optional[RegressionLoss] = None,
+            evaluation_metrics: List[RegressionMetric] = None
     ):
         """
         Sets protected attributes.
 
         Parameters
         ----------
-        metric : RegressionMetric
-            A score metric.
+        optimization_metric : RegressionMetric
+            A score metric. This metric is used for Optuna hyperparameters optimization.
         target_col : str
             Name of the column containing the targets associated to this task.
         criterion : Optional[RegressionLoss]
             A loss function.
+        evaluation_metrics : List[RegressionMetric]
+            A list of metrics to evaluate the trained models.
         """
-        super().__init__(metric=metric, target_col=target_col, criterion=criterion)
+        super().__init__(
+            optimization_metric=optimization_metric,
+            target_col=target_col,
+            criterion=criterion,
+            evaluation_metrics=evaluation_metrics
+        )
 
     @property
     def name(self) -> str:
@@ -178,9 +209,10 @@ class SegmentationTask(Task):
     def __init__(
             self,
             criterion: SegmentationLoss,
-            metric: SegmentationMetric,
+            optimization_metric: SegmentationMetric,
             organ: str,
-            modality: str
+            modality: str,
+            evaluation_metrics: List[SegmentationMetric] = None
     ):
         """
         Sets protected attributes.
@@ -189,16 +221,22 @@ class SegmentationTask(Task):
         ----------
         criterion : SegmentationLoss
             A loss function.
-        metric : SegmentationMetric
-            A score metric.
+        optimization_metric : SegmentationMetric
+            A score metric. This metric is used for Optuna hyperparameters optimization.
         organ : str
             Segmented organ.
         modality : str
             Modality on which segmentation was performed.
+        evaluation_metrics : List[SegmentationMetric]
+            A list of metrics to evaluate the trained models.
         """
         self._organ = organ
         self._modality = modality
-        super().__init__(criterion=criterion, metric=metric)
+        super().__init__(
+            criterion=criterion,
+            optimization_metric=optimization_metric,
+            evaluation_metrics=evaluation_metrics
+        )
 
     @property
     def organ(self) -> str:

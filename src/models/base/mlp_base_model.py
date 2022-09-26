@@ -135,7 +135,11 @@ class MLPBaseModel(TorchCustomModel):
         if self._calculate_epoch_score:
             # We get the scores values
             self.fix_thresholds_to_optimal_values(dataset=self._dataset)
-            epoch_scores = self.scores_dataset(dataset=self._dataset, mask=self._dataset.train_mask)
+            scores = self.scores_dataset(dataset=self._dataset, mask=self._dataset.train_mask)
+            epoch_scores = {
+                f"{task.name}_{task.optimization_metric.name}": scores[task.name][task.optimization_metric.name]
+                for task in self._dataset.tasks
+            }
         else:
             epoch_scores = {}
 
@@ -190,7 +194,11 @@ class MLPBaseModel(TorchCustomModel):
         epoch_losses = {name: np.mean(loss) for name, loss in epoch_losses.items()}
 
         if self._calculate_epoch_score:
-            epoch_scores = self.scores_dataset(dataset=self._dataset, mask=self._dataset.valid_mask)
+            scores = self.scores_dataset(dataset=self._dataset, mask=self._dataset.valid_mask)
+            epoch_scores = {
+                f"{task.name}_{task.optimization_metric.name}": scores[task.name][task.optimization_metric.name]
+                for task in self._dataset.tasks
+            }
         else:
             epoch_scores = {}
 

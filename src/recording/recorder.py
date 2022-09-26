@@ -198,6 +198,7 @@ class Recorder:
     def record_scores(
             self,
             score: float,
+            task: str,
             metric: str,
             mask_type: str = MaskType.TRAIN
     ) -> None:
@@ -208,6 +209,8 @@ class Recorder:
         ----------
         score : float
             Metric score.
+        task : str
+            Name of the task.
         metric : str
             Name of the metric.
         mask_type : str
@@ -216,8 +219,11 @@ class Recorder:
         # We find the proper section name
         section = Recorder.MASK_TO_SECTION[METRICS][mask_type]
 
+        if not (task in self._data[section]):
+            self._data[section][task] = {}
+
         # We save the score of the given metric
-        self._data[section][metric] = round(score, 6)
+        self._data[section][task][metric] = round(score, 6)
 
     def record_predictions(
             self,

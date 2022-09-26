@@ -17,7 +17,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 # from dgl import DGLGraph
 from monai.data import DataLoader
 import numpy as np
-from torch import FloatTensor, no_grad, tensor, Tensor
+from torch import FloatTensor, no_grad, stack, tensor, Tensor
 from torch.nn import BatchNorm1d, Module
 from torch.optim import Adam
 from torch.utils.data import SubsetRandomSampler
@@ -140,7 +140,7 @@ class TorchCustomModel(Module, ABC):
         for i in [MaskType.TRAIN, MaskType.VALID]:
             self._evaluations[i] = Evaluation(
                 losses=dict(**{self._criterion.name: []}, **{task.criterion.name: [] for task in self._tasks}),
-                scores={task.metric.name: [] for task in self._tasks}
+                scores={task.optimization_metric.name: [] for task in self._tasks}
             )
 
     @staticmethod
@@ -456,6 +456,47 @@ class TorchCustomModel(Module, ABC):
         """
         raise NotImplementedError
 
+    def predict_dataset(
+            self,
+            dataset: ProstateCancerDataset,
+            mask: List[int],
+    ) -> DataModel.y:
+        """
+        Returns predictions for all samples in a particular subset of the dataset, determined using a mask parameter.
+        For classification tasks, it returns the probability of belonging to class 1. For regression tasks, it returns
+        the predicted real-valued target.
+
+        NOTE : It doesn't return segmentation map as it will bust the computer's RAM.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
+        mask : List[int]
+            A list of dataset idx for which we want to obtain the predictions.
+
+        Returns
+        -------
+        predictions : DataModel.y
+            Predictions (except segmentation map).
+        """
+        subset = dataset[mask]
+        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
+
+        predictions = {}
+        with no_grad():
+            for idx, (x, _) in enumerate(data_loader):
+                pred = self.predict(x)
+
+                for task in dataset.tasks:
+                    if task.task_type != TaskType.SEGMENTATION:
+                        if idx == 0:
+                            predictions[task.name] = pred[task.name]
+                        else:
+                            predictions[task.name] = stack([predictions[task.name], pred[task.name]], dim=0)
+
+        return predictions
+
     def plot_evaluations(
             self,
             save_path: Optional[str] = None
@@ -492,8 +533,9 @@ class TorchCustomModel(Module, ABC):
     def scores(
             self,
             predictions: DataModel.y,
-            targets: DataModel.y
-    ) -> Dict[str, float]:
+            targets: DataModel.y,
+            include_evaluation_metrics: bool = False
+    ) -> Dict[str, Dict[str, float]]:
         """
         Returns the scores for all samples in a particular batch.
 
@@ -503,24 +545,34 @@ class TorchCustomModel(Module, ABC):
             Batch data items.
         targets : DataElement.y
             Batch data items.
+        include_evaluation_metrics: bool
+            Whether to calculate the scores with the evaluation metrics or not.
 
         Returns
         -------
-        scores : Dict[str, float]
-            Score for each tasks.
+        scores : Dict[str, Dict[str, float]]
+            Score for each tasks and each metrics.
         """
         with no_grad():
             scores = {}
             for task in self._tasks:
-                scores[task.name] = task.metric(predictions[task.name], targets[task.name])
+                scores[task.name] = {}
+                metrics = [task.optimization_metric]
+
+                if include_evaluation_metrics and task.evaluation_metrics:
+                    metrics = metrics + task.evaluation_metrics
+
+                for metric in metrics:
+                    scores[task.name][metric.name] = metric(predictions[task.name], targets[task.name])
 
         return scores
 
     def scores_dataset(
             self,
             dataset: ProstateCancerDataset,
-            mask: List[int]
-    ) -> Dict[str, float]:
+            mask: List[int],
+            include_evaluation_metrics: bool = False
+    ) -> Dict[str, Dict[str, float]]:
         """
         Returns the score of all samples in a particular subset of the dataset, determined using a mask parameter.
 
@@ -530,19 +582,30 @@ class TorchCustomModel(Module, ABC):
             A prostate cancer dataset.
         mask : List[int]
             A list of dataset idx for which we want to obtain the mean score.
+        include_evaluation_metrics: bool
+            Whether to calculate the scores with the evaluation metrics or not.
 
         Returns
         -------
-        scores : Dict[str, float]
-            Score for each tasks.
+        scores : Dict[str, Dict[str, float]]
+            Score for each tasks and each metrics.
         """
         subset = dataset[mask]
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
 
-        scores = {}
-        segmentation_scores_dict = {
-            task.name: [] for task in self.tasks if task.task_type == TaskType.SEGMENTATION
-        }
+        scores = {task.name: {} for task in self.tasks}
+        segmentation_scores_dict = {}
+        for task in self.tasks:
+            if task.task_type == TaskType.SEGMENTATION:
+                segmentation_scores_dict[task.name] = {}
+
+                metrics = [task.optimization_metric]
+                if include_evaluation_metrics and task.evaluation_metrics:
+                    metrics = metrics + task.evaluation_metrics
+
+                for metric in metrics:
+                    segmentation_scores_dict[task.name][metric.name] = []
+
         non_segmentation_outputs_dict = {
             task.name: Output() for task in self.tasks if task.task_type != TaskType.SEGMENTATION
         }
@@ -558,23 +621,39 @@ class TorchCustomModel(Module, ABC):
                     pred, target = predictions[task.name], targets[task.name]
 
                     if task.task_type == TaskType.SEGMENTATION:
-                        segmentation_scores_dict[task.name].append(task.metric(pred, target, MetricReduction.NONE))
+                        metrics = [task.optimization_metric]
+                        if include_evaluation_metrics and task.evaluation_metrics:
+                            metrics = metrics + task.evaluation_metrics
+
+                        for metric in metrics:
+                            segmentation_scores_dict[task.name][metric.name].append(
+                                metric(pred, target, MetricReduction.NONE)
+                            )
                     else:
                         non_segmentation_outputs_dict[task.name].predictions.append(pred)
                         non_segmentation_outputs_dict[task.name].targets.append(target)
 
             for task in self.tasks:
+                metrics = [task.optimization_metric]
+                if include_evaluation_metrics and task.evaluation_metrics:
+                    metrics = metrics + task.evaluation_metrics
+
                 if task.task_type == TaskType.SEGMENTATION:
-                    scores[task.name] = task.metric.perform_reduction(FloatTensor(segmentation_scores_dict[task.name]))
+                    for metric in metrics:
+                        scores[task.name][metric.name] = metric.perform_reduction(
+                            FloatTensor(segmentation_scores_dict[task.name][metric.name])
+                        )
                 else:
                     output = non_segmentation_outputs_dict[task.name]
-                    scores[task.name] = task.metric(output.predictions, output.targets)
+                    for metric in metrics:
+                        scores[task.name][metric.name] = metric(output.predictions, output.targets)
 
         return scores
 
     def fix_thresholds_to_optimal_values(
             self,
-            dataset: ProstateCancerDataset
+            dataset: ProstateCancerDataset,
+            include_evaluation_metrics: bool = False
     ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
@@ -583,6 +662,8 @@ class TorchCustomModel(Module, ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
+        include_evaluation_metrics: bool
+            Whether to fix the thresholds of evaluation metrics or not.
         """
         subset = dataset[dataset.train_mask]
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
@@ -607,13 +688,21 @@ class TorchCustomModel(Module, ABC):
 
             for task in classification_tasks:
                 output = outputs_dict[task.name]
-                scores = np.array([task.metric(output.predictions, output.targets, t) for t in thresholds])
+                metrics = [task.optimization_metric]
 
-                # We set the threshold to the optimal threshold
-                if task.metric.direction == Direction.MINIMIZE.value:
-                    task.metric.threshold = thresholds[np.argmin(scores)]
-                else:
-                    task.metric.threshold = thresholds[np.argmax(scores)]
+                if include_evaluation_metrics and task.evaluation_metrics:
+                    metrics = metrics + task.evaluation_metrics
+
+                for metric in metrics:
+                    scores = np.array(
+                        [metric(output.predictions, output.targets, t) for t in thresholds]
+                    )
+
+                    # We set the threshold to the optimal threshold
+                    if metric.direction == Direction.MINIMIZE.value:
+                        metric.threshold = thresholds[np.argmin(scores)]
+                    else:
+                        metric.threshold = thresholds[np.argmax(scores)]
 
     @staticmethod
     def _create_train_dataloader(
