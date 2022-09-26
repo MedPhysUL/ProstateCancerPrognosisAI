@@ -19,10 +19,10 @@ import pandas as pd
 from torch import cat, from_numpy, stack, Tensor
 from torch.utils.data import Dataset
 
-from src.data.processing.transforms import CategoricalTransform as CaT
 from src.data.processing.preprocessing import preprocess_categoricals, preprocess_continuous
-from src.utils.tasks import ClassificationTask, TableTask, TaskType
 from src.data.processing.tools import MaskType
+from src.data.processing.transforms import CategoricalTransform as CaT
+from src.utils.tasks import ClassificationTask, TableTask, TaskType
 
 
 class TableDataModel(NamedTuple):
@@ -550,16 +550,18 @@ class TableDataset(Dataset):
         """
         for idx, task in enumerate(self.tasks):
             if task.task_type == TaskType.CLASSIFICATION:
-                if task.evaluation_metrics:
-                    for metric in [task.optimization_metric] + task.evaluation_metrics:
-                        scaling_factor = metric.get_scaling_factor(y_train=self.y[self.train_mask, idx])
-                        metric.scaling_factor = scaling_factor
-                else:
-                    scaling_factor = task.optimization_metric.get_scaling_factor(y_train=self.y[self.train_mask, idx])
-                    task.optimization_metric.scaling_factor = scaling_factor
+                # We set the scaling factors of all metrics
+                metrics = [task.optimization_metric]
+                metrics = metrics + task.evaluation_metrics if task.evaluation_metrics else metrics
 
+                for metric in metrics:
+                    scaling_factor = metric.get_scaling_factor(y_train=self.y[self.train_mask, idx])
+                    metric.scaling_factor = scaling_factor
+
+                # We set the scaling factor of the criterion
                 if task.criterion:
-                    task.criterion.scaling_factor = task.optimization_metric.scaling_factor
+                    scaling_factor = task.criterion.get_scaling_factor(y_train=self.y[self.train_mask, idx])
+                    task.criterion.scaling_factor = scaling_factor
 
     def _numerical_setter(
             self,
