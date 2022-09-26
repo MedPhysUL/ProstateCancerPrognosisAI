@@ -574,7 +574,8 @@ class TorchCustomModel(Module, ABC):
 
     def fix_thresholds_to_optimal_values(
             self,
-            dataset: ProstateCancerDataset
+            dataset: ProstateCancerDataset,
+            include_evaluation_metrics: bool = False
     ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
@@ -583,6 +584,8 @@ class TorchCustomModel(Module, ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
+        include_evaluation_metrics: bool
+            Whether to fix the thresholds of evaluation metrics or not.
         """
         subset = dataset[dataset.train_mask]
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
@@ -607,13 +610,21 @@ class TorchCustomModel(Module, ABC):
 
             for task in classification_tasks:
                 output = outputs_dict[task.name]
-                scores = np.array([task.optimization_metric(output.predictions, output.targets, t) for t in thresholds])
+                metrics = [task.optimization_metric]
 
-                # We set the threshold to the optimal threshold
-                if task.optimization_metric.direction == Direction.MINIMIZE.value:
-                    task.optimization_metric.threshold = thresholds[np.argmin(scores)]
-                else:
-                    task.optimization_metric.threshold = thresholds[np.argmax(scores)]
+                if include_evaluation_metrics and task.evaluation_metrics:
+                    metrics = metrics + task.evaluation_metrics
+
+                for metric in metrics:
+                    scores = np.array(
+                        [metric(output.predictions, output.targets, t) for t in thresholds]
+                    )
+
+                    # We set the threshold to the optimal threshold
+                    if metric.direction == Direction.MINIMIZE.value:
+                        metric.threshold = thresholds[np.argmin(scores)]
+                    else:
+                        metric.threshold = thresholds[np.argmax(scores)]
 
     @staticmethod
     def _create_train_dataloader(

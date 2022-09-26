@@ -177,7 +177,8 @@ class BaseModel(ABC):
     @abstractmethod
     def fix_thresholds_to_optimal_values(
             self,
-            dataset: ProstateCancerDataset
+            dataset: ProstateCancerDataset,
+            include_evaluation_metrics: bool = False
     ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
@@ -186,5 +187,7 @@ class BaseModel(ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
+        include_evaluation_metrics: bool = False
+            Whether to fix the thresholds of evaluation metrics or not.
         """
         raise NotImplementedError
