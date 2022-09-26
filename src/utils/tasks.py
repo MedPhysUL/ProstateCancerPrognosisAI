@@ -60,7 +60,7 @@ class Task(ABC):
         return self._criterion
 
     @property
-    def evaluation_metrics(self) -> Optional[Metric]:
+    def evaluation_metrics(self) -> Optional[List[Metric]]:
         return self._evaluation_metrics
 
     @property
