@@ -196,7 +196,7 @@ class TorchCustomModel(Module, ABC):
             self,
             x: DataModel.x,
             y: DataModel.y
-    ) -> Tuple[DataModel.y, float]:
+    ) -> Tuple[Dict[str, Tensor], float]:
         """
         Executes a weights update using Sharpness-Aware Minimization (SAM) optimizer.
 
@@ -240,7 +240,7 @@ class TorchCustomModel(Module, ABC):
             self,
             x: DataModel.x,
             y: DataModel.y
-    ) -> Tuple[DataModel.y, float]:
+    ) -> Tuple[Dict[str, Tensor], float]:
         """
         Executes a weights update without using Sharpness-Aware Minimization (SAM).
 
