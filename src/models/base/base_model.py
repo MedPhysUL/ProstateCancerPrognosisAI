@@ -114,6 +114,33 @@ class BaseModel(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def predict_dataset(
+            self,
+            dataset: ProstateCancerDataset,
+            mask: List[int],
+    ) -> DataModel.y:
+        """
+        Returns predictions for all samples in a particular subset of the dataset, determined using a mask parameter.
+        For classification tasks, it returns the probability of belonging to class 1. For regression tasks, it returns
+        the predicted real-valued target.
+
+        NOTE : It doesn't return segmentation map as it will bust the computer's RAM.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
+        mask : List[int]
+            A list of dataset idx for which we want to obtain the predictions.
+
+        Returns
+        -------
+        predictions : DataModel.y
+            Predictions (except segmentation map).
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def save_model(
             self,
             path: str

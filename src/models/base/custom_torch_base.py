@@ -17,7 +17,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 # from dgl import DGLGraph
 from monai.data import DataLoader
 import numpy as np
-from torch import FloatTensor, no_grad, tensor, Tensor
+from torch import FloatTensor, no_grad, stack, tensor, Tensor
 from torch.nn import BatchNorm1d, Module
 from torch.optim import Adam
 from torch.utils.data import SubsetRandomSampler
@@ -455,6 +455,47 @@ class TorchCustomModel(Module, ABC):
             Predictions.
         """
         raise NotImplementedError
+
+    def predict_dataset(
+            self,
+            dataset: ProstateCancerDataset,
+            mask: List[int],
+    ) -> DataModel.y:
+        """
+        Returns predictions for all samples in a particular subset of the dataset, determined using a mask parameter.
+        For classification tasks, it returns the probability of belonging to class 1. For regression tasks, it returns
+        the predicted real-valued target.
+
+        NOTE : It doesn't return segmentation map as it will bust the computer's RAM.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
+        mask : List[int]
+            A list of dataset idx for which we want to obtain the predictions.
+
+        Returns
+        -------
+        predictions : DataModel.y
+            Predictions (except segmentation map).
+        """
+        subset = dataset[mask]
+        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
+
+        predictions = {}
+        with no_grad():
+            for idx, (x, _) in enumerate(data_loader):
+                pred = self.predict(x)
+
+                for task in dataset.tasks:
+                    if task.task_type != TaskType.SEGMENTATION:
+                        if idx == 0:
+                            predictions[task.name] = pred[task.name]
+                        else:
+                            predictions[task.name] = stack([predictions[task.name], pred[task.name]], dim=0)
+
+        return predictions
 
     def plot_evaluations(
             self,

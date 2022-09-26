@@ -125,6 +125,32 @@ class TorchWrapper(BaseModel):
         """
         return self._model.predict(x)
 
+    def predict_dataset(
+            self,
+            dataset: ProstateCancerDataset,
+            mask: List[int],
+    ) -> DataModel.y:
+        """
+        Returns predictions for all samples in a particular subset of the dataset, determined using a mask parameter.
+        For classification tasks, it returns the probability of belonging to class 1. For regression tasks, it returns
+        the predicted real-valued target.
+
+        NOTE : It doesn't return segmentation map as it will bust the computer's RAM.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
+        mask : List[int]
+            A list of dataset idx for which we want to obtain the predictions.
+
+        Returns
+        -------
+        predictions : DataModel.y
+            Predictions (except segmentation map).
+        """
+        return self._model.predict_dataset(dataset, mask)
+
     def save_model(self, path: str) -> None:
         """
         Saves the model to the given path.
@@ -171,7 +197,7 @@ class TorchWrapper(BaseModel):
         scores : Dict[str, Dict[str, float]]
             Score for each tasks and each metrics.
         """
-        return self._model.scores(predictions, targets)
+        return self._model.scores(predictions, targets, include_evaluation_metrics)
 
     def scores_dataset(
             self,
@@ -196,7 +222,7 @@ class TorchWrapper(BaseModel):
         scores : Dict[str, Dict[str, float]]
             Score for each tasks and each metrics.
         """
-        return self._model.scores_dataset(dataset, mask)
+        return self._model.scores_dataset(dataset, mask, include_evaluation_metrics)
 
     def fix_thresholds_to_optimal_values(
             self,
@@ -213,4 +239,4 @@ class TorchWrapper(BaseModel):
         include_evaluation_metrics: bool
             Whether to fix the thresholds of evaluation metrics or not.
         """
-        return self._model.fix_thresholds_to_optimal_values(dataset)
+        return self._model.fix_thresholds_to_optimal_values(dataset, include_evaluation_metrics)
