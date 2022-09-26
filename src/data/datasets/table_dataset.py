@@ -550,11 +550,16 @@ class TableDataset(Dataset):
         """
         for idx, task in enumerate(self.tasks):
             if task.task_type == TaskType.CLASSIFICATION:
-                scaling_factor = task.optimization_metric.get_scaling_factor(y_train=self.y[self.train_mask, idx])
-                task.optimization_metric.scaling_factor = scaling_factor
+                if task.evaluation_metrics:
+                    for metric in [task.optimization_metric] + task.evaluation_metrics:
+                        scaling_factor = metric.get_scaling_factor(y_train=self.y[self.train_mask, idx])
+                        metric.scaling_factor = scaling_factor
+                else:
+                    scaling_factor = task.optimization_metric.get_scaling_factor(y_train=self.y[self.train_mask, idx])
+                    task.optimization_metric.scaling_factor = scaling_factor
 
                 if task.criterion:
-                    task.criterion.scaling_factor = scaling_factor
+                    task.criterion.scaling_factor = task.optimization_metric.scaling_factor
 
     def _numerical_setter(
             self,
