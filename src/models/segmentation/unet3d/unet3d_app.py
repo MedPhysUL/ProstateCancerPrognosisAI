@@ -3,7 +3,7 @@
     @Author:            Raphael Brodeur
 
     @Creation Date:     05/2022
-    @Last modification: 07/2022
+    @Last modification: 09/2022
 
     @Description:       This file contains an implementation of a 3D U-Net.
 """
@@ -13,15 +13,13 @@ from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
 from monai.networks.nets import UNet
 from monai.transforms import (
-    AddChannel,
-    CenterSpatialCrop,
+    AddChanneld,
+    CenterSpatialCropd,
     Compose,
-    HistogramNormalize,
-    KeepLargestConnectedComponent,
-    # RandFlip,
-    # Rotate90,
-    ThresholdIntensity,
-    ToTensor
+    HistogramNormalized,
+    KeepLargestConnectedComponentd,
+    ThresholdIntensityd,
+    ToTensord,
 )
 from monai.utils import set_determinism
 import numpy as np
@@ -29,7 +27,6 @@ import torch
 from torch.utils.data.dataset import random_split
 from torch.utils.tensorboard import SummaryWriter
 
-# from src.data.processing.copy_items import Augmentation, AugmentationTransforms
 from src.data.extraction.local import LocalDatabaseManager
 from src.data.datasets.image_dataset import ImageDataset
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
@@ -39,30 +36,25 @@ if __name__ == '__main__':
     set_determinism(seed=1010710)
 
     writer = SummaryWriter(
-        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete'
+        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp01'
     )
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 40
-    batch_size = 4
-    num_epochs = 150
+    batch_size = 1
+    num_epochs = 1000
     lr = 1e-3
 
     # Defining Transforms
-    img_trans = Compose([
-        AddChannel(),
-        CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        ThresholdIntensity(threshold=-250, above=True, cval=-250),
-        ThresholdIntensity(threshold=500, above=False, cval=500),
-        HistogramNormalize(num_bins=751, min=0, max=1),
-        ToTensor(dtype=torch.float32)
-    ])
-    seg_trans = Compose([
-        AddChannel(),
-        CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        KeepLargestConnectedComponent(),
-        ToTensor(dtype=torch.float32)
+    trans = Compose([
+        AddChanneld(keys=['img', 'seg']),
+        CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
+        ThresholdIntensityd(keys=['img'], threshold=-250, above=True, cval=-250),
+        ThresholdIntensityd(keys=['img'], threshold=500, above=False, cval=500),
+        HistogramNormalized(keys=['img'], num_bins=751, min=0, max=1),
+        KeepLargestConnectedComponentd(keys=['seg']),
+        ToTensord(keys=['img', 'seg'], dtype=torch.float32)
     ])
 
     # ImageDataset
@@ -70,8 +62,7 @@ if __name__ == '__main__':
         database_manager=LocalDatabaseManager(
             path_to_database='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5'
         ),
-        img_transform=img_trans,
-        seg_transform=seg_trans
+        transform=trans,
     )
 
     # Dataset
@@ -81,72 +72,6 @@ if __name__ == '__main__':
 
     # Train/Val Split
     train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
-
-    # Data Augmentation
-    # aug_trans = [
-    #     # Rotation 180 deg
-    #     AugmentationTransforms(
-    #         img_transforms=Compose([
-    #             AddChannel(),
-    #             Rotate90(k=2, spatial_axes=(1, 2)),
-    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
-    #             ThresholdIntensity(threshold=-250, above=True, cval=-250),
-    #             ThresholdIntensity(threshold=500, above=False, cval=500),
-    #             HistogramNormalize(num_bins=751, min=0, max=1),
-    #             ToTensor(dtype=torch.float32)
-    #         ]),
-    #         seg_transforms=Compose([
-    #             AddChannel(),
-    #             Rotate90(k=2, spatial_axes=(1, 2)),
-    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
-    #             KeepLargestConnectedComponent(),
-    #             ToTensor(dtype=torch.float32)
-    #         ])
-    #     ),
-    #     # Flip lr
-    #     AugmentationTransforms(
-    #         img_transforms=Compose([
-    #             AddChannel(),
-    #             RandFlip(prob=1, spatial_axis=2),
-    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
-    #             ThresholdIntensity(threshold=-250, above=True, cval=-250),
-    #             ThresholdIntensity(threshold=500, above=False, cval=500),
-    #             HistogramNormalize(num_bins=751, min=0, max=1),
-    #             ToTensor(dtype=torch.float32)
-    #         ]),
-    #         seg_transforms=Compose([
-    #             AddChannel(),
-    #             RandFlip(prob=1, spatial_axis=2),
-    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
-    #             KeepLargestConnectedComponent(),
-    #             ToTensor(dtype=torch.float32)
-    #         ])
-    #     ),
-    #     # Flip lr + Rotation 180 deg
-    #     AugmentationTransforms(
-    #         img_transforms=Compose([
-    #             AddChannel(),
-    #             RandFlip(prob=1, spatial_axis=2),
-    #             Rotate90(k=2, spatial_axes=(1, 2)),
-    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
-    #             ThresholdIntensity(threshold=-250, above=True, cval=-250),
-    #             ThresholdIntensity(threshold=500, above=False, cval=500),
-    #             HistogramNormalize(num_bins=751, min=0, max=1),
-    #             ToTensor(dtype=torch.float32)
-    #         ]),
-    #         seg_transforms=Compose([
-    #             AddChannel(),
-    #             RandFlip(prob=1, spatial_axis=2),
-    #             Rotate90(k=2, spatial_axes=(1, 2)),
-    #             CenterSpatialCrop(roi_size=(1000, 160, 160)),
-    #             KeepLargestConnectedComponent(),
-    #             ToTensor(dtype=torch.float32)
-    #         ])
-    #     )
-    # ]
-    #
-    # augmentation = Augmentation(augmentation_transforms=aug_trans)
-    # train_ds_augmented = augmentation.get_augmented_dataset(train_ds)
 
     # Data Loader
     train_loader = DataLoader(
@@ -166,11 +91,12 @@ if __name__ == '__main__':
 
     # Model
     net = UNet(
-        dimensions=3,
+        spatial_dims=3,
         in_channels=1,
         out_channels=1,
         channels=(64, 128, 256, 512, 1024),
         strides=(2, 2, 2, 2),
+        num_res_units=3,
         dropout=0.2
     ).to(device)
 
@@ -184,16 +110,15 @@ if __name__ == '__main__':
     epoch_val_losses = []
     epoch_val_metrics = []
     best_metric = 0
-    print("6")
     for epoch in range(num_epochs):
         net.train()
         batch_loss = []
 
         # Training
         for batch in train_loader:
-            batch_images = batch.image[0].to(device)
-            batch_segs = batch.image[1].to(device)
-            # print("Table dataset exists?", not all(batch.table.isnan()))
+            batch_images = batch.image['img'].to(device)
+            batch_segs = batch.image['seg'].to(device)
+
             opt.zero_grad()
             y_pred = net(batch_images)
             loss_train = loss(y_pred, batch_segs)
@@ -207,15 +132,14 @@ if __name__ == '__main__':
 
         lr_scheduler.step()
 
+        # Validation
         net.eval()
         loss_val_list = []
         metric_vals = []
-
-        # Validation
         with torch.no_grad():
             for batch in val_loader:
-                batch_images = batch.image[0].to(device)
-                batch_segs = batch.image[1].to(device)
+                batch_images = batch.image['img'].to(device)
+                batch_segs = batch.image['seg'].to(device)
 
                 y_pred = net(batch_images)
 
@@ -230,6 +154,7 @@ if __name__ == '__main__':
                 # Metric
                 pred_metric = metric(y_pred=y_pred, y=batch_segs)
                 metric_vals += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
+
         epoch_val_losses.append(np.average(loss_val_list))
         epoch_val_metrics.append(np.average(metric_vals))
         print(f"EPOCH {epoch + 1}, val metric : {epoch_val_metrics[-1]}")
@@ -237,17 +162,10 @@ if __name__ == '__main__':
         # Save Best Metric
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete/best_model_parameters.pt')
+            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp01/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)
 
     writer.flush()
     writer.close()
-
-'''
-        with torch.no_grad():
-            for batch_images, batch_segs in val_loader:
-                batch_images = batch_images.to(device)
-                batch_segs = batch_segs.to(device)
-'''

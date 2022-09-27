@@ -3,23 +3,23 @@
     @Author:            Raphael Brodeur
 
     @Creation Date:     07/2022
-    @Last modification: 07/2022
+    @Last modification: 09/2022
 
     @Description:       This file contains a script to assess the performance of a 3D U-Net.
-
 """
+
 import matplotlib.pyplot as plt
 from monai.data import DataLoader
-from monai.metrics import DiceMetric
+from monai.metrics import DiceMetric, HausdorffDistanceMetric
 from monai.networks.nets import UNet
 from monai.transforms import (
-    AddChannel,
-    CenterSpatialCrop,
+    AddChanneld,
+    CenterSpatialCropd,
     Compose,
-    HistogramNormalize,
-    KeepLargestConnectedComponent,
-    ThresholdIntensity,
-    ToTensor
+    HistogramNormalized,
+    KeepLargestConnectedComponentd,
+    ThresholdIntensityd,
+    ToTensord
 )
 from monai.utils import set_determinism
 import numpy as np
@@ -37,31 +37,27 @@ if __name__ == '__main__':
     # Setting Up
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     metric = DiceMetric(include_background=True, reduction='mean')
+    # metric = HausdorffDistanceMetric(include_background=True, percentile=95)
     num_val = 40
     num_workers = 0
 
     # Defining Transforms
-    img_trans = Compose([
-        AddChannel(),
-        CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        ThresholdIntensity(threshold=-250, above=True, cval=-250),
-        ThresholdIntensity(threshold=500, above=False, cval=500),
-        HistogramNormalize(num_bins=751, min=0, max=1),
-        ToTensor(dtype=torch.float32)
+    trans = Compose([
+        AddChanneld(keys=['img', 'seg']),
+        CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
+        ThresholdIntensityd(keys=['img'], threshold=-250, above=True, cval=-250),
+        ThresholdIntensityd(keys=['img'], threshold=500, above=False, cval=500),
+        HistogramNormalized(keys=['img'], num_bins=751, min=0, max=1),
+        KeepLargestConnectedComponentd(keys=['seg']),
+        ToTensord(keys=['img', 'seg'], dtype=torch.float32)
     ])
-    seg_trans = Compose([
-        AddChannel(),
-        CenterSpatialCrop(roi_size=(1000, 160, 160)),
-        KeepLargestConnectedComponent(),
-        ToTensor(dtype=torch.float32)
-    ])
+
     # ImageDataset
     image_dataset = ImageDataset(
         database_manager=LocalDatabaseManager(
             path_to_database='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5'
         ),
-        img_transform=img_trans,
-        seg_transform=seg_trans
+        transform=trans
     )
 
     # Dataset
@@ -87,19 +83,21 @@ if __name__ == '__main__':
         out_channels=1,
         channels=(64, 128, 256, 512, 1024),
         strides=(2, 2, 2, 2),
+        num_res_units=3,
         dropout=0.2
     ).to(device)
 
     # Load Best Parameters
-    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete/best_model_parameters.pt'))
+    net.load_state_dict(torch.load('C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp01/best_min.pt'))
     net.eval()
 
     # Stats
     metric_list = []
+
     with torch.no_grad():
         for batch in val_loader:
-            batch_images = batch.image[0]
-            batch_segs = batch.image[1]
+            batch_images = batch.image['img']
+            batch_segs = batch.image['seg']
 
             batch_images = batch_images.to(device)
             batch_segs = batch_segs.to(device)
@@ -122,8 +120,8 @@ if __name__ == '__main__':
     patient_idx = -1
     with torch.no_grad():
         for patient in val_loader:
-            patient_img = patient.image[0]
-            patient_seg = patient.image[1]
+            patient_img = patient.image['img']
+            patient_seg = patient.image['seg']
             patient_idx += 1
             print(patient_idx)
 
@@ -137,19 +135,21 @@ if __name__ == '__main__':
                 y_pred = torch.round(y_pred)
                 print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
                 seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-                ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
+                ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=0.1)
 
             if patient_idx == np.argmin(metric_list):
                 print('Worst image', patient_idx)
                 img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
                 seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+
                 patient_img = patient_img.to(device)
                 y_pred = net(patient_img)
                 y_pred = torch.sigmoid(y_pred)
                 y_pred = torch.round(y_pred)
                 print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
+
                 seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-                ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
+                ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=0.1)
 
             if patient_idx == np.argsort(metric_list)[len(metric_list)//2]:
                 print('Median image', patient_idx)
@@ -161,13 +161,13 @@ if __name__ == '__main__':
                 y_pred = torch.round(y_pred)
                 print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
                 seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
-                ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=1)
+                ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=0.1)
 
     # Show All
     with torch.no_grad():
         for patient in val_loader:
-            patient_img = patient.image[0]
-            patient_seg = patient.image[1]
+            patient_img = patient.image['img']
+            patient_seg = patient.image['seg']
             img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
             seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
             patient_img = patient_img.to(device)
@@ -178,12 +178,16 @@ if __name__ == '__main__':
             seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
             ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred)
 
+    # Number of parameters
+    print('nbr de param', sum(p.numel() for p in net.parameters() if p.requires_grad))
+
+
     # Tensorboard Model Graph
     from monai.utils import first
     from torch.utils.tensorboard import SummaryWriter
-    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete')
+    writer = SummaryWriter(log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp01')
     with torch.no_grad():
-        img, seg = first(val_loader)
+        img = first(val_loader)[0]['img']
         img = img.to(device)
         writer.add_graph(net, img)
     writer.flush()
@@ -194,8 +198,8 @@ if __name__ == '__main__':
     volume_list = []
     with torch.no_grad():
         for batch in val_loader:
-            batch_images = batch.image[0]
-            batch_segs = batch.image[1]
+            batch_images = batch.image['img']
+            batch_segs = batch.image['seg']
 
             batch_images = batch_images.to(device)
             batch_segs = batch_segs.to(device)
@@ -211,4 +215,118 @@ if __name__ == '__main__':
     print(metric_list)
     print(volume_list)
     plt.scatter(x=volume_list, y=metric_list)
+    plt.title('Relationship Between Dice Coefficient and Prostate Volume', fontsize=20)
+    plt.ylim([0, 1])
+    plt.ylabel('Dice Coefficient', fontsize=18)
+    plt.xlabel('Number of Voxels', fontsize=18)
+    plt.grid(visible=True, axis='y')
     plt.show()
+
+    # Visualization with original CT
+    patient_idx = -1
+    with torch.no_grad():
+        for patient in val_loader:
+            patient_img = patient.image['img']
+            patient_seg = patient.image['seg']
+            patient_idx += 1
+            print(patient_idx)
+
+            if patient_idx == np.argmax(metric_list):
+                print('Best image', patient_idx)
+                img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+                seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+                patient_img = patient_img.to(device)
+
+                y_pred = net(patient_img)
+                y_pred = torch.sigmoid(y_pred)
+                y_pred = torch.round(y_pred)
+                print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
+
+                seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+
+                # img_og
+                val_loader.dataset.dataset.image_dataset.transform = Compose([
+                    AddChanneld(keys=['img', 'seg']),
+                    CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
+                    ToTensord(keys=['img', 'seg'], dtype=torch.float32)
+                ])
+                img_og = np.transpose(np.array(val_loader.dataset[patient_idx].image['img'][0]), (1, 2, 0))
+
+                ImageViewer().compare(img=img_og, seg_truth=seg_truth, seg_pred=seg_pred)
+
+                # Reset transforms
+                val_loader.dataset.dataset.image_dataset.transform = Compose([
+                    AddChanneld(keys=['img', 'seg']),
+                    CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
+                    ThresholdIntensityd(keys=['img'], threshold=-250, above=True, cval=-250),
+                    ThresholdIntensityd(keys=['img'], threshold=500, above=False, cval=500),
+                    HistogramNormalized(keys=['img'], num_bins=751, min=0, max=1),
+                    KeepLargestConnectedComponentd(keys=['seg']),
+                    ToTensord(keys=['img', 'seg'], dtype=torch.float32)
+                ])
+
+            if patient_idx == np.argmin(metric_list):
+                print('Worst image', patient_idx)
+                img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+                seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+
+                patient_img = patient_img.to(device)
+                y_pred = net(patient_img)
+                y_pred = torch.sigmoid(y_pred)
+                y_pred = torch.round(y_pred)
+                print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
+
+                seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+
+                # img_og
+                val_loader.dataset.dataset.image_dataset.transform = Compose([
+                    AddChanneld(keys=['img', 'seg']),
+                    CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
+                    ToTensord(keys=['img', 'seg'], dtype=torch.float32)
+                ])
+                img_og = np.transpose(np.array(val_loader.dataset[patient_idx].image['img'][0]), (1, 2, 0))
+
+                ImageViewer().compare(img=img_og, seg_truth=seg_truth, seg_pred=seg_pred)
+
+                # Reset transforms
+                val_loader.dataset.dataset.image_dataset.transform = Compose([
+                    AddChanneld(keys=['img', 'seg']),
+                    CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
+                    ThresholdIntensityd(keys=['img'], threshold=-250, above=True, cval=-250),
+                    ThresholdIntensityd(keys=['img'], threshold=500, above=False, cval=500),
+                    HistogramNormalized(keys=['img'], num_bins=751, min=0, max=1),
+                    KeepLargestConnectedComponentd(keys=['seg']),
+                    ToTensord(keys=['img', 'seg'], dtype=torch.float32)
+                ])
+
+            if patient_idx == np.argsort(metric_list)[len(metric_list)//2]:
+                print('Median image', patient_idx)
+                img = np.transpose(np.array(patient_img[0][0]), (1, 2, 0))
+                seg_truth = np.transpose(np.array(patient_seg[0][0]), (1, 2, 0))
+                patient_img = patient_img.to(device)
+                y_pred = net(patient_img)
+                y_pred = torch.sigmoid(y_pred)
+                y_pred = torch.round(y_pred)
+                print('dice score:', metric(y_pred=y_pred.cpu(), y=patient_seg))
+                seg_pred = np.transpose(np.array(y_pred[0][0].cpu()), (1, 2, 0))
+
+                # img_og
+                val_loader.dataset.dataset.image_dataset.transform = Compose([
+                    AddChanneld(keys=['img', 'seg']),
+                    CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
+                    ToTensord(keys=['img', 'seg'], dtype=torch.float32)
+                ])
+                img_og = np.transpose(np.array(val_loader.dataset[patient_idx].image['img'][0]), (1, 2, 0))
+
+                ImageViewer().compare(img=img_og, seg_truth=seg_truth, seg_pred=seg_pred)
+
+                # Reset transforms
+                val_loader.dataset.dataset.image_dataset.transform = Compose([
+                    AddChanneld(keys=['img', 'seg']),
+                    CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
+                    ThresholdIntensityd(keys=['img'], threshold=-250, above=True, cval=-250),
+                    ThresholdIntensityd(keys=['img'], threshold=500, above=False, cval=500),
+                    HistogramNormalized(keys=['img'], num_bins=751, min=0, max=1),
+                    KeepLargestConnectedComponentd(keys=['seg']),
+                    ToTensord(keys=['img', 'seg'], dtype=torch.float32)
+                ])

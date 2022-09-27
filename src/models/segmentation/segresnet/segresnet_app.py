@@ -1,17 +1,17 @@
 """
-    @file:              vnet_app.py
+    @file:              segresnet_app.py
     @Author:            Raphael Brodeur
 
-    @Creation Date:     07/2022
-    @Last modification: 07/2022
+    @Creation Date:     08/2022
+    @Last modification: 09/2022
 
-    @Description:       This file contains an implementation of a 3D V-Net.
+    @Description:       This file contains an implementation of a SegResNet.
 """
 
 from monai.data import DataLoader
 from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
-from monai.networks.nets import VNet
+from monai.networks.nets import SegResNet
 from monai.transforms import (
     AddChanneld,
     CenterSpatialCropd,
@@ -24,26 +24,26 @@ from monai.transforms import (
 from monai.utils import set_determinism
 import numpy as np
 import torch
-from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data.dataset import random_split
+from torch.utils.tensorboard import SummaryWriter
 
 from src.data.extraction.local import LocalDatabaseManager
 from src.data.datasets.image_dataset import ImageDataset
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     set_determinism(seed=1010710)
 
     writer = SummaryWriter(
-        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/vnet/runs/exp5'
+        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/segresnet/runs/exp01'
     )
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 40
     batch_size = 1
-    num_epochs = 100
+    num_epochs = 1000
     lr = 1e-3
 
     # Defining Transforms
@@ -62,7 +62,7 @@ if __name__ == "__main__":
         database_manager=LocalDatabaseManager(
             path_to_database='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5'
         ),
-        transform=trans
+        transform=trans,
     )
 
     # Dataset
@@ -90,7 +90,10 @@ if __name__ == "__main__":
     )
 
     # Model
-    net = VNet(dropout_prob=0.8).to(device)
+    net = SegResNet(
+        out_channels=1,
+        dropout_prob=0.2
+    ).to(device)
 
     opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=opt, gamma=0.99)
@@ -113,7 +116,6 @@ if __name__ == "__main__":
 
             opt.zero_grad()
             y_pred = net(batch_images)
-
             loss_train = loss(y_pred, batch_segs)
             loss_train.backward()
             opt.step()
@@ -123,11 +125,12 @@ if __name__ == "__main__":
         epoch_train_losses.append(np.average(batch_loss))
         writer.add_scalar('avg training loss per batch per epoch', epoch_train_losses[-1], epoch + 1)
 
+        lr_scheduler.step()
+
+        # Validation
         net.eval()
         loss_val_list = []
         metric_vals = []
-
-        # Validation
         with torch.no_grad():
             for batch in val_loader:
                 batch_images = batch.image['img'].to(device)
@@ -154,7 +157,7 @@ if __name__ == "__main__":
         # Save Best Metric
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/vnet/runs/exp5/best_model_parameters.pt')
+            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/segresnet/runs/exp01/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)

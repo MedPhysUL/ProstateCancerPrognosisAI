@@ -13,6 +13,7 @@
 from typing import Callable, Dict, List, NamedTuple, Optional, Set, Tuple
 
 from monai.data import Dataset
+
 from monai.transforms import CropForeground, SpatialCrop
 import numpy as np
 
@@ -59,7 +60,7 @@ class ImageDataset(Dataset):
         self._tasks = tasks
 
         db = database_manager.get_database()
-
+        
         img_list, seg_list = [], []
         for patient in db.keys():
             print(f"Loading {patient}.")
