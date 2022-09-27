@@ -1,11 +1,11 @@
 """
-    @file:              unet3d_app.py
+    @file:              segresnet_app.py
     @Author:            Raphael Brodeur
 
-    @Creation Date:     05/2022
-    @Last modification: 07/2022
+    @Creation Date:     08/2022
+    @Last modification: 09/2022
 
-    @Description:       This file contains an implementation of a 3D U-Net.
+    @Description:       This file contains an implementation of a SegResNet.
 """
 
 from monai.data import DataLoader
@@ -36,14 +36,14 @@ if __name__ == '__main__':
     set_determinism(seed=1010710)
 
     writer = SummaryWriter(
-        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/segresnet/runs/exp5'
+        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/segresnet/runs/exp01'
     )
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 40
-    batch_size = 4
-    num_epochs = 500
+    batch_size = 1
+    num_epochs = 1000
     lr = 1e-3
 
     # Defining Transforms
@@ -89,13 +89,6 @@ if __name__ == '__main__':
         shuffle=False
     )
 
-    # Live Data Augmentation
-    # train_loader.dataset.dataset.image_dataset.transform = Compose([
-    #     AddChanneld(keys=['img', 'seg']),
-    #     CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
-    #     ToTensord(keys=['img', 'seg'], dtype=torch.float32)
-    # ])
-
     # Model
     net = SegResNet(
         out_channels=1,
@@ -134,11 +127,10 @@ if __name__ == '__main__':
 
         lr_scheduler.step()
 
+        # Validation
         net.eval()
         loss_val_list = []
         metric_vals = []
-
-        # Validation
         with torch.no_grad():
             for batch in val_loader:
                 batch_images = batch.image['img'].to(device)
@@ -165,7 +157,7 @@ if __name__ == '__main__':
         # Save Best Metric
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/segresnet/runs/exp5/best_model_parameters.pt')
+            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/segresnet/runs/exp01/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)

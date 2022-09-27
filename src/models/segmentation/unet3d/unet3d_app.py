@@ -3,7 +3,7 @@
     @Author:            Raphael Brodeur
 
     @Creation Date:     05/2022
-    @Last modification: 07/2022
+    @Last modification: 09/2022
 
     @Description:       This file contains an implementation of a 3D U-Net.
 """
@@ -18,35 +18,31 @@ from monai.transforms import (
     Compose,
     HistogramNormalized,
     KeepLargestConnectedComponentd,
-    RandFlipd,
     ThresholdIntensityd,
     ToTensord,
-    RandRotate90d
 )
-from monai.utils import set_determinism, UpsampleMode
+from monai.utils import set_determinism
 import numpy as np
 import torch
 from torch.utils.data.dataset import random_split
 from torch.utils.tensorboard import SummaryWriter
 
-# from src.data.processing.augmentation import Augmentation, AugmentationTransforms
 from src.data.extraction.local import LocalDatabaseManager
 from src.data.datasets.image_dataset import ImageDataset
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
-from copy import deepcopy
 
 
 if __name__ == '__main__':
     set_determinism(seed=1010710)
 
     writer = SummaryWriter(
-        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete'
+        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp01'
     )
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 40
-    batch_size = 128
+    batch_size = 1
     num_epochs = 1000
     lr = 1e-3
 
@@ -93,20 +89,6 @@ if __name__ == '__main__':
         shuffle=False
     )
 
-    # Live Data Augmentation
-    # train_loader_augmented = deepcopy(train_loader)
-    # train_loader_augmented.dataset.dataset.image_dataset.transform = Compose([
-    #     AddChanneld(keys=['img', 'seg']),
-    #     CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
-    #     RandFlipd(keys=['img', 'seg'], prob=0.5, spatial_axis=2),
-    #     RandRotate90d(keys=['img', 'seg'], prob=0.25, max_k=3),
-    #     ThresholdIntensityd(keys=['img'], threshold=-250, above=True, cval=-250),
-    #     ThresholdIntensityd(keys=['img'], threshold=500, above=False, cval=500),
-    #     HistogramNormalized(keys=['img'], num_bins=751, min=0, max=1),
-    #     KeepLargestConnectedComponentd(keys=['seg']),
-    #     ToTensord(keys=['img', 'seg'], dtype=torch.float32)
-    # ])
-
     # Model
     net = UNet(
         spatial_dims=3,
@@ -114,7 +96,7 @@ if __name__ == '__main__':
         out_channels=1,
         channels=(64, 128, 256, 512, 1024),
         strides=(2, 2, 2, 2),
-        num_res_units=4,
+        num_res_units=3,
         dropout=0.2
     ).to(device)
 
@@ -128,12 +110,6 @@ if __name__ == '__main__':
     epoch_val_losses = []
     epoch_val_metrics = []
     best_metric = 0
-
-    ###########################
-    best_min = 0
-    best_mean_plus_min = 0
-    ###########################
-
     for epoch in range(num_epochs):
         net.train()
         batch_loss = []
@@ -156,11 +132,10 @@ if __name__ == '__main__':
 
         lr_scheduler.step()
 
+        # Validation
         net.eval()
         loss_val_list = []
         metric_vals = []
-
-        # Validation
         with torch.no_grad():
             for batch in val_loader:
                 batch_images = batch.image['img'].to(device)
@@ -187,26 +162,7 @@ if __name__ == '__main__':
         # Save Best Metric
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp30/best_model_parameters.pt')
-
-        ##################
-        print('epoch:', epoch + 1)
-        print('dices:', metric_vals)
-        print('max:', np.amax(metric_vals))
-        print('avg:', np.average(metric_vals))
-        print('min:', np.amin(metric_vals))
-        print('std:', np.std(metric_vals))
-
-        # best_min
-        if np.amin(metric_vals) > best_min:
-            best_min = np.amin(metric_vals)
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete/best_min.pt')
-
-        # best_mean_plus_min
-        if np.average(metric_vals) + np.amin(metric_vals) > best_mean_plus_min:
-            best_mean_plus_min = np.average(metric_vals) + np.amin(metric_vals)
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp_delete/best_mean_plus_min.pt')
-        ###########################
+            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp01/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)

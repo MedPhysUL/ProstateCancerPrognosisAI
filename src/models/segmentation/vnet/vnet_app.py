@@ -19,7 +19,6 @@ from monai.transforms import (
     HistogramNormalized,
     KeepLargestConnectedComponentd,
     ThresholdIntensityd,
-    ScaleIntensityRanged,
     ToTensord
 )
 from monai.utils import set_determinism
@@ -43,8 +42,8 @@ if __name__ == "__main__":
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 40
-    batch_size = 2
-    num_epochs = 500
+    batch_size = 1
+    num_epochs = 100
     lr = 1e-3
 
     # Defining Transforms
@@ -93,7 +92,7 @@ if __name__ == "__main__":
     # Model
     net = VNet(dropout_prob=0.8).to(device)
 
-    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-1)
+    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=opt, gamma=0.99)
     loss = DiceLoss(sigmoid=True)
     metric = DiceMetric(include_background=True, reduction='mean')

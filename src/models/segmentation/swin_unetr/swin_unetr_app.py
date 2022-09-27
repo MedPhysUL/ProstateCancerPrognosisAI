@@ -3,9 +3,9 @@
     @Author:            Raphael Brodeur
 
     @Creation Date:     08/2022
-    @Last modification: 08/2022
+    @Last modification: 09/2022
 
-    @Description:       This file contains an implementation of a 3D U-Net.
+    @Description:       This file contains an implementation of a Swin UNETR.
 """
 
 from monai.data import DataLoader
@@ -36,15 +36,15 @@ if __name__ == '__main__':
     set_determinism(seed=1010710)
 
     writer = SummaryWriter(
-        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/swin_unetr/runs/exp_delete'
+        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/swin_unetr/runs/exp01'
     )
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 40
     batch_size = 1
-    num_epochs = 500
-    lr = 1e-4
+    num_epochs = 1000
+    lr = 1e-3
 
     # Defining Transforms
     trans = Compose([
@@ -97,7 +97,7 @@ if __name__ == '__main__':
         drop_rate=0.8
     ).to(device)
 
-    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-1)
+    opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=opt, gamma=0.99)
     loss = DiceLoss(sigmoid=True)
     metric = DiceMetric(include_background=True, reduction='mean')
@@ -160,7 +160,7 @@ if __name__ == '__main__':
         # Save Best Metric
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/swin_unetr/runs/exp_delete/best_model_parameters.pt')
+            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/swin_unetr/runs/exp01/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)
