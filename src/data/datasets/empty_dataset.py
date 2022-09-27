@@ -8,11 +8,20 @@
     @Description:       This file contains a custom EmptyDataset class.
 """
 
-from typing import List, Union
+from enum import IntEnum
+from typing import Dict, List, Union
 
-import numpy as np
-from torch import nan
 from torch.utils.data import Dataset
+
+from src.data.datasets.table_dataset import TableDataModel
+
+
+class DatasetType(IntEnum):
+    """
+    Dataset type.
+    """
+    TABLE = 1
+    IMAGE = 2
 
 
 class EmptyDataset(Dataset):
@@ -22,22 +31,25 @@ class EmptyDataset(Dataset):
 
     def __init__(
             self,
-            to_tensor: bool = True
+            dataset_type: DatasetType
     ):
         """
         Sets protected and public attributes of our custom dataset class.
 
         Parameters
         ----------
-        to_tensor : bool
-            Whether we want features and targets in tensor format. False for numpy arrays.
+        dataset_type : DatasetType
+            Dataset type.
         """
-        self.to_tensor = to_tensor
+        if dataset_type in DatasetType:
+            self.dataset_type = dataset_type
+        else:
+            raise ValueError(f"Unknown dataset type {dataset_type}.")
 
     def __getitem__(
             self,
             idx: Union[int, List[int]]
-    ) -> float:
+    ) -> Union[Dict, TableDataModel]:
         """
         Gets dataset item. This method always returns NaN, regardless of the value of the index.
 
@@ -48,10 +60,10 @@ class EmptyDataset(Dataset):
 
         Returns
         -------
-        item : float
-            NaN value.
+        item : Union[Dict, TableDataModel]
+            Empty dict or data element.
         """
-        if self.to_tensor:
-            return nan
-        else:
-            return np.nan
+        if self.dataset_type == self.dataset_type.TABLE:
+            return TableDataModel(x={}, y={})
+        elif self.dataset_type == self.dataset_type.IMAGE:
+            return {}

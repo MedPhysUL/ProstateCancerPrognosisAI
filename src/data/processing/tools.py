@@ -5,12 +5,26 @@
     @Creation Date:     05/2022
     @Last modification: 05/2022
 
-    @Description:       This file contains helpful functions for pandas dataframe manipulations.
+    @Description:       This file contains helpful functions and classes used for pandas dataframe manipulations.
 """
 
 from typing import List, Optional
 
 import pandas as pd
+
+
+class MaskType:
+    """
+    Stores the constant related to mask types
+    """
+
+    TRAIN: str = "Train"
+    VALID: str = "Valid"
+    TEST: str = "Test"
+    INNER: str = "Inner"
+
+    def __iter__(self):
+        return iter([self.TRAIN, self.VALID, self.TEST])
 
 
 def is_categorical(

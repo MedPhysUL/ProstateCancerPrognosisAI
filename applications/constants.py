@@ -10,6 +10,10 @@
 
 import os
 
+from src.utils.score_metrics import AUC, DICEMetric
+from src.utils.losses import DICELoss
+from src.utils.tasks import ClassificationTask, SegmentationTask
+
 # SEED
 SEED = 1010710
 
@@ -63,3 +67,15 @@ COLUMNS_TYPES = {
     PN: CATEGORICAL_TYPE,
     BCR: CATEGORICAL_TYPE
 }
+
+# SET OF MODALITIES
+MODALITIES = {"CT"}
+
+# TASKS
+TABLE_TASKS = [
+    ClassificationTask(target_col=PN, optimization_metric=AUC()),
+    ClassificationTask(target_col=BCR, optimization_metric=AUC())
+]
+IMAGE_TASKS = [
+    SegmentationTask(criterion=DICELoss(), optimization_metric=DICEMetric(), organ="Prostate", modality="CT")
+]
