@@ -368,53 +368,54 @@ class RandomStratifiedSampler:
 
 # ---------------------- THE FUNCTION extract_masks BE INCLUDED IN THE STRATIFIER SAMPLER CLASS ---------------------- #
 # from itertools import product
-# from json import load
+from json import load
 
-# def extract_masks(
-#         file_path: str,
-#         k: int = 20,
-#         l: int = 20
-# ) -> Dict[int, Dict[str, Union[List[int], Dict[str, List[int]]]]]:
-#     """
-#     Extract masks saved in json file.
-#
-#     Parameters
-#     ----------
-#     file_path : str
-#         Path of json file containing the masks.
-#     k : int
-#         Number of outer loops to extract.
-#     l : int
-#         Number of inner loops to extract.
-#
-#     Returns
-#     -------
-#     masks
-#     """
-#     # Opening JSON file
-#     f = open(file_path)
-#
-#     # Extract complete masks
-#     all_masks = load(f)
-#
-#     # Extraction of masks subset
-#     masks = {}
-#     for i in map(str, range(k)):
-#         int_i = int(i)
-#         masks[int_i] = {}
-#         for t in MaskType():
-#             masks[int_i][t] = all_masks[i][t]
-#         masks[int_i][MaskType.INNER] = {}
-#         for j in map(str, range(l)):
-#             int_j = int(j)
-#             masks[int_i][MaskType.INNER][int_j] = {}
-#             for t in MaskType():
-#                 masks[int_i][MaskType.INNER][int_j][t] = all_masks[i][MaskType.INNER][j][t]
-#
-#     # Closing file
-#     f.close()
-#
-#     return masks
+
+def extract_masks(
+        file_path: str,
+        k: int = 20,
+        l: int = 20
+) -> Dict[int, Dict[str, Union[List[int], Dict[str, List[int]]]]]:
+    """
+    Extract masks saved in json file.
+
+    Parameters
+    ----------
+    file_path : str
+        Path of json file containing the masks.
+    k : int
+        Number of outer loops to extract.
+    l : int
+        Number of inner loops to extract.
+
+    Returns
+    -------
+    masks
+    """
+    # Opening JSON file
+    f = open(file_path)
+
+    # Extract complete masks
+    all_masks = load(f)
+
+    # Extraction of masks subset
+    masks = {}
+    for i in map(str, range(k)):
+        int_i = int(i)
+        masks[int_i] = {}
+        for t in MaskType():
+            masks[int_i][t] = all_masks[i][t]
+        masks[int_i][MaskType.INNER] = {}
+        for j in map(str, range(l)):
+            int_j = int(j)
+            masks[int_i][MaskType.INNER][int_j] = {}
+            for t in MaskType():
+                masks[int_i][MaskType.INNER][int_j][t] = all_masks[i][MaskType.INNER][j][t]
+
+    # Closing file
+    f.close()
+
+    return masks
 
 
 # ---------------------- THE FOLLOWING CODE SHOULD BE SOMEWHERE ELSE (kinda application side ------------------------- #
