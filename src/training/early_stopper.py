@@ -263,7 +263,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
 
     @property
     def early_stopper_type(self) -> EarlyStopperType:
-        return EarlyStopperType.LOSS
+        return EarlyStopperType.MULTITASK_LOSS
 
     def print_early_stopping_message(
             self,
