@@ -119,7 +119,7 @@ class TorchCustomModel(Module, ABC):
         return embedding_block
 
     @property
-    def input_size(self) -> int:
+    def table_input_size(self) -> int:
         if self.embedding_block:
             return len(self._dataset.table_dataset.cont_cols) + self.embedding_block.output_size
         else:
@@ -356,6 +356,9 @@ class TorchCustomModel(Module, ABC):
         # We assume that the tasks in the dataset are the tasks on which we need to calculate the loss.
         self._tasks, self._criterion.tasks = dataset.tasks, dataset.tasks
 
+        # We execute the callbacks that need to be ran at the beginning of training.
+        self.on_fit_begin()
+
         # We setup the early stopper depending on its type.
         if early_stopper.early_stopper_type == EarlyStopperType.METRIC:
             early_stopper.tasks = dataset.tasks
@@ -433,6 +436,13 @@ class TorchCustomModel(Module, ABC):
 
         # Computation of loss reduction + elastic penalty
         return self._criterion(pred, y) + self._alpha * l1_penalty + self._beta * l2_penalty
+
+    @abstractmethod
+    def on_fit_begin(self):
+        """
+        Called when the training (fit) phase starts.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def predict(

@@ -82,20 +82,12 @@ class MLPBaseModel(TorchCustomModel):
             verbose=verbose
         )
 
-        if len(layers) > 0:
-            self._main_encoding_block = MLPEncodingBlock(
-                input_size=self._input_size,
-                output_size=layers[-1],
-                layers=layers[:-1],
-                activation=activation,
-                dropout=dropout
-            )
-        else:
-            self._main_encoding_block = Identity()
-            layers.append(self._input_size)
+        self._activation = activation
+        self._dropout = dropout
+        self._layers = layers
 
-        # We add a linear layer to complete the layers
-        self._linear_layer = Linear(layers[-1], output_size)
+        self._linear_layer = None
+        self._main_encoding_block = None
 
     def _execute_train_step(
             self,
@@ -260,6 +252,27 @@ class MLPBaseModel(TorchCustomModel):
         y = {task.name: y_table[i] for i, task in enumerate(self.tasks)}
 
         return y
+
+    def on_fit_begin(
+            self
+    ) -> None:
+        """
+        Called when the training (fit) phase starts.
+        """
+        if len(self._layers) > 0:
+            self._main_encoding_block = MLPEncodingBlock(
+                input_size=self.table_input_size,
+                output_size=self._layers[-1],
+                layers=self._layers[:-1],
+                activation=self._activation,
+                dropout=self._dropout
+            )
+        else:
+            self._main_encoding_block = Identity()
+            self._layers.append(self.table_input_size)
+
+        # We add a linear layer to complete the layers
+        self._linear_layer = Linear(self._layers[-1], self._output_size)
 
     def predict(
             self,
