@@ -505,7 +505,7 @@ class BinaryCrossEntropyWithLogitsLoss(BinaryClassificationLoss):
 
     def __init__(
             self,
-            weight: float,
+            weight: float = 0.5,
             reduction: Union[LossReduction, str] = LossReduction.MEAN
     ):
         """
