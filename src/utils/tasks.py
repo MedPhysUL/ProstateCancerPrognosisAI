@@ -152,7 +152,7 @@ class ClassificationTask(TableTask):
 
     @property
     def name(self) -> str:
-        return f"{self._target_col}_classification"
+        return self._target_col
 
     @property
     def task_type(self) -> TaskType:
@@ -194,7 +194,7 @@ class RegressionTask(TableTask):
 
     @property
     def name(self) -> str:
-        return f"{self._target_col}_regression"
+        return self._target_col
 
     @property
     def task_type(self) -> TaskType:
@@ -248,7 +248,7 @@ class SegmentationTask(Task):
 
     @property
     def name(self) -> str:
-        return f"{self._organ}_segmentation"
+        return self._organ
 
     @property
     def task_type(self) -> TaskType:
