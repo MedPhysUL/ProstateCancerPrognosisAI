@@ -85,7 +85,7 @@ class Metric(ABC):
 
     @property
     def name(self) -> str:
-        return f"{self._reduction.value}_{self._name}"
+        return f"{self._reduction}_{self._name}"
 
     def perform_reduction(
             self,

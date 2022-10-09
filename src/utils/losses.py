@@ -60,7 +60,7 @@ class Loss(ABC):
 
     @property
     def name(self) -> str:
-        return self._name
+        return f"{self._reduction}_{self._name}"
 
     def perform_reduction(
             self,
