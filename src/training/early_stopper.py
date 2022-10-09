@@ -56,6 +56,7 @@ class EarlyStopper(ABC):
         self.early_stop = False
         self.counter = 0
         self.best_model = None
+        self.path_to_model = path_to_model
         self.file_path = path.join(path_to_model, f"{uuid4()}.pt")
 
     @property
@@ -103,6 +104,15 @@ class EarlyStopper(ABC):
         Removes the checkpoint file
         """
         remove(self.file_path)
+
+    def reset(
+            self
+    ) -> None:
+        """
+        Reset early stopper.
+        """
+        self.remove_checkpoint()
+        self.__init__(self.path_to_model, self.patience)
 
     def get_best_params(
             self

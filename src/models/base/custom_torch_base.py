@@ -164,7 +164,7 @@ class TorchCustomModel(Module, ABC):
             Validation loader.
         """
         # We create the valid dataloader (if valid size != 0)
-        valid_size, valid_data, early_stopper = len(dataset.valid_mask), None, None
+        valid_size, valid_data = len(dataset.valid_mask), None
 
         if valid_size != 0:
 
@@ -406,7 +406,7 @@ class TorchCustomModel(Module, ABC):
 
             # We extract best params and remove checkpoint file
             self.load_state_dict(early_stopper.get_best_params())
-            early_stopper.remove_checkpoint()
+            early_stopper.reset()
 
     def loss(
             self,
