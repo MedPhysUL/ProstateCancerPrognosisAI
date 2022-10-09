@@ -14,7 +14,7 @@ from typing import List, Optional
 
 import numpy as np
 from monai.data import DataLoader
-from torch import cat, no_grad, sigmoid
+from torch import cat, no_grad, sigmoid, stack
 from torch.nn import Identity, Linear
 
 from src.data.datasets.prostate_cancer_dataset import DataModel
@@ -230,7 +230,7 @@ class MLPBaseModel(TorchCustomModel):
             Predictions.
         """
         # We retrieve the table data only and transform the input dictionary to a tensor
-        x_table = cat(list(x.table.values()), 1)
+        x_table = stack(list(x.table.values()), 1)
 
         # We initialize a list of tensors to concatenate
         new_x_table = []
@@ -241,13 +241,13 @@ class MLPBaseModel(TorchCustomModel):
 
         # We perform entity embeddings on categorical features
         if len(self._dataset.table_dataset.cat_idx) != 0:
-            new_x_table.append(self._embedding_block(x_table))
+            new_x_table.append(self.embedding_block(x_table))
 
         # We concatenate all inputs
         x_table = cat(new_x_table, 1)
 
         # We compute the output
-        y_table = self._linear_layer(self._main_encoding_block(x_table)).squeeze()
+        y_table = self._linear_layer(self._main_encoding_block(x_table.float())).squeeze()
 
         y = {task.name: y_table[i] for i, task in enumerate(self.tasks)}
 
