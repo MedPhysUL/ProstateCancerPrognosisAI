@@ -87,7 +87,6 @@ class TorchCustomModel(Module, ABC):
         self._calculate_epoch_score = calculate_epoch_score
         self._criterion = criterion
         self._dataset: Optional[ProstateCancerDataset] = None
-        self._embedding_block = None
         self._evaluations: Dict[str, Evaluation] = {}
         self._path_to_model = path_to_model
         self._optimizer = None
