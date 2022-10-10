@@ -249,7 +249,7 @@ class MLPBaseModel(TorchCustomModel):
         # We compute the output
         y_table = self._linear_layer(self._main_encoding_block(x_table.float())).squeeze()
 
-        y = {task.name: y_table[i] for i, task in enumerate(self.tasks)}
+        y = {task.name: y_table[:, i] for i, task in enumerate(self.tasks)}
 
         return y
 
