@@ -107,7 +107,7 @@ class MLPBaseModel(TorchCustomModel):
         """
         # We set the model for training
         self.train()
-        epoch_losses = dict(**{self._criterion.name: []}, **{task.criterion.name: [] for task in self._tasks})
+        epoch_losses = dict(**{self._criterion.name: []}, **{task.name: [] for task in self._tasks})
 
         # We execute one training step
         for x, y in train_data:
@@ -119,7 +119,7 @@ class MLPBaseModel(TorchCustomModel):
 
             # We update the losses history
             epoch_losses[self._criterion.name].append(loss)
-            for name, single_task_loss in self._criterion.single_task_losses:
+            for name, single_task_loss in self._criterion.single_task_losses.items():
                 epoch_losses[name].append(single_task_loss)
 
         epoch_losses = {name: np.mean(loss) for name, loss in epoch_losses.items()}
