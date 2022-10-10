@@ -118,7 +118,7 @@ class MLPBaseModel(TorchCustomModel):
             pred, loss = self._update_weights([x], y)
 
             # We update the losses history
-            epoch_losses[self._criterion.name].append(loss.item())
+            epoch_losses[self._criterion.name].append(loss)
             for name, single_task_loss in self._criterion.single_task_losses:
                 epoch_losses[name].append(single_task_loss)
 
