@@ -12,6 +12,7 @@
 
 
 from abc import ABC, abstractmethod
+import os
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 
 # from dgl import DGLGraph
@@ -26,7 +27,7 @@ from src.data.datasets.prostate_cancer_dataset import DataModel, ProstateCancerD
 from src.data.processing.tools import MaskType
 # from src.data.processing.gnn_datasets import PetaleKGNNDataset
 from src.models.base.blocks.embeddings import EntityEmbeddingBlock
-from src.training.early_stopper import EarlyStopper, EarlyStopperType
+from src.training.early_stopper import EarlyStopper, EarlyStopperType, MetricEarlyStopper, MultiTaskLossEarlyStopper
 from src.training.optimizer import SAM
 from src.utils.multi_task_losses import MultiTaskLoss
 from src.utils.reductions import MetricReduction
@@ -93,6 +94,9 @@ class TorchCustomModel(Module, ABC):
         self._output_size = output_size
         self._tasks = None
         self._verbose = verbose
+
+        # Create model path
+        os.makedirs(path_to_model, exist_ok=True)
 
         # Initialization of a protected method
         self._update_weights = None
@@ -321,8 +325,9 @@ class TorchCustomModel(Module, ABC):
     def fit(
             self,
             dataset: ProstateCancerDataset,
-            early_stopper: EarlyStopper,
+            early_stopper_type: EarlyStopperType,
             lr: float,
+            patience: int = 10,
             rho: float = 0,
             batch_size: Optional[int] = 55,
             valid_batch_size: Optional[int] = None,
@@ -335,13 +340,15 @@ class TorchCustomModel(Module, ABC):
         ----------
         dataset : ProstateCancerDataset
             Prostate cancer dataset used to feed the dataloaders.
-        early_stopper : EarlyStopper
-            Early stopper.
+        early_stopper_type : EarlyStopperType
+            Early stopper type.
         lr : float
             Learning rate
         rho : float
             If rho >= 0, will be used as neighborhood size in Sharpness-Aware Minimization optimizer, otherwise, Adam
             optimizer will be used.
+        patience : float
+            Patience.
         batch_size : Optional[int]
             Size of the batches in the training loader.
         valid_batch_size : Optional[int]
@@ -359,9 +366,12 @@ class TorchCustomModel(Module, ABC):
         self.on_fit_begin()
 
         # We setup the early stopper depending on its type.
-        if early_stopper.early_stopper_type == EarlyStopperType.METRIC:
+        early_stopper = None
+        if early_stopper_type == EarlyStopperType.METRIC:
+            early_stopper = MetricEarlyStopper(path_to_model=self._path_to_model, patience=patience)
             early_stopper.tasks = dataset.tasks
-        elif early_stopper.early_stopper_type == EarlyStopperType.MULTITASK_LOSS:
+        elif early_stopper_type == EarlyStopperType.MULTITASK_LOSS:
+            early_stopper = MultiTaskLossEarlyStopper(path_to_model=self._path_to_model, patience=patience)
             early_stopper.criterion = self._criterion
 
         # We create an empty evaluations dictionary that logs losses and metrics values.
@@ -405,7 +415,7 @@ class TorchCustomModel(Module, ABC):
 
             # We extract best params and remove checkpoint file
             self.load_state_dict(early_stopper.get_best_params())
-            early_stopper.reset()
+            early_stopper.remove_checkpoint()
 
     def loss(
             self,

@@ -105,15 +105,6 @@ class EarlyStopper(ABC):
         """
         remove(self.file_path)
 
-    def reset(
-            self
-    ) -> None:
-        """
-        Reset early stopper.
-        """
-        self.remove_checkpoint()
-        self.__init__(self.path_to_model, self.patience)
-
     def get_best_params(
             self
     ) -> OrderedDict[str, Tensor]:
