@@ -548,7 +548,7 @@ class BinaryCrossEntropyWithLogitsLoss(BinaryClassificationLoss):
             reduction="none"
         )
 
-        return loss(pred, targets)
+        return loss(pred, targets.float())
 
 
 class DICELoss(SegmentationLoss):
