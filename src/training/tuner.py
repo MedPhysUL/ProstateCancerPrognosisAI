@@ -108,7 +108,7 @@ class Objective:
         scores = ray.get(futures)
 
         # We take the mean of the scores
-        return mean(tensor(scores)).item()
+        return mean(tensor(scores), dim=0).tolist()
 
     def _define_getters(
             self
@@ -277,7 +277,7 @@ class Objective:
             model.fix_thresholds_to_optimal_values(dts)
 
             # We calculate the scores on the different tasks
-            test_set_scores = model.score_dataset(dataset=dts, mask=dts.test_mask)
+            test_set_scores = model.scores_dataset(dataset=dts, mask=dts.test_mask)
 
             # We retrieve the score associated to the optimization metric
             scores = [test_set_scores[task.name][task.optimization_metric.name] for task in dts.tasks]
