@@ -466,36 +466,45 @@ class Tuner:
             # We save the graph
             fig.write_image(join(self.path, f"{task.name}_{Tuner.OPTIMIZATION_HIST_FIG}"))
 
-    def get_best_hps_sets(self) -> List[Dict[str, Any]]:
+    def get_best_trial(self) -> FrozenTrial:
         """
-        Retrieves the best sets of hyperparameters found in the tuning.
+        Retrieves the best trial among all the trials on the pareto front.
 
         Returns
         -------
-        dictionary : List[Dict[str, Any]]
-            List of dictionary with hyperparameters' values.
+        best_trial : FrozenTrial
+            Best trial.
         """
-        return [self._objective.extract_hps(trial) for trial in self._study.best_trials]
-
-    def get_best_hps_set(self) -> Dict[str, Any]:
-        """
-        Retrieves the best hyperparameters found in the tuning.
-
-        Returns
-        -------
-        dictionary : Dict[str, Any]
-            Dictionary with hyperparameters' values.
-        """
-        best_sets = self.get_best_hps_sets()
-
         # TODO : Find a way to choose the best hps set among all the sets on the pareto front. For now, we arbitrarily
         #  choose the first in the list.
-        return best_sets[0]
+
+        return self._study.best_trials[0]
+
+    def get_hps_importance(self) -> Dict[str, Dict[str, float]]:
+        """
+        Retrieves the hyperparameter importances.
+
+        Returns
+        -------
+        hps_importance : Dict[str, Dict[str, float]]
+            Hyperparameters importance for each task.
+        """
+        hps_importance = {}
+        for idx, task in enumerate(self._objective.dataset.tasks):
+            importances = get_param_importances(
+                study=self._study,
+                evaluator=FanovaImportanceEvaluator(seed=Tuner.HP_IMPORTANCE_SEED),
+                target=lambda t: t.values[idx]
+            )
+
+            hps_importance[task.name] = importances
+
+        return hps_importance
 
     def tune(
             self,
             verbose: bool = True
-    ) -> Tuple[Dict[str, Any], Dict[str, float]]:
+    ) -> Tuple[Dict[str, Any], Dict[str, Dict[str, float]]]:
         """
         Searches for the hyperparameters that optimize the objective function, using the TPE algorithm.
 
@@ -506,7 +515,7 @@ class Tuner:
 
         Returns
         -------
-        best_hps, hps_importance : Tuple[Dict[str, Any], Dict[str, float]]
+        best_hps, hps_importance : Tuple[Dict[str, Any], Dict[str, Dict[str, float]]]
             Best hyperparameters and hyperparameters' importance.
         """
         if self._study is None or self._objective is None:
@@ -533,11 +542,9 @@ class Tuner:
             self._plot_pareto_front()
 
         # We extract the best hyperparameters and their importance
-        best_hps = self.get_best_hps_set()
-        hps_importance = get_param_importances(
-            study=self._study,
-            evaluator=FanovaImportanceEvaluator(seed=Tuner.HP_IMPORTANCE_SEED)
-        )
+        best_trial = self.get_best_trial()
+        best_hps = self._objective.extract_hps(best_trial)
+        hps_importance = self.get_hps_importance()
 
         # We shutdown ray if it has been initialized in this function
         if not ray_already_init:
