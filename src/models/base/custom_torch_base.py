@@ -221,7 +221,7 @@ class TorchCustomModel(Module, ABC):
             Tuple of a dictionary of tensors with predictions and training loss.
         """
         # We compute the predictions
-        pred = self(*x)
+        pred = self(x)
 
         # First forward-backward pass
         loss = self.loss(pred, y)
@@ -230,7 +230,7 @@ class TorchCustomModel(Module, ABC):
 
         # Second forward-backward pass
         self._disable_running_stats()
-        second_pred = self(*x)
+        second_pred = self(x)
         self.loss(second_pred, y).backward()
         self._optimizer.second_step()
 
@@ -260,7 +260,7 @@ class TorchCustomModel(Module, ABC):
             Tuple of a dictionary of tensors with predictions and training loss.
         """
         # We compute the predictions
-        pred = self(*x)
+        pred = self(x)
 
         # We execute a single forward-backward pass
         loss = self.loss(pred, y)

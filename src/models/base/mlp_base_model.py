@@ -115,7 +115,7 @@ class MLPBaseModel(TorchCustomModel):
             self._optimizer.zero_grad()
 
             # We perform the weight update
-            _, loss = self._update_weights([x], y)
+            _, loss = self._update_weights(x, y)
 
             # We update the losses history
             epoch_losses[self._criterion.name].append(loss)
