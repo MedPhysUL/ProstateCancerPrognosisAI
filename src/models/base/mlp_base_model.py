@@ -247,7 +247,7 @@ class MLPBaseModel(TorchCustomModel):
         x_table = cat(new_x_table, 1)
 
         # We compute the output
-        y_table = self._linear_layer(self._main_encoding_block(x_table.float())).squeeze()
+        y_table = self._linear_layer(self._main_encoding_block(x_table.float()))
 
         y = {task.name: y_table[:, i] for i, task in enumerate(self.tasks)}
 
@@ -298,8 +298,7 @@ class MLPBaseModel(TorchCustomModel):
 
         predictions = {}
         with no_grad():
-            features = cat(list(x.table.values()), dim=1)
-            outputs = self(features)
+            outputs = self(x)
 
             for task in self.tasks:
                 if task.task_type == TaskType.CLASSIFICATION:
