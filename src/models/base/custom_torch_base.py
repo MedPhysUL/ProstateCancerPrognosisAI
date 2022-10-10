@@ -138,8 +138,8 @@ class TorchCustomModel(Module, ABC):
         """
         for i in [MaskType.TRAIN, MaskType.VALID]:
             self._evaluations[i] = Evaluation(
-                losses=dict(**{self._criterion.name: []}, **{task.criterion.name: [] for task in self._tasks}),
-                scores={task.optimization_metric.name: [] for task in self._tasks}
+                losses=dict(**{self._criterion.name: []}, **{task.name: [] for task in self._tasks}),
+                scores={task.name: [] for task in self._tasks}
             )
 
     @staticmethod
@@ -572,7 +572,9 @@ class TorchCustomModel(Module, ABC):
                     metrics = metrics + task.evaluation_metrics
 
                 for metric in metrics:
-                    scores[task.name][metric.name] = metric(predictions[task.name], targets[task.name])
+                    scores[task.name][metric.name] = metric(
+                        np.array(predictions[task.name]), np.array(targets[task.name])
+                    )
 
         return scores
 
@@ -627,7 +629,7 @@ class TorchCustomModel(Module, ABC):
                 predictions = self.predict(x)
 
                 for task in self.tasks:
-                    pred, target = predictions[task.name], targets[task.name]
+                    pred, target = predictions[task.name].item(), targets[task.name].item()
 
                     if task.task_type == TaskType.SEGMENTATION:
                         metrics = [task.optimization_metric]
@@ -636,7 +638,7 @@ class TorchCustomModel(Module, ABC):
 
                         for metric in metrics:
                             segmentation_scores_dict[task.name][metric.name].append(
-                                metric(pred, target, MetricReduction.NONE)
+                                metric(np.array(pred), np.array(target), MetricReduction.NONE)
                             )
                     else:
                         non_segmentation_outputs_dict[task.name].predictions.append(pred)
@@ -655,7 +657,7 @@ class TorchCustomModel(Module, ABC):
                 else:
                     output = non_segmentation_outputs_dict[task.name]
                     for metric in metrics:
-                        scores[task.name][metric.name] = metric(output.predictions, output.targets)
+                        scores[task.name][metric.name] = metric(np.array(output.predictions), np.array(output.targets))
 
         return scores
 
@@ -690,7 +692,7 @@ class TorchCustomModel(Module, ABC):
                 predictions = self.predict(x)
 
                 for task in classification_tasks:
-                    pred, target = predictions[task.name], targets[task.name]
+                    pred, target = predictions[task.name].item(), targets[task.name].item()
 
                     outputs_dict[task.name].predictions.append(pred)
                     outputs_dict[task.name].targets.append(target)
@@ -704,7 +706,7 @@ class TorchCustomModel(Module, ABC):
 
                 for metric in metrics:
                     scores = np.array(
-                        [metric(output.predictions, output.targets, t) for t in thresholds]
+                        [metric(np.array(output.predictions), np.array(output.targets), t) for t in thresholds]
                     )
 
                     # We set the threshold to the optimal threshold

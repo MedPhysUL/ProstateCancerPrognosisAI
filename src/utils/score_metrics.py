@@ -650,7 +650,7 @@ class AUC(BinaryClassificationMetric):
         metric : float
             Score.
         """
-        return roc_auc_score(targets, pred)
+        return roc_auc_score(targets.numpy(), pred.numpy())
 
 
 class BinaryAccuracy(BinaryClassificationMetric):

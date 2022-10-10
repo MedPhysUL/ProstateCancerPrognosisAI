@@ -129,7 +129,7 @@ class MLPBaseModel(TorchCustomModel):
             self.fix_thresholds_to_optimal_values(dataset=self._dataset)
             scores = self.scores_dataset(dataset=self._dataset, mask=self._dataset.train_mask)
             epoch_scores = {
-                f"{task.name}_{task.optimization_metric.name}": scores[task.name][task.optimization_metric.name]
+                task.name: scores[task.name][task.optimization_metric.name]
                 for task in self._dataset.tasks
             }
         else:
@@ -166,7 +166,7 @@ class MLPBaseModel(TorchCustomModel):
 
         # Set model for evaluation
         self.eval()
-        epoch_losses = dict(**{self._criterion.name: []}, **{task.criterion.name: [] for task in self._tasks})
+        epoch_losses = dict(**{self._criterion.name: []}, **{task.name: [] for task in self._tasks})
 
         # We execute one inference step on validation set
         with no_grad():
@@ -180,7 +180,7 @@ class MLPBaseModel(TorchCustomModel):
 
                 # We update the losses history
                 epoch_losses[self._criterion.name].append(loss.item())
-                for name, single_task_loss in self._criterion.single_task_losses:
+                for name, single_task_loss in self._criterion.single_task_losses.items():
                     epoch_losses[name].append(single_task_loss)
 
         epoch_losses = {name: np.mean(loss) for name, loss in epoch_losses.items()}
@@ -188,7 +188,7 @@ class MLPBaseModel(TorchCustomModel):
         if self._calculate_epoch_score:
             scores = self.scores_dataset(dataset=self._dataset, mask=self._dataset.valid_mask)
             epoch_scores = {
-                f"{task.name}_{task.optimization_metric.name}": scores[task.name][task.optimization_metric.name]
+                task.name: scores[task.name][task.optimization_metric.name]
                 for task in self._dataset.tasks
             }
         else:
