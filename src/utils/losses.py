@@ -544,7 +544,7 @@ class BinaryCrossEntropyWithLogitsLoss(BinaryClassificationLoss):
             Loss value.
         """
         loss = nn.BCEWithLogitsLoss(
-            pos_weight=tensor([1 - self.scaling_factor, self.scaling_factor]),
+            weight=where(targets == 1, self.scaling_factor, 1),
             reduction="none"
         )
 
