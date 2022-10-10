@@ -22,7 +22,12 @@ from optuna.pruners import NopPruner
 from optuna.samplers import TPESampler
 from optuna.study import Study
 from optuna.trial import FrozenTrial, Trial
-from optuna.visualization import plot_parallel_coordinate, plot_param_importances, plot_optimization_history
+from optuna.visualization import (
+    plot_parallel_coordinate,
+    plot_param_importances,
+    plot_pareto_front,
+    plot_optimization_history
+)
 import ray
 from torch import mean, tensor
 
@@ -318,6 +323,7 @@ class Tuner:
     # FIGURES NAME
     HPS_IMPORTANCE_FIG: str = "hp_importance.png"
     PARALLEL_COORD_FIG: str = "parallel_coordinates.png"
+    PARETO_FRONT_FIG: str = "pareto_front.png"
     OPTIMIZATION_HIST_FIG: str = "optimization_history.png"
 
     def __init__(
@@ -328,6 +334,7 @@ class Tuner:
             objective: Objective = None,
             save_hps_importance: Optional[bool] = False,
             save_parallel_coordinates: Optional[bool] = False,
+            save_pareto_front: Optional[bool] = False,
             save_optimization_history: Optional[bool] = False
     ):
         """
@@ -347,6 +354,8 @@ class Tuner:
             Whether we want to plot the hyperparameters importance graph after tuning.
         save_parallel_coordinates : Optional[bool]
             Whether we want to plot the parallel coordinates graph after tuning.
+        save_pareto_front : Optional[bool]
+            Whether we want to plot the pareto front after tuning.
         save_optimization_history : Optional[bool]
             Whether we want to plot the optimization history graph after tuning.
         """
@@ -360,6 +369,7 @@ class Tuner:
         self.path = join(path, f"{strftime('%Y%m%d-%H%M%S')}")
         self.save_hps_importance = save_hps_importance
         self.save_parallel_coordinates = save_parallel_coordinates
+        self.save_pareto_front = save_pareto_front
         self.save_optimization_history = save_optimization_history
 
         # We make sure that the path given exists
@@ -403,32 +413,71 @@ class Tuner:
         Plots the hyperparameters importance graph and save it in an html file.
         """
         # We generate the hyperparameters importance graph with optuna
-        fig = plot_param_importances(self._study, evaluator=FanovaImportanceEvaluator(seed=Tuner.HP_IMPORTANCE_SEED))
+        for idx, task in enumerate(self._objective.dataset.tasks):
+            fig = plot_param_importances(
+                self._study,
+                evaluator=FanovaImportanceEvaluator(seed=Tuner.HP_IMPORTANCE_SEED),
+                target=lambda t: t.values[idx],
+                target_name=task.name
+            )
 
-        # We save the graph
-        fig.write_image(join(self.path, Tuner.HPS_IMPORTANCE_FIG))
+            # We save the graph
+            fig.write_image(join(self.path, f"{task.name}_{Tuner.HPS_IMPORTANCE_FIG}"))
 
     def _plot_parallel_coordinates_graph(self) -> None:
         """
         Plots the parallel coordinates graph and save it in an html file.
         """
         # We generate the parallel coordinate graph with optuna
-        fig = plot_parallel_coordinate(self._study)
+        for idx, task in enumerate(self._objective.dataset.tasks):
+            fig = plot_parallel_coordinate(
+                self._study,
+                target=lambda t: t.values[idx],
+                target_name=task.name
+            )
+
+            # We save the graph
+            fig.write_image(join(self.path, f"{task.name}_{Tuner.PARALLEL_COORD_FIG}"))
+
+    def _plot_pareto_front(self) -> None:
+        """
+        Plots the pareto front.
+        """
+        fig = plot_pareto_front(
+            self._study,
+            target_names=[task.name for task in self._objective.dataset.tasks]
+        )
 
         # We save the graph
-        fig.write_image(join(self.path, Tuner.PARALLEL_COORD_FIG))
+        fig.write_image(join(self.path, f"{Tuner.PARETO_FRONT_FIG}"))
 
     def _plot_optimization_history_graph(self) -> None:
         """
         Plots the optimization history graph and save it in a html file.
         """
         # We generate the optimization history graph with optuna
-        fig = plot_optimization_history(self._study)
+        for idx, task in enumerate(self._objective.dataset.tasks):
+            fig = plot_optimization_history(
+                self._study,
+                target=lambda t: t.values[idx],
+                target_name=task.name
+            )
 
-        # We save the graph
-        fig.write_image(join(self.path, Tuner.OPTIMIZATION_HIST_FIG))
+            # We save the graph
+            fig.write_image(join(self.path, f"{task.name}_{Tuner.OPTIMIZATION_HIST_FIG}"))
 
-    def get_best_hps(self) -> Dict[str, Any]:
+    def get_best_hps_sets(self) -> List[Dict[str, Any]]:
+        """
+        Retrieves the best sets of hyperparameters found in the tuning.
+
+        Returns
+        -------
+        dictionary : List[Dict[str, Any]]
+            List of dictionary with hyperparameters' values.
+        """
+        return [self._objective.extract_hps(trial) for trial in self._study.best_trials]
+
+    def get_best_hps_set(self) -> Dict[str, Any]:
         """
         Retrieves the best hyperparameters found in the tuning.
 
@@ -437,7 +486,11 @@ class Tuner:
         dictionary : Dict[str, Any]
             Dictionary with hyperparameters' values.
         """
-        return self._objective.extract_hps(self._study.best_trial)
+        best_sets = self.get_best_hps_sets()
+
+        # TODO : Find a way to choose the best hps set among all the sets on the pareto front. For now, we arbitrarily
+        #  choose the first in the list.
+        return best_sets[0]
 
     def tune(
             self,
@@ -476,8 +529,11 @@ class Tuner:
         if self.save_optimization_history:
             self._plot_optimization_history_graph()
 
+        if self.save_pareto_front:
+            self._plot_pareto_front()
+
         # We extract the best hyperparameters and their importance
-        best_hps = self.get_best_hps()
+        best_hps = self.get_best_hps_set()
         hps_importance = get_param_importances(
             study=self._study,
             evaluator=FanovaImportanceEvaluator(seed=Tuner.HP_IMPORTANCE_SEED)

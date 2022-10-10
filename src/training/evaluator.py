@@ -52,6 +52,7 @@ class Evaluator:
             fixed_params_update_function: Optional[Callable] = None,
             save_hps_importance: Optional[bool] = False,
             save_parallel_coordinates: Optional[bool] = False,
+            save_pareto_front: Optional[bool] = False,
             save_optimization_history: Optional[bool] = False,
             pred_path: Optional[str] = None
     ):
@@ -89,6 +90,8 @@ class Evaluator:
             True if we want to plot the hyperparameters importance graph after tuning.
         save_parallel_coordinates : Optional[bool]
             True if we want to plot the parallel coordinates graph after tuning.
+        save_pareto_front : Optional[bool]
+            Whether we want to plot the pareto front after tuning.
         save_optimization_history : Optional[bool]
             True if we want to plot the optimization history graph after tuning.
         pred_path : Optional[str]
@@ -119,6 +122,7 @@ class Evaluator:
             n_trials=n_trials,
             save_hps_importance=save_hps_importance,
             save_parallel_coordinates=save_parallel_coordinates,
+            save_pareto_front=save_pareto_front,
             save_optimization_history=save_optimization_history,
             path=path_to_experiment_records
         )
