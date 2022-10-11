@@ -529,17 +529,19 @@ class TorchCustomModel(Module, ABC):
             Path were the figures will be saved.
         """
         train_history, valid_history, progression_type = [], [], []
-        for train, valid in zip(self._evaluations[MaskType.TRAIN], self._evaluations[MaskType.VALID]):
-            for name, train_loss in train.losses.items():
-                train_history.append(train_loss)
-                valid_history.append(valid.losses[name])
-                progression_type.append(name)
+        train = self._evaluations[MaskType.TRAIN]
+        valid = self._evaluations[MaskType.VALID]
 
-            if self._calculate_epoch_score:
-                for name, train_score in train.scores.items():
-                    train_history.append(train_score)
-                    valid_history.append(valid.scores[name])
-                    progression_type.append(name)
+        for name, train_loss in train.losses.items():
+            train_history.append(train_loss)
+            valid_history.append(valid.losses[name])
+            progression_type.append(name)
+
+        if self._calculate_epoch_score:
+            for name, train_score in train.scores.items():
+                train_history.append(train_score)
+                valid_history.append(valid.scores[name])
+                progression_type.append(name)
 
         # Figure construction
         visualize_epoch_progression(
