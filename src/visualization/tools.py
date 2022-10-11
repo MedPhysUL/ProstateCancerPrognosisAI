@@ -61,7 +61,7 @@ def visualize_epoch_progression(
         for i in range(len(train_history)):
 
             nb_epochs = len(train_history[i])
-            plt.subplot(1, 2, i+1)
+            plt.subplot(1, len(train_history), i+1)
             plt.plot(range(nb_epochs), train_history[i], label=MaskType.TRAIN)
             if len(valid_history[i]) != 0:
                 plt.plot(range(nb_epochs), valid_history[i], label=MaskType.VALID)
