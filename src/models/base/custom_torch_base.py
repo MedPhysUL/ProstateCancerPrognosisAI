@@ -399,6 +399,9 @@ class TorchCustomModel(Module, ABC):
         #     train_data = (train_data, dataset)
         #     valid_data = (valid_data, dataset)
 
+        # We set the model for training
+        self.train()
+
         # We execute the epochs
         for epoch in range(max_epochs):
 
@@ -502,17 +505,16 @@ class TorchCustomModel(Module, ABC):
         subset = dataset[mask]
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
 
-        predictions = {}
+        predictions_as_lists = {task.name: [] for task in dataset.tasks}
         with no_grad():
             for idx, (x, _) in enumerate(data_loader):
                 pred = self.predict(x)
 
                 for task in dataset.tasks:
                     if task.task_type != TaskType.SEGMENTATION:
-                        if idx == 0:
-                            predictions[task.name] = pred[task.name]
-                        else:
-                            predictions[task.name] = stack([predictions[task.name], pred[task.name]], dim=0)
+                        predictions_as_lists[task.name].append(pred[task.name])
+
+        predictions = {task.name: stack(predictions_as_lists[task.name], dim=0) for task in dataset.tasks}
 
         return predictions
 

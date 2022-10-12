@@ -105,8 +105,6 @@ class MLPBaseModel(TorchCustomModel):
         -------
         Mean epoch loss
         """
-        # We set the model for training
-        self.train()
         epoch_losses = dict(**{self._criterion.name: []}, **{task.name: [] for task in self._tasks})
 
         # We execute one training step
