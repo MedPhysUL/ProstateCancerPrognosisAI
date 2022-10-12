@@ -14,10 +14,11 @@ from os import makedirs, path
 from time import strftime
 from typing import Any, Callable, Dict, List, Optional
 
+import numpy as np
 from numpy.random import seed as np_seed
 from pandas import DataFrame
 import ray
-from torch import is_tensor, from_numpy, manual_seed
+from torch import is_tensor, from_numpy, manual_seed, stack
 
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset, TableDataset
 from src.data.processing.feature_selection import FeatureSelector
@@ -276,12 +277,11 @@ class Evaluator:
             recorder.generate_file()
 
             # We generate a plot that compares predictions to ground_truth
-            if not model.is_encoder():
-                compare_prediction_recordings(
-                    evaluations=[self.evaluation_name],
-                    split_index=k,
-                    recording_path=self._path_to_experiment_records
-                )
+            # compare_prediction_recordings(
+            #     evaluations=[self.evaluation_name],
+            #     split_index=k,
+            #     recording_path=self._path_to_experiment_records
+            # )
 
         # We save the evaluation recap
         get_evaluation_recap(evaluation_name=self.evaluation_name, recordings_path=self._path_to_experiment_records)
@@ -433,9 +433,19 @@ class Evaluator:
                 # We compute scores
                 scores = model.scores_dataset(dataset=subset, mask=mask, include_evaluation_metrics=True)
 
-                # We extract ids and targets
+                # We extract ids
                 ids = [subset.table_dataset.ids[i] for i in mask]
-                y = subset[mask].y
+
+                # We extract table targets and create tensors
+                targets = {task.name: [] for task in subset.tasks if task.task_type != TaskType.SEGMENTATION}
+                for sample in subset[mask]:
+                    for task_name in targets.keys():
+                        targets[task_name].append(sample.y[task_name])
+
+                if subset.table_dataset.to_tensor:
+                    targets = {k: stack(v, dim=0) for k, v in targets.items()}
+                else:
+                    targets = {k: np.stack(v, axis=0) for k, v in targets.items()}
 
                 # We record all tasks and metric scores
                 for task_name, metrics in scores.items():
@@ -459,6 +469,6 @@ class Evaluator:
                     recorder.record_predictions(
                         predictions=pred,
                         ids=ids,
-                        targets=y[task.name],
+                        targets=targets[task.name],
                         mask_type=mask_type
                     )
