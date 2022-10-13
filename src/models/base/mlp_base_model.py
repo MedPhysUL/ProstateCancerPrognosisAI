@@ -230,19 +230,20 @@ class MLPBaseModel(TorchCustomModel):
         # We retrieve the table data only and transform the input dictionary to a tensor
         x_table = stack(list(x.table.values()), 1)
 
-        # We initialize a list of tensors to concatenate
-        new_x_table = []
+        if self._use_entity_embedding:
+            # We initialize a list of tensors to concatenate
+            new_x_table = []
 
-        # We extract continuous data
-        if len(self._dataset.table_dataset.cont_idx) != 0:
-            new_x_table.append(x_table[:, self._dataset.table_dataset.cont_idx])
+            # We extract continuous data
+            if len(self._dataset.table_dataset.cont_idx) != 0:
+                new_x_table.append(x_table[:, self._dataset.table_dataset.cont_idx])
 
-        # We perform entity embeddings on categorical features
-        if len(self._dataset.table_dataset.cat_idx) != 0:
-            new_x_table.append(self.embedding_block(x_table))
+            # We perform entity embeddings on categorical features
+            if len(self._dataset.table_dataset.cat_idx) != 0:
+                new_x_table.append(self.embedding_block(x_table))
 
-        # We concatenate all inputs
-        x_table = cat(new_x_table, 1)
+            # We concatenate all inputs
+            x_table = cat(new_x_table, 1)
 
         # We compute the output
         y_table = self._linear_layer(self._main_encoding_block(x_table.float()))

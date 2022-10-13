@@ -56,6 +56,7 @@ class TorchCustomModel(Module, ABC):
             criterion: MultiTaskLoss,
             output_size: int,
             path_to_model: str,
+            use_entity_embedding: bool = False,
             alpha: float = 0,
             beta: float = 0,
             calculate_epoch_score: bool = True,
@@ -70,6 +71,8 @@ class TorchCustomModel(Module, ABC):
             Loss function of our model.
         path_to_model : str
             Path to save model.
+        use_entity_embedding : bool
+            Use entity embedding block.
         alpha : float
             L1 penalty coefficient.
         beta : float
@@ -93,6 +96,7 @@ class TorchCustomModel(Module, ABC):
         self._optimizer = None
         self._output_size = output_size
         self._tasks = None
+        self._use_entity_embedding = use_entity_embedding
         self._verbose = verbose
 
         # Create model path
@@ -102,31 +106,33 @@ class TorchCustomModel(Module, ABC):
         self._update_weights = None
 
     @property
-    def embedding_block(self) -> EntityEmbeddingBlock:
+    def embedding_block(self) -> Optional[EntityEmbeddingBlock]:
         embedding_block = None
+        if self._use_entity_embedding:
+            # We set the embedding layers
+            if len(self._dataset.table_dataset.cat_idx) != 0 and self._dataset.table_dataset.cat_sizes is not None:
 
-        # We set the embedding layers
-        if len(self._dataset.table_dataset.cat_idx) != 0 and self._dataset.table_dataset.cat_sizes is not None:
+                # We check embedding sizes (if nothing provided -> emb_sizes = cat_sizes - 1)
+                cat_emb_sizes = [s - 1 for s in self._dataset.table_dataset.cat_sizes]
+                if 0 in cat_emb_sizes:
+                    raise ValueError('One categorical variable as a single modality')
 
-            # We check embedding sizes (if nothing provided -> emb_sizes = cat_sizes - 1)
-            cat_emb_sizes = [s - 1 for s in self._dataset.table_dataset.cat_sizes]
-            if 0 in cat_emb_sizes:
-                raise ValueError('One categorical variable as a single modality')
+                embedding_block = EntityEmbeddingBlock(
+                    cat_sizes=self._dataset.table_dataset.cat_sizes,
+                    cat_emb_sizes=cat_emb_sizes,
+                    cat_idx=self._dataset.table_dataset.cat_idx
+                )
 
-            embedding_block = EntityEmbeddingBlock(
-                cat_sizes=self._dataset.table_dataset.cat_sizes,
-                cat_emb_sizes=cat_emb_sizes,
-                cat_idx=self._dataset.table_dataset.cat_idx
-            )
-
-        return embedding_block
+            return embedding_block
+        else:
+            return embedding_block
 
     @property
     def table_input_size(self) -> int:
-        if self.embedding_block:
+        if self._use_entity_embedding:
             return len(self._dataset.table_dataset.cont_cols) + self.embedding_block.output_size
         else:
-            return len(self._dataset.table_dataset.cont_cols)
+            return len(self._dataset.table_dataset.cont_cols) + len(self._dataset.table_dataset.cat_cols)
 
     @property
     def output_size(self) -> int:
