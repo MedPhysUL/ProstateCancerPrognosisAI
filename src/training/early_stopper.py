@@ -269,7 +269,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
             Number of training epochs done
         """
         print(f"\nEarly stopping occurred at epoch {epoch} with best_epoch = {epoch - self.patience}")
-        print(f"Criterion {self.criterion.name}), Loss :{round(self.best_val_loss, 4)}")
+        print(f"Criterion {self.criterion.name}, Loss :{round(self.best_val_loss, 4)}")
 
     def __call__(
             self,
