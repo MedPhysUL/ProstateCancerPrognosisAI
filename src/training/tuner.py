@@ -526,7 +526,7 @@ class Tuner:
 
         # We perform the optimization
         set_verbosity(FATAL)  # We remove verbosity from loading bar
-        self._study.optimize(self._objective, self.n_trials, show_progress_bar=verbose)
+        self._study.optimize(self._objective, self.n_trials, gc_after_trial=True, show_progress_bar=verbose)
 
         # We save the plots if it is required
         if self.save_hps_importance:
