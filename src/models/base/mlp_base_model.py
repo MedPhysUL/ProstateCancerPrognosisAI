@@ -105,10 +105,16 @@ class MLPBaseModel(TorchCustomModel):
         -------
         Mean epoch loss
         """
+        # Set model for training
+        self.train()
+
         epoch_losses = dict(**{self._criterion.name: []}, **{task.name: [] for task in self._tasks})
 
         # We execute one training step
         for x, y in train_data:
+            # Send batch to device
+            x, y = self._batch_to_device(x), self._batch_to_device(y)
+
             # We clear the gradients
             self._optimizer.zero_grad()
 
@@ -170,6 +176,9 @@ class MLPBaseModel(TorchCustomModel):
         with no_grad():
 
             for x, y in valid_loader:
+                # Send batch to device
+                x, y = self._batch_to_device(x), self._batch_to_device(y)
+
                 # We perform the forward pass
                 output = self(x)
 

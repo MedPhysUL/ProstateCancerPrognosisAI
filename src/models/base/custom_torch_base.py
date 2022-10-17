@@ -16,6 +16,7 @@ import os
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 
 # from dgl import DGLGraph
+import torch
 from monai.data import DataLoader
 import numpy as np
 from torch import FloatTensor, no_grad, stack, tensor, Tensor
@@ -23,7 +24,7 @@ from torch.nn import BatchNorm1d, Module
 from torch.optim import Adam
 from torch.utils.data import SubsetRandomSampler
 
-from src.data.datasets.prostate_cancer_dataset import DataModel, ProstateCancerDataset
+from src.data.datasets.prostate_cancer_dataset import DataModel, FeaturesModel, ProstateCancerDataset
 from src.data.processing.tools import MaskType
 # from src.data.processing.gnn_datasets import PetaleKGNNDataset
 from src.models.base.blocks.embeddings import EntityEmbeddingBlock
@@ -37,8 +38,8 @@ from src.visualization.tools import visualize_epoch_progression
 
 
 class Output(NamedTuple):
-    predictions: List = []
-    targets: List = []
+    predictions: List
+    targets: List
 
 
 class Evaluation(NamedTuple):
@@ -59,6 +60,7 @@ class TorchCustomModel(Module, ABC):
             use_entity_embedding: bool = False,
             alpha: float = 0,
             beta: float = 0,
+            device: Optional[torch.device] = None,
             calculate_epoch_score: bool = True,
             verbose: bool = False
     ) -> None:
@@ -77,6 +79,8 @@ class TorchCustomModel(Module, ABC):
             L1 penalty coefficient.
         beta : float
             L2 penalty coefficient.
+        device : torch.device
+            Device used for training.
         calculate_epoch_score : bool
             Whether we want to calculate the score at each training epoch.
         verbose : bool
@@ -91,6 +95,7 @@ class TorchCustomModel(Module, ABC):
         self._calculate_epoch_score = calculate_epoch_score
         self._criterion = criterion
         self._dataset: Optional[ProstateCancerDataset] = None
+        self._device = self._set_device(device)
         self._evaluations: Dict[str, Evaluation] = {}
         self._path_to_model = path_to_model
         self._optimizer = None
@@ -151,6 +156,28 @@ class TorchCustomModel(Module, ABC):
                 losses=dict(**{self._criterion.name: []}, **{task.name: [] for task in self._tasks}),
                 scores={task.name: [] for task in self._tasks}
             )
+
+    @staticmethod
+    def _set_device(
+            device: Optional[torch.device] = None
+    ) -> torch.device:
+        """
+        Sets the device to use for training.
+
+        Parameters
+        ----------
+        device : Optional[torch.device]
+            An optional device.
+
+        Returns
+        -------
+        device : torch.device
+            The device to use.
+        """
+        if device is None:
+            return torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+        return device
 
     @staticmethod
     def _create_validation_loader(
@@ -405,12 +432,11 @@ class TorchCustomModel(Module, ABC):
         #     train_data = (train_data, dataset)
         #     valid_data = (valid_data, dataset)
 
-        # We set the model for training
-        self.train()
+        # Send to device
+        self.to(device=self._device)
 
         # We execute the epochs
         for epoch in range(max_epochs):
-
             # We calculate training loss
             train_loss = self._execute_train_step(train_data)
             update_progress(epoch, train_loss)
@@ -638,18 +664,21 @@ class TorchCustomModel(Module, ABC):
                     segmentation_scores_dict[task.name][metric.name] = []
 
         non_segmentation_outputs_dict = {
-            task.name: Output() for task in self.tasks if task.task_type != TaskType.SEGMENTATION
+            task.name: Output(predictions=[], targets=[])
+            for task in self.tasks if task.task_type != TaskType.SEGMENTATION
         }
 
         # Set model for evaluation
         self.eval()
 
         with no_grad():
-            for x, targets in data_loader:
+            for x, y in data_loader:
+                x, y = self._batch_to_device(x), self._batch_to_device(y)
+
                 predictions = self.predict(x)
 
                 for task in self.tasks:
-                    pred, target = predictions[task.name].item(), targets[task.name].item()
+                    pred, target = predictions[task.name].item(), y[task.name].item()
 
                     if task.task_type == TaskType.SEGMENTATION:
                         metrics = [task.optimization_metric]
@@ -702,17 +731,19 @@ class TorchCustomModel(Module, ABC):
         thresholds = np.linspace(start=0.01, stop=0.95, num=95)
 
         classification_tasks = [task for task in self.tasks if task.task_type == TaskType.CLASSIFICATION]
-        outputs_dict = {task.name: Output() for task in classification_tasks}
+        outputs_dict = {task.name: Output(predictions=[], targets=[]) for task in classification_tasks}
 
         # Set model for evaluation
         self.eval()
 
         with no_grad():
-            for x, targets in data_loader:
+            for x, y in data_loader:
+                x, y = self._batch_to_device(x), self._batch_to_device(y)
+
                 predictions = self.predict(x)
 
                 for task in classification_tasks:
-                    pred, target = predictions[task.name].item(), targets[task.name].item()
+                    pred, target = predictions[task.name].item(), y[task.name].item()
 
                     outputs_dict[task.name].predictions.append(pred)
                     outputs_dict[task.name].targets.append(target)
@@ -840,3 +871,25 @@ class TorchCustomModel(Module, ABC):
         """
         if isinstance(module, BatchNorm1d) and hasattr(module, "backup_momentum"):
             module.momentum = module.backup_momentum
+
+    def _batch_to_device(
+            self,
+            batch: Union[dict, FeaturesModel, Tensor]
+    ) -> Union[dict, FeaturesModel, Tensor]:
+        """
+        Send batch to device.
+
+        Parameters
+        ----------
+        batch : Union[dict, FeaturesModel, Tensor]
+            Batch data
+        """
+        if isinstance(batch, FeaturesModel):
+            image_to_device = {k: self._batch_to_device(v) for k, v in batch.image.items()}
+            table_to_device = {k: self._batch_to_device(v) for k, v in batch.table.items()}
+            return FeaturesModel(image=image_to_device, table=table_to_device)
+        if isinstance(batch, dict):
+            return {k: self._batch_to_device(v) for k, v in batch.items()}
+        if isinstance(batch, torch.Tensor):
+            return batch.to(self._device)
+        return batch
