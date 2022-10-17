@@ -16,7 +16,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
-from torch import mean, tensor, Tensor
+from torch import mean, stack, Tensor
 
 from src.data.datasets.prostate_cancer_dataset import DataModel
 from src.utils.tasks import Task
@@ -136,4 +136,4 @@ class MeanLoss(MultiTaskLoss):
         loss : Tensor
             (1, 1) tensor.
         """
-        return mean(tensor([single_task_losses[task.name] for task in self.tasks]))
+        return mean(stack([single_task_losses[task.name] for task in self.tasks]))
