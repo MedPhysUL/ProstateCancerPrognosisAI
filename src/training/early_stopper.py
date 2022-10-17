@@ -56,6 +56,7 @@ class EarlyStopper(ABC):
         self.early_stop = False
         self.counter = 0
         self.best_model = None
+        self.path_to_model = path_to_model
         self.file_path = path.join(path_to_model, f"{uuid4()}.pt")
 
     @property
@@ -253,7 +254,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
 
     @property
     def early_stopper_type(self) -> EarlyStopperType:
-        return EarlyStopperType.LOSS
+        return EarlyStopperType.MULTITASK_LOSS
 
     def print_early_stopping_message(
             self,
@@ -268,7 +269,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
             Number of training epochs done
         """
         print(f"\nEarly stopping occurred at epoch {epoch} with best_epoch = {epoch - self.patience}")
-        print(f"Criterion {self.criterion.name}), Loss :{round(self.best_val_loss, 4)}")
+        print(f"Criterion {self.criterion.name}, Loss :{round(self.best_val_loss, 4)}")
 
     def __call__(
             self,

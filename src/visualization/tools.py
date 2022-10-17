@@ -24,8 +24,8 @@ EPOCHS_PROGRESSION_FIG: str = "epochs_progression.png"
 
 
 def visualize_epoch_progression(
-        train_history: List[Tensor],
-        valid_history: List[Tensor],
+        train_history: List[List[float]],
+        valid_history: List[List[float]],
         progression_type: List[str],
         path: str
 ) -> None:
@@ -34,10 +34,10 @@ def visualize_epoch_progression(
 
     Parameters
     ----------
-    train_history : List[Tensor]
-        A list of (E,) tensors where E is the number of epochs.
-    valid_history : List[Tensor]
-        A list of (E,) tensor.
+    train_history : List[List[float]]
+        A list of (E,) lists where E is the number of epochs.
+    valid_history : List[List[float]]
+        A list of (E,) list.
     progression_type : List[str]
         A list of string specifying the type of the progressions to visualize.
     path :
@@ -61,7 +61,7 @@ def visualize_epoch_progression(
         for i in range(len(train_history)):
 
             nb_epochs = len(train_history[i])
-            plt.subplot(1, 2, i+1)
+            plt.subplot(1, len(train_history), i+1)
             plt.plot(range(nb_epochs), train_history[i], label=MaskType.TRAIN)
             if len(valid_history[i]) != 0:
                 plt.plot(range(nb_epochs), valid_history[i], label=MaskType.VALID)

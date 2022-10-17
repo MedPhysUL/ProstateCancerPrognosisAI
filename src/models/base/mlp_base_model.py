@@ -14,7 +14,7 @@ from typing import List, Optional
 
 import numpy as np
 from monai.data import DataLoader
-from torch import cat, no_grad, sigmoid
+from torch import cat, no_grad, sigmoid, stack
 from torch.nn import Identity, Linear
 
 from src.data.datasets.prostate_cancer_dataset import DataModel
@@ -82,20 +82,12 @@ class MLPBaseModel(TorchCustomModel):
             verbose=verbose
         )
 
-        if len(layers) > 0:
-            self._main_encoding_block = MLPEncodingBlock(
-                input_size=self._input_size,
-                output_size=layers[-1],
-                layers=layers[:-1],
-                activation=activation,
-                dropout=dropout
-            )
-        else:
-            self._main_encoding_block = Identity()
-            layers.append(self._input_size)
+        self._activation = activation
+        self._dropout = dropout
+        self._layers = layers
 
-        # We add a linear layer to complete the layers
-        self._linear_layer = Linear(layers[-1], output_size)
+        self._linear_layer = None
+        self._main_encoding_block = None
 
     def _execute_train_step(
             self,
@@ -113,21 +105,25 @@ class MLPBaseModel(TorchCustomModel):
         -------
         Mean epoch loss
         """
-        # We set the model for training
+        # Set model for training
         self.train()
-        epoch_losses = dict(**{self._criterion.name: []}, **{task.criterion.name: [] for task in self._tasks})
+
+        epoch_losses = dict(**{self._criterion.name: []}, **{task.name: [] for task in self._tasks})
 
         # We execute one training step
         for x, y in train_data:
+            # Send batch to device
+            x, y = self._batch_to_device(x), self._batch_to_device(y)
+
             # We clear the gradients
             self._optimizer.zero_grad()
 
             # We perform the weight update
-            pred, loss = self._update_weights([x], y)
+            _, loss = self._update_weights(x, y)
 
             # We update the losses history
-            epoch_losses[self._criterion.name].append(loss.item())
-            for name, single_task_loss in self._criterion.single_task_losses:
+            epoch_losses[self._criterion.name].append(loss)
+            for name, single_task_loss in self._criterion.single_task_losses.items():
                 epoch_losses[name].append(single_task_loss)
 
         epoch_losses = {name: np.mean(loss) for name, loss in epoch_losses.items()}
@@ -137,7 +133,7 @@ class MLPBaseModel(TorchCustomModel):
             self.fix_thresholds_to_optimal_values(dataset=self._dataset)
             scores = self.scores_dataset(dataset=self._dataset, mask=self._dataset.train_mask)
             epoch_scores = {
-                f"{task.name}_{task.optimization_metric.name}": scores[task.name][task.optimization_metric.name]
+                task.name: scores[task.name][task.optimization_metric.name]
                 for task in self._dataset.tasks
             }
         else:
@@ -174,12 +170,15 @@ class MLPBaseModel(TorchCustomModel):
 
         # Set model for evaluation
         self.eval()
-        epoch_losses = dict(**{self._criterion.name: []}, **{task.criterion.name: [] for task in self._tasks})
+        epoch_losses = dict(**{self._criterion.name: []}, **{task.name: [] for task in self._tasks})
 
         # We execute one inference step on validation set
         with no_grad():
 
             for x, y in valid_loader:
+                # Send batch to device
+                x, y = self._batch_to_device(x), self._batch_to_device(y)
+
                 # We perform the forward pass
                 output = self(x)
 
@@ -188,7 +187,7 @@ class MLPBaseModel(TorchCustomModel):
 
                 # We update the losses history
                 epoch_losses[self._criterion.name].append(loss.item())
-                for name, single_task_loss in self._criterion.single_task_losses:
+                for name, single_task_loss in self._criterion.single_task_losses.items():
                     epoch_losses[name].append(single_task_loss)
 
         epoch_losses = {name: np.mean(loss) for name, loss in epoch_losses.items()}
@@ -196,7 +195,7 @@ class MLPBaseModel(TorchCustomModel):
         if self._calculate_epoch_score:
             scores = self.scores_dataset(dataset=self._dataset, mask=self._dataset.valid_mask)
             epoch_scores = {
-                f"{task.name}_{task.optimization_metric.name}": scores[task.name][task.optimization_metric.name]
+                task.name: scores[task.name][task.optimization_metric.name]
                 for task in self._dataset.tasks
             }
         else:
@@ -238,28 +237,50 @@ class MLPBaseModel(TorchCustomModel):
             Predictions.
         """
         # We retrieve the table data only and transform the input dictionary to a tensor
-        x_table = cat(list(x.table.values()), 1)
+        x_table = stack(list(x.table.values()), 1)
 
-        # We initialize a list of tensors to concatenate
-        new_x_table = []
+        if self._use_entity_embedding:
+            # We initialize a list of tensors to concatenate
+            new_x_table = []
 
-        # We extract continuous data
-        if len(self._dataset.table_dataset.cont_idx) != 0:
-            new_x_table.append(x_table[:, self._dataset.table_dataset.cont_idx])
+            # We extract continuous data
+            if len(self._dataset.table_dataset.cont_idx) != 0:
+                new_x_table.append(x_table[:, self._dataset.table_dataset.cont_idx])
 
-        # We perform entity embeddings on categorical features
-        if len(self._dataset.table_dataset.cat_idx) != 0:
-            new_x_table.append(self._embedding_block(x_table))
+            # We perform entity embeddings on categorical features
+            if len(self._dataset.table_dataset.cat_idx) != 0:
+                new_x_table.append(self.embedding_block(x_table))
 
-        # We concatenate all inputs
-        x_table = cat(new_x_table, 1)
+            # We concatenate all inputs
+            x_table = cat(new_x_table, 1)
 
         # We compute the output
-        y_table = self._linear_layer(self._main_encoding_block(x_table)).squeeze()
+        y_table = self._linear_layer(self._main_encoding_block(x_table.float()))
 
-        y = {task.name: y_table[i] for i, task in enumerate(self.tasks)}
+        y = {task.name: y_table[:, i] for i, task in enumerate(self.tasks)}
 
         return y
+
+    def on_fit_begin(
+            self
+    ) -> None:
+        """
+        Called when the training (fit) phase starts.
+        """
+        if len(self._layers) > 0:
+            self._main_encoding_block = MLPEncodingBlock(
+                input_size=self.table_input_size,
+                output_size=self._layers[-1],
+                layers=self._layers[:-1],
+                activation=self._activation,
+                dropout=self._dropout
+            )
+        else:
+            self._main_encoding_block = Identity()
+            self._layers.append(self.table_input_size)
+
+        # We add a linear layer to complete the layers
+        self._linear_layer = Linear(self._layers[-1], self._output_size)
 
     def predict(
             self,
@@ -285,8 +306,7 @@ class MLPBaseModel(TorchCustomModel):
 
         predictions = {}
         with no_grad():
-            features = cat(list(x.table.values()), dim=1)
-            outputs = self(features)
+            outputs = self(x)
 
             for task in self.tasks:
                 if task.task_type == TaskType.CLASSIFICATION:

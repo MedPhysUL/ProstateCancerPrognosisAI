@@ -14,7 +14,7 @@ import os
 from typing import Dict, List, Union
 
 import matplotlib.pyplot as plt
-from numpy import max, mean, median, min, std
+import numpy as np
 
 from src.recording.constants import *
 from src.visualization.tools import visualize_importance, visualize_scaled_importance
@@ -75,7 +75,7 @@ def get_evaluation_recap(
 
                     # Initialization of each individual key section in the dictionary
                     for key in key_lists[section]:
-                        data[section][key] = {VALUES: [], INFO: ""}
+                        data[section][key] = {VALUES: [], INFO: {}}
 
                 # We add values to each key associated to the current section
                 for key in key_lists[section]:
@@ -107,21 +107,33 @@ def set_info(
     # For each section
     for section in data.keys():
 
-        # For each key of this section
-        for key in data[section].keys():
+        # For each task of this section
+        for task_name in data[section].keys():
 
             # We extract the list of values
-            values = data[section][key][VALUES]
+            values = data[section][task_name][VALUES]
 
-            if not (isinstance(values[0], str) or values[0] is None):
-                mean_, std_ = round(mean(values), 4), round(std(values), 4)
-                med_, min_, max_ = round(median(values), 4), round(min(values), 4), round(max(values), 4)
-                data[section][key][INFO] = f"{mean_} +- {std_} [{med_}; {min_}-{max_}]"
-                data[section][key][MEAN] = mean_
-                data[section][key][STD] = std_
+            if isinstance(values[0], dict):
+                data[section][task_name][MEAN] = {}
+                data[section][task_name][STD] = {}
+
+                values_as_dict_of_lists = {k: [dic[k] for dic in values] for k in values[0]}
+
+                for key, value in values_as_dict_of_lists.items():
+                    mean_, std_ = round(np.mean(value), 4), round(np.std(value), 4)
+                    med_, min_, max_ = round(np.median(value), 4), round(np.min(value), 4), round(np.max(value), 4)
+                    data[section][task_name][INFO][key] = f"{mean_} +- {std_} [{med_}; {min_}-{max_}]"
+                    data[section][task_name][MEAN][key] = mean_
+                    data[section][task_name][STD][key] = std_
+            elif not (isinstance(values[0], str) or values[0] is None):
+                mean_, std_ = round(np.mean(values), 4), round(np.std(values), 4)
+                med_, min_, max_ = round(np.median(values), 4), round(np.min(values), 4), round(np.max(values), 4)
+                data[section][task_name][INFO] = f"{mean_} +- {std_} [{med_}; {min_}-{max_}]"
+                data[section][task_name][MEAN] = mean_
+                data[section][task_name][STD] = std_
             else:
-                counts = Counter(data[section][key][VALUES])
-                data[section][key][INFO] = str(dict(counts))
+                counts = Counter(data[section][task_name][VALUES])
+                data[section][task_name][INFO] = str(dict(counts))
 
 
 def plot_hps_importance_chart(
@@ -143,12 +155,17 @@ def plot_hps_importance_chart(
     with open(os.path.join(path, SUMMARY_FILE), "r") as read_file:
         data = json.load(read_file)[HYPERPARAMETER_IMPORTANCE]
 
-    # We create the bar plot
-    visualize_importance(
-        data=data,
-        figure_title='HPs importance',
-        filename=os.path.join(path, HPS_IMPORTANCE_CHART)
-    )
+    for task_name, value in data.items():
+        # We create the bar plot
+        mean_and_std_data = {}
+        for (hp, mean), (hp, std) in zip(data[task_name][MEAN].items(), data[task_name][STD].items()):
+            mean_and_std_data[hp] = {MEAN: mean, STD: std}
+
+        visualize_importance(
+            data=mean_and_std_data,
+            figure_title='HPs importance',
+            filename=os.path.join(path, f"{task_name}_{HPS_IMPORTANCE_CHART}")
+        )
 
 
 def plot_feature_importance_charts(

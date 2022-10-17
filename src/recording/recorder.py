@@ -161,19 +161,22 @@ class Recorder:
 
     def record_hyperparameters_importance(
             self,
-            hyperparameter_importance: Dict[str, float]
+            hyperparameter_importance: Dict[str, Dict[str, float]]
     ) -> None:
         """
         Saves the hyperparameters' importance in the protected dictionary.
 
         Parameters
         ----------
-        hyperparameter_importance : Dict[str, float]
-            Dictionary of hyperparameters and their importance.
+        hyperparameter_importance : Dict[str, Dict[str, float]]
+            Dictionary of hyperparameters and their importance for each tasks.
         """
-        # We save all the hyperparameters importance
-        for key in hyperparameter_importance.keys():
-            self._data[HYPERPARAMETER_IMPORTANCE][key] = round(hyperparameter_importance[key], 4)
+        for task_name, hps_importance in hyperparameter_importance.items():
+            self._data[HYPERPARAMETER_IMPORTANCE][task_name] = {}
+
+            # We save all the hyperparameters importance
+            for key in hps_importance.keys():
+                self._data[HYPERPARAMETER_IMPORTANCE][task_name][key] = round(hps_importance[key], 4)
 
     def record_model(
             self,

@@ -60,7 +60,7 @@ class Loss(ABC):
 
     @property
     def name(self) -> str:
-        return self._name
+        return f"{self._reduction}_{self._name}"
 
     def perform_reduction(
             self,
@@ -505,7 +505,7 @@ class BinaryCrossEntropyWithLogitsLoss(BinaryClassificationLoss):
 
     def __init__(
             self,
-            weight: float,
+            weight: float = 0.5,
             reduction: Union[LossReduction, str] = LossReduction.MEAN
     ):
         """
@@ -544,11 +544,11 @@ class BinaryCrossEntropyWithLogitsLoss(BinaryClassificationLoss):
             Loss value.
         """
         loss = nn.BCEWithLogitsLoss(
-            pos_weight=tensor([1 - self.scaling_factor, self.scaling_factor]),
+            weight=where(targets == 1, self.scaling_factor, 1),
             reduction="none"
         )
 
-        return loss(pred, targets)
+        return loss(pred, targets.float())
 
 
 class DICELoss(SegmentationLoss):

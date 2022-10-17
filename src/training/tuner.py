@@ -22,7 +22,12 @@ from optuna.pruners import NopPruner
 from optuna.samplers import TPESampler
 from optuna.study import Study
 from optuna.trial import FrozenTrial, Trial
-from optuna.visualization import plot_parallel_coordinate, plot_param_importances, plot_optimization_history
+from optuna.visualization import (
+    plot_parallel_coordinate,
+    plot_param_importances,
+    plot_pareto_front,
+    plot_optimization_history
+)
 import ray
 from torch import mean, tensor
 
@@ -108,7 +113,7 @@ class Objective:
         scores = ray.get(futures)
 
         # We take the mean of the scores
-        return mean(tensor(scores)).item()
+        return mean(tensor(scores), dim=0).tolist()
 
     def _define_getters(
             self
@@ -277,7 +282,7 @@ class Objective:
             model.fix_thresholds_to_optimal_values(dts)
 
             # We calculate the scores on the different tasks
-            test_set_scores = model.score_dataset(dataset=dts, mask=dts.test_mask)
+            test_set_scores = model.scores_dataset(dataset=dts, mask=dts.test_mask)
 
             # We retrieve the score associated to the optimization metric
             scores = [test_set_scores[task.name][task.optimization_metric.name] for task in dts.tasks]
@@ -318,6 +323,7 @@ class Tuner:
     # FIGURES NAME
     HPS_IMPORTANCE_FIG: str = "hp_importance.png"
     PARALLEL_COORD_FIG: str = "parallel_coordinates.png"
+    PARETO_FRONT_FIG: str = "pareto_front.png"
     OPTIMIZATION_HIST_FIG: str = "optimization_history.png"
 
     def __init__(
@@ -328,6 +334,7 @@ class Tuner:
             objective: Objective = None,
             save_hps_importance: Optional[bool] = False,
             save_parallel_coordinates: Optional[bool] = False,
+            save_pareto_front: Optional[bool] = False,
             save_optimization_history: Optional[bool] = False
     ):
         """
@@ -347,6 +354,8 @@ class Tuner:
             Whether we want to plot the hyperparameters importance graph after tuning.
         save_parallel_coordinates : Optional[bool]
             Whether we want to plot the parallel coordinates graph after tuning.
+        save_pareto_front : Optional[bool]
+            Whether we want to plot the pareto front after tuning.
         save_optimization_history : Optional[bool]
             Whether we want to plot the optimization history graph after tuning.
         """
@@ -360,6 +369,7 @@ class Tuner:
         self.path = join(path, f"{strftime('%Y%m%d-%H%M%S')}")
         self.save_hps_importance = save_hps_importance
         self.save_parallel_coordinates = save_parallel_coordinates
+        self.save_pareto_front = save_pareto_front
         self.save_optimization_history = save_optimization_history
 
         # We make sure that the path given exists
@@ -403,46 +413,98 @@ class Tuner:
         Plots the hyperparameters importance graph and save it in an html file.
         """
         # We generate the hyperparameters importance graph with optuna
-        fig = plot_param_importances(self._study, evaluator=FanovaImportanceEvaluator(seed=Tuner.HP_IMPORTANCE_SEED))
+        for idx, task in enumerate(self._objective.dataset.tasks):
+            fig = plot_param_importances(
+                self._study,
+                evaluator=FanovaImportanceEvaluator(seed=Tuner.HP_IMPORTANCE_SEED),
+                target=lambda t: t.values[idx],
+                target_name=task.name
+            )
 
-        # We save the graph
-        fig.write_image(join(self.path, Tuner.HPS_IMPORTANCE_FIG))
+            # We save the graph
+            fig.write_image(join(self.path, f"{task.name}_{Tuner.HPS_IMPORTANCE_FIG}"))
 
     def _plot_parallel_coordinates_graph(self) -> None:
         """
         Plots the parallel coordinates graph and save it in an html file.
         """
         # We generate the parallel coordinate graph with optuna
-        fig = plot_parallel_coordinate(self._study)
+        for idx, task in enumerate(self._objective.dataset.tasks):
+            fig = plot_parallel_coordinate(
+                self._study,
+                target=lambda t: t.values[idx],
+                target_name=task.name
+            )
+
+            # We save the graph
+            fig.write_image(join(self.path, f"{task.name}_{Tuner.PARALLEL_COORD_FIG}"))
+
+    def _plot_pareto_front(self) -> None:
+        """
+        Plots the pareto front.
+        """
+        fig = plot_pareto_front(
+            self._study,
+            target_names=[task.name for task in self._objective.dataset.tasks]
+        )
 
         # We save the graph
-        fig.write_image(join(self.path, Tuner.PARALLEL_COORD_FIG))
+        fig.write_image(join(self.path, f"{Tuner.PARETO_FRONT_FIG}"))
 
     def _plot_optimization_history_graph(self) -> None:
         """
         Plots the optimization history graph and save it in a html file.
         """
         # We generate the optimization history graph with optuna
-        fig = plot_optimization_history(self._study)
+        for idx, task in enumerate(self._objective.dataset.tasks):
+            fig = plot_optimization_history(
+                self._study,
+                target=lambda t: t.values[idx],
+                target_name=task.name
+            )
 
-        # We save the graph
-        fig.write_image(join(self.path, Tuner.OPTIMIZATION_HIST_FIG))
+            # We save the graph
+            fig.write_image(join(self.path, f"{task.name}_{Tuner.OPTIMIZATION_HIST_FIG}"))
 
-    def get_best_hps(self) -> Dict[str, Any]:
+    def get_best_trial(self) -> FrozenTrial:
         """
-        Retrieves the best hyperparameters found in the tuning.
+        Retrieves the best trial among all the trials on the pareto front.
 
         Returns
         -------
-        dictionary : Dict[str, Any]
-            Dictionary with hyperparameters' values.
+        best_trial : FrozenTrial
+            Best trial.
         """
-        return self._objective.extract_hps(self._study.best_trial)
+        # TODO : Find a way to choose the best hps set among all the sets on the pareto front. For now, we arbitrarily
+        #  choose the first in the list.
+
+        return self._study.best_trials[0]
+
+    def get_hps_importance(self) -> Dict[str, Dict[str, float]]:
+        """
+        Retrieves the hyperparameter importances.
+
+        Returns
+        -------
+        hps_importance : Dict[str, Dict[str, float]]
+            Hyperparameters importance for each task.
+        """
+        hps_importance = {}
+        for idx, task in enumerate(self._objective.dataset.tasks):
+            importances = get_param_importances(
+                study=self._study,
+                evaluator=FanovaImportanceEvaluator(seed=Tuner.HP_IMPORTANCE_SEED),
+                target=lambda t: t.values[idx]
+            )
+
+            hps_importance[task.name] = importances
+
+        return hps_importance
 
     def tune(
             self,
             verbose: bool = True
-    ) -> Tuple[Dict[str, Any], Dict[str, float]]:
+    ) -> Tuple[Dict[str, Any], Dict[str, Dict[str, float]]]:
         """
         Searches for the hyperparameters that optimize the objective function, using the TPE algorithm.
 
@@ -453,7 +515,7 @@ class Tuner:
 
         Returns
         -------
-        best_hps, hps_importance : Tuple[Dict[str, Any], Dict[str, float]]
+        best_hps, hps_importance : Tuple[Dict[str, Any], Dict[str, Dict[str, float]]]
             Best hyperparameters and hyperparameters' importance.
         """
         if self._study is None or self._objective is None:
@@ -464,7 +526,7 @@ class Tuner:
 
         # We perform the optimization
         set_verbosity(FATAL)  # We remove verbosity from loading bar
-        self._study.optimize(self._objective, self.n_trials, show_progress_bar=verbose)
+        self._study.optimize(self._objective, self.n_trials, gc_after_trial=True, show_progress_bar=verbose)
 
         # We save the plots if it is required
         if self.save_hps_importance:
@@ -476,12 +538,13 @@ class Tuner:
         if self.save_optimization_history:
             self._plot_optimization_history_graph()
 
+        if self.save_pareto_front:
+            self._plot_pareto_front()
+
         # We extract the best hyperparameters and their importance
-        best_hps = self.get_best_hps()
-        hps_importance = get_param_importances(
-            study=self._study,
-            evaluator=FanovaImportanceEvaluator(seed=Tuner.HP_IMPORTANCE_SEED)
-        )
+        best_trial = self.get_best_trial()
+        best_hps = self._objective.extract_hps(best_trial)
+        hps_importance = self.get_hps_importance()
 
         # We shutdown ray if it has been initialized in this function
         if not ray_already_init:

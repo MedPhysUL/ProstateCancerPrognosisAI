@@ -12,9 +12,11 @@
 
 
 from abc import ABC, abstractmethod
+import os
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 
 # from dgl import DGLGraph
+import torch
 from monai.data import DataLoader
 import numpy as np
 from torch import FloatTensor, no_grad, stack, tensor, Tensor
@@ -22,11 +24,11 @@ from torch.nn import BatchNorm1d, Module
 from torch.optim import Adam
 from torch.utils.data import SubsetRandomSampler
 
-from src.data.datasets.prostate_cancer_dataset import DataModel, ProstateCancerDataset
+from src.data.datasets.prostate_cancer_dataset import DataModel, FeaturesModel, ProstateCancerDataset
 from src.data.processing.tools import MaskType
 # from src.data.processing.gnn_datasets import PetaleKGNNDataset
 from src.models.base.blocks.embeddings import EntityEmbeddingBlock
-from src.training.early_stopper import EarlyStopper, EarlyStopperType
+from src.training.early_stopper import EarlyStopper, EarlyStopperType, MetricEarlyStopper, MultiTaskLossEarlyStopper
 from src.training.optimizer import SAM
 from src.utils.multi_task_losses import MultiTaskLoss
 from src.utils.reductions import MetricReduction
@@ -36,8 +38,8 @@ from src.visualization.tools import visualize_epoch_progression
 
 
 class Output(NamedTuple):
-    predictions: List = []
-    targets: List = []
+    predictions: List
+    targets: List
 
 
 class Evaluation(NamedTuple):
@@ -55,8 +57,10 @@ class TorchCustomModel(Module, ABC):
             criterion: MultiTaskLoss,
             output_size: int,
             path_to_model: str,
+            use_entity_embedding: bool = False,
             alpha: float = 0,
             beta: float = 0,
+            device: Optional[torch.device] = None,
             calculate_epoch_score: bool = True,
             verbose: bool = False
     ) -> None:
@@ -69,10 +73,14 @@ class TorchCustomModel(Module, ABC):
             Loss function of our model.
         path_to_model : str
             Path to save model.
+        use_entity_embedding : bool
+            Use entity embedding block.
         alpha : float
             L1 penalty coefficient.
         beta : float
             L2 penalty coefficient.
+        device : torch.device
+            Device used for training.
         calculate_epoch_score : bool
             Whether we want to calculate the score at each training epoch.
         verbose : bool
@@ -87,43 +95,49 @@ class TorchCustomModel(Module, ABC):
         self._calculate_epoch_score = calculate_epoch_score
         self._criterion = criterion
         self._dataset: Optional[ProstateCancerDataset] = None
-        self._embedding_block = None
+        self._device = self._set_device(device)
         self._evaluations: Dict[str, Evaluation] = {}
         self._path_to_model = path_to_model
         self._optimizer = None
         self._output_size = output_size
         self._tasks = None
+        self._use_entity_embedding = use_entity_embedding
         self._verbose = verbose
+
+        # Create model path
+        os.makedirs(path_to_model, exist_ok=True)
 
         # Initialization of a protected method
         self._update_weights = None
 
     @property
-    def embedding_block(self) -> EntityEmbeddingBlock:
+    def embedding_block(self) -> Optional[EntityEmbeddingBlock]:
         embedding_block = None
+        if self._use_entity_embedding:
+            # We set the embedding layers
+            if len(self._dataset.table_dataset.cat_idx) != 0 and self._dataset.table_dataset.cat_sizes is not None:
 
-        # We set the embedding layers
-        if len(self._dataset.table_dataset.cat_idx) != 0 and self._dataset.table_dataset.cat_sizes is not None:
+                # We check embedding sizes (if nothing provided -> emb_sizes = cat_sizes - 1)
+                cat_emb_sizes = [s - 1 for s in self._dataset.table_dataset.cat_sizes]
+                if 0 in cat_emb_sizes:
+                    raise ValueError('One categorical variable as a single modality')
 
-            # We check embedding sizes (if nothing provided -> emb_sizes = cat_sizes - 1)
-            cat_emb_sizes = [s - 1 for s in self._dataset.table_dataset.cat_sizes]
-            if 0 in cat_emb_sizes:
-                raise ValueError('One categorical variable as a single modality')
+                embedding_block = EntityEmbeddingBlock(
+                    cat_sizes=self._dataset.table_dataset.cat_sizes,
+                    cat_emb_sizes=cat_emb_sizes,
+                    cat_idx=self._dataset.table_dataset.cat_idx
+                )
 
-            embedding_block = EntityEmbeddingBlock(
-                cat_sizes=self._dataset.table_dataset.cat_sizes,
-                cat_emb_sizes=cat_emb_sizes,
-                cat_idx=self._dataset.table_dataset.cat_idx
-            )
-
-        return embedding_block
+            return embedding_block
+        else:
+            return embedding_block
 
     @property
-    def input_size(self) -> int:
-        if self.embedding_block:
+    def table_input_size(self) -> int:
+        if self._use_entity_embedding:
             return len(self._dataset.table_dataset.cont_cols) + self.embedding_block.output_size
         else:
-            return len(self._dataset.table_dataset.cont_cols)
+            return len(self._dataset.table_dataset.cont_cols) + len(self._dataset.table_dataset.cat_cols)
 
     @property
     def output_size(self) -> int:
@@ -139,9 +153,31 @@ class TorchCustomModel(Module, ABC):
         """
         for i in [MaskType.TRAIN, MaskType.VALID]:
             self._evaluations[i] = Evaluation(
-                losses=dict(**{self._criterion.name: []}, **{task.criterion.name: [] for task in self._tasks}),
-                scores={task.optimization_metric.name: [] for task in self._tasks}
+                losses=dict(**{self._criterion.name: []}, **{task.name: [] for task in self._tasks}),
+                scores={task.name: [] for task in self._tasks}
             )
+
+    @staticmethod
+    def _set_device(
+            device: Optional[torch.device] = None
+    ) -> torch.device:
+        """
+        Sets the device to use for training.
+
+        Parameters
+        ----------
+        device : Optional[torch.device]
+            An optional device.
+
+        Returns
+        -------
+        device : torch.device
+            The device to use.
+        """
+        if device is None:
+            return torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+        return device
 
     @staticmethod
     def _create_validation_loader(
@@ -164,7 +200,7 @@ class TorchCustomModel(Module, ABC):
             Validation loader.
         """
         # We create the valid dataloader (if valid size != 0)
-        valid_size, valid_data, early_stopper = len(dataset.valid_mask), None, None
+        valid_size, valid_data = len(dataset.valid_mask), None
 
         if valid_size != 0:
 
@@ -196,7 +232,7 @@ class TorchCustomModel(Module, ABC):
             self,
             x: DataModel.x,
             y: DataModel.y
-    ) -> Tuple[DataModel.y, float]:
+    ) -> Tuple[Dict[str, Tensor], float]:
         """
         Executes a weights update using Sharpness-Aware Minimization (SAM) optimizer.
 
@@ -218,7 +254,7 @@ class TorchCustomModel(Module, ABC):
             Tuple of a dictionary of tensors with predictions and training loss.
         """
         # We compute the predictions
-        pred = self(*x)
+        pred = self(x)
 
         # First forward-backward pass
         loss = self.loss(pred, y)
@@ -227,7 +263,7 @@ class TorchCustomModel(Module, ABC):
 
         # Second forward-backward pass
         self._disable_running_stats()
-        second_pred = self(*x)
+        second_pred = self(x)
         self.loss(second_pred, y).backward()
         self._optimizer.second_step()
 
@@ -240,7 +276,7 @@ class TorchCustomModel(Module, ABC):
             self,
             x: DataModel.x,
             y: DataModel.y
-    ) -> Tuple[DataModel.y, float]:
+    ) -> Tuple[Dict[str, Tensor], float]:
         """
         Executes a weights update without using Sharpness-Aware Minimization (SAM).
 
@@ -257,7 +293,7 @@ class TorchCustomModel(Module, ABC):
             Tuple of a dictionary of tensors with predictions and training loss.
         """
         # We compute the predictions
-        pred = self(*x)
+        pred = self(x)
 
         # We execute a single forward-backward pass
         loss = self.loss(pred, y)
@@ -322,8 +358,9 @@ class TorchCustomModel(Module, ABC):
     def fit(
             self,
             dataset: ProstateCancerDataset,
-            early_stopper: EarlyStopper,
+            early_stopper_type: EarlyStopperType,
             lr: float,
+            patience: int = 10,
             rho: float = 0,
             batch_size: Optional[int] = 55,
             valid_batch_size: Optional[int] = None,
@@ -336,13 +373,15 @@ class TorchCustomModel(Module, ABC):
         ----------
         dataset : ProstateCancerDataset
             Prostate cancer dataset used to feed the dataloaders.
-        early_stopper : EarlyStopper
-            Early stopper.
+        early_stopper_type : EarlyStopperType
+            Early stopper type.
         lr : float
             Learning rate
         rho : float
             If rho >= 0, will be used as neighborhood size in Sharpness-Aware Minimization optimizer, otherwise, Adam
             optimizer will be used.
+        patience : float
+            Patience.
         batch_size : Optional[int]
             Size of the batches in the training loader.
         valid_batch_size : Optional[int]
@@ -356,10 +395,16 @@ class TorchCustomModel(Module, ABC):
         # We assume that the tasks in the dataset are the tasks on which we need to calculate the loss.
         self._tasks, self._criterion.tasks = dataset.tasks, dataset.tasks
 
+        # We execute the callbacks that need to be ran at the beginning of training.
+        self.on_fit_begin()
+
         # We setup the early stopper depending on its type.
-        if early_stopper.early_stopper_type == EarlyStopperType.METRIC:
+        early_stopper = None
+        if early_stopper_type == EarlyStopperType.METRIC:
+            early_stopper = MetricEarlyStopper(path_to_model=self._path_to_model, patience=patience)
             early_stopper.tasks = dataset.tasks
-        elif early_stopper.early_stopper_type == EarlyStopperType.MULTITASK_LOSS:
+        elif early_stopper_type == EarlyStopperType.MULTITASK_LOSS:
+            early_stopper = MultiTaskLossEarlyStopper(path_to_model=self._path_to_model, patience=patience)
             early_stopper.criterion = self._criterion
 
         # We create an empty evaluations dictionary that logs losses and metrics values.
@@ -387,9 +432,11 @@ class TorchCustomModel(Module, ABC):
         #     train_data = (train_data, dataset)
         #     valid_data = (valid_data, dataset)
 
+        # Send to device
+        self.to(device=self._device)
+
         # We execute the epochs
         for epoch in range(max_epochs):
-
             # We calculate training loss
             train_loss = self._execute_train_step(train_data)
             update_progress(epoch, train_loss)
@@ -433,6 +480,13 @@ class TorchCustomModel(Module, ABC):
 
         # Computation of loss reduction + elastic penalty
         return self._criterion(pred, y) + self._alpha * l1_penalty + self._beta * l2_penalty
+
+    @abstractmethod
+    def on_fit_begin(self):
+        """
+        Called when the training (fit) phase starts.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def predict(
@@ -483,17 +537,16 @@ class TorchCustomModel(Module, ABC):
         subset = dataset[mask]
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
 
-        predictions = {}
+        predictions_as_lists = {task.name: [] for task in dataset.tasks}
         with no_grad():
             for idx, (x, _) in enumerate(data_loader):
                 pred = self.predict(x)
 
                 for task in dataset.tasks:
                     if task.task_type != TaskType.SEGMENTATION:
-                        if idx == 0:
-                            predictions[task.name] = pred[task.name]
-                        else:
-                            predictions[task.name] = stack([predictions[task.name], pred[task.name]], dim=0)
+                        predictions_as_lists[task.name].append(pred[task.name])
+
+        predictions = {task.name: stack(predictions_as_lists[task.name], dim=0) for task in dataset.tasks}
 
         return predictions
 
@@ -510,17 +563,19 @@ class TorchCustomModel(Module, ABC):
             Path were the figures will be saved.
         """
         train_history, valid_history, progression_type = [], [], []
-        for train, valid in zip(self._evaluations[MaskType.TRAIN], self._evaluations[MaskType.VALID]):
-            for name, train_loss in train.losses.items():
-                train_history.append(train_loss)
-                valid_history.append(valid.losses[name])
-                progression_type.append(name)
+        train = self._evaluations[MaskType.TRAIN]
+        valid = self._evaluations[MaskType.VALID]
 
-            if self._calculate_epoch_score:
-                for name, train_score in train.scores.items():
-                    train_history.append(train_score)
-                    valid_history.append(valid.scores[name])
-                    progression_type.append(name)
+        for name, train_loss in train.losses.items():
+            train_history.append(train_loss)
+            valid_history.append(valid.losses[name])
+            progression_type.append(name)
+
+        if self._calculate_epoch_score:
+            for name, train_score in train.scores.items():
+                train_history.append(train_score)
+                valid_history.append(valid.scores[name])
+                progression_type.append(name)
 
         # Figure construction
         visualize_epoch_progression(
@@ -563,7 +618,9 @@ class TorchCustomModel(Module, ABC):
                     metrics = metrics + task.evaluation_metrics
 
                 for metric in metrics:
-                    scores[task.name][metric.name] = metric(predictions[task.name], targets[task.name])
+                    scores[task.name][metric.name] = metric(
+                        np.array(predictions[task.name]), np.array(targets[task.name])
+                    )
 
         return scores
 
@@ -607,18 +664,21 @@ class TorchCustomModel(Module, ABC):
                     segmentation_scores_dict[task.name][metric.name] = []
 
         non_segmentation_outputs_dict = {
-            task.name: Output() for task in self.tasks if task.task_type != TaskType.SEGMENTATION
+            task.name: Output(predictions=[], targets=[])
+            for task in self.tasks if task.task_type != TaskType.SEGMENTATION
         }
 
         # Set model for evaluation
         self.eval()
 
         with no_grad():
-            for x, targets in data_loader:
+            for x, y in data_loader:
+                x, y = self._batch_to_device(x), self._batch_to_device(y)
+
                 predictions = self.predict(x)
 
                 for task in self.tasks:
-                    pred, target = predictions[task.name], targets[task.name]
+                    pred, target = predictions[task.name].item(), y[task.name].item()
 
                     if task.task_type == TaskType.SEGMENTATION:
                         metrics = [task.optimization_metric]
@@ -627,7 +687,7 @@ class TorchCustomModel(Module, ABC):
 
                         for metric in metrics:
                             segmentation_scores_dict[task.name][metric.name].append(
-                                metric(pred, target, MetricReduction.NONE)
+                                metric(np.array(pred), np.array(target), MetricReduction.NONE)
                             )
                     else:
                         non_segmentation_outputs_dict[task.name].predictions.append(pred)
@@ -646,7 +706,7 @@ class TorchCustomModel(Module, ABC):
                 else:
                     output = non_segmentation_outputs_dict[task.name]
                     for metric in metrics:
-                        scores[task.name][metric.name] = metric(output.predictions, output.targets)
+                        scores[task.name][metric.name] = metric(np.array(output.predictions), np.array(output.targets))
 
         return scores
 
@@ -671,17 +731,19 @@ class TorchCustomModel(Module, ABC):
         thresholds = np.linspace(start=0.01, stop=0.95, num=95)
 
         classification_tasks = [task for task in self.tasks if task.task_type == TaskType.CLASSIFICATION]
-        outputs_dict = {task.name: Output() for task in classification_tasks}
+        outputs_dict = {task.name: Output(predictions=[], targets=[]) for task in classification_tasks}
 
         # Set model for evaluation
         self.eval()
 
         with no_grad():
-            for x, targets in data_loader:
+            for x, y in data_loader:
+                x, y = self._batch_to_device(x), self._batch_to_device(y)
+
                 predictions = self.predict(x)
 
                 for task in classification_tasks:
-                    pred, target = predictions[task.name], targets[task.name]
+                    pred, target = predictions[task.name].item(), y[task.name].item()
 
                     outputs_dict[task.name].predictions.append(pred)
                     outputs_dict[task.name].targets.append(target)
@@ -695,7 +757,7 @@ class TorchCustomModel(Module, ABC):
 
                 for metric in metrics:
                     scores = np.array(
-                        [metric(output.predictions, output.targets, t) for t in thresholds]
+                        [metric(np.array(output.predictions), np.array(output.targets), t) for t in thresholds]
                     )
 
                     # We set the threshold to the optimal threshold
@@ -809,3 +871,25 @@ class TorchCustomModel(Module, ABC):
         """
         if isinstance(module, BatchNorm1d) and hasattr(module, "backup_momentum"):
             module.momentum = module.backup_momentum
+
+    def _batch_to_device(
+            self,
+            batch: Union[dict, FeaturesModel, Tensor]
+    ) -> Union[dict, FeaturesModel, Tensor]:
+        """
+        Send batch to device.
+
+        Parameters
+        ----------
+        batch : Union[dict, FeaturesModel, Tensor]
+            Batch data
+        """
+        if isinstance(batch, FeaturesModel):
+            image_to_device = {k: self._batch_to_device(v) for k, v in batch.image.items()}
+            table_to_device = {k: self._batch_to_device(v) for k, v in batch.table.items()}
+            return FeaturesModel(image=image_to_device, table=table_to_device)
+        if isinstance(batch, dict):
+            return {k: self._batch_to_device(v) for k, v in batch.items()}
+        if isinstance(batch, torch.Tensor):
+            return batch.to(self._device)
+        return batch

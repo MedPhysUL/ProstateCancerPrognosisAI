@@ -10,8 +10,8 @@
 
 import os
 
-from src.utils.score_metrics import AUC, DICEMetric
-from src.utils.losses import DICELoss
+from src.utils.score_metrics import BinaryBalancedAccuracy, DICEMetric
+from src.utils.losses import BinaryCrossEntropyWithLogitsLoss, DICELoss
 from src.utils.tasks import ClassificationTask, SegmentationTask
 
 # SEED
@@ -28,9 +28,13 @@ IMAGES_FOLDER_PATH = os.path.join(DATA_PATH, "Images")
 LEARNING_TABLE_PATH = os.path.join(DATA_PATH, "learning_table.csv")
 HOLDOUT_TABLE_PATH = os.path.join(DATA_PATH, "holdout_table.csv")
 
+MASKS_PATH: str = os.path.join(DATA_PATH, "masks")
+
 RECORDS_PATH = os.path.join("local_data", "records")
 OUTLIERS_RECORDS_PATH = os.path.join(RECORDS_PATH, "outliers")
 DESCRIPTIVE_ANALYSIS_PATH = os.path.join(RECORDS_PATH, "descriptive_analyses")
+EXPERIMENTS_PATH = os.path.join(RECORDS_PATH, "experiments")
+CHECKPOINTS_PATH = os.path.join(EXPERIMENTS_PATH, "checkpoints")
 
 # COLUMNS
 ID = "ID"
@@ -73,8 +77,16 @@ MODALITIES = {"CT"}
 
 # TASKS
 TABLE_TASKS = [
-    ClassificationTask(target_col=PN, optimization_metric=AUC()),
-    ClassificationTask(target_col=BCR, optimization_metric=AUC())
+    ClassificationTask(
+        target_col=PN,
+        optimization_metric=BinaryBalancedAccuracy(),
+        criterion=BinaryCrossEntropyWithLogitsLoss()
+    ),
+    ClassificationTask(
+        target_col=BCR,
+        optimization_metric=BinaryBalancedAccuracy(),
+        criterion=BinaryCrossEntropyWithLogitsLoss()
+    )
 ]
 IMAGE_TASKS = [
     SegmentationTask(criterion=DICELoss(), optimization_metric=DICEMetric(), organ="Prostate", modality="CT")

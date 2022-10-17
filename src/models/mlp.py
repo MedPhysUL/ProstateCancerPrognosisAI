@@ -12,6 +12,7 @@ from typing import List, Optional
 
 from src.models.base.torch_wrapper import TorchWrapper
 from src.models.base.mlp_base_model import MLPBaseModel
+from src.training.early_stopper import EarlyStopperType
 from src.utils.hyperparameters import CategoricalHP, HP, NumericalContinuousHP, NumericalIntHP
 from src.utils.multi_task_losses import MultiTaskLoss
 
@@ -50,6 +51,8 @@ class MLP(TorchWrapper):
             n_layer: int,
             n_unit: int,
             activation: str,
+            early_stopper_type: EarlyStopperType,
+            patience: int = 10,
             dropout: float = 0,
             alpha: float = 0,
             beta: float = 0,
@@ -77,6 +80,10 @@ class MLP(TorchWrapper):
             Number of units in each hidden layer
         activation : str
             Activation function
+        early_stopper_type : EarlyStopperType
+            Early stopper type.
+        patience : int
+            Patience.
         dropout : float
             Probability of dropout
         alpha : float
@@ -115,6 +122,8 @@ class MLP(TorchWrapper):
             train_params=dict(
                 lr=lr,
                 rho=rho,
+                early_stopper_type=early_stopper_type,
+                patience=patience,
                 batch_size=batch_size,
                 valid_batch_size=valid_batch_size,
                 max_epochs=max_epochs)
