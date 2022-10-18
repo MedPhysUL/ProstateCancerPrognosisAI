@@ -438,7 +438,7 @@ class Tuner:
             )
 
             if task.optimization_metric.direction == Direction.MAXIMIZE.value:
-                fig.data[0]["line"]["reversescale"] = False
+                fig.data[0]["line"].reversescale = False
 
             # We save the graph
             fig.write_image(join(self.path, f"{task.name}_{Tuner.PARALLEL_COORD_FIG}"))
