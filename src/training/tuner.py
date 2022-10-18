@@ -35,6 +35,7 @@ from src.data.datasets.table_dataset import MaskType
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
 from src.models.base.base_model import BaseModel
 from src.utils.hyperparameters import CategoricalHP, Distribution, HP, NumericalContinuousHP, NumericalIntHP, Range
+from src.utils.score_metrics import Direction
 
 
 class Objective:
@@ -435,6 +436,9 @@ class Tuner:
                 target=lambda t: t.values[idx],
                 target_name=task.name
             )
+
+            if task.optimization_metric.direction == Direction.MAXIMIZE.value:
+                fig.data[0]["line"]["reversescale"] = False
 
             # We save the graph
             fig.write_image(join(self.path, f"{task.name}_{Tuner.PARALLEL_COORD_FIG}"))
