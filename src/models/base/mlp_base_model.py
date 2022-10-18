@@ -306,6 +306,7 @@ class MLPBaseModel(TorchCustomModel):
 
         predictions = {}
         with no_grad():
+            x = self._batch_to_device(x)
             outputs = self(x)
 
             for task in self.tasks:
