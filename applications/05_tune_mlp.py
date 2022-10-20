@@ -79,3 +79,4 @@ if __name__ == '__main__':
     evaluator.evaluate()
 
     print(f"Time taken for MLP (minutes): {(time() - start) / 60:.2f}")
+
