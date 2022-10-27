@@ -536,7 +536,7 @@ class TorchCustomModel(Module, ABC):
             Predictions (except segmentation map).
         """
         subset = dataset[mask]
-        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
+        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
 
         predictions_as_lists = {task.name: [] for task in dataset.tasks}
         with no_grad():
@@ -649,7 +649,7 @@ class TorchCustomModel(Module, ABC):
             Score for each tasks and each metrics.
         """
         subset = dataset[mask]
-        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
+        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
 
         scores = {task.name: {} for task in self.tasks}
         segmentation_scores_dict = {}
@@ -727,7 +727,7 @@ class TorchCustomModel(Module, ABC):
             Whether to fix the thresholds of evaluation metrics or not.
         """
         subset = dataset[dataset.train_mask]
-        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
+        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
 
         thresholds = np.linspace(start=0.01, stop=0.95, num=95)
 
@@ -795,7 +795,8 @@ class TorchCustomModel(Module, ABC):
             dataset,
             batch_size=batch_size,
             sampler=SubsetRandomSampler(dataset.train_mask),
-            drop_last=(train_size % batch_size) == 1
+            drop_last=(train_size % batch_size) == 1,
+            collate_fn=None
         )
 
         return train_data
