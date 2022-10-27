@@ -59,7 +59,7 @@ class MLP(TorchWrapper):
             lr: float = 0.05,
             rho: float = 0,
             batch_size: int = 55,
-            valid_batch_size: Optional[int] = None,
+            valid_batch_size: int = 1,
             max_epochs: int = 200,
             verbose: bool = False,
     ):
@@ -100,7 +100,7 @@ class MLP(TorchWrapper):
         batch_size : int
             Size of the batches in the training loader
         valid_batch_size : int
-            Size of the batches in the valid loader (None = one single batch)
+            Size of the batches in the valid loader
         max_epochs : int
             Maximum number of epochs for training
         verbose : bool
