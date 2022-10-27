@@ -89,5 +89,10 @@ TABLE_TASKS = [
     )
 ]
 IMAGE_TASKS = [
-    SegmentationTask(criterion=DICELoss(), optimization_metric=DICEMetric(), organ="Prostate", modality="CT")
+    SegmentationTask(
+        criterion=DICELoss(),
+        optimization_metric=DICEMetric(),
+        organ="Prostate",
+        modality="CT"
+    )
 ]
