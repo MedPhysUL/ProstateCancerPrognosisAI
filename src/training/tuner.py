@@ -110,8 +110,9 @@ class Objective:
         suggested_hps = {k: f(trial) for k, f in self._getters.items()}
 
         # We execute parallel evaluations
-        futures = [self._run_single_evaluation.remote(masks=m, hps=suggested_hps) for k, m in self._masks.items()]
-        scores = ray.get(futures)
+        # futures = [self._run_single_evaluation.remote(masks=m, hps=suggested_hps) for k, m in self._masks.items()]
+        # scores = ray.get(futures)
+        scores = [self._run_single_evaluation(masks=m, hps=suggested_hps) for k, m in self._masks.items()]
 
         # We take the mean of the scores
         return mean(tensor(scores), dim=0).tolist()
@@ -246,7 +247,7 @@ class Objective:
             Function that train a single model using given masks and given HPs.
         """
 
-        @ray.remote(num_gpus=int(gpu_device))
+        # @ray.remote(num_gpus=int(gpu_device))
         def run_single_evaluation(
                 masks: Dict[str, List[int]],
                 hps: Dict[str, Any]
@@ -526,7 +527,7 @@ class Tuner:
             raise Exception("study and objective must be defined")
 
         # We check ray status
-        ray_already_init = self._check_ray_status()
+        # ray_already_init = self._check_ray_status()
 
         # We perform the optimization
         set_verbosity(FATAL)  # We remove verbosity from loading bar
@@ -551,8 +552,8 @@ class Tuner:
         hps_importance = self.get_hps_importance()
 
         # We shutdown ray if it has been initialized in this function
-        if not ray_already_init:
-            ray.shutdown()
+        # if not ray_already_init:
+        #    ray.shutdown()
 
         return best_hps, hps_importance
 
