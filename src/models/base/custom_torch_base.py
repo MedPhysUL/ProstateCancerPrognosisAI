@@ -11,6 +11,7 @@
 """
 
 from abc import ABC, abstractmethod
+import gc
 import os
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 
@@ -439,6 +440,7 @@ class TorchCustomModel(Module, ABC):
             # We calculate training loss
             train_loss = self._execute_train_step(train_data)
             update_progress(epoch, train_loss)
+            gc.collect()
 
             # We calculate valid score and apply early stopping if needed
             if self._execute_valid_step(valid_data, early_stopper):
