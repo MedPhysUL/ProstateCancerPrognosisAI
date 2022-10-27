@@ -211,7 +211,8 @@ class TorchCustomModel(Module, ABC):
             valid_data = DataLoader(
                 dataset,
                 batch_size=valid_batch_size,
-                sampler=SubsetRandomSampler(dataset.valid_mask)
+                sampler=SubsetRandomSampler(dataset.valid_mask),
+                collate_fn=None
             )
 
         return valid_data
