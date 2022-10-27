@@ -10,9 +10,10 @@ MLP_HPS = {
         Range.MAX: 0.01
     },
     MLPHP.BATCH_SIZE.name: {
-        Range.MIN: 5,
-        Range.MAX: 25,
-        Range.STEP: 5
+        # Range.MIN: 5,
+        # Range.MAX: 15,
+        # Range.STEP: 5
+        Range.VALUE: 2
     },
     MLPHP.BETA.name: {
         Range.MIN: 0.0005,
@@ -33,6 +34,7 @@ MLP_HPS = {
         Range.VALUE: 3,
     },
     MLPHP.N_UNIT.name: {
-        Range.VALUE: 100,
+        # Range.VALUE: 100,
+        Range.VALUE: 50
     },
 }
