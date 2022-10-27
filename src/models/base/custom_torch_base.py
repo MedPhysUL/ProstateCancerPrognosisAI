@@ -10,7 +10,6 @@
                         all pytorch models.
 """
 
-
 from abc import ABC, abstractmethod
 import os
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
@@ -182,7 +181,7 @@ class TorchCustomModel(Module, ABC):
     @staticmethod
     def _create_validation_loader(
             dataset: ProstateCancerDataset,
-            valid_batch_size: Optional[int]
+            valid_batch_size: int = 1
     ) -> DataLoader:
         """
         Creates the objects needed for validation during the training process.
@@ -191,8 +190,8 @@ class TorchCustomModel(Module, ABC):
         ----------
         dataset : ProstateCancerDataset
             Prostate cancer dataset used to feed the dataloader.
-        valid_batch_size : Optional[int]
-            Size of the batches in the valid loader (None = one single batch).
+        valid_batch_size : int
+            Size of the batches in the valid loader.
 
         Returns
         -------
@@ -205,7 +204,7 @@ class TorchCustomModel(Module, ABC):
         if valid_size != 0:
 
             # We check if a valid batch size was provided
-            valid_batch_size = min(valid_size, valid_batch_size) if valid_batch_size is not None else valid_size
+            valid_batch_size = min(valid_size, valid_batch_size)
 
             # We create the valid loader
             valid_data = DataLoader(
@@ -363,7 +362,7 @@ class TorchCustomModel(Module, ABC):
             patience: int = 10,
             rho: float = 0,
             batch_size: Optional[int] = 55,
-            valid_batch_size: Optional[int] = None,
+            valid_batch_size: int = 1,
             max_epochs: int = 200
     ) -> None:
         """
@@ -384,8 +383,8 @@ class TorchCustomModel(Module, ABC):
             Patience.
         batch_size : Optional[int]
             Size of the batches in the training loader.
-        valid_batch_size : Optional[int]
-            Size of the batches in the valid loader (None = one single batch).
+        valid_batch_size : int
+            Size of the batches in the valid loader.
         max_epochs : int
             Maximum number of epochs for training.
         """
@@ -678,7 +677,7 @@ class TorchCustomModel(Module, ABC):
                 predictions = self.predict(x)
 
                 for task in self.tasks:
-                    pred, target = predictions[task.name].item(), y[task.name].item()
+                    pred, target = predictions[task.name], y[task.name]
 
                     if task.task_type == TaskType.SEGMENTATION:
                         metrics = [task.optimization_metric]
@@ -687,11 +686,11 @@ class TorchCustomModel(Module, ABC):
 
                         for metric in metrics:
                             segmentation_scores_dict[task.name][metric.name].append(
-                                metric(np.array(pred), np.array(target), MetricReduction.NONE)
+                                metric(pred, target, MetricReduction.NONE)
                             )
                     else:
-                        non_segmentation_outputs_dict[task.name].predictions.append(pred)
-                        non_segmentation_outputs_dict[task.name].targets.append(target)
+                        non_segmentation_outputs_dict[task.name].predictions.append(pred.item())
+                        non_segmentation_outputs_dict[task.name].targets.append(target.item())
 
             for task in self.tasks:
                 metrics = [task.optimization_metric]
@@ -743,10 +742,10 @@ class TorchCustomModel(Module, ABC):
                 predictions = self.predict(x)
 
                 for task in classification_tasks:
-                    pred, target = predictions[task.name].item(), y[task.name].item()
+                    pred, target = predictions[task.name], y[task.name]
 
-                    outputs_dict[task.name].predictions.append(pred)
-                    outputs_dict[task.name].targets.append(target)
+                    outputs_dict[task.name].predictions.append(pred.item())
+                    outputs_dict[task.name].targets.append(target.item())
 
             for task in classification_tasks:
                 output = outputs_dict[task.name]
