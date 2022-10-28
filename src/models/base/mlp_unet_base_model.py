@@ -13,7 +13,7 @@ from typing import List, Optional
 import numpy as np
 from monai.data import DataLoader
 from monai.networks.nets import UNet
-from torch import cat, no_grad, sigmoid, stack
+from torch import cat, no_grad, sigmoid, stack, tensor
 from torch.nn import Identity, Linear
 
 from src.data.datasets.prostate_cancer_dataset import DataModel
@@ -135,7 +135,7 @@ class MLPUnetBaseModel(TorchCustomModel):
             for name, single_task_loss in self._criterion.single_task_losses.items():
                 epoch_losses[name].append(single_task_loss)
 
-        epoch_losses = {name: np.mean(loss) for name, loss in epoch_losses.items()}
+        epoch_losses = {name: np.nanmean(loss) for name, loss in epoch_losses.items()}
         print("TRAIN LOSSES", epoch_losses)
 
         if self._calculate_epoch_score:
@@ -180,7 +180,7 @@ class MLPUnetBaseModel(TorchCustomModel):
 
         # Set model for evaluation
         self.eval()
-        epoch_losses = dict(**{self._criterion.name: []}, **{task.name: [] for task in self._tasks})
+        epoch_losses = {task.name: [] for task in self._tasks}
 
         # We execute one inference step on validation set
         with no_grad():
@@ -193,15 +193,27 @@ class MLPUnetBaseModel(TorchCustomModel):
                 output = self(x)
 
                 # We calculate the loss and the score
-                loss = self.loss(output, y)
+                _ = self.loss(output, y)
 
                 # We update the losses history
-                epoch_losses[self._criterion.name].append(loss.item())
                 for name, single_task_loss in self._criterion.single_task_losses.items():
                     epoch_losses[name].append(single_task_loss)
 
-        epoch_losses = {name: np.mean(loss) for name, loss in epoch_losses.items()}
-        print("VALID LOSSES", epoch_losses)
+        epoch_losses = {name: np.nanmean(loss) for name, loss in epoch_losses.items()}
+        epoch_losses_as_tensors = {name: tensor(loss) for name, loss in epoch_losses.items()}
+
+        # Computations of penalties - Obviously this should not be here
+        l1_penalty, l2_penalty = tensor(0.), tensor(0.)
+        for _, w in self.named_parameters():
+            l1_penalty = l1_penalty + w.abs().sum()
+            l2_penalty = l2_penalty + w.pow(2).sum()
+
+        # Obviously this should not be here
+        valid_loss = self._criterion._compute_loss(
+            single_task_losses=epoch_losses_as_tensors
+        ) + self._alpha * l1_penalty + self._beta * l2_penalty
+
+        epoch_losses[self._criterion.name] = valid_loss.item()
 
         if self._calculate_epoch_score:
             scores = self.scores_dataset(dataset=self._dataset, mask=self._dataset.valid_mask)
