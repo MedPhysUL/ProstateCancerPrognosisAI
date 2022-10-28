@@ -15,7 +15,7 @@ from typing import List, Optional, Tuple, Union
 from monai.metrics import DiceMetric
 import numpy as np
 from sklearn.metrics import roc_auc_score
-from torch import from_numpy, isnan, is_tensor, mean, pow, prod, sum, Tensor, where, zeros
+from torch import any, from_numpy, isnan, is_tensor, nanmean, pow, prod, nansum, Tensor, where, zeros
 
 from src.utils.reductions import MetricReduction
 
@@ -118,11 +118,12 @@ class Metric(ABC):
             else:
                 return x.item()
         elif reduction == MetricReduction.MEAN.value:
-            return mean(x).item()
+            return nanmean(x).item()
         elif reduction == MetricReduction.SUM.value:
-            return sum(x).item()
+            return nansum(x).item()
         elif reduction == MetricReduction.GEOMETRIC_MEAN.value:
-            return pow(prod(x), exponent=(1 / x.shape[0])).item()
+            filtered_x = x[~any(x.isnan(), dim=1)]
+            return pow(prod(filtered_x), exponent=(1 / filtered_x.shape[0])).item()
 
     @property
     def reduction(self) -> str:
@@ -182,6 +183,9 @@ class RegressionMetric(Metric):
             Rounded metric score.
         """
         nonmissing_targets_idx = self.get_idx_of_nonmissing_targets(targets)
+        if len(nonmissing_targets_idx) == 0:
+            return np.nan
+
         targets, pred = targets[nonmissing_targets_idx], pred[nonmissing_targets_idx]
 
         if not is_tensor(pred):
@@ -348,6 +352,8 @@ class BinaryClassificationMetric(Metric):
             Rounded metric score.
         """
         nonmissing_targets_idx = self.get_idx_of_nonmissing_targets(targets)
+        if len(nonmissing_targets_idx) == 0:
+            return np.nan
         targets, pred = targets[nonmissing_targets_idx], pred[nonmissing_targets_idx]
 
         if thresh is None:
