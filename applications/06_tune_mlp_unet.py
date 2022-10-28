@@ -15,8 +15,8 @@ from monai.transforms import (
     AddChanneld,
     CenterSpatialCropd,
     Compose,
-    HistogramNormalized,
     KeepLargestConnectedComponentd,
+    ScaleIntensityd,
     ThresholdIntensityd,
     ToTensord,
 )
@@ -57,15 +57,15 @@ if __name__ == '__main__':
     )
 
     database_manager = LocalDatabaseManager(
-        path_to_database='D:/ProstateCancerData/learning_set.h5'
+        path_to_database='local_data/learning_set.h5'
     )
 
     trans = Compose([
         AddChanneld(keys=['CT', 'Prostate']),
-        CenterSpatialCropd(keys=['CT', 'Prostate'], roi_size=(1000, 120, 120)),
+        CenterSpatialCropd(keys=['CT', 'Prostate'], roi_size=(1000, 160, 160)),
         ThresholdIntensityd(keys=['CT'], threshold=-250, above=True, cval=-250),
         ThresholdIntensityd(keys=['CT'], threshold=500, above=False, cval=500),
-        HistogramNormalized(keys=['CT'], num_bins=751, min=0, max=1),
+        ScaleIntensityd(keys=['CT'], minv=0, maxv=1),
         KeepLargestConnectedComponentd(keys=['Prostate']),
         ToTensord(keys=['CT', 'Prostate'], dtype=float32)
     ])
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     }
 
     # Masks
-    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=1, l=1)
+    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=2, l=2)
 
     # Creation of the evaluator
     evaluator = Evaluator(model_constructor=MLPUnet,
