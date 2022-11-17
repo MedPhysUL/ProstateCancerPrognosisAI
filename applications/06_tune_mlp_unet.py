@@ -10,14 +10,11 @@
 
 from time import time
 
+from delia.databases import PatientsDatabase
 import pandas as pd
 from monai.transforms import (
-    AddChanneld,
-    CenterSpatialCropd,
     Compose,
-    KeepLargestConnectedComponentd,
-    ScaleIntensityd,
-    ThresholdIntensityd,
+    EnsureChannelFirstd,
     ToTensord,
 )
 from torch import float32
@@ -27,7 +24,6 @@ from hps import MLP_HPS
 from src.data.datasets.image_dataset import ImageDataset
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
 from src.data.datasets.table_dataset import TableDataset
-from src.data.extraction.local import LocalDatabaseManager
 from src.data.processing.sampling import extract_masks
 
 from src.models.mlp_unet import MLPUnet
@@ -56,22 +52,15 @@ if __name__ == '__main__':
         cat_cols=[GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
     )
 
-    database_manager = LocalDatabaseManager(
-        path_to_database='local_data/learning_set.h5'
-    )
+    database = PatientsDatabase(path_to_database=r"local_data/learning_set.h5")
 
     trans = Compose([
-        AddChanneld(keys=['CT', 'Prostate']),
-        CenterSpatialCropd(keys=['CT', 'Prostate'], roi_size=(1000, 160, 160)),
-        ThresholdIntensityd(keys=['CT'], threshold=-250, above=True, cval=-250),
-        ThresholdIntensityd(keys=['CT'], threshold=500, above=False, cval=500),
-        ScaleIntensityd(keys=['CT'], minv=0, maxv=1),
-        KeepLargestConnectedComponentd(keys=['Prostate']),
+        EnsureChannelFirstd(keys=['CT', 'Prostate']),
         ToTensord(keys=['CT', 'Prostate'], dtype=float32)
     ])
 
     image_dataset = ImageDataset(
-        database_manager=database_manager,
+        database=database,
         tasks=IMAGE_TASKS,
         modalities={"CT"},
         transforms=trans
@@ -113,4 +102,3 @@ if __name__ == '__main__':
     evaluator.evaluate()
 
     print(f"Time taken for MLP (minutes): {(time() - start) / 60:.2f}")
-
