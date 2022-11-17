@@ -188,7 +188,7 @@ class Evaluator:
             manual_seed(self.seed)
 
         # We initialize ray
-        # ray.init()
+        ray.init()
 
         # We execute the outer loop
         for k, v in self._masks.items():
@@ -301,7 +301,7 @@ class Evaluator:
             )
 
         # We shutdown ray
-        # ray.shutdown()
+        ray.shutdown()
 
     def _create_objective(
             self,
