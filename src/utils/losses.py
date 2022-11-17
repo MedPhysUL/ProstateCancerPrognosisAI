@@ -13,7 +13,7 @@ from typing import List, Optional, Tuple, Union
 
 from monai.losses import DiceLoss
 import numpy as np
-from torch import from_numpy, isnan, is_tensor, mean, nn, sum, tensor, Tensor, where
+from torch import from_numpy, isnan, is_tensor, nan, nanmean, nn, nansum, tensor, Tensor, where
 
 from src.utils.reductions import LossReduction
 
@@ -90,9 +90,9 @@ class Loss(ABC):
         if reduction == LossReduction.NONE.value:
             return x
         elif reduction == LossReduction.MEAN.value:
-            return mean(x)
+            return nanmean(x)
         elif reduction == LossReduction.SUM.value:
-            return sum(x)
+            return nansum(x)
 
     @property
     def reduction(self) -> str:
@@ -142,6 +142,9 @@ class RegressionLoss(Loss):
             Rounded loss score.
         """
         nonmissing_targets_idx = self.get_idx_of_nonmissing_targets(targets)
+        if len(nonmissing_targets_idx) == 0:
+            return tensor(nan, device=pred.device)
+
         targets, pred = targets[nonmissing_targets_idx], pred[nonmissing_targets_idx]
 
         if not is_tensor(pred):
@@ -286,6 +289,9 @@ class BinaryClassificationLoss(Loss):
             Rounded loss score.
         """
         nonmissing_targets_idx = self.get_idx_of_nonmissing_targets(targets)
+        if len(nonmissing_targets_idx) == 0:
+            return tensor(nan, device=pred.device)
+
         targets, pred = targets[nonmissing_targets_idx], pred[nonmissing_targets_idx]
 
         if not is_tensor(pred):

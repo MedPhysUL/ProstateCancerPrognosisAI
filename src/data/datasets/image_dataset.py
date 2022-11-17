@@ -10,12 +10,12 @@
                         can be specified.
 """
 
-from typing import Callable, Dict, List, NamedTuple, Optional, Set, Tuple
+import collections.abc
+from typing import Callable, Dict, List, NamedTuple, Optional, Union, Sequence, Set, Tuple
 
-from monai.data import Dataset
-
-from monai.transforms import CropForeground, SpatialCrop
+from monai.transforms import apply_transform, CropForeground, SpatialCrop
 import numpy as np
+from torch.utils.data import Dataset, Subset
 
 from src.data.extraction.local import LocalDatabaseManager
 from src.utils.tasks import SegmentationTask
@@ -57,37 +57,58 @@ class ImageDataset(Dataset):
         z_dim : ZDimension
             A tuple that specify the z-dimension crop.
         """
+        self._db_manager = database_manager
+        self._modalities = modalities
         self._tasks = tasks
+        self._transforms = transforms
+        self._z_dim = z_dim
 
-        db = database_manager.get_database()
-        
-        img_list, seg_list = [], []
-        for patient in db.keys():
-            print(f"Loading {patient}.")
-            img_dict, seg_dict = {}, {}
-            for series_number in db[patient].keys():
-                series = db[patient][series_number]
-                for modality in modalities:
-                    if series.attrs[database_manager.MODALITY] == modality:
-                        img_dict[modality] = self._transpose(series[database_manager.IMAGE])
+    def __len__(self) -> int:
+        db = self._db_manager.get_database()
+        return len(db.keys())
 
-                        for task in tasks:
-                            if modality == task.modality:
-                                seg_dict[task.organ] = self._transpose(series["0"][f"{task.organ}_label_map"])
+    def __getitem__(self, index: Union[int, slice, Sequence[int]]):
+        if isinstance(index, slice):
+            start, stop, step = index.indices(len(self))
+            indices = range(start, stop, step)
+            return Subset(dataset=self, indices=indices)
+        if isinstance(index, collections.abc.Sequence):
+            return Subset(dataset=self, indices=index)
 
-            img_dict, seg_dict = self._crop(img_dict=img_dict, seg_dict=seg_dict, z_dim=z_dim)
+        data_i = self._get_single_patient(index)
 
-            img_list.append(img_dict)
-            seg_list.append(seg_dict)
+        return self._transform(data_i)
 
-        super().__init__(
-            data=[dict(img_dict, **seg_dict) for img_dict, seg_dict in zip(img_list, seg_list)],
-            transform=transforms
-        )
+    def _get_single_patient(self, index: int):
+        db = self._db_manager.get_database()
+        patient = list(db.keys())[index]
+
+        print(f"Loading {patient}.")
+        img_dict, seg_dict = {}, {}
+        for series_number in db[patient].keys():
+            series = db[patient][series_number]
+            for modality in self._modalities:
+                if series.attrs[self._db_manager.MODALITY] == modality:
+                    img_dict[modality] = self._transpose(
+                        data=series[self._db_manager.IMAGE]
+                    ).astype(np.float16)
+
+                    for task in self._tasks:
+                        if modality == task.modality:
+                            seg_dict[task.organ] = self._transpose(
+                                data=series["0"][f"{task.organ}_label_map"]
+                            ).astype(np.int8)
+
+        img_dict, seg_dict = self._crop(img_dict=img_dict, seg_dict=seg_dict, z_dim=self._z_dim)
+
+        return dict(img_dict, **seg_dict)
 
     @property
     def tasks(self) -> List[SegmentationTask]:
         return self._tasks
+
+    def _transform(self, data_i):
+        return apply_transform(self._transforms, data_i) if self._transforms is not None else data_i
 
     @staticmethod
     def _transpose(data) -> np.array:

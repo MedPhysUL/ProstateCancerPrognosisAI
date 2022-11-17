@@ -67,7 +67,7 @@ class LocalDatabaseManager(PatientsDatabase):
             return h5py.File(self.path_to_database, mode="r")
         else:
             raise FileExistsError(
-                f"HDF5 file with path {self.path_to_database} doesn't exists. Use create_database before get_database.")
+                f"HDF5 file with path {self.path_to_database} doesn't exist. Use create_database before get_database.")
 
     def create_database(
             self,

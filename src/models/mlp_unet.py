@@ -11,7 +11,7 @@
 from typing import List, Optional
 
 from src.models.base.torch_wrapper import TorchWrapper
-from src.models.base.mlp_base_model import MLPBaseModel
+from src.models.base.mlp_unet_base_model import MLPUnetBaseModel
 from src.training.early_stopper import EarlyStopperType
 from src.utils.hyperparameters import CategoricalHP, HP, NumericalContinuousHP, NumericalIntHP
 from src.utils.multi_task_losses import MultiTaskLoss
@@ -38,7 +38,7 @@ class MLPHP:
         )
 
 
-class MLP(TorchWrapper):
+class MLPUnet(TorchWrapper):
     """
     Multilayer perceptron classification model wrapper.
     """
@@ -107,7 +107,7 @@ class MLP(TorchWrapper):
             If True, training progress will be printed
         """
         super().__init__(
-            model_constructor=MLPBaseModel,
+            model_constructor=MLPUnetBaseModel,
             model_params=dict(
                 output_size=output_size,
                 criterion=criterion,

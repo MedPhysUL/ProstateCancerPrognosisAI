@@ -10,8 +10,8 @@
                         all pytorch models.
 """
 
-
 from abc import ABC, abstractmethod
+import gc
 import os
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 
@@ -182,7 +182,7 @@ class TorchCustomModel(Module, ABC):
     @staticmethod
     def _create_validation_loader(
             dataset: ProstateCancerDataset,
-            valid_batch_size: Optional[int]
+            valid_batch_size: int = 1
     ) -> DataLoader:
         """
         Creates the objects needed for validation during the training process.
@@ -191,8 +191,8 @@ class TorchCustomModel(Module, ABC):
         ----------
         dataset : ProstateCancerDataset
             Prostate cancer dataset used to feed the dataloader.
-        valid_batch_size : Optional[int]
-            Size of the batches in the valid loader (None = one single batch).
+        valid_batch_size : int
+            Size of the batches in the valid loader.
 
         Returns
         -------
@@ -205,13 +205,14 @@ class TorchCustomModel(Module, ABC):
         if valid_size != 0:
 
             # We check if a valid batch size was provided
-            valid_batch_size = min(valid_size, valid_batch_size) if valid_batch_size is not None else valid_size
+            valid_batch_size = min(valid_size, valid_batch_size)
 
             # We create the valid loader
             valid_data = DataLoader(
                 dataset,
                 batch_size=valid_batch_size,
-                sampler=SubsetRandomSampler(dataset.valid_mask)
+                sampler=SubsetRandomSampler(dataset.valid_mask),
+                collate_fn=None
             )
 
         return valid_data
@@ -363,7 +364,7 @@ class TorchCustomModel(Module, ABC):
             patience: int = 10,
             rho: float = 0,
             batch_size: Optional[int] = 55,
-            valid_batch_size: Optional[int] = None,
+            valid_batch_size: int = 1,
             max_epochs: int = 200
     ) -> None:
         """
@@ -384,8 +385,8 @@ class TorchCustomModel(Module, ABC):
             Patience.
         batch_size : Optional[int]
             Size of the batches in the training loader.
-        valid_batch_size : Optional[int]
-            Size of the batches in the valid loader (None = one single batch).
+        valid_batch_size : int
+            Size of the batches in the valid loader.
         max_epochs : int
             Maximum number of epochs for training.
         """
@@ -440,6 +441,7 @@ class TorchCustomModel(Module, ABC):
             # We calculate training loss
             train_loss = self._execute_train_step(train_data)
             update_progress(epoch, train_loss)
+            gc.collect()
 
             # We calculate valid score and apply early stopping if needed
             if self._execute_valid_step(valid_data, early_stopper):
@@ -535,7 +537,7 @@ class TorchCustomModel(Module, ABC):
             Predictions (except segmentation map).
         """
         subset = dataset[mask]
-        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
+        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
 
         predictions_as_lists = {task.name: [] for task in dataset.tasks}
         with no_grad():
@@ -648,7 +650,7 @@ class TorchCustomModel(Module, ABC):
             Score for each tasks and each metrics.
         """
         subset = dataset[mask]
-        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
+        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
 
         scores = {task.name: {} for task in self.tasks}
         segmentation_scores_dict = {}
@@ -678,7 +680,7 @@ class TorchCustomModel(Module, ABC):
                 predictions = self.predict(x)
 
                 for task in self.tasks:
-                    pred, target = predictions[task.name].item(), y[task.name].item()
+                    pred, target = predictions[task.name], y[task.name]
 
                     if task.task_type == TaskType.SEGMENTATION:
                         metrics = [task.optimization_metric]
@@ -687,11 +689,11 @@ class TorchCustomModel(Module, ABC):
 
                         for metric in metrics:
                             segmentation_scores_dict[task.name][metric.name].append(
-                                metric(np.array(pred), np.array(target), MetricReduction.NONE)
+                                metric(pred, target, MetricReduction.NONE)
                             )
                     else:
-                        non_segmentation_outputs_dict[task.name].predictions.append(pred)
-                        non_segmentation_outputs_dict[task.name].targets.append(target)
+                        non_segmentation_outputs_dict[task.name].predictions.append(pred.item())
+                        non_segmentation_outputs_dict[task.name].targets.append(target.item())
 
             for task in self.tasks:
                 metrics = [task.optimization_metric]
@@ -726,7 +728,7 @@ class TorchCustomModel(Module, ABC):
             Whether to fix the thresholds of evaluation metrics or not.
         """
         subset = dataset[dataset.train_mask]
-        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False)
+        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
 
         thresholds = np.linspace(start=0.01, stop=0.95, num=95)
 
@@ -743,10 +745,10 @@ class TorchCustomModel(Module, ABC):
                 predictions = self.predict(x)
 
                 for task in classification_tasks:
-                    pred, target = predictions[task.name].item(), y[task.name].item()
+                    pred, target = predictions[task.name], y[task.name]
 
-                    outputs_dict[task.name].predictions.append(pred)
-                    outputs_dict[task.name].targets.append(target)
+                    outputs_dict[task.name].predictions.append(pred.item())
+                    outputs_dict[task.name].targets.append(target.item())
 
             for task in classification_tasks:
                 output = outputs_dict[task.name]
@@ -794,7 +796,8 @@ class TorchCustomModel(Module, ABC):
             dataset,
             batch_size=batch_size,
             sampler=SubsetRandomSampler(dataset.train_mask),
-            drop_last=(train_size % batch_size) == 1
+            drop_last=(train_size % batch_size) == 1,
+            collate_fn=None
         )
 
         return train_data

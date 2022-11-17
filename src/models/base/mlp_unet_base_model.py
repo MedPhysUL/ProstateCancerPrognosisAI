@@ -1,19 +1,18 @@
 """
-    @file:              mlp_base_model.py
-    @Author:            Maxence Larose, Nicolas Raymond, Mehdi Mitiche
+    @file:              mlp_unet_base_model.py
+    @Author:            Maxence Larose
 
     @Creation Date:     09/2022
     @Last modification: 09/2022
 
-    @Description:       This file is used to define an MLP model with entity embeddings. These models are not shaped
-                        to inherit from the BaseModel class. However, two wrapper classes for torch models are provided
-                        to enable the use of these mlp models with hyperparameter tuning functions.
+    @Description:       This file is used to define an MLP and 3D Unet model.
 """
 
 from typing import List, Optional
 
 import numpy as np
 from monai.data import DataLoader
+from monai.networks.nets import UNet
 from torch import cat, no_grad, sigmoid, stack, tensor
 from torch.nn import Identity, Linear
 
@@ -26,9 +25,9 @@ from src.utils.multi_task_losses import MultiTaskLoss
 from src.utils.tasks import TaskType
 
 
-class MLPBaseModel(TorchCustomModel):
+class MLPUnetBaseModel(TorchCustomModel):
     """
-    Multilayer perceptron model with entity embedding for categorical variables.
+    Multilayer perceptron model for table features and 3D Unet model for images.
     """
 
     def __init__(
@@ -82,6 +81,16 @@ class MLPBaseModel(TorchCustomModel):
             verbose=verbose
         )
 
+        self._net = UNet(
+            spatial_dims=3,
+            in_channels=1,
+            out_channels=1,
+            channels=(16, 32, 64, 128),
+            strides=(2, 2, 2),
+            num_res_units=3,
+            dropout=0.2
+        ).to(device=self._device)
+
         self._activation = activation
         self._dropout = dropout
         self._layers = layers
@@ -127,6 +136,7 @@ class MLPBaseModel(TorchCustomModel):
                 epoch_losses[name].append(single_task_loss)
 
         epoch_losses = {name: np.nanmean(loss) for name, loss in epoch_losses.items()}
+        print("TRAIN LOSSES", epoch_losses)
 
         if self._calculate_epoch_score:
             # We get the scores values
@@ -270,7 +280,10 @@ class MLPBaseModel(TorchCustomModel):
         # We compute the output
         y_table = self._linear_layer(self._main_encoding_block(x_table.float()))
 
-        y = {task.name: y_table[:, i] for i, task in enumerate(self.tasks)}
+        y = {task.name: y_table[:, i] for i, task in enumerate(self._dataset.table_dataset.tasks)}
+
+        for task in self._dataset.image_dataset.tasks:
+            y[task.name] = self._net(x.image["CT"])
 
         return y
 
@@ -287,13 +300,13 @@ class MLPBaseModel(TorchCustomModel):
                 layers=self._layers[:-1],
                 activation=self._activation,
                 dropout=self._dropout
-            )
+            ).to(device=self._device)
         else:
-            self._main_encoding_block = Identity()
+            self._main_encoding_block = Identity().to(device=self._device)
             self._layers.append(self.table_input_size)
 
         # We add a linear layer to complete the layers
-        self._linear_layer = Linear(self._layers[-1], self._output_size)
+        self._linear_layer = Linear(self._layers[-1], self._output_size - 1).to(device=self._device)
 
     def predict(
             self,
@@ -326,6 +339,8 @@ class MLPBaseModel(TorchCustomModel):
                 if task.task_type == TaskType.CLASSIFICATION:
                     predictions[task.name] = sigmoid(outputs[task.name])
                 elif task.task_type == TaskType.REGRESSION:
+                    predictions[task.name] = outputs[task.name]
+                elif task.task_type == TaskType.SEGMENTATION:
                     predictions[task.name] = outputs[task.name]
 
         return predictions
