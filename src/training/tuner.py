@@ -112,7 +112,6 @@ class Objective:
         # We execute parallel evaluations
         futures = [self._run_single_evaluation.remote(masks=m, hps=suggested_hps) for k, m in self._masks.items()]
         scores = ray.get(futures)
-        # scores = [self._run_single_evaluation(masks=m, hps=suggested_hps) for k, m in self._masks.items()]
 
         # We take the mean of the scores
         return mean(tensor(scores), dim=0).tolist()
