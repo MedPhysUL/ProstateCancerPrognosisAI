@@ -1,10 +1,10 @@
 certifi==2022.5.18.1
 charset-normalizer==2.0.12
 dataclasses==0.6
-dicom2hdf==0.2.3
+delia==1.0.7
 h5py==3.7.0
 matplotlib==3.5.2
-monai==0.9.0
+monai==1.0.1
 networkx==2.8.4
 numpy==1.23.0
 opencv-python==4.6.0.66
