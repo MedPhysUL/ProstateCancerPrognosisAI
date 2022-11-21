@@ -13,7 +13,7 @@ from typing import List, Optional
 import numpy as np
 from monai.data import DataLoader
 from monai.networks.nets import UNet
-from torch import cat, no_grad, sigmoid, stack, tensor
+from torch import cat, no_grad, round, sigmoid, stack, tensor
 from torch.nn import Identity, Linear
 
 from src.data.datasets.prostate_cancer_dataset import DataModel
@@ -85,8 +85,8 @@ class MLPUnetBaseModel(TorchCustomModel):
             spatial_dims=3,
             in_channels=1,
             out_channels=1,
-            channels=(16, 32, 64, 128),
-            strides=(2, 2, 2),
+            channels=(64, 128, 256, 512, 1024),
+            strides=(2, 2, 2, 2),
             num_res_units=3,
             dropout=0.2
         ).to(device=self._device)
@@ -341,6 +341,6 @@ class MLPUnetBaseModel(TorchCustomModel):
                 elif task.task_type == TaskType.REGRESSION:
                     predictions[task.name] = outputs[task.name]
                 elif task.task_type == TaskType.SEGMENTATION:
-                    predictions[task.name] = outputs[task.name]
+                    predictions[task.name] = round(sigmoid(outputs[task.name]))
 
         return predictions
