@@ -27,13 +27,6 @@ class ImageDataset(Dataset):
     HDF5 file. The rendered images are in shape (Z, X, Y).
     """
 
-    class ZDimension(NamedTuple):
-        """
-        A tuple that specify the z-dimension crop.
-        """
-        start: int
-        stop: int
-
     def __init__(
             self,
             database: PatientsDatabase,
