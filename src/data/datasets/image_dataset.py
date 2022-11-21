@@ -11,7 +11,7 @@
 """
 
 import collections.abc
-from typing import Callable, List, NamedTuple, Optional, Union, Sequence, Set
+from typing import Callable, List, Optional, Union, Sequence, Set
 
 from delia.databases.patients_database import PatientsDatabase
 from monai.transforms import apply_transform
