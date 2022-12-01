@@ -10,6 +10,7 @@
 """
 
 from copy import deepcopy
+from os import cpu_count
 from os import makedirs
 from os.path import join
 from time import strftime
@@ -246,7 +247,10 @@ class Objective:
             Function that train a single model using given masks and given HPs.
         """
 
-        @ray.remote(num_gpus=int(gpu_device))
+        # TODO : num_cpus and num_gpus should be user selectable. For now, we have to use all cpus per trial,
+        #  otherwise Ray thinks the tasks have to be parallelized and everything falls apart because the GPU memory is
+        #  not big enough to hold 2 trials (models) at a time.
+        @ray.remote(num_cpus=cpu_count(), num_gpus=int(gpu_device))
         def run_single_evaluation(
                 masks: Dict[str, List[int]],
                 hps: Dict[str, Any]
