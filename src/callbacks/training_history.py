@@ -9,7 +9,8 @@
                         metrics values obtained during the training process.
 """
 
-from typing import Dict, List, NamedTuple, Optional, Tuple
+from enum import Enum
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,14 +19,9 @@ from matplotlib.ticker import MaxNLocator
 from src.callbacks.callback import Callback, Priority
 
 
-class _History(NamedTuple):
-    losses: Dict[str, List[float]] = {}
-    metrics: Dict[str, List[float]] = {}
-
-
-class _Histories(NamedTuple):
-    training: _History = _History()
-    validation: _History = _History()
+class MeasureCategory(Enum):
+    LOSSES = "losses"
+    METRICS = "metrics"
 
 
 class TrainingHistory(Callback):
@@ -33,10 +29,13 @@ class TrainingHistory(Callback):
     This class is used to store losses and score metrics values obtained during the training process.
     """
 
+    TRAINING_SET_KEY = "training"
+    VALIDATION_SET_KEY = "validation"
+
     def __init__(
             self,
             name: str,
-            histories: Optional[_Histories] = None,
+            container: Optional[Dict[str, Dict[str, Dict[str, List[float]]]]] = None,
             **kwargs
     ):
         """
@@ -46,17 +45,26 @@ class TrainingHistory(Callback):
         ----------
         name : str
             The name of the callback.
-        histories : Optional[_Histories]
-            Histories named tuple.
+        container : Optional[Dict[str, Dict[str, Dict[str, List[float]]]]]
+            Histories container.
         **kwargs : dict
             The keyword arguments to pass to the Callback.
         """
         super().__init__(name, **kwargs)
 
-        if histories:
-            self._histories = histories
+        if container:
+            self._container = container
         else:
-            self._histories = _Histories()
+            self._container = {
+                self.TRAINING_SET_KEY: {
+                    MeasureCategory.LOSSES.value: {},
+                    MeasureCategory.METRICS.value: {}
+                },
+                self.VALIDATION_SET_KEY: {
+                    MeasureCategory.LOSSES.value: {},
+                    MeasureCategory.METRICS.value: {}
+                }
+            }
 
     @property
     def priority(self) -> int:
@@ -71,32 +79,32 @@ class TrainingHistory(Callback):
         return Priority.HIGH_PRIORITY.value
 
     @property
-    def training_set_history(self) -> _History:
+    def training_set_history(self) -> Dict[str, Dict[str, List[float]]]:
         """
         Training set losses and score metrics history.
 
         Returns
         -------
-        history : _History
+        history : Dict[str, Dict[str, List[float]]]
             Training set history.
         """
-        return self._histories.training
+        return self._container[self.TRAINING_SET_KEY]
 
     @property
-    def validation_set_history(self) -> _History:
+    def validation_set_history(self) -> Dict[str, Dict[str, List[float]]]:
         """
         Validation set losses and score metrics history.
 
         Returns
         -------
-        history : _History
+        history : Dict[str, Dict[str, List[float]]]
             Validation set history.
         """
-        return self._histories.validation
+        return self._container[self.VALIDATION_SET_KEY]
 
     def _create_plot(
             self,
-            measure_category: str,
+            measure_category: Union[MeasureCategory, str],
             **kwargs
     ) -> Tuple[plt.Figure, Dict[str, plt.Axes], Dict[str, List[plt.Line2D]]]:
         """
@@ -105,7 +113,7 @@ class TrainingHistory(Callback):
 
         Parameters
         ----------
-        measure_category : str
+        measure_category : MeasureCategory
             Measure category, i.e 'losses' or 'metrics'.
         kwargs : dict
             Keywords arguments controlling figure aesthetics.
@@ -115,8 +123,10 @@ class TrainingHistory(Callback):
         fig, axes, lines : Tuple[plt.Figure, Dict[str, plt.Axes], Dict[str, List[plt.Line2D]]]
             The figure, axes and lines of the plot.
         """
-        training_set_history_dict = getattr(self.training_set_history, measure_category)
-        validation_set_history_dict = getattr(self.validation_set_history, measure_category)
+        measure_category = MeasureCategory(measure_category).value
+
+        training_set_history_dict = self.training_set_history[measure_category]
+        validation_set_history_dict = self.validation_set_history[measure_category]
 
         training_set_names = list(training_set_history_dict.keys())
         validation_set_names = list(validation_set_history_dict.keys())
@@ -165,11 +175,11 @@ class TrainingHistory(Callback):
         """
         plt.close('all')
 
-        for history_type in _History._fields:
-            fig, axes, lines = self._create_plot(history_type, **kwargs)
+        for measure_category in [c.value for c in MeasureCategory]:
+            fig, axes, lines = self._create_plot(measure_category, **kwargs)
             plt.tight_layout(rect=(0, 0.03, 1, 0.95))
             if path_to_save is not None:
-                fig.savefig(f"{path_to_save}_{history_type}.pdf", dpi=kwargs.get("dpi", 300))
+                fig.savefig(f"{path_to_save}_{measure_category}.pdf", dpi=kwargs.get("dpi", 300))
             if show:
                 plt.show(block=kwargs.get("block", True))
             if kwargs.get("close", True):
@@ -180,17 +190,17 @@ class TrainingHistory(Callback):
         Append the current training set losses and metric scores to the history.
         """
         for loss_name, loss_value in trainer.state.train_losses.items():
-            self.training_set_history.losses[loss_name].append(loss_value)
+            self.training_set_history[MeasureCategory.LOSSES.value][loss_name].append(loss_value)
 
         for metric_name, metric_value in trainer.state.train_metrics.items():
-            self.training_set_history.metrics[metric_name].append(metric_value)
+            self.training_set_history[MeasureCategory.METRICS.value][metric_name].append(metric_value)
 
     def on_validation_end(self, trainer, **kwargs):
         """
         Append the current validation set losses and metric scores to the history.
         """
         for loss_name, loss_value in trainer.state.valid_losses.items():
-            self.validation_set_history.losses[loss_name].append(loss_value)
+            self.validation_set_history[MeasureCategory.LOSSES.value][loss_name].append(loss_value)
 
         for metric_name, metric_value in trainer.state.valid_metrics.items():
-            self.validation_set_history.metrics[metric_name].append(metric_value)
+            self.validation_set_history[MeasureCategory.METRICS.value][metric_name].append(metric_value)
