@@ -74,7 +74,7 @@ class Callback(ABC):
     def __init__(
             self,
             name: str,
-            save_state: bool = False,
+            save_state: bool = True,
             load_state: Optional[bool] = None
     ):
         """
