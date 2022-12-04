@@ -19,6 +19,9 @@ from src.utils.tasks import Task
 
 
 class BaseEarlyStopping(ABC, Callback):
+    """
+    Base class for early stopping.
+    """
 
     def __init__(
             self,
