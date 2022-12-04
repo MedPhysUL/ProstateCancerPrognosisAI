@@ -1,3 +1,14 @@
+"""
+    @file:              training_history.py
+    @Author:            Maxence Larose
+
+    @Creation Date:     12/2022
+    @Last modification: 12/2022
+
+    @Description:       This file is used to define the TrainingHistory class which is used to store losses and score
+                        metrics values obtained during the training process.
+"""
+
 from typing import Dict, List, NamedTuple, Optional, Tuple
 
 import numpy as np
