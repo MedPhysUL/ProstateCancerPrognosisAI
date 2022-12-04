@@ -5,7 +5,7 @@
     @Creation Date:     12/2022
     @Last modification: 12/2022
 
-    @Description:       This file is used to define the Checkpoint callback.
+    @Description:       This file is used to define the 'Checkpoint' callback.
 """
 
 from enum import Enum
