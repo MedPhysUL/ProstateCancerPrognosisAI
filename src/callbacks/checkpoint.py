@@ -1,3 +1,13 @@
+"""
+    @file:              checkpoint.py
+    @Author:            Maxence Larose, Mehdi Mitiche, Nicolas Raymond
+
+    @Creation Date:     12/2022
+    @Last modification: 12/2022
+
+    @Description:       This file is used to define the Checkpoint callback.
+"""
+
 from enum import Enum
 import json
 import os
@@ -20,7 +30,7 @@ class BestModelMode(Enum):
         The model with the smallest multi-task loss on the validation set is considered the 'best' model.
     """
     MULTITASK_LOSS = "MultiTaskLoss"
-    # TODO : Implement a multi-task metric.
+    # TODO : Implement a multi-task score metric.
 
 
 class CheckpointLoadingMode(Enum):
