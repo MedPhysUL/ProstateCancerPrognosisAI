@@ -18,7 +18,7 @@ from src.utils.score_metrics import Direction
 from src.utils.tasks import Task
 
 
-class _EarlyStopping(ABC, Callback):
+class BaseEarlyStopping(ABC, Callback):
 
     def __init__(
             self,
@@ -86,7 +86,7 @@ class _EarlyStopping(ABC, Callback):
         raise NotImplementedError
 
 
-class MetricEarlyStopping(_EarlyStopping):
+class MetricEarlyStopping(BaseEarlyStopping):
 
     def __init__(
             self,
@@ -179,7 +179,7 @@ class MetricEarlyStopping(_EarlyStopping):
             print(f"Task ({task.name}) (metric {task.optimization_metric.name}), Score :{round(score, 4)}")
 
 
-class MultiTaskLossEarlyStopping(_EarlyStopping):
+class MultiTaskLossEarlyStopping(BaseEarlyStopping):
 
     def __init__(
             self,
