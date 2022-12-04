@@ -50,7 +50,7 @@ class TrainingHistory(Callback):
         **kwargs : dict
             The keyword arguments to pass to the Callback.
         """
-        super().__init__(name, **kwargs)
+        super().__init__(name=name, **kwargs)
 
         if container:
             self._container = container
