@@ -37,7 +37,7 @@ class CallbackList:
             "All callbacks must be instances of Callback."
 
         self.callbacks = list(callbacks)
-        self.validate_duplicates()
+        self.check_duplicates()
         self.sort()
 
     def __getitem__(self, idx: int) -> Callback:
@@ -78,7 +78,7 @@ class CallbackList:
         """
         return len(self.callbacks)
 
-    def validate_duplicates(self):
+    def check_duplicates(self):
         """
         Validates that the duplicated classes in the CallbackList are allowed duplicates.
         """
@@ -112,7 +112,7 @@ class CallbackList:
         """
         assert isinstance(callback, Callback), "callback must be an instance of Callback"
         self.callbacks.append(callback)
-        self.validate_duplicates()
+        self.check_duplicates()
         self.sort()
 
     def remove(self, callback: Callback):
