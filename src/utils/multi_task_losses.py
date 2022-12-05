@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     09/2022
-    @Last modification: 09/2022
+    @Last modification: 12/2022
 
     @Description:       This file is used to define the multi-task losses used to measure models' performance. The
                         ultimate goal is to implement a loss based on uncertainty. See :
@@ -18,7 +18,6 @@ from typing import Dict, List, Optional
 
 from torch import nanmean, stack, Tensor
 
-from src.data.datasets.prostate_cancer_dataset import DataModel
 from src.utils.tasks import Task
 
 
@@ -29,7 +28,8 @@ class MultiTaskLoss(ABC):
 
     def __init__(
             self,
-            name: str
+            name: str,
+            tasks: Optional[List[Task]] = None
     ):
         """
         Sets protected attributes.
@@ -38,64 +38,16 @@ class MultiTaskLoss(ABC):
         ----------
         name : str
             Name of the Loss.
+        tasks : Optional[List[Task]]
+            Tasks to include in the multi-task loss calculation. By default, we use all available tasks.
         """
         # Protected attributes
         self._name = name
-        self._single_task_losses = None
-        self._tasks = None
-
-    def __call__(
-            self,
-            predictions: DataModel.y,
-            targets: DataModel.y
-    ) -> Tensor:
-        """
-        Gets loss value.
-
-        Parameters
-        ----------
-        predictions : DataModel.y
-            Batch data items.
-        targets : DataElement.y
-            Batch data items.
-
-        Returns
-        -------
-        loss : Tensor
-            (1, 1) tensor.
-        """
-        losses = {task.name: task.criterion(predictions[task.name], targets[task.name]) for task in self._tasks}
-        self._single_task_losses = {name: loss.item() for name, loss in losses.items()}
-
-        return self._compute_loss(losses)
+        self._tasks = tasks
 
     @property
     def name(self) -> str:
         return self._name
-
-    @abstractmethod
-    def _compute_loss(
-            self,
-            single_task_losses: Dict[str, Tensor]
-    ) -> Tensor:
-        """
-        Gets loss value.
-
-        Parameters
-        ----------
-        single_task_losses : Dict[str, Tensor]
-            Dictionary of single task losses.
-
-        Returns
-        -------
-        loss : Tensor
-            (1, 1) tensor.
-        """
-        raise NotImplementedError
-
-    @property
-    def single_task_losses(self) -> Optional[Dict[str, float]]:
-        return self._single_task_losses
 
     @property
     def tasks(self) -> Optional[List[Task]]:
@@ -105,6 +57,47 @@ class MultiTaskLoss(ABC):
     def tasks(self, tasks: List[Task]) -> None:
         self._tasks = tasks
 
+    def __call__(
+            self,
+            losses: Dict[str, Tensor]
+    ) -> Tensor:
+        """
+        Gets multi-task loss value.
+
+        Parameters
+        ----------
+        losses : Dict[str, Tensor]
+            Dictionary of single task losses. Keys are task names and values are losses (1, 1) tensors.
+
+        Returns
+        -------
+        loss : Tensor
+            (1, 1) tensor.
+        """
+        assert self.tasks is not None, "The 'tasks' attribute must be set before computing the multi-task loss."
+
+        return self._compute_loss(losses)
+
+    @abstractmethod
+    def _compute_loss(
+            self,
+            losses: Dict[str, Tensor]
+    ) -> Tensor:
+        """
+        Gets loss value.
+
+        Parameters
+        ----------
+        losses : Dict[str, Tensor]
+            Dictionary of single task losses.
+
+        Returns
+        -------
+        loss : Tensor
+            (1, 1) tensor.
+        """
+        raise NotImplementedError
+
 
 class MeanLoss(MultiTaskLoss):
     """
@@ -113,22 +106,28 @@ class MeanLoss(MultiTaskLoss):
 
     def __init__(
             self,
+            tasks: Optional[List[Task]] = None
     ):
         """
         Sets protected attributes.
+
+        Parameters
+        ----------
+        tasks : Optional[List[Task]]
+            Tasks to include in the multi-task loss calculation. By default, we use all available tasks.
         """
-        super().__init__(name="MeanLoss")
+        super().__init__(name="MeanLoss", tasks=tasks)
 
     def _compute_loss(
             self,
-            single_task_losses: Dict[str, Tensor]
+            losses: Dict[str, Tensor]
     ) -> Tensor:
         """
         Gets loss value.
 
         Parameters
         ----------
-        single_task_losses : Dict[str, Tensor]
+        losses : Dict[str, Tensor]
             Dictionary of single task losses.
 
         Returns
@@ -136,4 +135,4 @@ class MeanLoss(MultiTaskLoss):
         loss : Tensor
             (1, 1) tensor.
         """
-        return nanmean(stack([single_task_losses[task.name] for task in self.tasks]))
+        return nanmean(stack([losses[task.name] for task in self.tasks]))
