@@ -156,15 +156,15 @@ class ModelCheckpoint(Callback):
             The save name.
         """
         if checkpoint_loading_mode == checkpoint_loading_mode.BEST_EPOCH:
-            if Checkpoint.CHECKPOINT_BEST_KEY in checkpoints_meta:
-                return checkpoints_meta[Checkpoint.CHECKPOINT_BEST_KEY]
+            if ModelCheckpoint.CHECKPOINT_BEST_KEY in checkpoints_meta:
+                return checkpoints_meta[ModelCheckpoint.CHECKPOINT_BEST_KEY]
             else:
                 raise FileNotFoundError(f"No best checkpoint found in checkpoints_meta. Please use a different "
                                         f"'checkpoint_loading_mode'.")
         elif checkpoint_loading_mode == checkpoint_loading_mode.LAST_EPOCH:
-            epoch_dict = checkpoints_meta[Checkpoint.CHECKPOINT_EPOCHS_KEY]
+            epoch_dict = checkpoints_meta[ModelCheckpoint.CHECKPOINT_EPOCHS_KEY]
             last_epoch: int = max([int(e) for e in epoch_dict])
-            return checkpoints_meta[Checkpoint.CHECKPOINT_EPOCHS_KEY][str(last_epoch)]
+            return checkpoints_meta[ModelCheckpoint.CHECKPOINT_EPOCHS_KEY][str(last_epoch)]
         else:
             raise ValueError("Invalid 'checkpoint_loading_mode'. ")
 
@@ -178,7 +178,7 @@ class ModelCheckpoint(Callback):
         metadata_path : str
             The path to the checkpoints metadata file.
         """
-        return os.path.join(self.path_to_checkpoint_folder, f"{Checkpoint.CHECKPOINT_METADATA_KEY}.json")
+        return os.path.join(self.path_to_checkpoint_folder, f"{ModelCheckpoint.CHECKPOINT_METADATA_KEY}.json")
 
     @staticmethod
     def get_checkpoint_filename(epoch: int):
@@ -195,7 +195,7 @@ class ModelCheckpoint(Callback):
         checkpoint_filename : str
             The filename for the checkpoint at the given epoch.
         """
-        return f"{Checkpoint.CHECKPOINT_EPOCH_KEY}-{epoch}.pth"
+        return f"{ModelCheckpoint.CHECKPOINT_EPOCH_KEY}-{epoch}.pth"
 
     def _create_new_checkpoint_metadata(self, epoch: int, best: bool = False) -> dict:
         """
@@ -214,9 +214,9 @@ class ModelCheckpoint(Callback):
             The new checkpoint's metadata.
         """
         save_name = self.get_checkpoint_filename(epoch)
-        new_info = {Checkpoint.CHECKPOINT_EPOCHS_KEY: {str(epoch): save_name}}
+        new_info = {ModelCheckpoint.CHECKPOINT_EPOCHS_KEY: {str(epoch): save_name}}
         if best:
-            new_info[Checkpoint.CHECKPOINT_BEST_KEY] = save_name
+            new_info[ModelCheckpoint.CHECKPOINT_BEST_KEY] = save_name
         return new_info
 
     def save_checkpoint(
@@ -266,14 +266,14 @@ class ModelCheckpoint(Callback):
         path = os.path.join(self.path_to_checkpoint_folder, save_name)
 
         basic_states = {
-            Checkpoint.CHECKPOINT_EPOCH_KEY: epoch,
-            Checkpoint.CHECKPOINT_MODEL_STATE_KEY: model_state,
-            Checkpoint.CHECKPOINT_OPTIMIZER_STATE_KEY: optimizer_state,
-            Checkpoint.CHECKPOINT_EPOCH_TRAIN_LOSSES_KEY: train_losses,
-            Checkpoint.CHECKPOINT_EPOCH_TRAIN_METRICS_KEY: train_metrics,
-            Checkpoint.CHECKPOINT_EPOCH_VALID_LOSSES_KEY: valid_losses,
-            Checkpoint.CHECKPOINT_EPOCH_VALID_METRICS_KEY: valid_metrics,
-            Checkpoint.CHECKPOINT_TRAINING_HISTORY_KEY: training_history
+            ModelCheckpoint.CHECKPOINT_EPOCH_KEY: epoch,
+            ModelCheckpoint.CHECKPOINT_MODEL_STATE_KEY: model_state,
+            ModelCheckpoint.CHECKPOINT_OPTIMIZER_STATE_KEY: optimizer_state,
+            ModelCheckpoint.CHECKPOINT_EPOCH_TRAIN_LOSSES_KEY: train_losses,
+            ModelCheckpoint.CHECKPOINT_EPOCH_TRAIN_METRICS_KEY: train_metrics,
+            ModelCheckpoint.CHECKPOINT_EPOCH_VALID_LOSSES_KEY: valid_losses,
+            ModelCheckpoint.CHECKPOINT_EPOCH_VALID_METRICS_KEY: valid_metrics,
+            ModelCheckpoint.CHECKPOINT_TRAINING_HISTORY_KEY: training_history
         }
         assert all(key not in other_states for key in basic_states.keys()), (
             f"Other states cannot have the same keys as the basic states ({list(basic_states.keys())})."
@@ -369,10 +369,10 @@ class ModelCheckpoint(Callback):
         else:
             try:
                 checkpoint = self.load_checkpoint(trainer.checkpoint_loading_mode)
-                trainer.model.load_state(checkpoint[Checkpoint.CHECKPOINT_MODEL_STATE_KEY], strict=True)
+                trainer.model.load_state(checkpoint[ModelCheckpoint.CHECKPOINT_MODEL_STATE_KEY], strict=True)
                 if trainer.optimizer is not None:
-                    trainer.optimizer.load_state(checkpoint[Checkpoint.CHECKPOINT_OPTIMIZER_STATE_KEY])
-                epoch = int(checkpoint[Checkpoint.CHECKPOINT_EPOCH_KEY]) + 1
+                    trainer.optimizer.load_state(checkpoint[ModelCheckpoint.CHECKPOINT_OPTIMIZER_STATE_KEY])
+                epoch = int(checkpoint[ModelCheckpoint.CHECKPOINT_EPOCH_KEY]) + 1
 
             except FileNotFoundError as e:
                 if self.verbose:
