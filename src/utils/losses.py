@@ -450,7 +450,7 @@ class SegmentationLoss(Loss):
         if not is_tensor(pred):
             pred, targets = self.convert_to_tensors(pred, targets)
 
-        return self._compute_loss(pred, targets, reduction)
+        return self.perform_reduction(self._compute_loss(pred, targets), reduction)
 
     @staticmethod
     def convert_to_tensors(
@@ -481,8 +481,7 @@ class SegmentationLoss(Loss):
     def _compute_loss(
             self,
             pred: Tensor,
-            targets: Tensor,
-            reduction: Optional[Union[LossReduction, str]]
+            targets: Tensor
     ) -> Tensor:
         """
         Computes the loss value.
@@ -493,8 +492,6 @@ class SegmentationLoss(Loss):
             (N, X, Y, Z) tensor with predicted labels
         targets : Tensor
             (N, X, Y, Z) tensor with ground truth
-        reduction : Optional[Union[LossReduction, str]]
-            Reduction method to use.
 
         Returns
         -------
@@ -552,7 +549,7 @@ class BinaryCrossEntropyWithLogitsLoss(BinaryClassificationLoss):
         loss = nn.BCEWithLogitsLoss(
             weight=where(targets == 1, self.scaling_factor, 1),
             reduction="none"
-        )
+        ).to(device=pred.device)
 
         return loss(pred, targets.float())
 
@@ -582,8 +579,7 @@ class DICELoss(SegmentationLoss):
     def _compute_loss(
             self,
             pred: Tensor,
-            targets: Tensor,
-            reduction: Optional[Union[LossReduction, str]]
+            targets: Tensor
     ) -> Tensor:
         """
         Returns average Dice loss between two tensors.
@@ -594,14 +590,12 @@ class DICELoss(SegmentationLoss):
             (N,) tensor with predicted probabilities of being in class 1
         targets : Tensor
             (N,) tensor with ground truth
-        reduction : Optional[Union[LossReduction, str]]
-            Reduction method to use.
 
         Returns
         -------
         loss : Tensor
             Loss value.
         """
-        loss = DiceLoss(sigmoid=True, reduction="none")
+        loss = DiceLoss(sigmoid=True, reduction="none").to(device=pred.device)
 
-        return self.perform_reduction(loss(pred, targets), reduction)
+        return loss(pred, targets)
