@@ -138,7 +138,7 @@ class MetricEarlyStopping(BaseEarlyStopping):
             Trainer.
         kwargs : dict
         """
-        self.tasks = trainer.state.tasks
+        self.tasks = trainer.state.objects["tasks"]
         val_scores = trainer.state.valid_metrics
 
         new_scores_is_better = []
