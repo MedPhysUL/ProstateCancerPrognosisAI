@@ -5,51 +5,38 @@
     @Creation Date:     12/2022
     @Last modification: 12/2022
 
-    @Description:       This file is used to define regularization callbacks which are used to modify the weights of
-                        the model after each iteration according to some penalty.
+    @Description:       This file is used to define regularizations which are used to add some penalty to the loss
+                        function.
 """
-
 
 from abc import abstractmethod
 from typing import Dict, Iterable, Iterator, Optional, Union
 
 from torch import linalg, tensor, Tensor
 from torch.nn import Module, Parameter, ParameterList
-from torch.optim import Optimizer
-
-from src.callbacks.callback import Callback, Priority
 
 
-class BaseRegularization(Module, Callback):
+class Regularization(Module):
     """
     Base class for regularization.
     """
 
     def __init__(
             self,
-            name: str,
-            optimizer: Optimizer,
             params: Union[Iterable[Parameter], Dict[str, Parameter]],
-            lambda_: float = 1.0,
-            **kwargs
+            lambda_: float = 1.0
     ):
         """
         Constructor of the BaseRegularization class.
 
         Parameters
         ----------
-        name : str
-            The name of the callback.
-        optimizer : Optimizer
-            The regularization optimizer. It can be different from the actual optimizer used to update the weights
-            according to performance.
         params : Union[Iterable[Parameter], Dict[str, Parameter]]
             The parameters which are regularized.
         lambda_ : float
             The weight of the regularization. In other words, the coefficient that multiplies the loss.
         """
-        super().__init__(**kwargs)
-        Callback.__init__(self, name=name, **kwargs)
+        super().__init__()
 
         if isinstance(params, dict):
             params = list(params.values())
@@ -58,19 +45,6 @@ class BaseRegularization(Module, Callback):
 
         self.params = ParameterList(params)
         self.lambda_ = lambda_
-        self.optimizer = optimizer
-
-    @property
-    def priority(self) -> int:
-        """
-        Priority on a scale from 0 (low priority) to 100 (high priority).
-
-        Returns
-        -------
-        priority: int
-            Callback priority.
-        """
-        return Priority.MEDIUM_PRIORITY.value
 
     def __call__(self, *args, **kwargs) -> Tensor:
         """
@@ -88,7 +62,7 @@ class BaseRegularization(Module, Callback):
         loss : Tensor
             The loss of the regularization.
         """
-        out = super(BaseRegularization, self).__call__(*args, **kwargs)
+        out = super(Regularization, self).__call__(*args, **kwargs)
         return self.lambda_ * out
 
     @abstractmethod
@@ -110,54 +84,24 @@ class BaseRegularization(Module, Callback):
         """
         raise NotImplementedError
 
-    def on_optimization_end(self, trainer, **kwargs):
-        """
-        Update weights using the calculated penalty (regularization loss).
 
-        Parameters
-        ----------
-        trainer : Trainer
-            The trainer
-        kwargs : dict
-            Keywords arguments.
-        """
-        loss = self()
-        if self.optimizer is not None:
-            self.optimizer.zero_grad()
-        loss.backward()
-        if self.optimizer is not None:
-            self.optimizer.step()
-
-
-class RegularizationList(BaseRegularization):
+class RegularizationList:
     """
     Holds regularizations in a list.
     """
 
     def __init__(
             self,
-            regularizations: Optional[Iterable[BaseRegularization]] = None,
-            **kwargs
+            regularizations: Optional[Iterable[Regularization]] = None
     ):
         """
         Constructor of the RegularizationList class.
 
         Parameters
         ----------
-        regularizations : Optional[Iterable[BaseRegularization]]
+        regularizations : Optional[Iterable[Regularization]]
             The regularizations to apply.
-        **kwargs : dict
-            The keyword arguments to pass to the Callback.
         """
-        self.regularizations = regularizations if regularizations is not None else []
-        _params = []
-        for regularization in self.regularizations:
-            _params.extend(regularization.params)
-        super(RegularizationList, self).__init__(
-            params=_params,
-            lambda_=1.0,
-            **kwargs
-        )
         self.regularizations = regularizations if regularizations is not None else []
 
     def __iter__(self) -> Iterator:
@@ -193,15 +137,13 @@ class RegularizationList(BaseRegularization):
         return loss
 
 
-class Lp(BaseRegularization):
+class Lp(Regularization):
     """
     Regularization that applies LP norm.
     """
 
     def __init__(
             self,
-            name: str,
-            optimizer: Optimizer,
             params: Union[Iterable[Parameter], Dict[str, Parameter]],
             lambda_: float = 1.0,
             power: int = 1,
@@ -212,11 +154,6 @@ class Lp(BaseRegularization):
 
         Parameters
         ----------
-        name : str
-            The name of the callback.
-        optimizer : Optimizer
-            The regularization optimizer. It can be different from the actual optimizer used to update the weights
-            according to performance.
         params : Union[Iterable[Parameter], Dict[str, Parameter]]
             The parameters which are regularized.
         lambda_ : float
@@ -224,7 +161,7 @@ class Lp(BaseRegularization):
         power : int
             The p parameter of the LP norm. Example: p=1 -> L1 norm, p=2 -> L2 norm.
         """
-        super(Lp, self).__init__(name=name, optimizer=optimizer, params=params, lambda_=lambda_, **kwargs)
+        super(Lp, self).__init__(params=params, lambda_=lambda_)
         self.power = power
 
     def forward(self, *args, **kwargs) -> Tensor:
@@ -256,28 +193,20 @@ class L1(Lp):
 
     def __init__(
             self,
-            name: str,
-            optimizer: Optimizer,
             params: Union[Iterable[Parameter], Dict[str, Parameter]],
-            lambda_: float = 1.0,
-            **kwargs
+            lambda_: float = 1.0
     ):
         """
         Constructor of the L1 class.
 
         Parameters
         ----------
-        name : str
-            The name of the callback.
-        optimizer : Optimizer
-            The regularization optimizer. It can be different from the actual optimizer used to update the weights
-            according to performance.
         params : Union[Iterable[Parameter], Dict[str, Parameter]]
             The parameters which are regularized.
         lambda_ : float
             The weight of the regularization. In other words, the coefficient that multiplies the loss.
         """
-        super(L1, self).__init__(name=name, optimizer=optimizer, params=params, lambda_=lambda_, power=1, **kwargs)
+        super(L1, self).__init__(params=params, lambda_=lambda_, power=1)
 
 
 class L2(Lp):
@@ -287,25 +216,17 @@ class L2(Lp):
 
     def __init__(
             self,
-            name: str,
-            optimizer: Optimizer,
             params: Union[Iterable[Parameter], Dict[str, Parameter]],
-            lambda_: float = 1.0,
-            **kwargs
+            lambda_: float = 1.0
     ):
         """
         Constructor of the L2 class.
 
         Parameters
         ----------
-        name : str
-            The name of the callback.
-        optimizer : Optimizer
-            The regularization optimizer. It can be different from the actual optimizer used to update the weights
-            according to performance.
         params : Union[Iterable[Parameter], Dict[str, Parameter]]
             The parameters which are regularized.
         lambda_ : float
             The weight of the regularization. In other words, the coefficient that multiplies the loss.
         """
-        super(L2, self).__init__(name=name, optimizer=optimizer, params=params, lambda_=lambda_, power=2, **kwargs)
+        super(L2, self).__init__(params=params, lambda_=lambda_, power=2)
