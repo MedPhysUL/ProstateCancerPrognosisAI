@@ -59,6 +59,18 @@ class LearningAlgorithm(Callback):
         """
         return Priority.MEDIUM_PRIORITY.value
 
+    @property
+    def allow_duplicates(self) -> bool:
+        """
+        Whether to allow duplicates of this specific Callback class in the 'CallbackList'.
+
+        Returns
+        -------
+        allow : bool
+            Allow duplicates.
+        """
+        return True
+
     def load_checkpoint_state(self, trainer, checkpoint: dict, **kwargs):
         """
         Loads the state of the callback from a dictionary.

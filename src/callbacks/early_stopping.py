@@ -58,6 +58,18 @@ class BaseEarlyStopping(ABC, Callback):
         """
         return Priority.LOW_PRIORITY.value
 
+    @property
+    def allow_duplicates(self) -> bool:
+        """
+        Whether to allow duplicates of this specific Callback class in the 'CallbackList'.
+
+        Returns
+        -------
+        allow : bool
+            Allow duplicates.
+        """
+        return True
+
     @abstractmethod
     def on_epoch_end(self, trainer, **kwargs):
         """

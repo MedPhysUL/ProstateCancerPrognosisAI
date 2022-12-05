@@ -117,6 +117,18 @@ class ModelCheckpoint(Callback):
         """
         return Priority.LOW_PRIORITY.value
 
+    @property
+    def allow_duplicates(self) -> bool:
+        """
+        Whether to allow duplicates of this specific Callback class in the 'CallbackList'.
+
+        Returns
+        -------
+        allow : bool
+            Allow duplicates.
+        """
+        return False
+
     @staticmethod
     def _replace_trainer_history(trainer, new_history: dict):
         """

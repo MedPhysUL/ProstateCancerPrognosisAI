@@ -76,6 +76,18 @@ class TrainingHistory(Callback):
         return Priority.HIGH_PRIORITY.value
 
     @property
+    def allow_duplicates(self) -> bool:
+        """
+        Whether to allow duplicates of this specific Callback class in the 'CallbackList'.
+
+        Returns
+        -------
+        allow : bool
+            Allow duplicates.
+        """
+        return False
+
+    @property
     def training_set_history(self) -> Dict[str, Dict[str, List[float]]]:
         """
         Training set losses and score metrics history.

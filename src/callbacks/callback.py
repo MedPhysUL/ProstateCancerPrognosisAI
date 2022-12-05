@@ -101,6 +101,7 @@ class Callback(ABC):
         self.tuner = None
 
     @abstractmethod
+    @property
     def priority(self) -> int:
         """
         Priority on a scale from 0 (low priority) to 100 (high priority).
@@ -109,6 +110,19 @@ class Callback(ABC):
         -------
         priority: int
             Callback priority.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    @property
+    def allow_duplicates(self) -> bool:
+        """
+        Whether to allow duplicates of this specific Callback class in the 'CallbackList'.
+
+        Returns
+        -------
+        allow : bool
+            Allow duplicates.
         """
         raise NotImplementedError
 

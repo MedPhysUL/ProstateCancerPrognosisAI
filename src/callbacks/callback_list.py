@@ -37,6 +37,7 @@ class CallbackList:
             "All callbacks must be instances of Callback."
 
         self.callbacks = list(callbacks)
+        self.validate_duplicates()
         self.sort()
 
     def __getitem__(self, idx: int) -> Callback:
@@ -77,6 +78,23 @@ class CallbackList:
         """
         return len(self.callbacks)
 
+    def validate_duplicates(self):
+        """
+        Validates that the duplicated classes in the CallbackList are allowed duplicates.
+        """
+        seen, duplicates = set(), []
+
+        for callback in self.callbacks:
+            if callback.allow_duplicates is False:
+                if callback in seen:
+                    duplicates.append(callback.name)
+                else:
+                    seen.add(callback.name)
+
+        if duplicates:
+            raise AssertionError(f"Duplicates of 'Callback' with 'allow_duplicates' == False are not allowed in "
+                                 f"'CallbackList'. Found duplicates {duplicates}.")
+
     def sort(self):
         """
         Sorts the callbacks using their priority.
@@ -94,6 +112,7 @@ class CallbackList:
         """
         assert isinstance(callback, Callback), "callback must be an instance of Callback"
         self.callbacks.append(callback)
+        self.validate_duplicates()
         self.sort()
 
     def remove(self, callback: Callback):
