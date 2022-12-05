@@ -48,7 +48,7 @@ class CheckpointLoadingMode(Enum):
     LAST_EPOCH = "last"
 
 
-class Checkpoint(Callback):
+class ModelCheckpoint(Callback):
     """
     This class is used to manage and create the checkpoints of a model.
     """
