@@ -222,7 +222,7 @@ class SegmentationTask(Task):
         criterion : SegmentationLoss
             A loss function.
         optimization_metric : SegmentationMetric
-            A score metric. This metric is used for Optuna hyperparameters optimization.
+            A score metric. This metric is used for Optuna hyperparameters optimization and for 'MetricEarlyStopping'.
         organ : str
             Segmented organ.
         modality : str
