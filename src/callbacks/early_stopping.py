@@ -155,7 +155,7 @@ class MetricEarlyStopping(BaseEarlyStopping):
 
             # if the counter reach the patience we early stop
             if self.counter >= self.patience:
-                trainer.update_state_(stop_training_flag=True)
+                trainer.update_state(stop_training_flag=True)
         else:
             self.counter = 0
 
@@ -233,7 +233,7 @@ class MultiTaskLossEarlyStopping(BaseEarlyStopping):
 
             # if the counter reach the patience we early stop
             if self.counter >= self.patience:
-                trainer.update_state_(stop_training_flag=True)
+                trainer.update_state(stop_training_flag=True)
 
         # if the score is better than the best score saved we update the best model
         else:

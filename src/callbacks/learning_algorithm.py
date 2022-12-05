@@ -175,7 +175,7 @@ class LearningAlgorithm(Callback):
         pred_batch = trainer.state.pred_batch
         y_batch = trainer.state.y_batch
         batch_loss = self._optimizer_step(pred_batch, y_batch)
-        trainer.update_state_(batch_loss=batch_loss)
+        trainer.update_state(batch_loss=batch_loss)
 
     def on_optimization_end(self, trainer, **kwargs):
         """
@@ -204,4 +204,4 @@ class LearningAlgorithm(Callback):
         pred_batch = trainer.state.pred_batch
         y_batch = trainer.state.y_batch
         batch_loss = self._compute_loss(pred_batch, y_batch)
-        trainer.update_state_(batch_loss=batch_loss)
+        trainer.update_state(batch_loss=batch_loss)

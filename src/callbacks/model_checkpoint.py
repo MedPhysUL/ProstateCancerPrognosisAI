@@ -377,7 +377,7 @@ class ModelCheckpoint(Callback):
             finally:
                 self.current_checkpoint = checkpoint
 
-        trainer.update_state_(epoch=epoch)
+        trainer.update_state(epoch=epoch)
         self.current_best_metric = np.nanmin(
             trainer.training_history.validation_set_history.losses[trainer.criterion.name]
         )
