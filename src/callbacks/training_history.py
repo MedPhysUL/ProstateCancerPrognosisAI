@@ -63,6 +63,18 @@ class TrainingHistory(Callback):
                 }
             }
 
+    def __getitem__(self, key):
+        return self._container[key]
+
+    def __contains__(self, item):
+        return item in self._container
+
+    def __iter__(self):
+        return iter(self._container)
+
+    def __len__(self):
+        return len(self._container)
+
     @property
     def priority(self) -> int:
         """
