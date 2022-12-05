@@ -67,7 +67,6 @@ class ModelCheckpoint(Callback):
 
     def __init__(
             self,
-            name: str,
             path_to_checkpoint_folder: str = "./checkpoints",
             save_freq: int = 1,
             save_best_only: bool = False,
@@ -80,8 +79,6 @@ class ModelCheckpoint(Callback):
 
         Parameters
         ----------
-        name : str
-            The name of the callback.
         path_to_checkpoint_folder : str
             Path to the folder to save the checkpoints to.
         save_freq : int
@@ -95,7 +92,7 @@ class ModelCheckpoint(Callback):
         **kwargs : dict
             The keyword arguments to pass to the Callback.
         """
-        super().__init__(name=name, save_state=False, **kwargs)
+        super().__init__(save_state=False, **kwargs)
         os.makedirs(path_to_checkpoint_folder, exist_ok=True)
         self.path_to_checkpoint_folder = path_to_checkpoint_folder
         self.verbose = verbose

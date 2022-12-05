@@ -25,7 +25,6 @@ class BaseEarlyStopping(ABC, Callback):
 
     def __init__(
             self,
-            name: str,
             patience: int,
             tolerance: float,
             **kwargs
@@ -35,14 +34,12 @@ class BaseEarlyStopping(ABC, Callback):
 
         Parameters
         ----------
-        name : str
-            The name of the callback.
         patience : int
             Number of consecutive epochs without improvement allowed.
         tolerance : float
             Permissible difference between measures.
         """
-        super().__init__(name=name, **kwargs)
+        super().__init__(**kwargs)
 
         self.best_measure = None
         self.counter = 0
@@ -93,7 +90,6 @@ class MetricEarlyStopping(BaseEarlyStopping):
 
     def __init__(
             self,
-            name: str,
             patience: int = 10,
             tolerance: float = 1e-4,
             **kwargs
@@ -103,14 +99,12 @@ class MetricEarlyStopping(BaseEarlyStopping):
 
         Parameters
         ----------
-        name : str
-            The name of the callback.
         patience : int
             Number of consecutive epochs without improvement allowed.
         tolerance : float
             Permissible difference between measures.
         """
-        super().__init__(name=name, patience=patience, tolerance=tolerance, **kwargs)
+        super().__init__(patience=patience, tolerance=tolerance, **kwargs)
 
         self._tasks = []
         self._best_val_metric_scores = []
@@ -186,7 +180,6 @@ class MultiTaskLossEarlyStopping(BaseEarlyStopping):
 
     def __init__(
             self,
-            name: str,
             patience: int,
             tolerance: float,
             **kwargs
@@ -196,14 +189,12 @@ class MultiTaskLossEarlyStopping(BaseEarlyStopping):
 
         Parameters
         ----------
-        name : str
-            The name of the callback.
         patience : int
             Number of consecutive epochs without improvement allowed.
         tolerance : float
             Permissible difference between measures.
         """
-        super().__init__(name=name, patience=patience, tolerance=tolerance, **kwargs)
+        super().__init__(patience=patience, tolerance=tolerance, **kwargs)
 
         self._criterion = None
         self._is_better = lambda x, y: (y - x) > self.tolerance

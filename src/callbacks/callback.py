@@ -69,6 +69,8 @@ class Callback(ABC):
         - `on_tuning_end`
     """
 
+    instance_counter = 0
+
     UNSERIALIZABLE_ATTRIBUTES = ["trainer", "tuner"]
 
     def __init__(
@@ -89,7 +91,10 @@ class Callback(ABC):
         load_state:
             Whether to load from the checkpoint file. Default is equal to save_state.
         """
-        self.name = name
+        self.instance_id = self.instance_counter
+        self.name = name if name is not None else f"{self.__class__.__name__}<{self.instance_id}>"
+        self.__class__.instance_counter += 1
+
         self.save_state = save_state
         self.load_state = load_state if load_state is not None else save_state
         self.trainer = None
@@ -349,3 +354,9 @@ class Callback(ABC):
             The trainer.
         """
         return {}
+
+    def __del__(self):
+        """
+        Delete instance.
+        """
+        self.__class__.instance_counter -= 1

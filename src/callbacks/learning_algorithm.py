@@ -24,7 +24,6 @@ class LearningAlgorithm(Callback):
 
     def __init__(
             self,
-            name: str,
             criterion: MultiTaskLoss,
             optimizer: Optimizer,
             regularization: Optional[Union[Regularization, RegularizationList, Iterable[Regularization]]] = None,
@@ -37,8 +36,12 @@ class LearningAlgorithm(Callback):
         ----------
         criterion : MultiTaskLoss
             Multi-task loss.
+        optimizer : Optimizer
+            A pytorch Optimizer.
+        regularization : Optional[Union[Regularization, RegularizationList, Iterable[Regularization]]]
+            Regularization.
         """
-        super().__init__(name=name, **kwargs)
+        super().__init__(**kwargs)
 
         self.criterion = criterion
         self.optimizer = optimizer

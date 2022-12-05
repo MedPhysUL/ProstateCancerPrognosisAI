@@ -34,7 +34,6 @@ class TrainingHistory(Callback):
 
     def __init__(
             self,
-            name: str,
             container: Optional[Dict[str, Dict[str, Dict[str, List[float]]]]] = None,
             **kwargs
     ):
@@ -43,14 +42,12 @@ class TrainingHistory(Callback):
 
         Parameters
         ----------
-        name : str
-            The name of the callback.
         container : Optional[Dict[str, Dict[str, Dict[str, List[float]]]]]
             Histories container.
         **kwargs : dict
             The keyword arguments to pass to the Callback.
         """
-        super().__init__(name=name, **kwargs)
+        super().__init__(**kwargs)
 
         if container:
             self._container = container
