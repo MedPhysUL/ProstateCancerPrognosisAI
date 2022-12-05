@@ -1,11 +1,11 @@
 """
-    @file:              callbacks.py
+    @file:              callback_list.py
     @Author:            Maxence Larose
 
     @Creation Date:     12/2022
     @Last modification: 12/2022
 
-    @Description:       This file is used to define the Callbacks class which essentially acts as a list of
+    @Description:       This file is used to define the 'CallbackList' class which essentially acts as a list of
                         callbacks. A lot of the logic behind the following code is borrowed from PyTorch Lightning
                         (https://pytorch-lightning.readthedocs.io/en/stable/extensions/callbacks.html) and
                         NeuroTorch (https://github.com/NeuroTorch/NeuroTorch).
@@ -16,10 +16,9 @@ from typing import Iterable, Optional, Iterator, Dict, Any
 from src.callbacks.callback import Callback
 
 
-class Callbacks:
+class CallbackList:
     """
-    This class is used to store callbacks that are used during training. This class essentially acts as a list of
-    callbacks. Each callback in the list is called in the order it is stored in the list.
+    Holds callbacks in a list. Each callback in the list is called in the order it is stored in the list.
     """
 
     def __init__(self, callbacks: Optional[Iterable[Callback]] = None):
