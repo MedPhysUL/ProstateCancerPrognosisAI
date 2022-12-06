@@ -18,10 +18,10 @@ class MaskType:
     Stores the constant related to mask types
     """
 
-    TRAIN: str = "Train"
-    VALID: str = "Valid"
-    TEST: str = "Test"
-    INNER: str = "Inner"
+    TRAIN: str = "train"
+    VALID: str = "valid"
+    TEST: str = "test"
+    INNER: str = "inner"
 
     def __iter__(self):
         return iter([self.TRAIN, self.VALID, self.TEST])
