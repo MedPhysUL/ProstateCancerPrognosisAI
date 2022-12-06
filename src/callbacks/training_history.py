@@ -38,12 +38,12 @@ class TrainingHistory(Callback):
             **kwargs
     ):
         """
-        Initialize the histories container.
+        Initialize the history container.
 
         Parameters
         ----------
         container : Optional[Dict[str, Dict[str, Dict[str, List[float]]]]]
-            Histories container.
+            History container.
         **kwargs : dict
             The keyword arguments to pass to the Callback.
         """
@@ -63,8 +63,11 @@ class TrainingHistory(Callback):
                 }
             }
 
-    def __getitem__(self, key):
-        return self._container[key]
+    def __getitem__(self, item: Union[str, int]) -> dict:
+        if isinstance(item, str):
+            return self._container[item]
+        elif isinstance(item, int):
+            return self._get_state(self._container, item)
 
     def __contains__(self, item):
         return item in self._container
@@ -123,6 +126,55 @@ class TrainingHistory(Callback):
         """
         return self._container[self.VALIDATION_SET_KEY]
 
+    def _get_state(self, container: dict, idx: int) -> dict:
+        """
+        Get a specific epoch measures state dictionary, i.e. the state of the losses and metrics values at the specified
+        epoch index.
+
+        Parameters
+        ----------
+        container : dict
+            History container.
+        idx : int
+            Epoch index.
+
+        Returns
+        -------
+        epoch_history : dict
+            Epoch dict.
+        """
+        epoch_measures = {}
+        for k, v in container.items():
+            if isinstance(v, dict):
+                epoch_measures[k] = self._get_state(v, idx)
+            elif isinstance(v, list):
+                epoch_measures[k] = v[idx]
+            else:
+                raise TypeError(f"'container' dictionary must contain values of type 'dict' or 'list'. Found "
+                                f"{type(v)}.")
+
+        return epoch_measures
+
+    def _append_state(self, container: dict, state: dict):
+        """
+        Append an epoch measures state dictionary to the history container.
+
+        Parameters
+        ----------
+        state : dict
+            Epoch measures state.
+        """
+        for k, v in container.items():
+            if isinstance(v, dict):
+                self._append_state(v, state[k])
+            elif isinstance(v, list):
+                container[k].append(state[k])
+            else:
+                raise TypeError(f"'container' dictionary must contain values of type 'dict' or 'list'. Found "
+                                f"{type(v)}.")
+
+        return container
+
     def _create_plot(
             self,
             measure_category: Union[MeasureCategory, str],
@@ -130,7 +182,7 @@ class TrainingHistory(Callback):
     ) -> Tuple[plt.Figure, Dict[str, plt.Axes], Dict[str, List[plt.Line2D]]]:
         """
         Create a plot of the given measure category ('losses' or 'metrics') using the training and validation set
-        histories.
+        history.
 
         Parameters
         ----------
@@ -163,7 +215,7 @@ class TrainingHistory(Callback):
                 )
             if key in validation_set_names:
                 lines[key].append(
-                    ax.plot(training_set_history_dict[key], label="Valid", linewidth=kwargs.get("lw", 3))[0]
+                    ax.plot(validation_set_history_dict[key], label="Valid", linewidth=kwargs.get("lw", 3))[0]
                 )
 
             ax.set_ylabel(key, fontsize=kwargs.get("fontsize", 16))
@@ -206,22 +258,44 @@ class TrainingHistory(Callback):
             if kwargs.get("close", True):
                 plt.close(fig)
 
-    def on_train_end(self, trainer, **kwargs):
+    def on_epoch_end(self, trainer, **kwargs):
         """
-        Append the current training set losses and metric scores to the history.
-        """
-        for loss_name, loss_value in trainer.state.train_losses.items():
-            self.training_set_history[MeasureCategory.LOSSES.value][loss_name].append(loss_value)
+        Append the current train and valid losses and metric scores to the history.
 
-        for metric_name, metric_value in trainer.state.train_metrics.items():
-            self.training_set_history[MeasureCategory.METRICS.value][metric_name].append(metric_value)
-
-    def on_validation_end(self, trainer, **kwargs):
+        Parameters
+        ----------
+        trainer : Trainer
+            The trainer.
+        kwargs : dict
+            Keywords arguments.
         """
-        Append the current validation set losses and metric scores to the history.
-        """
-        for loss_name, loss_value in trainer.state.valid_losses.items():
-            self.validation_set_history[MeasureCategory.LOSSES.value][loss_name].append(loss_value)
+        self._append_state(self._container, trainer.state.epoch_losses_and_metrics)
 
-        for metric_name, metric_value in trainer.state.valid_metrics.items():
-            self.validation_set_history[MeasureCategory.METRICS.value][metric_name].append(metric_value)
+
+if __name__ == "__main__":
+    history = TrainingHistory(
+        container={
+            "training": {
+                "losses": {
+                    "Entropy": [1.0, 3],
+                    "PN": [1.0, -1]
+                },
+                "metrics": {
+                    "Acc": [1.0, 2.0],
+                    "F1": [1.0, 0]
+                }
+            },
+            "validation": {
+                "losses": {
+                    "BCR": [1.0, 20],
+                    "PN": [1.0, 5]
+                },
+                "metrics": {
+                    "Acc": [1.0, 7],
+                    "F1": [1.0, 1]
+                }
+            }
+        }
+    )
+
+    print(history.plot(show=True))
