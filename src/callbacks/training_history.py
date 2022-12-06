@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from src.callbacks.callback import Callback, Priority
+from src.data.processing.tools import MaskType
 
 
 class MeasureCategory(Enum):
@@ -28,9 +29,6 @@ class TrainingHistory(Callback):
     """
     This class is used to store losses and score metrics values obtained during the training process.
     """
-
-    TRAINING_SET_KEY = "training"
-    VALIDATION_SET_KEY = "validation"
 
     def __init__(
             self,
@@ -53,20 +51,20 @@ class TrainingHistory(Callback):
             self._container = container
         else:
             self._container = {
-                self.TRAINING_SET_KEY: {
+                MaskType.TRAIN: {
                     MeasureCategory.LOSSES.value: {},
                     MeasureCategory.METRICS.value: {}
                 },
-                self.VALIDATION_SET_KEY: {
+                MaskType.VALID: {
                     MeasureCategory.LOSSES.value: {},
                     MeasureCategory.METRICS.value: {}
                 }
             }
 
-    def __getitem__(self, item: Union[str, int]) -> dict:
+    def __getitem__(self, item: Union[str, int, slice]) -> dict:
         if isinstance(item, str):
             return self._container[item]
-        elif isinstance(item, int):
+        elif isinstance(item, (int, slice)):
             return self._get_state(self._container, item)
 
     def __contains__(self, item):
@@ -112,7 +110,7 @@ class TrainingHistory(Callback):
         history : Dict[str, Dict[str, List[float]]]
             Training set history.
         """
-        return self._container[self.TRAINING_SET_KEY]
+        return self._container[MaskType.TRAIN]
 
     @property
     def validation_set_history(self) -> Dict[str, Dict[str, List[float]]]:
@@ -124,51 +122,62 @@ class TrainingHistory(Callback):
         history : Dict[str, Dict[str, List[float]]]
             Validation set history.
         """
-        return self._container[self.VALIDATION_SET_KEY]
+        return self._container[MaskType.VALID]
 
-    def _get_state(self, container: dict, idx: int) -> dict:
+    def _get_state(self, container: dict, idx: Union[int, slice]) -> dict:
         """
-        Get a specific epoch measures state dictionary, i.e. the state of the losses and metrics values at the specified
-        epoch index.
+        Get a specific epoch state dictionary, i.e. the state of the losses and metrics values at the specified epoch
+        index.
 
         Parameters
         ----------
         container : dict
             History container.
-        idx : int
+        idx : Union[int, slice]
             Epoch index.
 
         Returns
         -------
-        epoch_history : dict
+        epoch_state : dict
             Epoch dict.
         """
-        epoch_measures = {}
+        epoch_state = {}
         for k, v in container.items():
             if isinstance(v, dict):
-                epoch_measures[k] = self._get_state(v, idx)
+                epoch_state[k] = self._get_state(v, idx)
             elif isinstance(v, list):
-                epoch_measures[k] = v[idx]
+                epoch_state[k] = v[idx]
             else:
                 raise TypeError(f"'container' dictionary must contain values of type 'dict' or 'list'. Found "
                                 f"{type(v)}.")
 
-        return epoch_measures
+        return epoch_state
 
     def _append_state(self, container: dict, state: dict):
         """
-        Append an epoch measures state dictionary to the history container.
+        Append an epoch state dictionary to the history container.
 
         Parameters
         ----------
         state : dict
-            Epoch measures state.
+            Epoch state.
         """
-        for k, v in container.items():
+        for k, v in state.items():
             if isinstance(v, dict):
-                self._append_state(v, state[k])
+                self._append_state(container[k], v)
             elif isinstance(v, list):
-                container[k].append(state[k])
+                values_to_add = state[k]
+                if k in container:
+                    if isinstance(values_to_add, list):
+                        for value in values_to_add:
+                            container[k].append(value)
+                    else:
+                        container[k].append(state[k])
+                else:
+                    if isinstance(values_to_add, list):
+                        container[k] = values_to_add
+                    else:
+                        container[k] = [state[k]]
             else:
                 raise TypeError(f"'container' dictionary must contain values of type 'dict' or 'list'. Found "
                                 f"{type(v)}.")
@@ -275,7 +284,7 @@ class TrainingHistory(Callback):
 if __name__ == "__main__":
     history = TrainingHistory(
         container={
-            "training": {
+            "train": {
                 "losses": {
                     "Entropy": [1.0, 3],
                     "PN": [1.0, -1]
@@ -285,7 +294,7 @@ if __name__ == "__main__":
                     "F1": [1.0, 0]
                 }
             },
-            "validation": {
+            "valid": {
                 "losses": {
                     "BCR": [1.0, 20],
                     "PN": [1.0, 5]
@@ -298,4 +307,4 @@ if __name__ == "__main__":
         }
     )
 
-    print(history.plot(show=True))
+    history.plot(show=True)
