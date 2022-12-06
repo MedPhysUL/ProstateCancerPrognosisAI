@@ -75,7 +75,7 @@ class Callback(ABC):
 
     def __init__(
             self,
-            name: str,
+            name: Optional[str] = None,
             save_state: bool = True,
             load_state: Optional[bool] = None
     ):
@@ -100,8 +100,8 @@ class Callback(ABC):
         self.trainer = None
         self.tuner = None
 
-    @abstractmethod
     @property
+    @abstractmethod
     def priority(self) -> int:
         """
         Priority on a scale from 0 (low priority) to 100 (high priority).
@@ -113,8 +113,8 @@ class Callback(ABC):
         """
         raise NotImplementedError
 
-    @abstractmethod
     @property
+    @abstractmethod
     def allow_duplicates(self) -> bool:
         """
         Whether to allow duplicates of this specific Callback class in the 'CallbackList'.
