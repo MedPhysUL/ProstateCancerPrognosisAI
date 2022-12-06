@@ -110,7 +110,7 @@ class LearningAlgorithm(Callback):
 
         return None
 
-    def _compute_loss(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor]) -> Tensor:
+    def _compute_loss(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor], trainer) -> Tensor:
         """
         Calls the criterion and add the elastic penalty.
 
@@ -120,6 +120,8 @@ class LearningAlgorithm(Callback):
             Predictions.
         y_batch : Dict[str, Tensor]
             Targets.
+        trainer : Trainer
+            The trainer.
 
         Returns
         -------
@@ -132,6 +134,21 @@ class LearningAlgorithm(Callback):
 
         if self.regularization:
             batch_loss = batch_loss + self.regularization()
+
+        if trainer.model.training:
+            trainer.update_train_losses(
+                {
+                    **{name: loss.item() for name, loss in losses.items()},
+                    **{self.criterion.name, batch_loss.item()}
+                }
+            )
+        else:
+            trainer.update_valid_losses(
+                {
+                    **{name: loss.item() for name, loss in losses.items()},
+                    **{self.criterion.name, batch_loss.item()}
+                }
+            )
 
         return batch_loss
 
@@ -151,7 +168,7 @@ class LearningAlgorithm(Callback):
         if self.criterion.tasks is None:
             self.criterion.tasks = tasks
 
-    def _optimizer_step(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor]):
+    def _optimizer_step(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor], trainer):
         """
         Perform an optimizer step, i.e calculate loss and perform backward pass.
 
@@ -161,6 +178,8 @@ class LearningAlgorithm(Callback):
             Predictions.
         y_batch : Dict[str, Tensor]
             Targets.
+        trainer : Trainer
+            The trainer.
 
         Returns
         -------
@@ -168,7 +187,7 @@ class LearningAlgorithm(Callback):
             Tensor with loss value.
         """
         self.optimizer.zero_grad()
-        batch_loss = self._compute_loss(pred_batch, y_batch)
+        batch_loss = self._compute_loss(pred_batch, y_batch, trainer)
         batch_loss.backward()
         self.optimizer.step()
         return batch_loss.detach_()
@@ -186,8 +205,8 @@ class LearningAlgorithm(Callback):
         """
         pred_batch = trainer.state.pred_batch
         y_batch = trainer.state.y_batch
-        batch_loss = self._optimizer_step(pred_batch, y_batch)
-        trainer.update_state(batch_loss=batch_loss)
+        batch_loss = self._optimizer_step(pred_batch, y_batch, trainer)
+        trainer.update_state(batch_loss=batch_loss.item())  # TODO : Last learning algo batch loss is batch loss? Weird
 
     def on_optimization_end(self, trainer, **kwargs):
         """
@@ -202,7 +221,7 @@ class LearningAlgorithm(Callback):
         """
         self.optimizer.zero_grad()
 
-    def on_validation_batch_start(self, trainer, **kwargs):
+    def on_validation_batch_end(self, trainer, **kwargs):
         """
         Calculates validation loss and update 'batch_loss' value in trainer state.
 
@@ -215,5 +234,5 @@ class LearningAlgorithm(Callback):
         """
         pred_batch = trainer.state.pred_batch
         y_batch = trainer.state.y_batch
-        batch_loss = self._compute_loss(pred_batch, y_batch)
-        trainer.update_state(batch_loss=batch_loss)
+        batch_loss = self._compute_loss(pred_batch, y_batch, trainer)
+        trainer.update_state(batch_loss=batch_loss.item())  # TODO : Last learning algo batch loss is batch loss? Weird
