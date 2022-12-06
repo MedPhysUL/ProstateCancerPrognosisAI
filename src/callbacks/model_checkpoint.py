@@ -57,10 +57,7 @@ class ModelCheckpoint(Callback):
     CHECKPOINT_BEST_KEY: str = "best"
     CHECKPOINT_EPOCHS_KEY: str = "epochs"
     CHECKPOINT_EPOCH_KEY: str = "epoch"
-    CHECKPOINT_EPOCH_TRAIN_LOSSES_KEY: str = 'train_losses'
-    CHECKPOINT_EPOCH_TRAIN_METRICS_KEY: str = 'train_metrics'
-    CHECKPOINT_EPOCH_VALID_LOSSES_KEY: str = 'valid_losses'
-    CHECKPOINT_EPOCH_VALID_METRICS_KEY: str = 'valid_metrics'
+    CHECKPOINT_EPOCH_LOSSES_AND_METRICS_KEY: str = 'epoch_losses_and_metrics'
     CHECKPOINT_OPTIMIZER_STATE_KEY: str = "optimizer_state"
     CHECKPOINT_MODEL_STATE_KEY: str = "model_state"
     CHECKPOINT_TRAINING_HISTORY_KEY: str = "training_history"
@@ -231,10 +228,7 @@ class ModelCheckpoint(Callback):
     def save_checkpoint(
             self,
             epoch: int,
-            train_losses: Dict[str, float],
-            train_metrics: Dict[str, float],
-            valid_losses: Dict[str, float],
-            valid_metrics: Dict[str, float],
+            epoch_losses_and_metrics: Dict[str, float],
             best: bool = False,
             model_state: Optional[dict] = None,
             optimizer_state: Optional[dict] = None,
@@ -248,14 +242,8 @@ class ModelCheckpoint(Callback):
         ----------
         epoch : int
             The epoch number.
-        train_losses : Dict[str, float]
-            Train losses at the current epoch.
-        train_metrics : Dict[str, float]
-            Train metrics at the current epoch.
-        valid_losses : Dict[str, float]
-            Valid losses at the current epoch.
-        valid_metrics : Dict[str, float]
-            Valid metrics at the current epoch.
+        epoch_losses_and_metrics : Dict[str, Dict[str, Dict[str, float]]]
+            Train losses and metrics AND valid losses and metrics at the current epoch.
         best : bool
             Whether this is the best epoch so far.
         model_state : Optional[dict]
@@ -278,10 +266,7 @@ class ModelCheckpoint(Callback):
             ModelCheckpoint.CHECKPOINT_EPOCH_KEY: epoch,
             ModelCheckpoint.CHECKPOINT_MODEL_STATE_KEY: model_state,
             ModelCheckpoint.CHECKPOINT_OPTIMIZER_STATE_KEY: optimizer_state,
-            ModelCheckpoint.CHECKPOINT_EPOCH_TRAIN_LOSSES_KEY: train_losses,
-            ModelCheckpoint.CHECKPOINT_EPOCH_TRAIN_METRICS_KEY: train_metrics,
-            ModelCheckpoint.CHECKPOINT_EPOCH_VALID_LOSSES_KEY: valid_losses,
-            ModelCheckpoint.CHECKPOINT_EPOCH_VALID_METRICS_KEY: valid_metrics,
+            ModelCheckpoint.CHECKPOINT_EPOCH_LOSSES_AND_METRICS_KEY: epoch_losses_and_metrics,
             ModelCheckpoint.CHECKPOINT_TRAINING_HISTORY_KEY: training_history
         }
         assert all(key not in other_states for key in basic_states.keys()), (
@@ -417,10 +402,7 @@ class ModelCheckpoint(Callback):
 
         self.save_checkpoint(
             epoch=trainer.state.epoch,
-            train_losses=trainer.state.train_losses,
-            train_metrics=trainer.state.train_metrics,
-            valid_losses=trainer.state.valid_losses,
-            valid_metrics=trainer.state.valid_metrics,
+            epoch_losses_and_metrics=trainer.state.epoch_losses_and_metrics,
             best=is_best,
             state_dict=trainer.model.state_dict(),
             optimizer_state_dict=trainer.optimizer.state_dict() if trainer.optimizer else None,
