@@ -31,7 +31,7 @@ class Range:
 
 class HP:
     """
-    A class that represents an hyperparameter.
+    A class that represents a hyperparameter.
     """
 
     def __init__(
