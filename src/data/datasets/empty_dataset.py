@@ -8,7 +8,7 @@
     @Description:       This file contains a custom EmptyDataset class.
 """
 
-from enum import IntEnum
+from enum import Enum
 from typing import Dict, List, Union
 
 from torch.utils.data import Dataset
@@ -16,12 +16,12 @@ from torch.utils.data import Dataset
 from src.data.datasets.table_dataset import TableDataModel
 
 
-class DatasetType(IntEnum):
+class DatasetType(Enum):
     """
     Dataset type.
     """
-    TABLE = 1
-    IMAGE = 2
+    TABLE = "table"
+    IMAGE = "image"
 
 
 class EmptyDataset(Dataset):
@@ -51,12 +51,13 @@ class EmptyDataset(Dataset):
             idx: Union[int, List[int]]
     ) -> Union[Dict, TableDataModel]:
         """
-        Gets dataset item. This method always returns NaN, regardless of the value of the index.
+        Gets dataset items. The particularity of the EmptyDataset is that this method always returns empty items,
+        regardless of the value of the index.
 
         Parameters
         ----------
         idx : Union[int, List[int]]
-            Index.
+            Indexes of items in the dataset.
 
         Returns
         -------
