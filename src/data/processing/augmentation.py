@@ -5,7 +5,7 @@
     @Creation Date:     07/2022
     @Last modification: 07/2022
 
-    @Description:       This file contains the Augmentation class which make it possible to manage image/segmentation
+    @Description:       This file contains the Augmentation class which makes it possible to manage image/segmentation
                         augmentations.
 """
 
