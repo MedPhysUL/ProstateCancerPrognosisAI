@@ -3,7 +3,7 @@
     @Author:            Raphael Brodeur, Maxence Larose
 
     @Creation Date:     05/2022
-    @Last modification: 07/2022
+    @Last modification: 01/2023
 
     @Description:       This file contains a class used to create a dataset of various patients and their respective CT
                         and segmentation map from a given local HDF5 file. The foreground is cropped and a crop along Z
@@ -44,10 +44,10 @@ class ImageDataset(Dataset):
             A database that is used to interact with the HDF5 file that contains all the patients' folders.
         tasks : List[SegmentationTask]
             Task to perform.
+        modalities : Set[str]
+            Set of modalities to include in the dataset. Ex : {CT, PT, MR}.
         transforms : Optional[Callable]
             A single or a sequence of transforms to apply to images and segmentations (depending on transform keys).
-        z_dim : ZDimension
-            A tuple that specify the z-dimension crop.
         """
         self._db = database
         self._modalities = modalities
