@@ -21,6 +21,9 @@ import numpy as np
 
 
 class AnatomicalPlane(IntEnum):
+    """
+    A simple enumeration of anatomical planes.
+    """
     ALL = -1,
     CORONAL = 0,
     SAGITTAL = 1,
@@ -28,6 +31,9 @@ class AnatomicalPlane(IntEnum):
 
 
 class Plot(IntEnum):
+    """
+    A simple enumeration of possible plot types.
+    """
     IMAGE = 0,
     GROUND_TRUTH = 1,
     PREDICTION = 2
@@ -40,6 +46,9 @@ class ImageViewer:
     """
 
     class Config(NamedTuple):
+        """
+        This class is used to store the current image viewer configuration.
+        """
         img_plane: Optional[np.ndarray]
         seg_plane: Optional[np.ndarray]
         slice_index: Optional[Slider]
@@ -55,7 +64,7 @@ class ImageViewer:
             **kwargs
     ) -> Config:
         """
-        Initializes the figures for visualization.
+        Gets figure configuration.
 
         Parameters
         ----------
@@ -189,7 +198,7 @@ class ImageViewer:
         plt.show()
 
     @staticmethod
-    def _get_config_compare(
+    def _get_config_of_comparison_figure(
             plot: Plot,
             img: np.ndarray,
             seg_truth: np.ndarray,
@@ -198,7 +207,7 @@ class ImageViewer:
             **kwargs
     ) -> Config:
         """
-        Initializes the figures.
+        Gets figure configuration for the figure used as comparison.
 
         Parameters
         ----------
@@ -298,7 +307,7 @@ class ImageViewer:
         )
 
     @staticmethod
-    def _update_compare(
+    def _update_comparison_figure_plane(
             val,
             image_config: Config,
             truth_config: Config,
@@ -357,7 +366,7 @@ class ImageViewer:
         """
         fig, axes = plt.subplots(1, 3)
 
-        image_config = self._get_config_compare(
+        image_config = self._get_config_of_comparison_figure(
             plot=Plot.IMAGE,
             img=img,
             seg_truth=seg_truth,
@@ -365,7 +374,7 @@ class ImageViewer:
             axes=axes,
             **kwargs
         )
-        truth_config = self._get_config_compare(
+        truth_config = self._get_config_of_comparison_figure(
             plot=Plot.GROUND_TRUTH,
             img=img,
             seg_truth=seg_truth,
@@ -373,7 +382,7 @@ class ImageViewer:
             axes=axes,
             **kwargs
         )
-        pred_config = self._get_config_compare(
+        pred_config = self._get_config_of_comparison_figure(
             plot=Plot.PREDICTION,
             img=img,
             seg_truth=seg_truth,
@@ -384,7 +393,7 @@ class ImageViewer:
 
         truth_config.slice_index.on_changed(
             partial(
-                self._update_compare,
+                self._update_comparison_figure_plane,
                 image_config=image_config,
                 truth_config=truth_config,
                 pred_config=pred_config
