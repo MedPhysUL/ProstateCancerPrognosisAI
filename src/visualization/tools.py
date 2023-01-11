@@ -35,7 +35,7 @@ def visualize_epoch_progression(
     Parameters
     ----------
     train_history : List[List[float]]
-        A list of (E,) lists where E is the number of epochs.
+        A list of (E,) lists of loss values/evaluation metrics values across epochs where E is the number of epochs
     valid_history : List[List[float]]
         A list of (E,) list.
     progression_type : List[str]
