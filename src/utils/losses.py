@@ -75,7 +75,7 @@ class Loss(ABC):
         x : Tensor
             (N, 1) tensor.
         reduction : Optional[Union[LossReduction, str]]
-            Reduction method to use. If None, we use self.reduction.
+            Reduction method to use. If None, we use the default reduction, i.e. self.reduction.
 
         Returns
         -------
@@ -440,7 +440,7 @@ class SegmentationLoss(Loss):
         targets : Union[np.array, Tensor]
             (N, X, Y, Z) tensor or array with ground truth
         reduction : Optional[Union[LossReduction, str]]
-            Reduction method to use. If None, we use self.reduction.
+            Reduction method to use. If None, we use the default reduction, i.e. self.reduction.
 
         Returns
         -------
