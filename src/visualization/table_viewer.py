@@ -21,6 +21,9 @@ from src.data.datasets.table_dataset import MaskType, TableDataset
 
 
 class TableViewer:
+    """
+    A class that is used to visualize tabular data.
+    """
 
     TABLES_PATH = "tables"
     FIGURES_PATH = "figures"
@@ -198,7 +201,7 @@ class TableViewer:
         absolute = int(round(pct / 100. * np.sum(values)))
         return "{:.1f}%".format(pct, absolute)
 
-    def _visualize_class_distribution(
+    def _update_axes_of_class_distribution_figure(
             self,
             axes: plt.axes,
             targets: np.array,
@@ -264,7 +267,7 @@ class TableViewer:
             for idx, (name, mask) in enumerate(self._nonempty_masks[i].items()):
                 if mask:
                     filtered_df = self._original_dataframes[i].loc[self._original_dataframes[i]["Sets"] == name]
-                    self._visualize_class_distribution(
+                    self._update_axes_of_class_distribution_figure(
                         axes=axes[0, idx],
                         targets=filtered_df[target_col],
                         label_names={f"{target_col}_0": 0, f"{target_col}_1": 1},
