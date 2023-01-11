@@ -555,13 +555,13 @@ class TableDataset(Dataset):
                 metrics = metrics + task.evaluation_metrics if task.evaluation_metrics else metrics
 
                 for metric in metrics:
-                    scaling_factor = metric.get_scaling_factor(y_train=self.y[self.train_mask, idx])
-                    metric.scaling_factor = scaling_factor
+                    metric.scaling_factor = metric.get_scaling_factor(y_train=self.y[self.train_mask, idx])
 
                 # We set the scaling factor of the criterion
                 if task.criterion:
-                    scaling_factor = task.criterion.get_scaling_factor(y_train=self.y[self.train_mask, idx])
-                    task.criterion.scaling_factor = scaling_factor
+                    task.criterion.scaling_factor = task.criterion.get_scaling_factor(
+                        y_train=self.y[self.train_mask, idx]
+                    )
 
     def _numerical_setter(
             self,
@@ -734,7 +734,7 @@ class TableDataset(Dataset):
             One hot vector of categorical columns.
         """
         # We check if the column names specified are categorical
-        self._valid_columns_type(cat_cols, categorical=True)
+        self._validate_columns_type(cat_cols, categorical=True)
 
         # We extract one hot encodings
         e = CaT.one_hot_encode(self.get_imputed_dataframe()[cat_cols].astype('str'))
@@ -778,7 +778,7 @@ class TableDataset(Dataset):
         # We set the classification tasks scaling factors
         self._set_scaling_factors()
 
-    def _valid_columns_type(
+    def _validate_columns_type(
             self,
             col_list: List[str],
             categorical: bool
