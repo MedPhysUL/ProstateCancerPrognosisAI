@@ -100,7 +100,7 @@ class Metric(ABC):
         x : Union[float, Tensor]
             Float or (N, 1) tensor.
         reduction : Optional[Union[MetricReduction, str]]
-            Reduction method to use. If None, we use self.reduction.
+            Reduction method to use. If None, we use the default reduction, i.e. self.reduction.
 
         Returns
         -------
@@ -334,7 +334,7 @@ class BinaryClassificationMetric(Metric):
             thresh: Optional[float] = None
     ) -> float:
         """
-        Converts inputs to tensors, applies softmax if shape is different than expected and than computes the metric
+        Converts inputs to tensors, applies softmax if shape is different than expected and then computes the metric
         and applies rounding.
 
         Parameters
@@ -393,7 +393,7 @@ class BinaryClassificationMetric(Metric):
             y_train: Union[np.array, Tensor]
     ) -> float:
         """
-        Computes the scaling factor that needs to be apply to the weight of samples in the class 1.
+        Computes the scaling factor that needs to be applied to the weight of samples in the class 1.
 
         We need to find alpha that satisfies :
             (alpha*n1)/n0 = w/(1-w)
@@ -412,7 +412,6 @@ class BinaryClassificationMetric(Metric):
         """
         y_train = y_train[self.get_idx_of_nonmissing_targets(y_train)]
 
-        # Otherwise we return samples' weights in the appropriate format
         n1 = y_train.sum()              # number of samples with label 1
         n0 = y_train.shape[0] - n1      # number of samples with label 0
 
@@ -455,7 +454,7 @@ class BinaryClassificationMetric(Metric):
         Parameters
         ----------
         pred_proba : Tensor
-            (N,) tensor with with predicted probabilities of being in class 1.
+            (N,) tensor with predicted probabilities of being in class 1.
         targets : Tensor
             (N,) tensor with ground truth.
         thresh : Optional[float]
@@ -541,7 +540,7 @@ class SegmentationMetric(Metric):
             reduction: Optional[Union[MetricReduction, str]] = None
     ) -> float:
         """
-        Converts inputs to tensors than computes the metric and applies rounding.
+        Converts inputs to tensors then computes the metric and applies rounding.
 
         Parameters
         ----------
@@ -550,7 +549,7 @@ class SegmentationMetric(Metric):
         targets : Union[np.array, Tensor]
             (N, X, Y, Z) tensor or array with ground truth
         reduction : Optional[Union[MetricReduction, str]]
-            Reduction method to use. If None, we use self.reduction.
+            Reduction method to use. If None, we use the default reduction, i.e. self.reduction.
 
         Returns
         -------
@@ -700,7 +699,7 @@ class BinaryAccuracy(BinaryClassificationMetric):
         targets : Tensor
             (N,) tensor with ground truth
         thresh : Tensor
-            Probability threshold that must be reach by a sample to be classified into class 1 (Not used here)
+            Probability threshold that must be reach by a sample to be classified into class 1.
 
         Returns
         -------
@@ -745,7 +744,7 @@ class BinaryBalancedAccuracy(BinaryClassificationMetric):
             thresh: float
     ) -> Tensor:
         """
-        Returns the either (TPR + TNR)/2 or sqrt(TPR*TNR).
+        Returns the balanced accuracy, i.e (TPR + TNR)/2.
 
         Parameters
         ----------
