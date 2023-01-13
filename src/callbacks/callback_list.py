@@ -86,10 +86,10 @@ class CallbackList:
 
         for callback in self.callbacks:
             if callback.allow_duplicates is False:
-                if callback in seen:
+                if isinstance(callback, tuple(seen)):
                     duplicates.append(callback.name)
                 else:
-                    seen.add(callback.name)
+                    seen.add(type(callback))
 
         if duplicates:
             raise AssertionError(f"Duplicates of 'Callback' with 'allow_duplicates' == False are not allowed in "
