@@ -92,7 +92,7 @@ class Callback(ABC):
             Whether to load from the checkpoint file. Default is equal to save_state.
         """
         self.instance_id = self.instance_counter
-        self.name = name if name is not None else f"{self.__class__.__name__}<{self.instance_id}>"
+        self.name = name if name is not None else f"{self.__class__.__name__}_{self.instance_id}"
         self.__class__.instance_counter += 1
 
         self.save_state = save_state
