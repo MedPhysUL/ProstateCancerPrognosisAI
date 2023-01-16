@@ -9,20 +9,87 @@
                         metrics values obtained during the training process.
 """
 
-from enum import Enum
-from typing import Dict, List, Optional, Tuple, Union
+import os
+from typing import Dict, List, Literal, Optional, Tuple, TypedDict, Union
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from src.callbacks.callback import Callback, Priority
-from src.data.processing.tools import MaskType
 
 
-class MeasureCategory(Enum):
-    LOSSES = "losses"
-    METRICS = "metrics"
+class _Measures(TypedDict):
+    """
+    A TypeDict defining the data structure that contains the various measurements performed during a training process.
+
+    Elements
+    --------
+    metrics : Dict[str, Dict[str, List[float]]]
+        A dictionary containing metric values. The keys are the names of the tasks, the values are dictionaries whose
+        keys are the names of the metrics while its values are a list of the metric measured each epoch.
+
+        Example (2 tasks, 3 epochs) :
+
+            metrics = {
+                "PN_classification": {
+                    "Accuracy": [0.6, 0.5, 0.9],
+                    "AUC": [0.6, 0.7, 0.75]
+                },
+                "Prostate_segmentation": {
+                    "DICEMetric": [0.7, 0.76, 0.85]
+                },
+            }
+
+    multi_task_losses: Dict[str, Dict[str, List[float]]]
+        A dictionary containing multi-task losses. The keys are the names of the learning algorithm used, the values
+        are dictionaries whose keys are the names of the losses while its values are a list of the loss measured each
+        epoch.
+
+        Example (2 learning algorithms, 3 epochs) :
+            multi_task_losses = {
+                "LearningAlgorithm<0>": {
+                    "mean_loss_without_regularization": [0.9, 0.7, 0.6],
+                    "mean_loss_with_regularization": [1.1, 0.8, 0.7]
+                },
+                "LearningAlgorithm<1>": {
+                    "median_loss_without_regularization": [1.1, 0.8, 0.7],
+                    "median_loss_with_regularization": [2, 1.5, 1.1]
+                },
+            }
+
+    single_task_losses: Dict[str, Dict[str, List[float]]]
+        A dictionary containing single task losses. The keys are the names of the tasks, the values are dictionaries
+        whose keys are the names of the losses while its values are a list of the loss measured each epoch.
+
+        Example (2 tasks, 3 epochs) :
+            single_task_losses = {
+                "PN_classification": {
+                    "BinaryBalancedAccuracy": [0.6, 0.5, 0.9]
+                },
+                "Prostate_segmentation": {
+                    "DICELoss": [0.7, 0.76, 0.85]
+                },
+            }
+    """
+    metrics: Dict[str, Dict[str, List[float]]]
+    multi_task_losses: Dict[str, Dict[str, List[float]]]
+    single_task_losses: Dict[str, Dict[str, List[float]]]
+
+
+class _History(TypedDict):
+    """
+    A TypeDict defining the data structure that contains the different sets measurements.
+
+    Elements
+    --------
+    train : _Measures
+        Training set measures.
+    valid : _Measures
+        Validation set measures.
+    """
+    train: _Measures
+    valid: _Measures
 
 
 class TrainingHistory(Callback):
@@ -30,9 +97,14 @@ class TrainingHistory(Callback):
     This class is used to store losses and score metrics values obtained during the training process.
     """
 
+    _TRAIN: Literal["train"] = "train"
+    _VALID: Literal["valid"] = "valid"
+
+    _MULTI_TASK_LOSSES: Literal["multi_task_losses"] = "multi_task_losses"
+
     def __init__(
             self,
-            container: Optional[Dict[str, Dict[str, Dict[str, List[float]]]]] = None,
+            container: Optional[_History] = None,
             **kwargs
     ):
         """
@@ -40,7 +112,7 @@ class TrainingHistory(Callback):
 
         Parameters
         ----------
-        container : Optional[Dict[str, Dict[str, Dict[str, List[float]]]]]
+        container : Optional[_History]
             History container.
         **kwargs : dict
             The keyword arguments to pass to the Callback.
@@ -50,20 +122,12 @@ class TrainingHistory(Callback):
         if container:
             self._container = container
         else:
-            self._container = {
-                MaskType.TRAIN: {
-                    MeasureCategory.LOSSES.value: {},
-                    MeasureCategory.METRICS.value: {}
-                },
-                MaskType.VALID: {
-                    MeasureCategory.LOSSES.value: {},
-                    MeasureCategory.METRICS.value: {}
-                }
-            }
+            empty_measures = _Measures(metrics={}, multi_task_losses={}, single_task_losses={})
+            self._container = _History(train=empty_measures, valid=empty_measures)
 
     def __getitem__(self, item: Union[str, int, slice]) -> dict:
         if isinstance(item, str):
-            return self._container[item]
+            return self._container[item]  # type: ignore
         elif isinstance(item, (int, slice)):
             return self._get_state(self._container, item)
 
@@ -101,28 +165,28 @@ class TrainingHistory(Callback):
         return False
 
     @property
-    def training_set_history(self) -> Dict[str, Dict[str, List[float]]]:
+    def training_set_history(self) -> _Measures:
         """
         Training set losses and score metrics history.
 
         Returns
         -------
-        history : Dict[str, Dict[str, List[float]]]
+        history : Dict[MeasureCategory, Dict[str, List[float]]]
             Training set history.
         """
-        return self._container[MaskType.TRAIN]
+        return self._container[self._TRAIN]
 
     @property
-    def validation_set_history(self) -> Dict[str, Dict[str, List[float]]]:
+    def validation_set_history(self) -> _Measures:
         """
         Validation set losses and score metrics history.
 
         Returns
         -------
-        history : Dict[str, Dict[str, List[float]]]
+        history : Dict[MeasureCategory, Dict[str, List[float]]]
             Validation set history.
         """
-        return self._container[MaskType.VALID]
+        return self._container[self._VALID]
 
     def _get_state(self, container: dict, idx: Union[int, slice]) -> dict:
         """
@@ -186,7 +250,8 @@ class TrainingHistory(Callback):
 
     def _create_plot(
             self,
-            measure_category: Union[MeasureCategory, str],
+            measure_category: Literal["metrics", "multi_task_losses", "single_task_losses"],
+            task_key: str,
             **kwargs
     ) -> Tuple[plt.Figure, Dict[str, plt.Axes], Dict[str, List[plt.Line2D]]]:
         """
@@ -195,8 +260,10 @@ class TrainingHistory(Callback):
 
         Parameters
         ----------
-        measure_category : MeasureCategory
-            Measure category, i.e 'losses' or 'metrics'.
+        measure_category : Literal["metrics", "multi_task_losses", "single_task_losses"]
+            Measure category, i.e 'multi_task_losses', 'single_task_losses' or 'metrics'.
+        task_key : str
+            Specific task key in the measure category history.
         kwargs : dict
             Keywords arguments controlling figure aesthetics.
 
@@ -205,26 +272,34 @@ class TrainingHistory(Callback):
         fig, axes, lines : Tuple[plt.Figure, Dict[str, plt.Axes], Dict[str, List[plt.Line2D]]]
             The figure, axes and lines of the plot.
         """
-        measure_category = MeasureCategory(measure_category).value
+        train_measure_history = self.training_set_history[measure_category]
+        valid_measure_history = self.validation_set_history[measure_category]
 
-        training_set_history_dict = self.training_set_history[measure_category]
-        validation_set_history_dict = self.validation_set_history[measure_category]
+        if task_key in train_measure_history:
+            train_task_history = train_measure_history[task_key]
+            train_tasks = list(train_task_history.keys())
+        else:
+            train_task_history, train_tasks = [], []
 
-        training_set_names = list(training_set_history_dict.keys())
-        validation_set_names = list(validation_set_history_dict.keys())
-        all_names = list(set(training_set_names + validation_set_names))
+        if task_key in valid_measure_history:
+            valid_task_history = valid_measure_history[task_key]
+            valid_tasks = list(valid_task_history.keys())
+        else:
+            valid_task_history, valid_tasks = [], []
 
-        axes_dict, lines = {}, {k: [] for k in all_names}
-        fig, axes = plt.subplots(nrows=len(all_names), ncols=1, figsize=kwargs.get("figsize", (16, 12)), sharex='all')
+        all_tasks = list(set(train_tasks + valid_tasks))
+
+        axes_dict, lines = {}, {k: [] for k in all_tasks}
+        fig, axes = plt.subplots(nrows=len(all_tasks), ncols=1, figsize=kwargs.get("figsize", (16, 12)), sharex='all')
         axes = np.ravel(axes)
-        for i, (ax, key) in enumerate(zip(axes, all_names)):
-            if key in training_set_names:
+        for i, (ax, key) in enumerate(zip(axes, all_tasks)):
+            if key in train_tasks:
                 lines[key].append(
-                    ax.plot(training_set_history_dict[key], label="Train", linewidth=kwargs.get("lw", 3))[0]
+                    ax.plot(train_task_history[key], label=self._TRAIN, linewidth=kwargs.get("lw", 3))[0]
                 )
-            if key in validation_set_names:
+            if key in valid_tasks:
                 lines[key].append(
-                    ax.plot(validation_set_history_dict[key], label="Valid", linewidth=kwargs.get("lw", 3))[0]
+                    ax.plot(valid_task_history[key], label=self._VALID, linewidth=kwargs.get("lw", 3))[0]
                 )
 
             ax.set_ylabel(key, fontsize=kwargs.get("fontsize", 16))
@@ -249,7 +324,7 @@ class TrainingHistory(Callback):
         Parameters
         ----------
         path_to_save : Optional[str]
-            Path to save the figure.
+            Path to save the figures. Should be a directory.
         show : bool
             Show figure.
         kwargs : dict
@@ -257,15 +332,41 @@ class TrainingHistory(Callback):
         """
         plt.close('all')
 
-        for measure_category in [c.value for c in MeasureCategory]:
-            fig, axes, lines = self._create_plot(measure_category, **kwargs)
-            plt.tight_layout(rect=(0, 0.03, 1, 0.95))
+        for measure_category in _Measures.__annotations__.keys():
+            training_set_task_keys = list(self.training_set_history[measure_category].keys())  # type: ignore
+            validation_set_task_keys = list(self.validation_set_history[measure_category].keys())  # type: ignore
+            all_task_keys = list(set(training_set_task_keys + validation_set_task_keys))
+
             if path_to_save is not None:
-                fig.savefig(f"{path_to_save}_{measure_category}.pdf", dpi=kwargs.get("dpi", 300))
-            if show:
-                plt.show(block=kwargs.get("block", True))
-            if kwargs.get("close", True):
-                plt.close(fig)
+                path_to_measure_category_directory = os.path.join(path_to_save, measure_category)
+                os.mkdir(path_to_measure_category_directory)
+
+            for task_key in all_task_keys:
+                fig, axes, lines = self._create_plot(measure_category, task_key, **kwargs)  # type: ignore
+                plt.tight_layout(rect=(0, 0.03, 1, 0.95))
+                if path_to_save is not None:
+                    path_to_fig = os.path.join(os.path.join(path_to_save, measure_category), f"{task_key}.pdf")
+                    fig.savefig(path_to_fig, dpi=kwargs.get("dpi", 300))
+                if show:
+                    plt.show(block=kwargs.get("block", True))
+                if kwargs.get("close", True):
+                    plt.close(fig)
+
+    def on_fit_start(self, trainer, **kwargs):
+        """
+        If needed, builds the multi_task_losses container using the names of the learning algorithms.
+
+        Parameters
+        ----------
+        trainer : Trainer
+            The trainer.
+        """
+        multi_task_losses_dict = {learning_algo.name: {} for learning_algo in trainer.learning_algorithms}
+
+        if not self._container[self._TRAIN][self._MULTI_TASK_LOSSES]:
+            self._container[self._TRAIN][self._MULTI_TASK_LOSSES] = multi_task_losses_dict
+        if not self._container[self._VALID][self._MULTI_TASK_LOSSES]:
+            self._container[self._VALID][self._MULTI_TASK_LOSSES] = multi_task_losses_dict
 
     def on_epoch_end(self, trainer, **kwargs):
         """
@@ -285,25 +386,63 @@ if __name__ == "__main__":
     history = TrainingHistory(
         container={
             "train": {
-                "losses": {
-                    "Entropy": [1.0, 3],
-                    "PN": [1.0, -1]
-                },
                 "metrics": {
-                    "Acc": [1.0, 2.0],
-                    "F1": [1.0, 0]
+                    "PN_classification": {
+                        "Accuracy": [0.6, 0.5, 0.9],
+                        "AUC": [0.6, 0.7, 0.75]
+                    },
+                    "Prostate_segmentation": {
+                        "DICEMetric": [0.7, 0.76, 0.85]
+                    },
+                },
+                "multi_task_losses": {
+                    "LearningAlgorithm<0>": {
+                        "mean_loss_without_regularization": [0.9, 0.7, 0.6],
+                        "mean_loss_with_regularization": [1.1, 0.8, 0.7]
+                    },
+                    "LearningAlgorithm<1>": {
+                        "median_loss_without_regularization": [1.1, 0.8, 0.7],
+                        "median_loss_with_regularization": [2, 1.5, 1.1]
+                    },
+                },
+                "single_task_losses": {
+                    "PN_classification": {
+                        "BinaryBalancedAccuracy": [0.6, 0.5, 0.9]
+                    },
+                    "Prostate_segmentation": {
+                        "DICELoss": [0.7, 0.76, 0.85]
+                    },
                 }
             },
             "valid": {
-                "losses": {
-                    "BCR": [1.0, 20],
-                    "PN": [1.0, 5]
-                },
                 "metrics": {
-                    "Acc": [1.0, 7],
-                    "F1": [1.0, 1]
+                    "PN_classification": {
+                        "Accuracy": [0.55, 0.45, 0.85],
+                        "AUC": [0.55, 0.65, 0.7]
+                    },
+                    "Prostate_segmentation": {
+                        "DICEMetric": [0.65, 0.71, 0.8]
+                    },
+                },
+                "multi_task_losses": {
+                    "LearningAlgorithm<0>": {
+                        "mean_loss_without_regularization": [0.95, 0.75, 0.65],
+                        "mean_loss_with_regularization": [1.15, 0.85, 0.75]
+                    },
+                    "LearningAlgorithm<1>": {
+                        "median_loss_without_regularization": [1.15, 0.85, 0.75],
+                        "median_loss_with_regularization": [2.05, 1.55, 1.15]
+                    },
+                },
+                "single_task_losses": {
+                    "PN_classification": {
+                        "BinaryBalancedAccuracy": [0.65, 0.55, 0.95]
+                    },
+                    "Prostate_segmentation": {
+                        "DICELoss": [0.75, 0.81, 0.9]
+                    },
                 }
-            }
+            },
         }
     )
 
