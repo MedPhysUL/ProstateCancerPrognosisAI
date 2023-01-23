@@ -73,7 +73,7 @@ class ImageDataset(Dataset):
 
                         for task in tasks:
                             if modality == task.modality:
-                                seg_dict[task.organ] = self._transpose(series["0"][f"{task.organ}_label_map"])
+                                seg_dict[task.name] = self._transpose(series["0"][f"{task.organ}_label_map"])
 
             img_dict, seg_dict = self._crop(img_dict=img_dict, seg_dict=seg_dict, z_dim=z_dim)
 

@@ -22,9 +22,9 @@ import numpy as np
 
 class AnatomicalPlane(IntEnum):
     ALL = -1,
-    CORONAL = 0,
-    SAGITTAL = 1,
-    AXIAL = 2
+    AXIAL = 0
+    CORONAL = 1,
+    SAGITTAL = 2,
 
 
 class Plot(IntEnum):

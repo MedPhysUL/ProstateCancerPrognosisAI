@@ -117,7 +117,6 @@ class ProstateCancerDataset(Dataset):
         """
         if isinstance(index, int):
             imaging_dict = self.image_dataset[index]
-
             y_imaging, x_imaging = {}, {}
             for key, item in imaging_dict.items():
                 if key in [task.name for task in self.image_dataset.tasks]:

@@ -19,7 +19,7 @@ from monai.transforms import (
     HistogramNormalized,
     KeepLargestConnectedComponentd,
     ThresholdIntensityd,
-    ToTensord,
+    ToTensord, EnsureChannelFirstd,
 )
 from monai.utils import set_determinism
 import numpy as np
@@ -30,39 +30,52 @@ from torch.utils.tensorboard import SummaryWriter
 from src.data.extraction.local import LocalDatabaseManager
 from src.data.datasets.image_dataset import ImageDataset
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
+from src.utils.tasks import SegmentationTask
+from src.utils.losses import DICELoss
+from src.utils.score_metrics import DICEMetric
 
 
 if __name__ == '__main__':
     set_determinism(seed=1010710)
 
     writer = SummaryWriter(
-        log_dir='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp01'
+        log_dir='/applications/local_data/unet3d/runs/exp01'
     )
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
-    num_val = 40
+    num_val = 1
     batch_size = 1
-    num_epochs = 1000
+    num_epochs = 4
     lr = 1e-3
 
     # Defining Transforms
     trans = Compose([
-        AddChanneld(keys=['img', 'seg']),
-        CenterSpatialCropd(keys=['img', 'seg'], roi_size=(1000, 160, 160)),
-        ThresholdIntensityd(keys=['img'], threshold=-250, above=True, cval=-250),
-        ThresholdIntensityd(keys=['img'], threshold=500, above=False, cval=500),
-        HistogramNormalized(keys=['img'], num_bins=751, min=0, max=1),
-        KeepLargestConnectedComponentd(keys=['seg']),
-        ToTensord(keys=['img', 'seg'], dtype=torch.float32)
+        EnsureChannelFirstd(keys=['CT', 'Prostate_segmentation']),
+        CenterSpatialCropd(keys=['CT', 'Prostate_segmentation'], roi_size=(1000, 160, 160)),
+        # ThresholdIntensityd(keys=['img'], threshold=-250, above=True, cval=-250),
+        # ThresholdIntensityd(keys=['img'], threshold=500, above=False, cval=500),
+        # HistogramNormalized(keys=['img'], num_bins=751, min=0, max=1),
+        # KeepLargestConnectedComponentd(keys=['seg']),
+        ToTensord(keys=['CT', 'Prostate_segmentation'], dtype=torch.float32)
     ])
 
     # ImageDataset
+    task = SegmentationTask(
+        criterion=DICELoss(),
+        optimization_metric=DICEMetric(),
+        organ="Prostate",
+        modality="CT",
+        evaluation_metrics=[DICEMetric()]
+    )
+
     image_dataset = ImageDataset(
         database_manager=LocalDatabaseManager(
-            path_to_database='C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/learning_set.h5'
+            path_to_database='C:/Users/rapha/Desktop/dummy_db.h5'
         ),
-        transform=trans,
+        tasks=[task],
+        modalities={"CT"},
+        transforms=trans
     )
 
     # Dataset
@@ -73,20 +86,23 @@ if __name__ == '__main__':
     # Train/Val Split
     train_ds, val_ds = random_split(ds, [len(ds) - num_val, num_val])
 
+
     # Data Loader
     train_loader = DataLoader(
         dataset=train_ds,
         num_workers=num_workers,
         batch_size=batch_size,
         pin_memory=True,
-        shuffle=True
+        shuffle=True,
+        collate_fn=None
     )
     val_loader = DataLoader(
         dataset=val_ds,
         num_workers=num_workers,
         batch_size=1,
         pin_memory=True,
-        shuffle=False
+        shuffle=False,
+        collate_fn=None
     )
 
     # Model
@@ -94,7 +110,7 @@ if __name__ == '__main__':
         spatial_dims=3,
         in_channels=1,
         out_channels=1,
-        channels=(64, 128, 256, 512, 1024),
+        channels=(4, 8, 16, 32, 64),
         strides=(2, 2, 2, 2),
         num_res_units=3,
         dropout=0.2
@@ -116,8 +132,8 @@ if __name__ == '__main__':
 
         # Training
         for batch in train_loader:
-            batch_images = batch.image['img'].to(device)
-            batch_segs = batch.image['seg'].to(device)
+            batch_images = batch.x.image['CT'].to(device)
+            batch_segs = batch.y['Prostate_segmentation'].to(device)
 
             opt.zero_grad()
             y_pred = net(batch_images)
@@ -138,8 +154,8 @@ if __name__ == '__main__':
         metric_vals = []
         with torch.no_grad():
             for batch in val_loader:
-                batch_images = batch.image['img'].to(device)
-                batch_segs = batch.image['seg'].to(device)
+                batch_images = batch.x.image['CT'].to(device)
+                batch_segs = batch.y["Prostate_segmentation"].to(device)
 
                 y_pred = net(batch_images)
 
@@ -162,10 +178,18 @@ if __name__ == '__main__':
         # Save Best Metric
         if epoch_val_metrics[-1] > best_metric:
             best_metric = epoch_val_metrics[-1]
-            torch.save(net.state_dict(), 'C:/Users/CHU/Documents/GitHub/ProstateCancerPrognosisAI/applications/local_data/unet3d/runs/exp01/best_model_parameters.pt')
+            torch.save(net.state_dict(), '/applications/local_data/unet3d/runs/exp01/best_model_parameters.pt')
 
         writer.add_scalar('avg validation loss per epoch', epoch_val_losses[-1], epoch + 1)
         writer.add_scalar('avg validation metric per epoch', epoch_val_metrics[-1], epoch + 1)
 
     writer.flush()
     writer.close()
+
+    print(net)
+    print("param", sum(param.numel() for param in net.parameters()))
+    print("trainable", sum(p.numel() for p in net.parameters() if p.requires_grad))
+
+    from torchsummary import summary
+    summary(net)
+    
