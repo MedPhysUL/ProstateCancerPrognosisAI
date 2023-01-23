@@ -630,7 +630,7 @@ class TorchCustomModel(Module, ABC):
             self,
             dataset: ProstateCancerDataset,
             mask: List[int],
-            include_evaluation_metrics: bool = False
+            include_evaluation_metrics: bool = False  # TODO : Remove this parameter (always set to True)
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns the score of all samples in a particular subset of the dataset, determined using a mask parameter.
@@ -715,7 +715,7 @@ class TorchCustomModel(Module, ABC):
     def fix_thresholds_to_optimal_values(
             self,
             dataset: ProstateCancerDataset,
-            include_evaluation_metrics: bool = False
+            include_evaluation_metrics: bool = False  # TODO : Remove this parameter (always set to True)
     ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
