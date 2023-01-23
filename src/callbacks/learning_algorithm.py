@@ -110,6 +110,45 @@ class LearningAlgorithm(Callback):
 
         return None
 
+    def _update_batch_state(
+            self,
+            single_task_losses: Dict[str, Tensor],
+            multi_task_loss_without_regularization: Tensor,
+            multi_task_loss_with_regularization: Optional[Tensor],
+            trainer
+    ):
+        single_task_losses_dict = {
+            task.name: {
+                task.criterion.name: single_task_losses[task.name].detach().item()
+            } for task in self.criterion.tasks
+        }
+
+        multi_task_losses_without_regularization_dict = {
+            self.name: {self.criterion.name: multi_task_loss_without_regularization.detach().item()}
+        }
+
+        if multi_task_loss_with_regularization:
+            multi_task_losses_with_regularization_dict = {
+                self.name: {self.criterion.name: multi_task_loss_with_regularization.detach().item()}
+            }
+        else:
+            multi_task_losses_with_regularization_dict = {}
+
+        trainer.batch_state.single_task_losses = {
+            **trainer.batch_state.single_task_losses,
+            **single_task_losses_dict
+        }
+
+        trainer.batch_state.multi_task_losses_with_regularization = {
+            **trainer.batch_state.multi_task_losses_with_regularization,
+            **multi_task_losses_with_regularization_dict
+        }
+
+        trainer.batch_state.multi_task_losses_without_regularization = {
+            **trainer.batch_state.multi_task_losses_without_regularization,
+            **multi_task_losses_without_regularization_dict
+        }
+
     def _compute_loss(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor], trainer) -> Tensor:
         """
         Calls the criterion and add the elastic penalty.
@@ -130,27 +169,15 @@ class LearningAlgorithm(Callback):
         """
         losses = {task.name: task.criterion(pred_batch[task.name], y_batch[task.name]) for task in self.criterion.tasks}
 
-        batch_loss = self.criterion(losses)
+        loss_without_regularization = self.criterion(losses)
 
+        loss_with_regularization = None
         if self.regularization:
-            batch_loss = batch_loss + self.regularization()
+            loss_with_regularization = loss_without_regularization + self.regularization()
 
-        if trainer.model.training:
-            trainer.update_train_losses(
-                {
-                    **{name: loss.item() for name, loss in losses.items()},
-                    **{self.criterion.name, batch_loss.item()}
-                }
-            )
-        else:
-            trainer.update_valid_losses(
-                {
-                    **{name: loss.item() for name, loss in losses.items()},
-                    **{self.criterion.name, batch_loss.item()}
-                }
-            )
+        self._update_batch_state(losses, loss_without_regularization, loss_with_regularization, trainer)
 
-        return batch_loss
+        return loss_with_regularization if loss_with_regularization else loss_without_regularization
 
     def on_fit_start(self, trainer, **kwargs):
         """
@@ -163,7 +190,7 @@ class LearningAlgorithm(Callback):
         kwargs : dict
             Keyword arguments.
         """
-        tasks = trainer.state.objects["tasks"]
+        tasks = trainer.training_state.tasks
 
         if self.criterion.tasks is None:
             self.criterion.tasks = tasks
@@ -190,7 +217,7 @@ class LearningAlgorithm(Callback):
         batch_loss = self._compute_loss(pred_batch, y_batch, trainer)
         batch_loss.backward()
         self.optimizer.step()
-        return batch_loss.detach_()
+        batch_loss.detach_()
 
     def on_optimization_start(self, trainer, **kwargs):
         """
@@ -203,10 +230,9 @@ class LearningAlgorithm(Callback):
         kwargs : dict
             Keyword arguments.
         """
-        pred_batch = trainer.state.pred_batch
-        y_batch = trainer.state.y_batch
-        batch_loss = self._optimizer_step(pred_batch, y_batch, trainer)
-        trainer.update_state(batch_loss=batch_loss.item())  # TODO : Last learning algo batch loss is batch loss? Weird
+        pred_batch = trainer.batch_state.pred
+        y_batch = trainer.batch_state.y
+        self._optimizer_step(pred_batch, y_batch, trainer)
 
     def on_optimization_end(self, trainer, **kwargs):
         """
@@ -232,7 +258,6 @@ class LearningAlgorithm(Callback):
         kwargs : dict
             Keyword arguments.
         """
-        pred_batch = trainer.state.pred_batch
-        y_batch = trainer.state.y_batch
-        batch_loss = self._compute_loss(pred_batch, y_batch, trainer)
-        trainer.update_state(batch_loss=batch_loss.item())  # TODO : Last learning algo batch loss is batch loss? Weird
+        pred_batch = trainer.batch_state.pred
+        y_batch = trainer.batch_state.y
+        self._compute_loss(pred_batch, y_batch, trainer)
