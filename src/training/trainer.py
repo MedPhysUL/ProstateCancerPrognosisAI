@@ -211,12 +211,10 @@ class Trainer:
         train_dataloader = self._create_train_dataloader(dataset=dataset, batch_size=batch_size)
         valid_dataloader = self._create_valid_dataloader(dataset=dataset)
 
-        self.training_state.update(
-            n_epochs=n_epochs,
-            train_dataloader=train_dataloader,
-            valid_dataloader=valid_dataloader,
-            tasks=dataset.tasks
-        )
+        self.training_state.n_epochs = n_epochs
+        self.training_state.train_dataloader = train_dataloader
+        self.training_state.valid_dataloader = valid_dataloader
+        self.training_state.tasks = dataset.tasks
 
         self.sort_callbacks()
         self.callbacks.on_fit_start(self)
@@ -347,7 +345,9 @@ class Trainer:
     ):
         x_batch = self.x_transform(self._batch_to_device(x_batch))
         y_batch = self.y_transform(self._batch_to_device(y_batch))
-        self.batch_state.update(x=x_batch, y=y_batch)
+
+        self.batch_state.x = x_batch
+        self.batch_state.y = y_batch
 
         if self.model.training:
             self.callbacks.on_train_batch_start(self)
@@ -356,7 +356,6 @@ class Trainer:
             self.callbacks.on_validation_batch_start(self)
             with no_grad():
                 pred_batch = self.model(x_batch)
-
         self.batch_state.pred = pred_batch
 
         if self.model.training:

@@ -18,11 +18,6 @@ MeasurementTypes = Union[MeasurementType, MeasurementHistoryType]
 @dataclass
 class BaseState:
 
-    def update(self, **kwargs):
-        self_dict = vars(self)
-        assert all(k in self_dict for k in kwargs)
-        self_dict.update(kwargs)
-
     def __getstate__(self):
         return {k: v for k, v in vars(self).items()}
 
