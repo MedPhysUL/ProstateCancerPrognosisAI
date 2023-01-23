@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     12/2022
-    @Last modification: 12/2022
+    @Last modification: 01/2023
 
     @Description:       This file is used to define a 'LearningAlgorithm' which dictates how to update the model's
                         parameters during the training process.
