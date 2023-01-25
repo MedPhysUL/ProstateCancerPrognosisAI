@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     09/2022
-    @Last modification: 09/2022
+    @Last modification: 01/2023
 
     @Description:       This file is used to define the losses used to measure models' performance.
 """
@@ -39,8 +39,8 @@ class Loss(ABC):
             Reduction method to use.
         """
         # Protected attributes
-        self._name = name
         self._reduction = LossReduction(reduction).value
+        self._name = name if name is not None else f"{self.__class__.__name__}('reduction'={repr(self._reduction)})"
 
     @abstractmethod
     def __call__(
@@ -60,7 +60,7 @@ class Loss(ABC):
 
     @property
     def name(self) -> str:
-        return f"{self._reduction}_{self._name}"
+        return self._name
 
     def perform_reduction(
             self,
@@ -260,10 +260,6 @@ class BinaryClassificationLoss(Loss):
     def scaling_factor(self) -> Optional[float]:
         return self._scaling_factor
 
-    @scaling_factor.setter
-    def scaling_factor(self, scaling_factor: float):
-        self._scaling_factor = scaling_factor
-
     @property
     def weight(self) -> float:
         return self._weight
@@ -323,12 +319,12 @@ class BinaryClassificationLoss(Loss):
 
         return idx[0].tolist()
 
-    def get_scaling_factor(
+    def update_scaling_factor(
             self,
             y_train: Union[np.array, Tensor]
-    ) -> float:
+    ):
         """
-        Computes the scaling factor that needs to be apply to the weight of samples in the class 1.
+        Computes the positive scaling factor that needs to be apply to the weight of samples in the class 1.
 
         We need to find alpha that satisfies :
             (alpha*n1)/n0 = w/(1-w)
@@ -339,11 +335,6 @@ class BinaryClassificationLoss(Loss):
         ----------
         y_train : Union[Tensor, np.array]
             (N_train, ) tensor or array with targets used for training.
-
-        Returns
-        -------
-        scaling_factor : float
-            Positive scaling factors.
         """
         y_train = y_train[self.get_idx_of_nonmissing_targets(y_train)]
 
@@ -351,7 +342,7 @@ class BinaryClassificationLoss(Loss):
         n1 = y_train.sum()              # number of samples with label 1
         n0 = y_train.shape[0] - n1      # number of samples with label 0
 
-        return (n0/n1)*(self.weight/(1-self.weight))
+        self._scaling_factor = (n0/n1)*(self.weight/(1-self.weight))
 
     @staticmethod
     def convert_to_tensors(
@@ -508,6 +499,7 @@ class BinaryCrossEntropyWithLogitsLoss(BinaryClassificationLoss):
 
     def __init__(
             self,
+            name: Optional[str] = None,
             weight: float = 0.5,
             reduction: Union[LossReduction, str] = LossReduction.MEAN
     ):
@@ -516,12 +508,14 @@ class BinaryCrossEntropyWithLogitsLoss(BinaryClassificationLoss):
 
         Parameters
         ----------
+        name : Optional[str]
+            Name of the loss.
         weight : float
             The weight attributed to class 1 (in [0, 1]).
         reduction : Union[LossReduction, str]
             Reduction method to use.
         """
-        super().__init__(name="BinaryCrossEntropyLoss", reduction=reduction, weight=weight)
+        super().__init__(name=name, reduction=reduction, weight=weight)
 
         if self.reduction not in (LossReduction.MEAN.value, LossReduction.SUM.value):
             raise ValueError(f"Unsupported reduction: {self.reduction}, available options are ['mean', 'sum'].")
@@ -561,6 +555,7 @@ class DICELoss(SegmentationLoss):
 
     def __init__(
             self,
+            name: Optional[str] = None,
             reduction: Union[LossReduction, str] = LossReduction.MEAN
     ):
         """
@@ -568,10 +563,12 @@ class DICELoss(SegmentationLoss):
 
         Parameters
         ----------
+        name : Optional[str]
+            Name of the loss.
         reduction : Union[LossReduction, str]
             Reduction method to use.
         """
-        super().__init__(name="DICELoss", reduction=reduction)
+        super().__init__(name=name, reduction=reduction)
 
         if self.reduction not in (LossReduction.MEAN.value, LossReduction.SUM.value):
             raise ValueError(f"Unsupported reduction: {self.reduction}, available options are ['mean', 'sum'].")

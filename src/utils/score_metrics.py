@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     07/2022
-    @Last modification: 07/2022
+    @Last modification: 01/2023
 
     @Description:       This file is used to define the metrics used to measure models' performance.
 """
@@ -59,9 +59,9 @@ class Metric(ABC):
         """
         # Protected attributes
         self._direction = Direction(direction).value
-        self._name = name
         self._reduction = MetricReduction(reduction).value
         self._n_digits = n_digits
+        self._name = name if name is not None else f"{self.__class__.__name__}('reduction'={repr(self._reduction)})"
 
     @abstractmethod
     def __call__(
@@ -85,7 +85,7 @@ class Metric(ABC):
 
     @property
     def name(self) -> str:
-        return f"{self._reduction}_{self._name}"
+        return self._name
 
     def perform_reduction(
             self,
@@ -311,10 +311,6 @@ class BinaryClassificationMetric(Metric):
     def scaling_factor(self) -> Optional[float]:
         return self._scaling_factor
 
-    @scaling_factor.setter
-    def scaling_factor(self, scaling_factor: float):
-        self._scaling_factor = scaling_factor
-
     @property
     def threshold(self) -> float:
         return self._threshold
@@ -388,12 +384,12 @@ class BinaryClassificationMetric(Metric):
 
         return idx[0].tolist()
 
-    def get_scaling_factor(
+    def update_scaling_factor(
             self,
             y_train: Union[np.array, Tensor]
-    ) -> float:
+    ):
         """
-        Computes the scaling factor that needs to be applied to the weight of samples in the class 1.
+        Computes the positive scaling factor that needs to be applied to the weight of samples in the class 1.
 
         We need to find alpha that satisfies :
             (alpha*n1)/n0 = w/(1-w)
@@ -404,18 +400,13 @@ class BinaryClassificationMetric(Metric):
         ----------
         y_train : Union[Tensor, np.array]
             (N_train, ) tensor or array with targets used for training.
-
-        Returns
-        -------
-        scaling_factor : float
-            Positive scaling factors.
         """
         y_train = y_train[self.get_idx_of_nonmissing_targets(y_train)]
 
         n1 = y_train.sum()              # number of samples with label 1
         n0 = y_train.shape[0] - n1      # number of samples with label 0
 
-        return (n0/n1)*(self.weight/(1-self.weight))
+        self._scaling_factor = (n0/n1)*(self.weight/(1-self.weight))
 
     @staticmethod
     def convert_to_tensors(
@@ -620,7 +611,8 @@ class AUC(BinaryClassificationMetric):
 
     def __init__(
             self,
-            n_digits: int = 5
+            n_digits: int = 5,
+            name: Optional[str] = None
     ) -> None:
         """
         Sets protected attributes using parent's constructor.
@@ -629,8 +621,10 @@ class AUC(BinaryClassificationMetric):
         ----------
         n_digits : int
             Number of digits kept for the score.
+        name : Optional[str]
+            Name of the metric.
         """
-        super().__init__(direction=Direction.MAXIMIZE, name="AUC", reduction=MetricReduction.NONE, n_digits=n_digits)
+        super().__init__(direction=Direction.MAXIMIZE, name=name, reduction=MetricReduction.NONE, n_digits=n_digits)
 
     def _compute_metric(
             self,
@@ -666,6 +660,7 @@ class BinaryAccuracy(BinaryClassificationMetric):
     def __init__(
             self,
             n_digits: int = 5,
+            name: Optional[str] = None,
             reduction: Union[MetricReduction, str] = MetricReduction.MEAN
     ):
         """
@@ -675,10 +670,12 @@ class BinaryAccuracy(BinaryClassificationMetric):
         ----------
         n_digits : int
             Number of digits kept for the score.
+        name : Optional[str]
+            Name of the metric.
         reduction : Union[MetricReduction, str]
             Reduction method to use.
         """
-        super().__init__(direction=Direction.MAXIMIZE, name="Accuracy", reduction=reduction, n_digits=n_digits)
+        super().__init__(direction=Direction.MAXIMIZE, name=name, reduction=reduction, n_digits=n_digits)
 
         if self.reduction not in (MetricReduction.MEAN.value, MetricReduction.SUM.value):
             raise ValueError(f"Unsupported reduction: {self.reduction}, available options are ['mean', 'sum'].")
@@ -719,6 +716,7 @@ class BinaryBalancedAccuracy(BinaryClassificationMetric):
     def __init__(
             self,
             n_digits: int = 5,
+            name: Optional[str] = None,
             reduction: Union[MetricReduction, str] = MetricReduction.MEAN
     ):
         """
@@ -728,10 +726,12 @@ class BinaryBalancedAccuracy(BinaryClassificationMetric):
         ----------
         n_digits : int
             Number of digits kept for the score.
+        name : Optional[str]
+            Name of the metric.
         reduction : Union[MetricReduction, str]
             "Mean" for (TPR + TNR)/2 or "GeometricMean" for sqrt(TPR*TNR)
         """
-        super().__init__(direction=Direction.MAXIMIZE, name="BalancedAcc", reduction=reduction, n_digits=n_digits)
+        super().__init__(direction=Direction.MAXIMIZE, name=name, reduction=reduction, n_digits=n_digits)
 
         if self.reduction not in (MetricReduction.MEAN.value, MetricReduction.GEOMETRIC_MEAN.value):
             raise ValueError(f"Unsupported reduction: {self.reduction}, available options are "
@@ -777,6 +777,7 @@ class DICEMetric(SegmentationMetric):
     def __init__(
             self,
             n_digits: int = 5,
+            name: Optional[str] = None,
             reduction: Union[MetricReduction, str] = MetricReduction.MEAN
     ) -> None:
         """
@@ -786,10 +787,12 @@ class DICEMetric(SegmentationMetric):
         ----------
         n_digits : int
             Number of digits kept for the score.
+        name : Optional[str]
+            Name of the metric.
         reduction :  Union[MetricReduction, str]
             Reduction method to use.
         """
-        super().__init__(direction=Direction.MAXIMIZE, name="DICEMetric", reduction=reduction, n_digits=n_digits)
+        super().__init__(direction=Direction.MAXIMIZE, name=name, reduction=reduction, n_digits=n_digits)
 
         if self.reduction not in (MetricReduction.MEAN.value, MetricReduction.SUM.value):
             raise ValueError(f"Unsupported reduction: {self.reduction}, available options are ['mean', 'sum'].")

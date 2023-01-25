@@ -3,13 +3,14 @@
     @Author:            Maxence Larose, Mehdi Mitiche, Nicolas Raymond
 
     @Creation Date:     05/2022
-    @Last modification: 12/2022
+    @Last modification: 01/2023
 
     @Description:       This file is used to define the 'MetricEarlyStopping' and 'MultiTaskLossEarlyStopping' callback.
 """
 
 from abc import ABC, abstractmethod
-from typing import List
+from itertools import count
+from typing import List, Optional
 
 import numpy as np
 
@@ -23,10 +24,13 @@ class BaseEarlyStopping(ABC, Callback):
     Base class for early stopping.
     """
 
+    instance_counter = count()
+
     def __init__(
             self,
             patience: int,
             tolerance: float,
+            name: Optional[str] = None,
             **kwargs
     ) -> None:
         """
@@ -38,8 +42,12 @@ class BaseEarlyStopping(ABC, Callback):
             Number of consecutive epochs without improvement allowed.
         tolerance : float
             Permissible difference between measures.
+        name : Optional[str]
+            The name of the callback.
         """
-        super().__init__(**kwargs)
+        self.instance_id = next(self.instance_counter)
+        name = name if name is not None else f"{self.__class__.__name__}({self.instance_id})"
+        super().__init__(name=name, **kwargs)
 
         self.best_measure = None
         self.counter = 0
@@ -129,7 +137,7 @@ class MetricEarlyStopping(BaseEarlyStopping):
     def tasks(self, tasks: List[Task]):
         if not self._best_val_metric_scores:
             self._best_val_metric_scores = [
-                np.inf if t.optimization_metric.direction == Direction.MINIMIZE.value else -np.inf for t in tasks
+                np.inf if t.early_stopping_metric.direction == Direction.MINIMIZE.value else -np.inf for t in tasks
             ]
 
         self._tasks = tasks
@@ -144,14 +152,14 @@ class MetricEarlyStopping(BaseEarlyStopping):
             Trainer.
         kwargs : dict
         """
-        self.tasks = trainer.state.objects["tasks"]
+        self.tasks = trainer.training_state.tasks
         val_scores = trainer.state.valid_metrics
 
         new_scores_is_better = []
         for i, task, best_score in enumerate(zip(self._tasks, self._best_val_metric_scores)):
-            val_score = val_scores[task.optimization_metric.name]
+            val_score = val_scores[task.early_stopping_metric.name]
 
-            if task.optimization_metric.direction == Direction.MINIMIZE.value:
+            if task.early_stopping_metric.direction == Direction.MINIMIZE.value:
                 new_score_is_better = (best_score - val_score) > self.tolerance
             else:
                 new_score_is_better = (val_score - best_score) > self.tolerance
@@ -185,7 +193,7 @@ class MetricEarlyStopping(BaseEarlyStopping):
         print(f"\nEarly stopping occurred at epoch {epoch} with best_epoch = {epoch - self.patience}")
 
         for score, task in zip(self._best_val_metric_scores, self._tasks):
-            print(f"Task ({task.name}) (metric {task.optimization_metric.name}), Score :{round(score, 4)}")
+            print(f"Task ({task.name}) (metric {task.early_stopping_metric.name}), Score :{round(score, 4)}")
 
 
 class MultiTaskLossEarlyStopping(BaseEarlyStopping):

@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Nicolas Raymond, Mehdi Mitiche
 
     @Creation Date:     03/2022
-    @Last modification: 09/2022
+    @Last modification: 01/2023
 
     @Description:      This file is used to define the Evaluator class in charge of comparing models against each other.
 """
@@ -29,7 +29,7 @@ from src.recording.recorder import Recorder
 from src.recording.tools import (compare_prediction_recordings, get_evaluation_recap, plot_feature_importance_charts,
                                  plot_hps_importance_chart)
 from src.training.tuner import Objective, Tuner
-from src.utils.tasks import TaskType
+from src.utils.tasks import ClassificationTask, SegmentationTask
 
 
 class Evaluator:
@@ -408,15 +408,12 @@ class Evaluator:
         """
 
         # We find the optimal threshold and save it
-        model.fix_thresholds_to_optimal_values(dataset=subset, include_evaluation_metrics=True)
+        model.fix_thresholds_to_optimal_values(dataset=subset)
 
         # Record thresholds
-        classification_tasks = [task for task in subset.tasks if task.task_type == TaskType.CLASSIFICATION]
+        classification_tasks = [task for task in subset.tasks if isinstance(task, ClassificationTask)]
         for task in classification_tasks:
-            metrics = [task.optimization_metric]
-            metrics = metrics + task.evaluation_metrics if task.evaluation_metrics else metrics
-
-            for metric in metrics:
+            for metric in task.metrics:
                 recorder.record_data_info(f"{task.name}_{metric.name}_Threshold", str(metric.threshold))
 
         for mask, mask_type in [
@@ -431,13 +428,13 @@ class Evaluator:
                 predictions = model.predict_dataset(dataset=subset, mask=mask)
 
                 # We compute scores
-                scores = model.scores_dataset(dataset=subset, mask=mask, include_evaluation_metrics=True)
+                scores = model.scores_dataset(dataset=subset, mask=mask)
 
                 # We extract ids
                 ids = [subset.table_dataset.ids[i] for i in mask]
 
                 # We extract table targets and create tensors
-                targets = {task.name: [] for task in subset.tasks if task.task_type != TaskType.SEGMENTATION}
+                targets = {task.name: [] for task in subset.tasks if isinstance(task, SegmentationTask)}
                 for sample in subset[mask]:
                     for task_name in targets.keys():
                         targets[task_name].append(sample.y[task_name])
@@ -453,7 +450,7 @@ class Evaluator:
                         recorder.record_scores(score=score, metric=metric_name, mask_type=mask_type, task=task_name)
 
                 for task in subset.tasks:
-                    if task.task_type == TaskType.SEGMENTATION:
+                    if isinstance(task, SegmentationTask):
                         continue
 
                     pred = predictions[task.name]
@@ -461,9 +458,9 @@ class Evaluator:
                     if not is_tensor(pred):
                         pred = from_numpy(pred)
 
-                    if task.task_type == TaskType.CLASSIFICATION:
+                    if isinstance(task, ClassificationTask):
                         # We get the final predictions from the soft predictions
-                        pred = (pred >= task.optimization_metric.threshold).long()
+                        pred = (pred >= task.decision_threshold_metric.threshold).long()
 
                     # We save the predictions
                     recorder.record_predictions(

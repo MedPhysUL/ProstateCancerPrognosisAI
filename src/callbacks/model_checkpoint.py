@@ -3,12 +3,13 @@
     @Author:            Maxence Larose, Mehdi Mitiche, Nicolas Raymond
 
     @Creation Date:     12/2022
-    @Last modification: 12/2022
+    @Last modification: 01/2023
 
     @Description:       This file is used to define the 'Checkpoint' callback.
 """
 
 from enum import Enum
+from itertools import count
 import json
 import os
 import shutil
@@ -53,6 +54,8 @@ class ModelCheckpoint(Callback):
     This class is used to manage and create the checkpoints of a model.
     """
 
+    instance_counter = count()
+
     CHECKPOINT_METADATA_KEY: str = 'metadata'
     CHECKPOINT_BEST_KEY: str = "best"
     CHECKPOINT_EPOCHS_KEY: str = "epochs"
@@ -69,6 +72,7 @@ class ModelCheckpoint(Callback):
             save_best_only: bool = False,
             epoch_to_start_save: int = 0,
             verbose: bool = False,
+            name: Optional[str] = None,
             **kwargs
     ):
         """
@@ -86,10 +90,15 @@ class ModelCheckpoint(Callback):
             The epoch at which to start saving checkpoints.
         verbose : bool
             Whether to print out the trace of the checkpoint.
+        name : Optional[str]
+            The name of the callback.
         **kwargs : dict
             The keyword arguments to pass to the Callback.
         """
-        super().__init__(save_state=False, **kwargs)
+        self.instance_id = next(self.instance_counter)
+        name = name if name is not None else f"{self.__class__.__name__}({self.instance_id})"
+        super().__init__(name=name, save_state=False, **kwargs)
+
         os.makedirs(path_to_checkpoint_folder, exist_ok=True)
         self.path_to_checkpoint_folder = path_to_checkpoint_folder
         self.verbose = verbose

@@ -9,6 +9,7 @@
                         metrics values obtained during the training process.
 """
 
+from itertools import count
 import os
 from typing import Dict, List, Literal, Optional, Tuple, TypedDict, Union
 
@@ -35,11 +36,11 @@ class MeasurementsHistoryDict(TypedDict):
 
         Example (2 learning algorithms, 3 epochs) :
             multi_task_losses = {
-                "LearningAlgorithm_0": {
+                "LearningAlgorithm(0)": {
                     "mean_loss_without_regularization": [0.9, 0.7, 0.6],
                     "mean_loss_with_regularization": [1.1, 0.8, 0.7]
                 },
-                "LearningAlgorithm_1": {
+                "LearningAlgorithm(1)": {
                     "median_loss_without_regularization": [1.1, 0.8, 0.7],
                     "median_loss_with_regularization": [2, 1.5, 1.1]
                 },
@@ -51,10 +52,10 @@ class MeasurementsHistoryDict(TypedDict):
 
         Example (2 tasks, 3 epochs) :
             single_task_losses = {
-                "PN_classification": {
+                "ClassificationTask('target_column'='PN')": {
                     "BinaryBalancedAccuracy": [0.6, 0.5, 0.9]
                 },
-                "Prostate_segmentation": {
+                "SegmentationTask('modality'='CT', 'organ'='Prostate')": {
                     "DICELoss": [0.7, 0.76, 0.85]
                 },
             }
@@ -66,11 +67,11 @@ class MeasurementsHistoryDict(TypedDict):
         Example (2 tasks, 3 epochs) :
 
             metrics = {
-                "PN_classification": {
+                "ClassificationTask('target_column'='PN')": {
                     "Accuracy": [0.6, 0.5, 0.9],
                     "AUC": [0.6, 0.7, 0.75]
                 },
-                "Prostate_segmentation": {
+                "SegmentationTask('modality'='CT', 'organ'='Prostate')": {
                     "DICEMetric": [0.7, 0.76, 0.85]
                 },
             }
@@ -100,6 +101,8 @@ class TrainingHistory(Callback):
     This class is used to store losses and score metrics values obtained during the training process.
     """
 
+    instance_counter = count()
+
     TRAIN: Literal["train"] = r"train"
     VALID: Literal["valid"] = r"valid"
 
@@ -110,6 +113,7 @@ class TrainingHistory(Callback):
     def __init__(
             self,
             container: Optional[HistoryDict] = None,
+            name: Optional[str] = None,
             **kwargs
     ):
         """
@@ -119,10 +123,14 @@ class TrainingHistory(Callback):
         ----------
         container : Optional[History]
             History container.
+        name : Optional[str]
+            The name of the callback.
         **kwargs : dict
             The keyword arguments to pass to the Callback.
         """
-        super().__init__(**kwargs)
+        self.instance_id = next(self.instance_counter)
+        name = name if name is not None else f"{self.__class__.__name__}({self.instance_id})"
+        super().__init__(name=name, **kwargs)
 
         if container:
             self._container = container

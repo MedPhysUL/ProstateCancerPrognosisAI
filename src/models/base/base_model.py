@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     05/2022
-    @Last modification: 07/2022
+    @Last modification: 01/2023
 
     @Description:       This file contains an abstract model named BaseModel. All other models need to inherit from
                         this model to ensure consistency will all hyperparameters tuning functions.
@@ -159,8 +159,7 @@ class BaseModel(ABC):
     def scores(
             self,
             predictions: DataModel.y,
-            targets: DataModel.y,
-            include_evaluation_metrics: bool = False
+            targets: DataModel.y
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns the scores for all samples in a particular batch.
@@ -171,8 +170,6 @@ class BaseModel(ABC):
             Batch data items.
         targets : DataElement.y
             Batch data items.
-        include_evaluation_metrics: bool
-            Whether to fix the thresholds of evaluation metrics or not.
 
         Returns
         -------
@@ -185,8 +182,7 @@ class BaseModel(ABC):
     def scores_dataset(
             self,
             dataset: ProstateCancerDataset,
-            mask: List[int],
-            include_evaluation_metrics: bool = False
+            mask: List[int]
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns the score of all samples in a particular subset of the dataset, determined using a mask parameter.
@@ -197,8 +193,6 @@ class BaseModel(ABC):
             A prostate cancer dataset.
         mask : List[int]
             A list of dataset idx for which we want to obtain the mean score.
-        include_evaluation_metrics: bool
-            Whether to calculate the scores with the evaluation metrics or not.
 
         Returns
         -------
@@ -210,8 +204,7 @@ class BaseModel(ABC):
     @abstractmethod
     def fix_thresholds_to_optimal_values(
             self,
-            dataset: ProstateCancerDataset,
-            include_evaluation_metrics: bool = False
+            dataset: ProstateCancerDataset
     ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
@@ -220,7 +213,5 @@ class BaseModel(ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
-        include_evaluation_metrics: bool
-            Whether to calculate the scores with the evaluation metrics or not.
         """
         raise NotImplementedError

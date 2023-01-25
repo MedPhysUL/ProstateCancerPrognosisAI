@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     09/2022
-    @Last modification: 09/2022
+    @Last modification: 01/2023
 
     @Description:       This file contains an abstract class named TorchCustomModel from which all custom pytorch
                         models implemented for the project must inherit. This class allows to store common function of
@@ -33,7 +33,7 @@ from src.training.optimizer import SAM
 from src.utils.multi_task_losses import MultiTaskLoss
 from src.utils.reductions import MetricReduction
 from src.utils.score_metrics import Direction
-from src.utils.tasks import Task, TaskType
+from src.utils.tasks import ClassificationTask, SegmentationTask, Task
 from src.visualization.tools import visualize_epoch_progression
 
 
@@ -545,7 +545,7 @@ class TorchCustomModel(Module, ABC):
                 pred = self.predict(x)
 
                 for task in dataset.tasks:
-                    if task.task_type != TaskType.SEGMENTATION:
+                    if isinstance(task, SegmentationTask):
                         predictions_as_lists[task.name].append(pred[task.name])
 
         predictions = {task.name: stack(predictions_as_lists[task.name], dim=0) for task in dataset.tasks}
@@ -590,8 +590,7 @@ class TorchCustomModel(Module, ABC):
     def scores(
             self,
             predictions: DataModel.y,
-            targets: DataModel.y,
-            include_evaluation_metrics: bool = False
+            targets: DataModel.y
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns the scores for all samples in a particular batch.
@@ -602,8 +601,6 @@ class TorchCustomModel(Module, ABC):
             Batch data items.
         targets : DataElement.y
             Batch data items.
-        include_evaluation_metrics: bool
-            Whether to calculate the scores with the evaluation metrics or not.
 
         Returns
         -------
@@ -614,12 +611,8 @@ class TorchCustomModel(Module, ABC):
             scores = {}
             for task in self._tasks:
                 scores[task.name] = {}
-                metrics = [task.optimization_metric]
 
-                if include_evaluation_metrics and task.evaluation_metrics:
-                    metrics = metrics + task.evaluation_metrics
-
-                for metric in metrics:
+                for metric in task.metrics:
                     scores[task.name][metric.name] = metric(
                         np.array(predictions[task.name]), np.array(targets[task.name])
                     )
@@ -629,8 +622,7 @@ class TorchCustomModel(Module, ABC):
     def scores_dataset(
             self,
             dataset: ProstateCancerDataset,
-            mask: List[int],
-            include_evaluation_metrics: bool = False  # TODO : Remove this parameter (always set to True)
+            mask: List[int]
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns the score of all samples in a particular subset of the dataset, determined using a mask parameter.
@@ -641,8 +633,6 @@ class TorchCustomModel(Module, ABC):
             A prostate cancer dataset.
         mask : List[int]
             A list of dataset idx for which we want to obtain the mean score.
-        include_evaluation_metrics: bool
-            Whether to calculate the scores with the evaluation metrics or not.
 
         Returns
         -------
@@ -655,19 +645,15 @@ class TorchCustomModel(Module, ABC):
         scores = {task.name: {} for task in self.tasks}
         segmentation_scores_dict = {}
         for task in self.tasks:
-            if task.task_type == TaskType.SEGMENTATION:
+            if isinstance(task, SegmentationTask):
                 segmentation_scores_dict[task.name] = {}
 
-                metrics = [task.optimization_metric]
-                if include_evaluation_metrics and task.evaluation_metrics:
-                    metrics = metrics + task.evaluation_metrics
-
-                for metric in metrics:
+                for metric in task.metrics:
                     segmentation_scores_dict[task.name][metric.name] = []
 
         non_segmentation_outputs_dict = {
             task.name: Output(predictions=[], targets=[])
-            for task in self.tasks if task.task_type != TaskType.SEGMENTATION
+            for task in self.tasks if isinstance(task, SegmentationTask)
         }
 
         # Set model for evaluation
@@ -682,12 +668,9 @@ class TorchCustomModel(Module, ABC):
                 for task in self.tasks:
                     pred, target = predictions[task.name], y[task.name]
 
-                    if task.task_type == TaskType.SEGMENTATION:
-                        metrics = [task.optimization_metric]
-                        if include_evaluation_metrics and task.evaluation_metrics:
-                            metrics = metrics + task.evaluation_metrics
+                    if isinstance(task, SegmentationTask):
 
-                        for metric in metrics:
+                        for metric in task.metrics:
                             segmentation_scores_dict[task.name][metric.name].append(
                                 metric(pred, target, MetricReduction.NONE)
                             )
@@ -696,26 +679,21 @@ class TorchCustomModel(Module, ABC):
                         non_segmentation_outputs_dict[task.name].targets.append(target.item())
 
             for task in self.tasks:
-                metrics = [task.optimization_metric]
-                if include_evaluation_metrics and task.evaluation_metrics:
-                    metrics = metrics + task.evaluation_metrics
-
-                if task.task_type == TaskType.SEGMENTATION:
-                    for metric in metrics:
+                if isinstance(task, SegmentationTask):
+                    for metric in task.metrics:
                         scores[task.name][metric.name] = metric.perform_reduction(
                             FloatTensor(segmentation_scores_dict[task.name][metric.name])
                         )
                 else:
                     output = non_segmentation_outputs_dict[task.name]
-                    for metric in metrics:
+                    for metric in task.metrics:
                         scores[task.name][metric.name] = metric(np.array(output.predictions), np.array(output.targets))
 
         return scores
 
     def fix_thresholds_to_optimal_values(
             self,
-            dataset: ProstateCancerDataset,
-            include_evaluation_metrics: bool = False  # TODO : Remove this parameter (always set to True)
+            dataset: ProstateCancerDataset
     ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
@@ -724,15 +702,13 @@ class TorchCustomModel(Module, ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
-        include_evaluation_metrics: bool
-            Whether to fix the thresholds of evaluation metrics or not.
         """
         subset = dataset[dataset.train_mask]
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
 
         thresholds = np.linspace(start=0.01, stop=0.95, num=95)
 
-        classification_tasks = [task for task in self.tasks if task.task_type == TaskType.CLASSIFICATION]
+        classification_tasks = [task for task in self.tasks if isinstance(task, ClassificationTask)]
         outputs_dict = {task.name: Output(predictions=[], targets=[]) for task in classification_tasks}
 
         # Set model for evaluation
@@ -752,12 +728,8 @@ class TorchCustomModel(Module, ABC):
 
             for task in classification_tasks:
                 output = outputs_dict[task.name]
-                metrics = [task.optimization_metric]
 
-                if include_evaluation_metrics and task.evaluation_metrics:
-                    metrics = metrics + task.evaluation_metrics
-
-                for metric in metrics:
+                for metric in task.metrics:
                     scores = np.array(
                         [metric(np.array(output.predictions), np.array(output.targets), t) for t in thresholds]
                     )

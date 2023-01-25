@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     10/2022
-    @Last modification: 12/2022
+    @Last modification: 01/2023
 
     @Description:       This file is used to define the Callback abstract class. A lot of the logic behind the
                         following code is borrowed from PyTorch Lightning
@@ -69,13 +69,11 @@ class Callback(ABC):
         - `on_tuning_end`
     """
 
-    instance_counter = 0
-
     UNSERIALIZABLE_ATTRIBUTES = ["trainer", "tuner"]
 
     def __init__(
             self,
-            name: Optional[str] = None,
+            name: str,
             save_state: bool = True,
             load_state: Optional[bool] = None
     ):
@@ -86,17 +84,14 @@ class Callback(ABC):
         ----------
         name : str
             The name of the callback.
-        save_state :
+        save_state : bool
             Whether to save the state of the callback in the checkpoint file. Default is True.
-        load_state:
+        load_state : Optional[bool]
             Whether to load from the checkpoint file. Default is equal to save_state.
         """
-        self.instance_id = self.instance_counter
-        self.name = name if name is not None else f"{self.__class__.__name__}_{self.instance_id}"
-        self.__class__.instance_counter += 1
-
-        self.save_state = save_state
         self.load_state = load_state if load_state is not None else save_state
+        self.name = name
+        self.save_state = save_state
         self.trainer = None
         self.tuner = None
 
@@ -108,7 +103,7 @@ class Callback(ABC):
 
         Returns
         -------
-        priority: int
+        priority : int
             Callback priority.
         """
         raise NotImplementedError

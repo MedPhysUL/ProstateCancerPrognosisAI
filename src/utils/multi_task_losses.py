@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     09/2022
-    @Last modification: 12/2022
+    @Last modification: 01/2023
 
     @Description:       This file is used to define the multi-task losses used to measure models' performance. The
                         ultimate goal is to implement a loss based on uncertainty. See :
@@ -42,7 +42,7 @@ class MultiTaskLoss(ABC):
             Tasks to include in the multi-task loss calculation. By default, we use all available tasks.
         """
         # Protected attributes
-        self._name = name
+        self._name = name if name is not None else f"{self.__class__.__name__}"
         self._tasks = tasks
 
     @property
@@ -106,6 +106,7 @@ class MeanLoss(MultiTaskLoss):
 
     def __init__(
             self,
+            name: Optional[str] = None,
             tasks: Optional[List[Task]] = None
     ):
         """
@@ -113,10 +114,12 @@ class MeanLoss(MultiTaskLoss):
 
         Parameters
         ----------
+        name : Optional[str]
+            Name of the multi-task loss.
         tasks : Optional[List[Task]]
             Tasks to include in the multi-task loss calculation. By default, we use all available tasks.
         """
-        super().__init__(name="MeanLoss", tasks=tasks)
+        super().__init__(name=name, tasks=tasks)
 
     def _compute_loss(
             self,

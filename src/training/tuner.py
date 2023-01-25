@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Mehdi Mitiche, Nicolas Raymond
 
     @Creation Date:     05/2022
-    @Last modification: 08/2022
+    @Last modification: 01/2023
 
     @Description:       This file is used to define the Objective and Tuner classes used for hyperparameter tuning
                         using https://dl.acm.org/doi/10.1145/3377930.3389817.
@@ -290,7 +290,7 @@ class Objective:
             test_set_scores = model.scores_dataset(dataset=dts, mask=dts.test_mask)
 
             # We retrieve the score associated to the optimization metric
-            scores = [test_set_scores[task.name][task.optimization_metric.name] for task in dts.tasks]
+            scores = [test_set_scores[task.name][task.hps_tuning_metric.name] for task in dts.tasks]
 
             return scores
 
@@ -397,7 +397,7 @@ class Tuner:
         study : Study
             Study object.
         """
-        directions = [task.optimization_metric.direction for task in self._objective.dataset.tasks]
+        directions = [task.hps_tuning_metric.direction for task in self._objective.dataset.tasks]
 
         study = create_study(
             directions=directions,
@@ -441,7 +441,7 @@ class Tuner:
                 target_name=task.name
             )
 
-            if task.optimization_metric.direction == Direction.MAXIMIZE.value:
+            if task.hps_tuning_metric.direction == Direction.MAXIMIZE.value:
                 fig.data[0]["line"].reversescale = False
 
             # We save the graph

@@ -78,20 +78,20 @@ MODALITIES = {"CT"}
 # TASKS
 TABLE_TASKS = [
     ClassificationTask(
-        target_col=PN,
-        optimization_metric=BinaryBalancedAccuracy(),
+        target_column=PN,
+        hps_tuning_metric=BinaryBalancedAccuracy(),
         criterion=BinaryCrossEntropyWithLogitsLoss()
     ),
     ClassificationTask(
-        target_col=BCR,
-        optimization_metric=BinaryBalancedAccuracy(),
+        target_column=BCR,
+        hps_tuning_metric=BinaryBalancedAccuracy(),
         criterion=BinaryCrossEntropyWithLogitsLoss()
     )
 ]
 IMAGE_TASKS = [
     SegmentationTask(
         criterion=DICELoss(),
-        optimization_metric=DICEMetric(),
+        hps_tuning_metric=DICEMetric(),
         organ="Prostate",
         modality="CT"
     )

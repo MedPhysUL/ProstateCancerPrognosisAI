@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Nicolas Raymond, Mehdi Mitiche
 
     @Creation Date:     09/2022
-    @Last modification: 09/2022
+    @Last modification: 01/2023
 
     @Description:       This file is used to define an MLP model with entity embeddings. These models are not shaped
                         to inherit from the BaseModel class. However, two wrapper classes for torch models are provided
@@ -23,7 +23,7 @@ from src.models.base.custom_torch_base import TorchCustomModel
 from src.models.base.blocks.encoders import MLPEncodingBlock
 from src.training.early_stopper import EarlyStopper, EarlyStopperType
 from src.utils.multi_task_losses import MultiTaskLoss
-from src.utils.tasks import TaskType
+from src.utils.tasks import ClassificationTask, RegressionTask
 
 
 class MLPBaseModel(TorchCustomModel):
@@ -133,7 +133,7 @@ class MLPBaseModel(TorchCustomModel):
             self.fix_thresholds_to_optimal_values(dataset=self._dataset)
             scores = self.scores_dataset(dataset=self._dataset, mask=self._dataset.train_mask)
             epoch_scores = {
-                task.name: scores[task.name][task.optimization_metric.name]
+                task.name: scores[task.name][task.hps_tuning_metric.name]
                 for task in self._dataset.tasks
             }
         else:
@@ -208,7 +208,7 @@ class MLPBaseModel(TorchCustomModel):
         if self._calculate_epoch_score:
             scores = self.scores_dataset(dataset=self._dataset, mask=self._dataset.valid_mask)
             epoch_scores = {
-                task.name: scores[task.name][task.optimization_metric.name]
+                task.name: scores[task.name][task.hps_tuning_metric.name]
                 for task in self._dataset.tasks
             }
         else:
@@ -323,9 +323,9 @@ class MLPBaseModel(TorchCustomModel):
             outputs = self(x)
 
             for task in self.tasks:
-                if task.task_type == TaskType.CLASSIFICATION:
+                if isinstance(task, ClassificationTask):
                     predictions[task.name] = sigmoid(outputs[task.name])
-                elif task.task_type == TaskType.REGRESSION:
+                elif isinstance(task, RegressionTask):
                     predictions[task.name] = outputs[task.name]
 
         return predictions

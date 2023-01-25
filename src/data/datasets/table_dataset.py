@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     05/2022
-    @Last modification: 07/2022
+    @Last modification: 01/2023
 
     @Description:       This file contains a custom torch dataset named TableDataset. We follow
                         https://ieeexplore.ieee.org/document/8892612 setting for multi-output learning. This class
@@ -22,7 +22,7 @@ from torch.utils.data import Dataset
 from src.data.processing.preprocessing import preprocess_categoricals, preprocess_continuous
 from src.data.processing.tools import MaskType
 from src.data.processing.transforms import CategoricalTransform as CaT
-from src.utils.tasks import ClassificationTask, TableTask, TaskType
+from src.utils.tasks import ClassificationTask, TableTask
 
 
 class TableDataModel(NamedTuple):
@@ -88,7 +88,7 @@ class TableDataset(Dataset):
         self._ids_to_row_idx = {id_: i for i, id_ in enumerate(self._ids)}
         self._n = df.shape[0]
         self._original_data = df
-        self._target_cols = [task.target_col for task in tasks]
+        self._target_cols = [task.target_column for task in tasks]
         self._to_tensor = to_tensor
         self._train_mask, self._valid_mask, self._test_mask = [], None, []
         self._x_cat, self._x_cont = None, None
@@ -549,19 +549,14 @@ class TableDataset(Dataset):
         Sets scaling factor of all classification tasks.
         """
         for idx, task in enumerate(self.tasks):
-            if task.task_type == TaskType.CLASSIFICATION:
+            if isinstance(task, ClassificationTask):
                 # We set the scaling factors of all metrics
-                metrics = [task.optimization_metric]
-                metrics = metrics + task.evaluation_metrics if task.evaluation_metrics else metrics
-
-                for metric in metrics:
-                    metric.scaling_factor = metric.get_scaling_factor(y_train=self.y[self.train_mask, idx])
+                for metric in task.metrics:
+                    metric.update_scaling_factor(y_train=self.y[self.train_mask, idx])
 
                 # We set the scaling factor of the criterion
                 if task.criterion:
-                    task.criterion.scaling_factor = task.criterion.get_scaling_factor(
-                        y_train=self.y[self.train_mask, idx]
-                    )
+                    task.criterion.update_scaling_factor(y_train=self.y[self.train_mask, idx])
 
     def _numerical_setter(
             self,
@@ -827,7 +822,7 @@ class TableDataset(Dataset):
         targets = []
         for task in tasks:
             # Set targets protected attribute according to task
-            t = self.original_data[task.target_col].to_numpy(dtype=float)
+            t = self.original_data[task.target_column].to_numpy(dtype=float)
 
             if (not isinstance(task, ClassificationTask)) and target_to_tensor:
                 t = from_numpy(t).float()

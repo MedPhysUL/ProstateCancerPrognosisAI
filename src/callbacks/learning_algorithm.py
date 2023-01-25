@@ -9,6 +9,7 @@
                         parameters during the training process.
 """
 
+from itertools import count
 from typing import Dict, Iterable, Optional, Union
 
 from torch import Tensor
@@ -22,10 +23,13 @@ from src.utils.multi_task_losses import MultiTaskLoss
 
 class LearningAlgorithm(Callback):
 
+    instance_counter = count()
+
     def __init__(
             self,
             criterion: MultiTaskLoss,
             optimizer: Optimizer,
+            name: Optional[str] = None,
             regularization: Optional[Union[Regularization, RegularizationList, Iterable[Regularization]]] = None,
             **kwargs
     ):
@@ -38,10 +42,14 @@ class LearningAlgorithm(Callback):
             Multi-task loss.
         optimizer : Optimizer
             A pytorch Optimizer.
+        name : Optional[str]
+            The name of the callback.
         regularization : Optional[Union[Regularization, RegularizationList, Iterable[Regularization]]]
             Regularization.
         """
-        super().__init__(**kwargs)
+        self.instance_id = next(self.instance_counter)
+        name = name if name is not None else f"{self.__class__.__name__}({self.instance_id})"
+        super().__init__(name=name, **kwargs)
 
         self.criterion = criterion
         self.optimizer = optimizer
