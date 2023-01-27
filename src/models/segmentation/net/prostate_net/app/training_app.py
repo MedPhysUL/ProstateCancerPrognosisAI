@@ -38,24 +38,24 @@ if __name__ == '__main__':
     set_determinism(seed=1010710)
 
     writer = SummaryWriter(
-        log_dir='/src/models/segmentation/net/prostate_net/saved_parameters'
+        log_dir='../saved_parameters'
     )
 
     # Parameters for Training (part 1 of 2)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     num_workers = 0
     num_val = 40
-    batch_size = 4
+    batch_size = 4  # TODO
     num_epochs = 100
 
     # Transformations
     transformations = Compose([
         EnsureChannelFirstd(keys=['CT', 'Prostate_segmentation']),
-        CenterSpatialCropd(keys=['CT', 'Prostate_segmentation'], roi_size=(1000, 160, 160)),
-        ThresholdIntensityd(keys=['img'], threshold=-250, above=True, cval=-250),
-        ThresholdIntensityd(keys=['img'], threshold=500, above=False, cval=500),
-        HistogramNormalized(keys=['img'], num_bins=751, min=0, max=1),
-        KeepLargestConnectedComponentd(keys=['seg']),
+        # CenterSpatialCropd(keys=['CT', 'Prostate_segmentation'], roi_size=(1000, 160, 160)), TODO
+        # ThresholdIntensityd(keys=['img'], threshold=-250, above=True, cval=-250),
+        # ThresholdIntensityd(keys=['img'], threshold=500, above=False, cval=500),
+        # HistogramNormalized(keys=['img'], num_bins=751, min=0, max=1),
+        # KeepLargestConnectedComponentd(keys=['seg']),
         ToTensord(keys=['CT', 'Prostate_segmentation'], dtype=torch.float32)
     ])
 
@@ -185,12 +185,12 @@ if __name__ == '__main__':
         # Save Best Parameters
         if epoch_val_metrics_avg[-1] > best_metric_avg:
             best_metric_avg = epoch_val_metrics_avg[-1]
-            torch.save(net.state_dict(), '/src/models/segmentation/net/prostate_net/saved_parameters/best_parameters_avg.pt')
+            torch.save(net.state_dict(), '../saved_parameters/best_parameters_avg.pt')
             print(f"New best metric avg: {best_metric_avg}")
 
         if epoch_val_metrics_avg_plus_min[-1] > best_metric_avg_plus_min:
             best_metric_avg_plus_min = epoch_val_metrics_avg_plus_min[-1]
-            torch.save(net.state_dict(), '/src/models/segmentation/net/prostate_net/saved_parameters/best_parameters_avg_plus_min.pt')
+            torch.save(net.state_dict(), '../saved_parameters/best_parameters_avg_plus_min.pt')
             print(f"New best metric avg+min: {best_metric_avg_plus_min}")
 
         writer.add_scalar('Average validation loss per epoch', epoch_val_losses[-1], epoch + 1)
