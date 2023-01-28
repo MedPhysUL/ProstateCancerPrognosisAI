@@ -103,8 +103,8 @@ class TrainingHistory(Callback):
 
     instance_counter = count()
 
-    TRAIN: Literal["train"] = r"train"
-    VALID: Literal["valid"] = r"valid"
+    TRAIN: Literal["train"] = "train"
+    VALID: Literal["valid"] = "valid"
 
     MULTI_TASK_LOSSES: Literal["multi_task_losses"] = "multi_task_losses"
     SINGLE_TASK_LOSSES: Literal["multi_task_losses"] = "single_task_losses"
