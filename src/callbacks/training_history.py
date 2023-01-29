@@ -37,12 +37,12 @@ class MeasurementsHistoryDict(TypedDict):
         Example (2 learning algorithms, 3 epochs) :
             multi_task_losses = {
                 "LearningAlgorithm(0)": {
-                    "mean_loss_without_regularization": [0.9, 0.7, 0.6],
-                    "mean_loss_with_regularization": [1.1, 0.8, 0.7]
+                    "MeanLoss('regularization'=False)": [0.9, 0.7, 0.6],
+                    "MeanLoss('regularization'=True)": [1.1, 0.8, 0.7]
                 },
                 "LearningAlgorithm(1)": {
-                    "median_loss_without_regularization": [1.1, 0.8, 0.7],
-                    "median_loss_with_regularization": [2, 1.5, 1.1]
+                    "MedianLoss('regularization'=False)": [1.1, 0.8, 0.7],
+                    "MedianLoss('regularization'=True)": [2, 1.5, 1.1]
                 },
             }
 
@@ -53,10 +53,10 @@ class MeasurementsHistoryDict(TypedDict):
         Example (2 tasks, 3 epochs) :
             single_task_losses = {
                 "ClassificationTask('target_column'='PN')": {
-                    "BinaryBalancedAccuracy": [0.6, 0.5, 0.9]
+                    "BinaryBalancedAccuracy('reduction'='mean')": [0.6, 0.5, 0.9]
                 },
                 "SegmentationTask('modality'='CT', 'organ'='Prostate')": {
-                    "DICELoss": [0.7, 0.76, 0.85]
+                    "DICELoss('reduction'='mean')": [0.7, 0.76, 0.85]
                 },
             }
 
@@ -68,11 +68,11 @@ class MeasurementsHistoryDict(TypedDict):
 
             metrics = {
                 "ClassificationTask('target_column'='PN')": {
-                    "Accuracy": [0.6, 0.5, 0.9],
-                    "AUC": [0.6, 0.7, 0.75]
+                    "BinaryBalancedAccuracy('reduction'='mean')": [0.6, 0.5, 0.9],
+                    "AUC('reduction'='none')": [0.6, 0.7, 0.75]
                 },
                 "SegmentationTask('modality'='CT', 'organ'='Prostate')": {
-                    "DICEMetric": [0.7, 0.76, 0.85]
+                    "DICEMetric('reduction'='mean')": [0.7, 0.76, 0.85]
                 },
             }
     """
@@ -132,18 +132,7 @@ class TrainingHistory(Callback):
         name = name if name is not None else f"{self.__class__.__name__}({self.instance_id})"
         super().__init__(name=name, **kwargs)
 
-        if container:
-            self._container = container
-        else:
-            empty_measure = MeasurementsHistoryDict(
-                multi_task_losses={},
-                single_task_metrics={},
-                single_task_losses={}
-            )
-            self._container = HistoryDict(
-                train=empty_measure,
-                valid=empty_measure
-            )
+        self._container = container if container else self._get_empty_container()
 
     def __getitem__(self, item: Union[str, int, slice]) -> dict:
         if isinstance(item, str):
@@ -207,6 +196,19 @@ class TrainingHistory(Callback):
             Validation set history.
         """
         return self._container[self.VALID]
+
+    @staticmethod
+    def _get_empty_container() -> HistoryDict:
+        """
+        Gets empty history container.
+
+        Returns
+        -------
+        container : HistoryDict
+            History container
+        """
+        empty_measure = MeasurementsHistoryDict(multi_task_losses={}, single_task_metrics={}, single_task_losses={})
+        return HistoryDict(train=empty_measure, valid=empty_measure)
 
     def _get_state(self, container: dict, idx: Union[int, slice]) -> dict:
         """
