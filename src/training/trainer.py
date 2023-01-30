@@ -108,7 +108,7 @@ class Trainer:
         else:
             self._model_checkpoint = None
 
-    def _checks_if_training_can_be_stopped(self):
+    def _check_if_training_can_be_stopped(self):
         if not self.training_state.stop_training_flag:
             self.training_state.stop_training_flag = all(
                 learning_algorithm.stopped for learning_algorithm in self.learning_algorithms
@@ -272,7 +272,7 @@ class Trainer:
             postfix.update(self.callbacks.on_progress_bar_update(self))
             progress_bar.set_postfix(postfix)
 
-            self._checks_if_training_can_be_stopped()
+            self._check_if_training_can_be_stopped()
             if self.training_state.stop_training_flag:
                 progress_bar.set_postfix(dict(**{"stop_flag": "True"}, **postfix))
                 break
