@@ -21,7 +21,7 @@ class Trainer:
     def __init__(
             self,
             model: BaseModel,
-            callbacks: Optional[Union[Callback, CallbackList, List[Callback]]] = None,
+            callbacks: Union[Callback, CallbackList, List[Callback]],
             device: Optional[torch_device] = None,
             verbose: bool = True,
             **kwargs
@@ -31,7 +31,7 @@ class Trainer:
         """
         assert model.is_built, "Model must be built before training"
         self.model = model
-        self.callbacks = self._get_initialized_callbacks(callbacks)
+        self.callbacks = callbacks
         self.sort_callbacks()
         self.device = device if device else model.device
         self.verbose = verbose
@@ -60,40 +60,53 @@ class Trainer:
         return self._force_overwrite
 
     @property
-    def training_history(self) -> TrainingHistory:
-        training_histories = list(filter(lambda x: isinstance(x, TrainingHistory), self.callbacks))
-        assert len(training_histories) == 1, "There should be one and only one `TrainingHistory` callback."
+    def callbacks(self) -> CallbackList:
+        return self._callbacks
 
-        return training_histories[0]
-
-    @property
-    def learning_algorithms(self) -> List[LearningAlgorithm]:
-        learning_algorithms = list(filter(lambda x: isinstance(x, LearningAlgorithm), self.callbacks))
-        assert learning_algorithms, "There should be at least one `LearningAlgorithm` callback."
-
-        return learning_algorithms
-
-    @property
-    def model_checkpoint(self) -> Optional[ModelCheckpoint]:
-        model_checkpoints = list(filter(lambda x: isinstance(x, ModelCheckpoint), self.callbacks))
-
-        if model_checkpoints:
-            assert len(model_checkpoints) == 1, "There should be a single `ModelCheckpoint` callback, if there is one."
-            return model_checkpoints[0]
-        else:
-            return None
-
-    @staticmethod
-    def _get_initialized_callbacks(
-            callbacks: Optional[Union[Callback, CallbackList, List[Callback]]]
-    ) -> CallbackList:
-        if callbacks is None:
-            callbacks = []
+    @callbacks.setter
+    def callbacks(self, callbacks: Union[Callback, CallbackList, List[Callback]]):
+        if not isinstance(callbacks, (Callback, CallbackList, list)):
+            raise AssertionError("'callbacks must be of type 'Callback', 'CallbackList' or 'List[Callback]'.")
         if isinstance(callbacks, Callback):
             callbacks = [callbacks]
         if not any([isinstance(callback, TrainingHistory) for callback in callbacks]):
             callbacks.append(TrainingHistory())
-        return CallbackList(callbacks)
+
+        self._callbacks = CallbackList(callbacks)
+
+        self._set_training_history()
+        self._set_learning_algorithms()
+        self._set_model_checkpoint()
+
+    @property
+    def training_history(self) -> TrainingHistory:
+        return self._training_history
+
+    def _set_training_history(self):
+        training_histories = list(filter(lambda x: isinstance(x, TrainingHistory), self.callbacks))
+        assert len(training_histories) == 1, "There should be one and only one `TrainingHistory` callback."
+        self._training_history = training_histories[0]
+
+    @property
+    def learning_algorithms(self) -> List[LearningAlgorithm]:
+        return self._learning_algorithms
+
+    def _set_learning_algorithms(self):
+        learning_algorithms = list(filter(lambda x: isinstance(x, LearningAlgorithm), self.callbacks))
+        assert learning_algorithms, "There should be at least one `LearningAlgorithm` callback."
+        self._learning_algorithms = learning_algorithms
+
+    @property
+    def model_checkpoint(self) -> Optional[ModelCheckpoint]:
+        return self._model_checkpoint
+
+    def _set_model_checkpoint(self):
+        model_checkpoints = list(filter(lambda x: isinstance(x, ModelCheckpoint), self.callbacks))
+        if model_checkpoints:
+            assert len(model_checkpoints) == 1, "There should be a single `ModelCheckpoint` callback, if there is one."
+            self._model_checkpoint = model_checkpoints[0]
+        else:
+            self._model_checkpoint = None
 
     def _checks_if_training_can_be_stopped(self):
         if not self.training_state.stop_training_flag:
