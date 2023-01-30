@@ -62,20 +62,23 @@ class Trainer:
     @property
     def training_history(self) -> TrainingHistory:
         training_histories = list(filter(lambda x: isinstance(x, TrainingHistory), self.callbacks))
-        assert len(training_histories) == 1, "There should be one and only one 'TrainingHistory' callback."
+        assert len(training_histories) == 1, "There should be one and only one `TrainingHistory` callback."
 
         return training_histories[0]
 
     @property
-    def learning_algorithms(self) -> CallbackList:
-        return CallbackList(list(filter(lambda x: isinstance(x, LearningAlgorithm), self.callbacks)))
+    def learning_algorithms(self) -> List[LearningAlgorithm]:
+        learning_algorithms = list(filter(lambda x: isinstance(x, LearningAlgorithm), self.callbacks))
+        assert learning_algorithms, "There should be at least one `LearningAlgorithm` callback."
+
+        return learning_algorithms
 
     @property
     def model_checkpoint(self) -> Optional[ModelCheckpoint]:
         model_checkpoints = list(filter(lambda x: isinstance(x, ModelCheckpoint), self.callbacks))
 
         if model_checkpoints:
-            assert len(model_checkpoints) == 1, "There should be a single 'ModelCheckpoint' callback, if there is one."
+            assert len(model_checkpoints) == 1, "There should be a single `ModelCheckpoint` callback, if there is one."
             return model_checkpoints[0]
         else:
             return None
@@ -91,6 +94,12 @@ class Trainer:
         if not any([isinstance(callback, TrainingHistory) for callback in callbacks]):
             callbacks.append(TrainingHistory())
         return CallbackList(callbacks)
+
+    def _checks_if_training_can_be_stopped(self):
+        if not self.training_state.stop_training_flag:
+            self.training_state.stop_training_flag = all(
+                learning_algorithm.stopped for learning_algorithm in self.learning_algorithms
+            )
 
     def sort_callbacks(self):
         """
@@ -110,6 +119,7 @@ class Trainer:
             checkpoint = self.model_checkpoint.current_checkpoint
             if checkpoint:
                 self.callbacks.load_checkpoint_state(self, checkpoint)
+                self.model.load_checkpoint_state(checkpoint)
 
     @staticmethod
     def _create_train_dataloader(
@@ -213,7 +223,6 @@ class Trainer:
 
         self.sort_callbacks()
         self.callbacks.on_fit_start(self)
-
         self.load_state()
         if self.epoch_state.idx is None:
             self.epoch_state.idx = 0
@@ -249,6 +258,8 @@ class Trainer:
             postfix = self.epoch_state.as_dict()
             postfix.update(self.callbacks.on_progress_bar_update(self))
             progress_bar.set_postfix(postfix)
+
+            self._checks_if_training_can_be_stopped()
             if self.training_state.stop_training_flag:
                 progress_bar.set_postfix(dict(**{"stop_flag": "True"}, **postfix))
                 break

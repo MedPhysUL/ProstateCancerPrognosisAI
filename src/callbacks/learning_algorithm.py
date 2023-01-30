@@ -17,7 +17,20 @@ from torch.optim import Optimizer
 
 from src.callbacks.callback import Callback, Priority
 from src.callbacks.utils.regularization import Regularization, RegularizationList
+from src.callbacks.utils.early_stopper import EarlyStopper
 from src.utils.multi_task_losses import MultiTaskLoss
+
+
+def _pass_if_stopped(_func):
+    def wrapper(*args, **kwargs):
+        self = args[0]
+
+        if self.stopped:
+            pass
+        else:
+            return _func(*args, **kwargs)
+
+    return wrapper
 
 
 class LearningAlgorithm(Callback):
@@ -31,6 +44,7 @@ class LearningAlgorithm(Callback):
             self,
             criterion: MultiTaskLoss,
             optimizer: Optimizer,
+            early_stopper: Optional[EarlyStopper] = None,
             lr_scheduler: Optional[object] = None,
             name: Optional[str] = None,
             regularization: Optional[Union[Regularization, RegularizationList, Iterable[Regularization]]] = None,
@@ -57,9 +71,16 @@ class LearningAlgorithm(Callback):
         super().__init__(name=name, **kwargs)
 
         self.criterion = criterion
+        self.early_stopper = early_stopper
         self.lr_scheduler = lr_scheduler
         self.optimizer = optimizer
         self.regularization = regularization
+
+        self._stopped = False
+
+    @property
+    def stopped(self) -> bool:
+        return self._stopped
 
     @property
     def priority(self) -> int:
@@ -199,6 +220,7 @@ class LearningAlgorithm(Callback):
 
         return loss_with_regularization if loss_with_regularization else loss_without_regularization
 
+    @_pass_if_stopped
     def on_fit_start(self, trainer, **kwargs):
         """
         Sets criterion tasks.
@@ -212,6 +234,8 @@ class LearningAlgorithm(Callback):
         """
         if self.criterion.tasks is None:
             self.criterion.tasks = trainer.training_state.tasks
+
+        self.early_stopper.on_fit_start(self)
 
     def _optimizer_step(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor], trainer):
         """
@@ -237,6 +261,7 @@ class LearningAlgorithm(Callback):
         self.optimizer.step()
         batch_loss.detach_()
 
+    @_pass_if_stopped
     def on_optimization_start(self, trainer, **kwargs):
         """
         Calculates loss and update 'batch_loss' value in trainer state.
@@ -252,6 +277,7 @@ class LearningAlgorithm(Callback):
         y_batch = trainer.batch_state.y
         self._optimizer_step(pred_batch, y_batch, trainer)
 
+    @_pass_if_stopped
     def on_optimization_end(self, trainer, **kwargs):
         """
         Sets the gradients of all optimized Tensors to zero.
@@ -265,6 +291,7 @@ class LearningAlgorithm(Callback):
         """
         self.optimizer.zero_grad()
 
+    @_pass_if_stopped
     def on_validation_batch_end(self, trainer, **kwargs):
         """
         Calculates validation loss and update 'batch_loss' value in trainer state.
@@ -280,6 +307,7 @@ class LearningAlgorithm(Callback):
         y_batch = trainer.batch_state.y
         self._compute_loss(pred_batch, y_batch, trainer)
 
+    @_pass_if_stopped
     def on_epoch_end(self, trainer, **kwargs):
         """
         Performs a learning rate scheduler step.
@@ -293,3 +321,9 @@ class LearningAlgorithm(Callback):
         """
         if self.lr_scheduler:
             self.lr_scheduler.step()
+
+        early_stop = self.early_stopper(trainer.epoch_state)
+
+        if early_stop:
+            self._stopped = True
+            self.early_stopper.print_early_stopping_message(trainer.epoch_state)
