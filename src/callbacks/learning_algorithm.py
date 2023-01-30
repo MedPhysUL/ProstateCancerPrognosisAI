@@ -16,7 +16,6 @@ from torch import Tensor
 from torch.optim import Optimizer
 
 from src.callbacks.callback import Callback, Priority
-from src.callbacks.model_checkpoint import ModelCheckpoint
 from src.callbacks.utils.regularization import Regularization, RegularizationList
 from src.utils.multi_task_losses import MultiTaskLoss
 
@@ -24,6 +23,8 @@ from src.utils.multi_task_losses import MultiTaskLoss
 class LearningAlgorithm(Callback):
 
     instance_counter = count()
+
+    CHECKPOINT_OPTIMIZER_STATE_KEY = "optimizer_state"
 
     def __init__(
             self,
@@ -92,7 +93,7 @@ class LearningAlgorithm(Callback):
         """
         if self.save_state:
             state = checkpoint.get(self.name, {})
-            optimizer_state = state.get(ModelCheckpoint.CHECKPOINT_OPTIMIZER_STATE_KEY, None)
+            optimizer_state = state.get(self.CHECKPOINT_OPTIMIZER_STATE_KEY, None)
             if optimizer_state is not None:
                 self.optimizer.load_state_dict(optimizer_state)
 
@@ -112,9 +113,7 @@ class LearningAlgorithm(Callback):
         """
         if self.save_state:
             if self.optimizer is not None:
-                return {
-                    ModelCheckpoint.CHECKPOINT_OPTIMIZER_STATE_KEY: self.optimizer.state_dict()
-                }
+                return {self.CHECKPOINT_OPTIMIZER_STATE_KEY: self.optimizer.state_dict()}
 
         return None
 
@@ -198,10 +197,8 @@ class LearningAlgorithm(Callback):
         kwargs : dict
             Keyword arguments.
         """
-        tasks = trainer.training_state.tasks
-
         if self.criterion.tasks is None:
-            self.criterion.tasks = tasks
+            self.criterion.tasks = trainer.training_state.tasks
 
     def _optimizer_step(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor], trainer):
         """
