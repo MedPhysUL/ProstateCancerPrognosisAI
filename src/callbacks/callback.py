@@ -363,9 +363,3 @@ class Callback(ABC):
             The trainer.
         """
         return {}
-
-    def __del__(self):
-        """
-        Delete instance.
-        """
-        self.__class__.instance_counter -= 1
