@@ -121,8 +121,8 @@ class BatchesState(BaseState):
 @dataclass
 class EpochState(BaseState):
 
-    _SUFFIX_WITH_REGULARIZATION = "('regularization'=True)"
-    _SUFFIX_WITHOUT_REGULARIZATION = "('regularization'=False)"
+    SUFFIX_WITH_REGULARIZATION = "('regularization'=True)"
+    SUFFIX_WITHOUT_REGULARIZATION = "('regularization'=False)"
 
     """
     This class is used to store the current epoch state.
@@ -171,11 +171,11 @@ class EpochState(BaseState):
         for algo_name, v in batches_state.multi_task_losses_without_regularization.items():
             multi_task_losses[algo_name] = {}
             for loss_name, loss_value in v.items():
-                multi_task_losses[algo_name][f"{loss_name}{self._SUFFIX_WITHOUT_REGULARIZATION}"] = loss_value
+                multi_task_losses[algo_name][f"{loss_name}{self.SUFFIX_WITHOUT_REGULARIZATION}"] = loss_value
 
                 if batches_state.multi_task_losses_with_regularization:
                     loss_with_reg = batches_state.multi_task_losses_with_regularization[algo_name][loss_name]
-                    multi_task_losses[algo_name][f"{loss_name}{self._SUFFIX_WITH_REGULARIZATION}"] = loss_with_reg
+                    multi_task_losses[algo_name][f"{loss_name}{self.SUFFIX_WITH_REGULARIZATION}"] = loss_with_reg
 
         if training:
             self.train_multi_task_losses = multi_task_losses
