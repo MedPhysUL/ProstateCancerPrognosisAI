@@ -132,22 +132,22 @@ class TrainingHistory(Callback):
         name = name if name is not None else f"{self.__class__.__name__}({self.instance_id})"
         super().__init__(name=name, **kwargs)
 
-        self._container = container if container else self._get_empty_container()
+        self.container = container if container else self._get_empty_container()
 
     def __getitem__(self, item: Union[str, int, slice]) -> dict:
         if isinstance(item, str):
             return self._container[item]  # type: ignore
         elif isinstance(item, (int, slice)):
-            return self._get_state(self._container, item)
+            return self._get_state(self.container, item)
 
     def __contains__(self, item):
-        return item in self._container
+        return item in self.container
 
     def __iter__(self):
-        return iter(self._container)
+        return iter(self.container)
 
     def __len__(self):
-        return len(self._container)
+        return len(self.container)
 
     @property
     def priority(self) -> int:
@@ -183,7 +183,7 @@ class TrainingHistory(Callback):
         history : MeasuresHistoryTypedDict
             Training set history.
         """
-        return self._container[self.TRAIN]
+        return self.container[self.TRAIN]
 
     @property
     def validation_set_history(self) -> MeasurementsHistoryDict:
@@ -195,7 +195,7 @@ class TrainingHistory(Callback):
         history : MeasuresHistoryTypedDict
             Validation set history.
         """
-        return self._container[self.VALID]
+        return self.container[self.VALID]
 
     @staticmethod
     def _get_empty_container() -> HistoryDict:
@@ -381,7 +381,7 @@ class TrainingHistory(Callback):
         kwargs : dict
             Keywords arguments.
         """
-        self._append_state(self._container, trainer.epoch_state.as_dict())
+        self._append_state(self.container, trainer.epoch_state.as_dict())
 
 
 if __name__ == "__main__":
