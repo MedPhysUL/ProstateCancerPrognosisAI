@@ -24,7 +24,7 @@ from torch.nn import BatchNorm1d, Module
 from torch.optim import Adam
 from torch.utils.data import SubsetRandomSampler
 
-from src.data.datasets.prostate_cancer_dataset import DataModel, FeaturesModel, ProstateCancerDataset
+from src.data.datasets.prostate_cancer_dataset import FeaturesType, ProstateCancerDataset, TargetsType
 from src.data.processing.tools import MaskType
 # from src.data.processing.gnn_datasets import PetaleKGNNDataset
 from src.models.base.blocks.embeddings import EntityEmbeddingBlock
@@ -231,9 +231,9 @@ class TorchCustomModel(Module, ABC):
 
     def _sam_weight_update(
             self,
-            x: DataModel.x,
-            y: DataModel.y
-    ) -> Tuple[Dict[str, Tensor], float]:
+            x: FeaturesType,
+            y: TargetsType
+    ) -> Tuple[TargetsType, float]:
         """
         Executes a weights update using Sharpness-Aware Minimization (SAM) optimizer.
 
@@ -244,14 +244,14 @@ class TorchCustomModel(Module, ABC):
 
         Parameters
         ----------
-        x : DataModel.x
+        x : FeaturesType
             Batch data items.
-        y : DataModel.y
+        y : TargetsType
             Batch data items.
 
         Returns
         -------
-        (pred, loss) : Tuple[DataModel.y, float]
+        (pred, loss) : Tuple[TargetsType, float]
             Tuple of a dictionary of tensors with predictions and training loss.
         """
         # We compute the predictions
@@ -275,22 +275,22 @@ class TorchCustomModel(Module, ABC):
 
     def _basic_weight_update(
             self,
-            x: DataModel.x,
-            y: DataModel.y
-    ) -> Tuple[Dict[str, Tensor], float]:
+            x: FeaturesType,
+            y: TargetsType
+    ) -> Tuple[TargetsType, float]:
         """
         Executes a weights update without using Sharpness-Aware Minimization (SAM).
 
         Parameters
         ----------
-        x : DataModel.x
+        x : FeaturesType
             Batch data items.
-        y : DataModel.y
+        y : TargetsType
             Batch data items.
 
         Returns
         -------
-        (pred, loss) : Tuple[DataModel.y, float]
+        (pred, loss) : Tuple[TargetsType, float]
             Tuple of a dictionary of tensors with predictions and training loss.
         """
         # We compute the predictions
@@ -456,17 +456,17 @@ class TorchCustomModel(Module, ABC):
 
     def loss(
             self,
-            pred: DataModel.y,
-            y: DataModel.y,
+            pred: TargetsType,
+            y: TargetsType,
     ) -> Tensor:
         """
         Calls the criterion and add the elastic penalty.
 
         Parameters
         ----------
-        pred : DataModel.y
+        pred : TargetsType
             Predictions.
-        y: DataModel.y
+        y: TargetsType
             Targets.
 
         Returns
@@ -493,8 +493,8 @@ class TorchCustomModel(Module, ABC):
     @abstractmethod
     def predict(
             self,
-            x: DataModel.x
-    ) -> DataModel.y:
+            x: FeaturesType
+    ) -> TargetsType:
         """
         Returns predictions for all samples in a particular batch. For classification tasks, it returns the probability
         of belonging to class 1. For regression tasks, it returns the predicted real-valued target. For segmentation
@@ -502,12 +502,12 @@ class TorchCustomModel(Module, ABC):
 
         Parameters
         ----------
-        x : DataElement.x
+        x : FeaturesType
             Batch data items.
 
         Returns
         -------
-        predictions : DataModel.y
+        predictions : TargetsType
             Predictions.
         """
         raise NotImplementedError
@@ -516,7 +516,7 @@ class TorchCustomModel(Module, ABC):
             self,
             dataset: ProstateCancerDataset,
             mask: List[int],
-    ) -> DataModel.y:
+    ) -> TargetsType:
         """
         Returns predictions for all samples in a particular subset of the dataset, determined using a mask parameter.
         For classification tasks, it returns the probability of belonging to class 1. For regression tasks, it returns
@@ -533,7 +533,7 @@ class TorchCustomModel(Module, ABC):
 
         Returns
         -------
-        predictions : DataModel.y
+        predictions : TargetsType
             Predictions (except segmentation map).
         """
         subset = dataset[mask]
@@ -589,17 +589,17 @@ class TorchCustomModel(Module, ABC):
 
     def scores(
             self,
-            predictions: DataModel.y,
-            targets: DataModel.y
+            predictions: TargetsType,
+            targets: TargetsType
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns the scores for all samples in a particular batch.
 
         Parameters
         ----------
-        predictions : DataModel.y
+        predictions : TargetsType
             Batch data items.
-        targets : DataElement.y
+        targets : TargetsType
             Batch data items.
 
         Returns
@@ -849,20 +849,20 @@ class TorchCustomModel(Module, ABC):
 
     def _batch_to_device(
             self,
-            batch: Union[dict, FeaturesModel, Tensor]
-    ) -> Union[dict, FeaturesModel, Tensor]:
+            batch: Union[dict, FeaturesType, Tensor]
+    ) -> Union[dict, FeaturesType, Tensor]:
         """
         Send batch to device.
 
         Parameters
         ----------
-        batch : Union[dict, FeaturesModel, Tensor]
+        batch : Union[dict, FeaturesType, Tensor]
             Batch data
         """
-        if isinstance(batch, FeaturesModel):
+        if isinstance(batch, FeaturesType):
             image_to_device = {k: self._batch_to_device(v) for k, v in batch.image.items()}
             table_to_device = {k: self._batch_to_device(v) for k, v in batch.table.items()}
-            return FeaturesModel(image=image_to_device, table=table_to_device)
+            return FeaturesType(image=image_to_device, table=table_to_device)
         if isinstance(batch, dict):
             return {k: self._batch_to_device(v) for k, v in batch.items()}
         if isinstance(batch, torch.Tensor):

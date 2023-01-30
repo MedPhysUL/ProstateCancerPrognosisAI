@@ -20,7 +20,10 @@ from src.data.datasets.table_dataset import TableDataset
 from src.utils.tasks import Task
 
 
-class FeaturesModel(NamedTuple):
+TargetsType = Dict[str, Union[np.ndarray, Tensor]]
+
+
+class FeaturesType(NamedTuple):
     """
     Features element named tuple. This tuple is used to separate images and table features where
         - image : I-dimensional dictionary containing (N, ) tensor or array where I is the number of images used as
@@ -31,14 +34,14 @@ class FeaturesModel(NamedTuple):
     table: Dict[str, Union[np.ndarray, Tensor]] = {}
 
 
-class DataModel(NamedTuple):
+class DataType(NamedTuple):
     """
     Data element named tuple. This tuple is used to separate features (x) and targets (y) where
         - x : D-dimensional dictionary containing (N, ) tensor or array where D is the number of features.
         - y : T-dimensional dictionary containing (N, ) tensor or array where T is the number of tasks.
     """
-    x: FeaturesModel
-    y: Dict[str, Union[np.ndarray, Tensor]]
+    x: FeaturesType
+    y: TargetsType
 
 
 class ProstateCancerDataset(Dataset):
@@ -101,7 +104,7 @@ class ProstateCancerDataset(Dataset):
     def __getitem__(
             self,
             index: Union[int, List[int]]
-    ) -> Union[DataModel, Subset]:
+    ) -> Union[DataType, Subset]:
         """
         Gets dataset items.
 
@@ -112,7 +115,7 @@ class ProstateCancerDataset(Dataset):
 
         Returns
         -------
-        items : Union[DataModel, Subset]
+        items : Union[DataType, Subset]
             Data items from image and table datasets.
         """
         if isinstance(index, int):
@@ -125,8 +128,8 @@ class ProstateCancerDataset(Dataset):
                 else:
                     x_imaging[key] = item
 
-            return DataModel(
-                x=FeaturesModel(image=x_imaging, table=self.table_dataset[index].x),
+            return DataType(
+                x=FeaturesType(image=x_imaging, table=self.table_dataset[index].x),
                 y=dict(**self.table_dataset[index].y, **y_imaging)
             )
         elif isinstance(index, list):

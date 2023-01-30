@@ -12,7 +12,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-from src.data.datasets.prostate_cancer_dataset import DataModel, ProstateCancerDataset
+from src.data.datasets.prostate_cancer_dataset import FeaturesType, ProstateCancerDataset, TargetsType
 from src.utils.hyperparameters import HP
 
 
@@ -71,17 +71,17 @@ class BaseModel(ABC):
     @abstractmethod
     def losses(
             self,
-            predictions: DataModel.y,
-            targets: DataModel.y
+            predictions: TargetsType,
+            targets: TargetsType
     ) -> Dict[str, float]:
         """
         Returns the losses for all samples in a particular batch.
 
         Parameters
         ----------
-        predictions : DataModel.y
+        predictions : TargetsType
             Batch data items.
-        targets : DataElement.y
+        targets : TargetsType
             Batch data items.
 
         Returns
@@ -94,8 +94,8 @@ class BaseModel(ABC):
     @abstractmethod
     def predict(
             self,
-            x: DataModel.x
-    ) -> DataModel.y:
+            x: FeaturesType
+    ) -> TargetsType:
         """
         Returns predictions for all samples in a particular batch. For classification tasks, it returns the probability
         of belonging to class 1. For regression tasks, it returns the predicted real-valued target. For segmentation
@@ -103,12 +103,12 @@ class BaseModel(ABC):
 
         Parameters
         ----------
-        x : DataElement.x
+        x : FeaturesType
             Batch data items.
 
         Returns
         -------
-        predictions : DataModel.y
+        predictions : TargetsType
             Predictions.
         """
         raise NotImplementedError
@@ -118,7 +118,7 @@ class BaseModel(ABC):
             self,
             dataset: ProstateCancerDataset,
             mask: List[int],
-    ) -> DataModel.y:
+    ) -> TargetsType:
         """
         Returns predictions for all samples in a particular subset of the dataset, determined using a mask parameter.
         For classification tasks, it returns the probability of belonging to class 1. For regression tasks, it returns
@@ -135,7 +135,7 @@ class BaseModel(ABC):
 
         Returns
         -------
-        predictions : DataModel.y
+        predictions : TargetsType
             Predictions (except segmentation map).
         """
         raise NotImplementedError
@@ -158,17 +158,17 @@ class BaseModel(ABC):
     @abstractmethod
     def scores(
             self,
-            predictions: DataModel.y,
-            targets: DataModel.y
+            predictions: TargetsType,
+            targets: TargetsType
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns the scores for all samples in a particular batch.
 
         Parameters
         ----------
-        predictions : DataModel.y
+        predictions : TargetsType
             Batch data items.
-        targets : DataElement.y
+        targets : TargetsType
             Batch data items.
 
         Returns

@@ -3,10 +3,9 @@ from typing import Any, Dict, List, Union
 
 from monai.data import DataLoader
 import numpy as np
-from torch import Tensor
 
 from src.callbacks.training_history import MeasurementHistoryType, TrainingHistory
-from src.data.datasets.prostate_cancer_dataset import FeaturesModel
+from src.data.datasets.prostate_cancer_dataset import FeaturesType, TargetsType
 from src.utils.tasks import Task
 from src.utils.transforms import to_numpy
 
@@ -42,20 +41,20 @@ class BatchState(BaseState):
     single_task_losses : MeasurementType
         The single task losses of the current batch. The keys are the names of the tasks, the values are dictionaries
         whose keys are the names of the losses while its values are losses measured in the current batch.
-    x : DataModel.x
+    x : FeaturesType
         The current input batch.
-    y : DataModel.y
+    y : TargetsType
         The current target batch.
-    pred : DataModel.y
+    pred : TargetsType
         The current prediction.
     """
     idx: int = None
     multi_task_losses_with_regularization: MeasurementType = field(default_factory=dict)
     multi_task_losses_without_regularization: MeasurementType = field(default_factory=dict)
     single_task_losses: MeasurementType = field(default_factory=dict)
-    x: FeaturesModel = None
-    y: Dict[str, Tensor] = field(default_factory=dict)
-    pred: Dict[str, Tensor] = field(default_factory=dict)
+    x: FeaturesType = None
+    y: TargetsType = field(default_factory=dict)
+    pred: TargetsType = field(default_factory=dict)
 
 
 @dataclass

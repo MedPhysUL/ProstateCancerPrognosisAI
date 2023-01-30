@@ -17,7 +17,7 @@ from monai.data import DataLoader
 from torch import cat, no_grad, sigmoid, stack, tensor
 from torch.nn import Identity, Linear
 
-from src.data.datasets.prostate_cancer_dataset import DataModel
+from src.data.datasets.prostate_cancer_dataset import FeaturesType, TargetsType
 from src.data.processing.tools import MaskType
 from src.models.base.custom_torch_base import TorchCustomModel
 from src.models.base.blocks.encoders import MLPEncodingBlock
@@ -234,19 +234,19 @@ class MLPBaseModel(TorchCustomModel):
 
     def forward(
             self,
-            x: DataModel.x
-    ) -> DataModel.y:
+            x: FeaturesType
+    ) -> TargetsType:
         """
         Executes the forward pass.
 
         Parameters
         ----------
-        x : DataElement.x
+        x : FeaturesType
             Batch data items.
 
         Returns
         -------
-        predictions : DataModel.y
+        predictions : TargetsType
             Predictions.
         """
         # We retrieve the table data only and transform the input dictionary to a tensor
@@ -297,8 +297,8 @@ class MLPBaseModel(TorchCustomModel):
 
     def predict(
             self,
-            x: DataModel.x
-    ) -> DataModel.y:
+            x: FeaturesType
+    ) -> TargetsType:
         """
         Returns predictions for all samples in a particular batch. For classification tasks, it returns the probability
         of belonging to class 1. For regression tasks, it returns the predicted real-valued target. For segmentation
@@ -306,12 +306,12 @@ class MLPBaseModel(TorchCustomModel):
 
         Parameters
         ----------
-        x : DataElement.x
+        x : FeaturesType
             Batch data items.
 
         Returns
         -------
-        predictions : DataModel.y
+        predictions : TargetsType
             Predictions.
         """
         # Set model for evaluation

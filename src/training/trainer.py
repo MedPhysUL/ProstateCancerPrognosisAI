@@ -11,7 +11,7 @@ from src.callbacks.callback_list import CallbackList
 from src.callbacks.model_checkpoint import CheckpointLoadingMode, ModelCheckpoint
 from src.callbacks.training_history import TrainingHistory
 from src.callbacks.learning_algorithm import LearningAlgorithm
-from src.data.datasets.prostate_cancer_dataset import FeaturesModel, ProstateCancerDataset
+from src.data.datasets.prostate_cancer_dataset import FeaturesType, ProstateCancerDataset
 from src.models.base.base_model import BaseModel
 from src.training.states import BatchState, BatchesState, EpochState, TrainingState
 from src.utils.transforms import ToTensor
@@ -362,20 +362,20 @@ class Trainer:
 
     def _batch_to_device(
             self,
-            batch: Union[dict, FeaturesModel, Tensor]
-    ) -> Union[dict, FeaturesModel, Tensor]:
+            batch: Union[dict, FeaturesType, Tensor]
+    ) -> Union[dict, FeaturesType, Tensor]:
         """
         Send batch to device.
 
         Parameters
         ----------
-        batch : Union[dict, FeaturesModel, Tensor]
+        batch : Union[dict, FeaturesType, Tensor]
             Batch data
         """
-        if isinstance(batch, FeaturesModel):
+        if isinstance(batch, FeaturesType):
             image_to_device = {k: self._batch_to_device(v) for k, v in batch.image.items()}
             table_to_device = {k: self._batch_to_device(v) for k, v in batch.table.items()}
-            return FeaturesModel(image=image_to_device, table=table_to_device)
+            return FeaturesType(image=image_to_device, table=table_to_device)
         if isinstance(batch, dict):
             return {k: self._batch_to_device(v) for k, v in batch.items()}
         if isinstance(batch, Tensor):

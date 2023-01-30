@@ -13,7 +13,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from torch import save
 
-from src.data.datasets.prostate_cancer_dataset import DataModel, ProstateCancerDataset
+from src.data.datasets.prostate_cancer_dataset import FeaturesType, ProstateCancerDataset, TargetsType
 from src.models.base.base_model import BaseModel
 from src.models.base.custom_torch_base import TorchCustomModel
 from src.utils.hyperparameters import HP
@@ -70,17 +70,17 @@ class TorchWrapper(BaseModel):
 
     def losses(
             self,
-            predictions: DataModel.y,
-            targets: DataModel.y
+            predictions: TargetsType,
+            targets: TargetsType
     ) -> Dict[str, float]:
         """
         Returns the losses for all samples in a particular batch.
 
         Parameters
         ----------
-        predictions : DataModel.y
+        predictions : TargetsType
             Batch data items.
-        targets : DataElement.y
+        targets : TargetsType
             Batch data items.
 
         Returns
@@ -106,8 +106,8 @@ class TorchWrapper(BaseModel):
 
     def predict(
             self,
-            x: DataModel.x
-    ) -> DataModel.y:
+            x: FeaturesType
+    ) -> TargetsType:
         """
         Returns predictions for all samples in a particular batch. For classification tasks, it returns the probability
         of belonging to class 1. For regression tasks, it returns the predicted real-valued target. For segmentation
@@ -115,12 +115,12 @@ class TorchWrapper(BaseModel):
 
         Parameters
         ----------
-        x : DataElement.x
+        x : FeaturesType
             Batch data items.
 
         Returns
         -------
-        predictions : DataModel.y
+        predictions : TargetsType
             Predictions.
         """
         return self._model.predict(x)
@@ -129,7 +129,7 @@ class TorchWrapper(BaseModel):
             self,
             dataset: ProstateCancerDataset,
             mask: List[int],
-    ) -> DataModel.y:
+    ) -> TargetsType:
         """
         Returns predictions for all samples in a particular subset of the dataset, determined using a mask parameter.
         For classification tasks, it returns the probability of belonging to class 1. For regression tasks, it returns
@@ -146,7 +146,7 @@ class TorchWrapper(BaseModel):
 
         Returns
         -------
-        predictions : DataModel.y
+        predictions : TargetsType
             Predictions (except segmentation map).
         """
         return self._model.predict_dataset(dataset, mask)
@@ -176,8 +176,8 @@ class TorchWrapper(BaseModel):
 
     def scores(
             self,
-            predictions: DataModel.y,
-            targets: DataModel.y,
+            predictions: TargetsType,
+            targets: TargetsType,
             include_evaluation_metrics: bool = False
     ) -> Dict[str, Dict[str, float]]:
         """
@@ -185,9 +185,9 @@ class TorchWrapper(BaseModel):
 
         Parameters
         ----------
-        predictions : DataModel.y
+        predictions : TargetsType
             Batch data items.
-        targets : DataElement.y
+        targets : TargetsType
             Batch data items.
         include_evaluation_metrics: bool
             Whether to calculate the scores with the evaluation metrics or not.
