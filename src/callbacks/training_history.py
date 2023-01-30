@@ -110,6 +110,8 @@ class TrainingHistory(Callback):
     SINGLE_TASK_LOSSES: Literal["multi_task_losses"] = "single_task_losses"
     SINGLE_TASK_METRICS: Literal["multi_task_losses"] = "single_task_metrics"
 
+    MEASUREMENT_CATEGORIES = [MULTI_TASK_LOSSES, SINGLE_TASK_LOSSES, SINGLE_TASK_METRICS]
+
     def __init__(
             self,
             container: Optional[HistoryDict] = None,
@@ -136,7 +138,7 @@ class TrainingHistory(Callback):
 
     def __getitem__(self, item: Union[str, int, slice]) -> dict:
         if isinstance(item, str):
-            return self.container[item]  # type: ignore
+            return self.container[item]
         elif isinstance(item, (int, slice)):
             return self._get_state(self.container, item)
 
@@ -272,20 +274,20 @@ class TrainingHistory(Callback):
 
     def _create_plot(
             self,
-            measure_category: Literal["single_task_metrics", "multi_task_losses", "single_task_losses"],
+            measurement_category: Literal["single_task_metrics", "multi_task_losses", "single_task_losses"],
             task_key: str,
             **kwargs
     ) -> Tuple[plt.Figure, Dict[str, plt.Axes], Dict[str, List[plt.Line2D]]]:
         """
-        Create a plot of the given measure category ('losses' or 'metrics') using the training and validation set
+        Create a plot of the given measurement category ('losses' or 'metrics') using the training and validation set
         history.
 
         Parameters
         ----------
-        measure_category : Literal["single_task_metrics", "multi_task_losses", "single_task_losses"]
-            Measure category, i.e 'multi_task_losses', 'single_task_losses' or 'metrics'.
+        measurement_category : Literal["single_task_metrics", "multi_task_losses", "single_task_losses"]
+            Measurement category, i.e 'multi_task_losses', 'single_task_losses' or 'metrics'.
         task_key : str
-            Specific task key in the measure category history.
+            Specific task key in the measurement category history.
         kwargs : dict
             Keywords arguments controlling figure aesthetics.
 
@@ -294,17 +296,17 @@ class TrainingHistory(Callback):
         fig, axes, lines : Tuple[plt.Figure, Dict[str, plt.Axes], Dict[str, List[plt.Line2D]]]
             The figure, axes and lines of the plot.
         """
-        train_measure_history = self.training_set_history[measure_category]
-        valid_measure_history = self.validation_set_history[measure_category]
+        train_measurement_history = self.training_set_history[measurement_category]
+        valid_measurement_history = self.validation_set_history[measurement_category]
 
-        if task_key in train_measure_history:
-            train_task_history = train_measure_history[task_key]
+        if task_key in train_measurement_history:
+            train_task_history = train_measurement_history[task_key]
             train_tasks = list(train_task_history.keys())
         else:
             train_task_history, train_tasks = [], []
 
-        if task_key in valid_measure_history:
-            valid_task_history = valid_measure_history[task_key]
+        if task_key in valid_measurement_history:
+            valid_task_history = valid_measurement_history[task_key]
             valid_tasks = list(valid_task_history.keys())
         else:
             valid_task_history, valid_tasks = [], []
@@ -350,20 +352,20 @@ class TrainingHistory(Callback):
         """
         plt.close('all')
 
-        for measure_category in MeasurementsHistoryDict.__annotations__.keys():
-            training_set_task_keys = list(self.training_set_history[measure_category].keys())  # type: ignore
-            validation_set_task_keys = list(self.validation_set_history[measure_category].keys())  # type: ignore
+        for measurement_category in self.MEASUREMENT_CATEGORIES:
+            training_set_task_keys = list(self.training_set_history[measurement_category].keys())
+            validation_set_task_keys = list(self.validation_set_history[measurement_category].keys())
             all_task_keys = list(set(training_set_task_keys + validation_set_task_keys))
 
             if path_to_save is not None:
-                path_to_measure_category_directory = os.path.join(path_to_save, measure_category)
-                os.mkdir(path_to_measure_category_directory)
+                path_to_measurement_category_directory = os.path.join(path_to_save, measurement_category)
+                os.mkdir(path_to_measurement_category_directory)
 
             for task_key in all_task_keys:
-                fig, axes, lines = self._create_plot(measure_category, task_key, **kwargs)  # type: ignore
+                fig, axes, lines = self._create_plot(measurement_category, task_key, **kwargs)
                 plt.tight_layout(rect=(0, 0.03, 1, 0.95))
                 if path_to_save is not None:
-                    path_to_fig = os.path.join(os.path.join(path_to_save, measure_category), f"{task_key}.pdf")
+                    path_to_fig = os.path.join(os.path.join(path_to_save, measurement_category), f"{task_key}.pdf")
                     fig.savefig(path_to_fig, dpi=kwargs.get("dpi", 300))
                 if show:
                     plt.show(block=kwargs.get("block", True))
