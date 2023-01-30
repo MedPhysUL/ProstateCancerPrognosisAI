@@ -59,7 +59,7 @@ class EarlyStopper(ABC):
     @abstractmethod
     def __call__(self, epoch_state: EpochState) -> bool:
         """
-        Called when an epoch ends. Returns whether to early stop or not.
+        Called when an epoch ends. Returns whether to early stop.
 
         Parameters
         ----------
@@ -135,7 +135,7 @@ class MetricsEarlyStopper(EarlyStopper):
 
     def __call__(self, epoch_state: EpochState) -> bool:
         """
-        Called when an epoch ends. Returns whether to early stop or not.
+        Called when an epoch ends. Returns whether to early stop.
 
         Parameters
         ----------
