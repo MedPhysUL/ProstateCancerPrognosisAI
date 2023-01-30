@@ -25,11 +25,13 @@ class LearningAlgorithm(Callback):
     instance_counter = count()
 
     CHECKPOINT_OPTIMIZER_STATE_KEY = "optimizer_state"
+    CHECKPOINT_LR_SCHEDULER_STATE_KEY = "lr_scheduler_state"
 
     def __init__(
             self,
             criterion: MultiTaskLoss,
             optimizer: Optimizer,
+            lr_scheduler: Optional[object] = None,
             name: Optional[str] = None,
             regularization: Optional[Union[Regularization, RegularizationList, Iterable[Regularization]]] = None,
             **kwargs
@@ -43,6 +45,8 @@ class LearningAlgorithm(Callback):
             Multi-task loss.
         optimizer : Optimizer
             A pytorch Optimizer.
+        lr_scheduler : Optional[object]
+            A pytorch learning rate scheduler.
         name : Optional[str]
             The name of the callback.
         regularization : Optional[Union[Regularization, RegularizationList, Iterable[Regularization]]]
@@ -53,6 +57,7 @@ class LearningAlgorithm(Callback):
         super().__init__(name=name, **kwargs)
 
         self.criterion = criterion
+        self.lr_scheduler = lr_scheduler
         self.optimizer = optimizer
         self.regularization = regularization
 
@@ -93,9 +98,14 @@ class LearningAlgorithm(Callback):
         """
         if self.save_state:
             state = checkpoint.get(self.name, {})
+            
             optimizer_state = state.get(self.CHECKPOINT_OPTIMIZER_STATE_KEY, None)
-            if optimizer_state is not None:
+            if optimizer_state:
                 self.optimizer.load_state_dict(optimizer_state)
+
+            lr_scheduler_state = state.get(self.CHECKPOINT_LR_SCHEDULER_STATE_KEY, None)
+            if lr_scheduler_state:
+                self.lr_scheduler.load_state_dict(lr_scheduler_state)
 
     def get_checkpoint_state(self, trainer, **kwargs) -> Optional[dict]:
         """
@@ -112,8 +122,11 @@ class LearningAlgorithm(Callback):
             The state of the callback.
         """
         if self.save_state:
-            if self.optimizer is not None:
-                return {self.CHECKPOINT_OPTIMIZER_STATE_KEY: self.optimizer.state_dict()}
+            state = {self.CHECKPOINT_OPTIMIZER_STATE_KEY: self.optimizer.state_dict()}
+            if self.lr_scheduler:
+                state[self.CHECKPOINT_LR_SCHEDULER_STATE_KEY] = self.lr_scheduler.state_dict()
+
+            return state
 
         return None
 
@@ -202,7 +215,7 @@ class LearningAlgorithm(Callback):
 
     def _optimizer_step(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor], trainer):
         """
-        Perform an optimizer step, i.e calculate loss and perform backward pass.
+        Performs an optimizer step, i.e calculates loss and performs backward pass.
 
         Parameters
         ----------
@@ -266,3 +279,17 @@ class LearningAlgorithm(Callback):
         pred_batch = trainer.batch_state.pred
         y_batch = trainer.batch_state.y
         self._compute_loss(pred_batch, y_batch, trainer)
+
+    def on_epoch_end(self, trainer, **kwargs):
+        """
+        Performs a learning rate scheduler step.
+
+        Parameters
+        ----------
+        trainer : Trainer
+            The trainer.
+        kwargs : dict
+            Keyword arguments.
+        """
+        if self.lr_scheduler:
+            self.lr_scheduler.step()
