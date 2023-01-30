@@ -136,7 +136,7 @@ class TrainingHistory(Callback):
 
     def __getitem__(self, item: Union[str, int, slice]) -> dict:
         if isinstance(item, str):
-            return self._container[item]  # type: ignore
+            return self.container[item]  # type: ignore
         elif isinstance(item, (int, slice)):
             return self._get_state(self.container, item)
 
