@@ -31,9 +31,9 @@ class Trainer:
         """
         assert model.is_built, "Model must be built before training"
         self.model = model
-        self.callbacks = self._set_default_callbacks(callbacks)
+        self.callbacks = self._get_initialized_callbacks(callbacks)
         self.sort_callbacks()
-        self.device = self._set_default_device(device)
+        self.device = device if device else model.device
         self.verbose = verbose
 
         self.batch_state = BatchState()
@@ -80,13 +80,8 @@ class Trainer:
         else:
             return None
 
-    def _set_default_device(self, device: Optional[torch_device]) -> torch_device:
-        if device is None:
-            return self.model.device
-        return device
-
     @staticmethod
-    def _set_default_callbacks(
+    def _get_initialized_callbacks(
             callbacks: Optional[Union[Callback, CallbackList, List[Callback]]]
     ) -> CallbackList:
         if callbacks is None:
