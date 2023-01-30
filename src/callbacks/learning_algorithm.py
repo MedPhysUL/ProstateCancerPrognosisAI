@@ -98,7 +98,7 @@ class LearningAlgorithm(Callback):
         """
         if self.save_state:
             state = checkpoint.get(self.name, {})
-            
+
             optimizer_state = state.get(self.CHECKPOINT_OPTIMIZER_STATE_KEY, None)
             if optimizer_state:
                 self.optimizer.load_state_dict(optimizer_state)
