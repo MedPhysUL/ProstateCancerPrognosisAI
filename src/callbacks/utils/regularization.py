@@ -137,7 +137,7 @@ class RegularizationList:
         return loss
 
 
-class Lp(Regularization):
+class LpRegularization(Regularization):
     """
     Regularization that applies LP norm.
     """
@@ -161,7 +161,7 @@ class Lp(Regularization):
         power : int
             The p parameter of the LP norm. Example: p=1 -> L1 norm, p=2 -> L2 norm.
         """
-        super(Lp, self).__init__(params=params, lambda_=lambda_)
+        super(LpRegularization, self).__init__(params=params, lambda_=lambda_)
         self.power = power
 
     def forward(self, *args, **kwargs) -> Tensor:
@@ -186,7 +186,7 @@ class Lp(Regularization):
         return loss
 
 
-class L1(Lp):
+class L1Regularization(LpRegularization):
     """
     Regularization that applies L1 norm.
     """
@@ -206,10 +206,10 @@ class L1(Lp):
         lambda_ : float
             The weight of the regularization. In other words, the coefficient that multiplies the loss.
         """
-        super(L1, self).__init__(params=params, lambda_=lambda_, power=1)
+        super(L1Regularization, self).__init__(params=params, lambda_=lambda_, power=1)
 
 
-class L2(Lp):
+class L2Regularization(LpRegularization):
     """
     Regularization that applies L2 norm.
     """
@@ -229,4 +229,4 @@ class L2(Lp):
         lambda_ : float
             The weight of the regularization. In other words, the coefficient that multiplies the loss.
         """
-        super(L2, self).__init__(params=params, lambda_=lambda_, power=2)
+        super(L2Regularization, self).__init__(params=params, lambda_=lambda_, power=2)
