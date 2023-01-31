@@ -39,8 +39,8 @@ class Loss(ABC):
             Reduction method to use.
         """
         # Protected attributes
-        self._reduction = LossReduction(reduction).value
-        self._name = name if name is not None else f"{self.__class__.__name__}('reduction'={repr(self._reduction)})"
+        self.reduction = LossReduction(reduction).value
+        self.name = name if name is not None else f"{self.__class__.__name__}('reduction'={repr(self.reduction)})"
 
     @abstractmethod
     def __call__(
@@ -57,10 +57,6 @@ class Loss(ABC):
             Loss value.
         """
         raise NotImplementedError
-
-    @property
-    def name(self) -> str:
-        return self._name
 
     def perform_reduction(
             self,
@@ -93,10 +89,6 @@ class Loss(ABC):
             return nanmean(x)
         elif reduction == LossReduction.SUM.value:
             return nansum(x)
-
-    @property
-    def reduction(self) -> str:
-        return self._reduction
 
 
 class RegressionLoss(Loss):

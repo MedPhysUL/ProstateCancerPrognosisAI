@@ -58,10 +58,10 @@ class Metric(ABC):
             Number of digits kept.
         """
         # Protected attributes
-        self._direction = Direction(direction).value
-        self._reduction = MetricReduction(reduction).value
-        self._n_digits = n_digits
-        self._name = name if name is not None else f"{self.__class__.__name__}('reduction'={repr(self._reduction)})"
+        self.direction = Direction(direction).value
+        self.reduction = MetricReduction(reduction).value
+        self.n_digits = n_digits
+        self.name = name if name is not None else f"{self.__class__.__name__}('reduction'={repr(self.reduction)})"
 
     @abstractmethod
     def __call__(
@@ -78,14 +78,6 @@ class Metric(ABC):
             Rounded metric score.
         """
         raise NotImplementedError
-
-    @property
-    def direction(self) -> str:
-        return self._direction
-
-    @property
-    def name(self) -> str:
-        return self._name
 
     def perform_reduction(
             self,
@@ -124,14 +116,6 @@ class Metric(ABC):
         elif reduction == MetricReduction.GEOMETRIC_MEAN.value:
             filtered_x = x[~any(x.isnan(), dim=1)]
             return pow(prod(filtered_x), exponent=(1 / filtered_x.shape[0])).item()
-
-    @property
-    def reduction(self) -> str:
-        return self._reduction
-
-    @property
-    def n_digits(self) -> int:
-        return self._n_digits
 
 
 class RegressionMetric(Metric):

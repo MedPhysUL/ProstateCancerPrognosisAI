@@ -42,12 +42,8 @@ class MultiTaskLoss(ABC):
             Tasks to include in the multi-task loss calculation. By default, we use all available tasks.
         """
         # Protected attributes
-        self._name = name if name is not None else f"{self.__class__.__name__}"
+        self.name = name if name is not None else f"{self.__class__.__name__}"
         self._tasks = tasks
-
-    @property
-    def name(self) -> str:
-        return self._name
 
     @property
     def tasks(self) -> Optional[List[Task]]:
