@@ -28,8 +28,8 @@ class EarlyStopper(ABC):
 
     def __init__(
             self,
-            patience: int,
-            tolerance: float
+            patience: int = 10,
+            tolerance: float = 1e-4
     ) -> None:
         """
         Sets protected attributes of early stopper.
@@ -44,7 +44,7 @@ class EarlyStopper(ABC):
         super().__init__()
 
         self.counter = 0
-        self.learning_algorithm = None
+        self.learning_algorithm_name = None
         self.patience = patience
         self.tolerance = tolerance
 
@@ -57,7 +57,7 @@ class EarlyStopper(ABC):
         learning_algorithm : LearningAlgorithm
             The learning algorithm.
         """
-        self.learning_algorithm = learning_algorithm
+        self.learning_algorithm_name = learning_algorithm.name
 
     @abstractmethod
     def __call__(self, epoch_state: EpochState) -> bool:
@@ -133,7 +133,7 @@ class MetricsEarlyStopper(EarlyStopper):
             The learning algorithm.
         """
         super().on_fit_start(learning_algorithm)
-        self._tasks = self.learning_algorithm.criterion.tasks
+        self._tasks = learning_algorithm.criterion.tasks
         self._initialize_best_val_metric_scores()
 
     def __call__(self, epoch_state: EpochState) -> bool:
@@ -191,7 +191,7 @@ class MetricsEarlyStopper(EarlyStopper):
             The current epoch state.
         """
         print(
-            f"\n{self.learning_algorithm.name}: Early stopping occurred at epoch {epoch_state.idx} with best_epoch = "
+            f"\n{self.learning_algorithm_name}: Early stopping occurred at epoch {epoch_state.idx} with best_epoch = "
             f"{epoch_state.idx - self.patience}"
         )
 
@@ -203,8 +203,8 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
 
     def __init__(
             self,
-            patience: int,
-            tolerance: float,
+            patience: int = 10,
+            tolerance: float = 1e-4,
             with_regularization: Optional[bool] = True
     ) -> None:
         """
@@ -226,13 +226,18 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         self._is_better = lambda x, y: (y - x) > self.tolerance
         self._with_regularization = with_regularization
 
-    def _set_criterion_full_name(self):
+    def _set_criterion_full_name(self, learning_algorithm: LearningAlgorithm):
         """
         Initializes criterion full name.
-        """
-        basic_name = self.learning_algorithm.criterion.name
 
-        if not self.learning_algorithm.regularization:
+        Parameters
+        ----------
+        learning_algorithm : LearningAlgorithm
+            Learning algorithm.
+        """
+        basic_name = learning_algorithm.criterion.name
+
+        if not learning_algorithm.regularization:
             suffix = EpochState.SUFFIX_WITHOUT_REGULARIZATION
         else:
             if self._with_regularization:
@@ -252,7 +257,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
             The learning algorithm.
         """
         super().on_fit_start(learning_algorithm)
-        self._set_criterion_full_name()
+        self._set_criterion_full_name(learning_algorithm)
 
     def __call__(self, epoch_state: EpochState) -> bool:
         """
@@ -268,7 +273,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         early_stop : bool
             Whether to early stop.
         """
-        val_loss = epoch_state.valid_multi_task_losses[self.learning_algorithm.name][self._criterion_full_name]
+        val_loss = epoch_state.valid_multi_task_losses[self.learning_algorithm_name][self._criterion_full_name]
 
         # if the score is worst than the best score we increment the counter
         if not self._is_better(val_loss, self._best_val_loss):
@@ -298,7 +303,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
             The current epoch state.
         """
         print(
-            f"\n{self.learning_algorithm.name}: Early stopping occurred at epoch {epoch_state.idx} with best_epoch = "
+            f"\n{self.learning_algorithm_name}: Early stopping occurred at epoch {epoch_state.idx} with best_epoch = "
             f"{epoch_state.idx - self.patience}"
         )
 
