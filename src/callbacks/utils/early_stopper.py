@@ -225,7 +225,6 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         self.with_regularization = with_regularization
 
         self._best_val_loss = np.inf
-        self._is_better = lambda x, y: (y - x) > self.tolerance
 
     def _set_criterion_full_name(self, learning_algorithm: LearningAlgorithm):
         """
@@ -277,7 +276,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         val_loss = epoch_state.valid_multi_task_losses[self.learning_algorithm_name][self.criterion_full_name]
 
         # if the score is worst than the best score we increment the counter
-        if not self._is_better(val_loss, self._best_val_loss):
+        if not (self._best_val_loss - val_loss) > self.tolerance:
             self.counter += 1
 
             # if the counter reach the patience we early stop
