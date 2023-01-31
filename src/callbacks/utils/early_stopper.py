@@ -229,10 +229,13 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         """
         basic_name = self.learning_algorithm.criterion.name
 
-        if self._with_regularization:
-            suffix = EpochState.SUFFIX_WITH_REGULARIZATION
-        else:
+        if not self.learning_algorithm.regularization:
             suffix = EpochState.SUFFIX_WITHOUT_REGULARIZATION
+        else:
+            if self._with_regularization:
+                suffix = EpochState.SUFFIX_WITH_REGULARIZATION
+            else:
+                suffix = EpochState.SUFFIX_WITHOUT_REGULARIZATION
 
         self._criterion_full_name = f"{basic_name}{suffix}"
 
