@@ -8,14 +8,17 @@
     @Description:       This file is used to define the `EarlyStopper` object, used within a `LearningAlgorithm`.
 """
 
+from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import numpy as np
 
-from src.callbacks.learning_algorithm import LearningAlgorithm
 from src.training.states import EpochState
 from src.utils.score_metrics import Direction
+
+if TYPE_CHECKING:
+    from src.callbacks.learning_algorithm import LearningAlgorithm
 
 
 class EarlyStopper(ABC):
