@@ -11,14 +11,7 @@
 from monai.data import DataLoader
 from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
-from monai.transforms import (
-    CenterSpatialCropd,
-    Compose,
-    HistogramNormalized,
-    KeepLargestConnectedComponentd,
-    ThresholdIntensityd,
-    ToTensord, EnsureChannelFirstd,
-)
+from monai.transforms import Compose, EnsureChannelFirstd, ToTensord
 from monai.utils import set_determinism
 import numpy as np
 import torch
@@ -51,11 +44,6 @@ if __name__ == '__main__':
     # Transformations
     transformations = Compose([
         EnsureChannelFirstd(keys=['CT', 'Prostate_segmentation']),
-        # CenterSpatialCropd(keys=['CT', 'Prostate_segmentation'], roi_size=(1000, 160, 160)), TODO
-        # ThresholdIntensityd(keys=['img'], threshold=-250, above=True, cval=-250),
-        # ThresholdIntensityd(keys=['img'], threshold=500, above=False, cval=500),
-        # HistogramNormalized(keys=['img'], num_bins=751, min=0, max=1),
-        # KeepLargestConnectedComponentd(keys=['seg']),
         ToTensord(keys=['CT', 'Prostate_segmentation'], dtype=torch.float32)
     ])
 

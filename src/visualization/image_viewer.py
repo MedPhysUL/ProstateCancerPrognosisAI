@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Raphael Brodeur
 
     @Creation Date:     06/2022
-    @Last modification: 07/2022
+    @Last modification: 01/2023
 
     @Description:       This file contains the ImageViewer class which is used to visualize a patient's image (whether
                         it is a CT or a PET) alongside its respective segmentation and to compare an image alongside its
@@ -477,3 +477,131 @@ class ImageViewer:
 
         if show:
             plt.show()
+
+    def view_latent_image(self, img):
+        """
+        Description.
+        """
+        img = img.detach().numpy()
+        max_voxel = np.max(img)
+        min_voxel = np.min(img)
+
+        max_channel = img.shape[0] - 1
+        max_zslice = img.shape[1] - 1
+
+        fig, ax = plt.subplots()
+        plt.subplots_adjust(bottom=0.20)
+
+        ax.imshow(
+            img[0][int(max_zslice // 2)],
+            cmap="Greys_r",
+            vmax=max_voxel,
+            vmin=min_voxel
+        )
+
+        ax_channel = plt.axes([0.14 + 1 * 0.27, 0.1, 0.2, 0.02], facecolor='lightgoldenrodyellow')
+        ax_zslice = plt.axes([0.14 + 1 * 0.27, 0.05, 0.2, 0.02], facecolor='lightgoldenrodyellow')
+
+        slider_channel = Slider(
+            ax=ax_channel,
+            label="Channel",
+            valmin=0,
+            valmax=max_channel,
+            valinit=0,
+            valstep=1
+        )
+        slider_zslice = Slider(
+            ax=ax_zslice,
+            label="Z slice",
+            valmin=0,
+            valmax=max_zslice,
+            valinit=int(max_zslice // 2),
+            valstep=1
+        )
+
+        def update(val):
+            channel = slider_channel.val
+            zslice = slider_zslice.val
+            ax.imshow(
+                img[channel][zslice],
+                cmap="Greys_r",
+                vmax=max_voxel,
+                vmin=min_voxel
+            )
+            fig.canvas.draw_idle()
+
+        slider_channel.on_changed(update)
+        slider_zslice.on_changed(update)
+
+        plt.show()
+
+    def view_filter(self, conv):
+        """
+        Description.
+        """
+        conv = conv.detach().numpy()
+        max_voxel = np.max(conv)
+        min_voxel = np.min(conv)
+
+        max_filter = conv.shape[0] - 1
+        max_channel = conv.shape[1] - 1
+        max_zslice = conv.shape[2] - 1
+
+        fig, ax = plt.subplots()
+        plt.subplots_adjust(bottom=0.20)
+
+        ax.imshow(
+            conv[0][0][int(max_zslice // 2)],
+            cmap="Greys_r",
+            vmax=max_voxel,
+            vmin=min_voxel
+        )
+
+        ax_filter = plt.axes([0.14 + 1 * 0.27, 0.1, 0.2, 0.02], facecolor='lightgoldenrodyellow')
+        ax_channel = plt.axes([0.14 + 1 * 0.27, 0.05, 0.2, 0.02], facecolor='lightgoldenrodyellow')
+        ax_zslice = plt.axes([0.14 + 1 * 0.27, 0, 0.2, 0.02], facecolor='lightgoldenrodyellow')
+
+        slider_filter = Slider(
+            ax=ax_filter,
+            label="Filter",
+            valmin=0,
+            valmax=max_filter,
+            valinit=0,
+            valstep=1
+        )
+        slider_channel = Slider(
+            ax=ax_channel,
+            label="Channel",
+            valmin=0,
+            valmax=max_channel,
+            valinit=0,
+            valstep=1
+        )
+        slider_zslice = Slider(
+            ax=ax_zslice,
+            label="Z slice",
+            valmin=0,
+            valmax=max_zslice,
+            valinit=int(max_zslice // 2),
+            valstep=1
+        )
+
+        def update(val):
+            filter = slider_filter.val
+            channel = slider_channel.val
+            zslice = slider_zslice.val
+            ax.imshow(
+                conv[filter][channel][zslice],
+                cmap="Greys_r",
+                vmax=max_voxel,
+                vmin=min_voxel
+            )
+            fig.canvas.draw_idle()
+
+        slider_filter.on_changed(update)
+        slider_channel.on_changed(update)
+        slider_zslice.on_changed(update)
+
+        plt.show()
+
+
