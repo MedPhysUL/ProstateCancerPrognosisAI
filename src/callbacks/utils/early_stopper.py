@@ -221,10 +221,11 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         """
         super().__init__(patience=patience, tolerance=tolerance)
 
+        self.criterion_full_name = None
+        self.with_regularization = with_regularization
+
         self._best_val_loss = np.inf
-        self._criterion_full_name = None
         self._is_better = lambda x, y: (y - x) > self.tolerance
-        self._with_regularization = with_regularization
 
     def _set_criterion_full_name(self, learning_algorithm: LearningAlgorithm):
         """
@@ -240,12 +241,12 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         if not learning_algorithm.regularization:
             suffix = EpochState.SUFFIX_WITHOUT_REGULARIZATION
         else:
-            if self._with_regularization:
+            if self.with_regularization:
                 suffix = EpochState.SUFFIX_WITH_REGULARIZATION
             else:
                 suffix = EpochState.SUFFIX_WITHOUT_REGULARIZATION
 
-        self._criterion_full_name = f"{basic_name}{suffix}"
+        self.criterion_full_name = f"{basic_name}{suffix}"
 
     def on_fit_start(self, learning_algorithm: LearningAlgorithm):
         """
@@ -273,7 +274,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         early_stop : bool
             Whether to early stop.
         """
-        val_loss = epoch_state.valid_multi_task_losses[self.learning_algorithm_name][self._criterion_full_name]
+        val_loss = epoch_state.valid_multi_task_losses[self.learning_algorithm_name][self.criterion_full_name]
 
         # if the score is worst than the best score we increment the counter
         if not self._is_better(val_loss, self._best_val_loss):
@@ -307,4 +308,4 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
             f"{epoch_state.idx - self.patience}"
         )
 
-        print(f"\nCriterion {self._criterion_full_name}, Loss :{round(self._best_val_loss, 4)}")
+        print(f"\nCriterion {self.criterion_full_name}, Loss :{round(self._best_val_loss, 4)}")
