@@ -201,7 +201,7 @@ class Callback(ABC):
         if self.load_state and checkpoint is not None:
             state = checkpoint.get(self.name, None)
             if state is not None:
-                self.__dict__.update(state)
+                vars(self).update(state)
 
     def get_checkpoint_state(self, trainer, **kwargs) -> object:
         """
@@ -219,7 +219,7 @@ class Callback(ABC):
             The state of the callback.
         """
         if self.save_state:
-            return {k: v for k, v in self.__dict__.items() if k not in self.UNSERIALIZABLE_ATTRIBUTES}
+            return {k: v for k, v in vars(self).items() if k not in self.UNSERIALIZABLE_ATTRIBUTES}
 
     def on_epoch_start(self, trainer, **kwargs):
         """
