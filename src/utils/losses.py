@@ -252,6 +252,10 @@ class BinaryClassificationLoss(Loss):
     def scaling_factor(self) -> Optional[float]:
         return self._scaling_factor
 
+    @scaling_factor.setter
+    def scaling_factor(self, scaling_factor: float):
+        self._scaling_factor = scaling_factor
+
     @property
     def weight(self) -> float:
         return self._weight
@@ -276,6 +280,10 @@ class BinaryClassificationLoss(Loss):
         loss : Tensor
             Rounded loss score.
         """
+        assert self.scaling_factor, f"Scaling factor must be set before computing the {self.__class__.__name__}. Use " \
+                                    f"the method 'update_scaling_factor' or directly set the 'scaling_factor " \
+                                    f"attribute'."
+
         nonmissing_targets_idx = self.get_idx_of_nonmissing_targets(targets)
         if len(nonmissing_targets_idx) == 0:
             return tensor(nan, device=pred.device)

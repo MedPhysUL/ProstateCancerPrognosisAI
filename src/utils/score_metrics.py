@@ -295,6 +295,10 @@ class BinaryClassificationMetric(Metric):
     def scaling_factor(self) -> Optional[float]:
         return self._scaling_factor
 
+    @scaling_factor.setter
+    def scaling_factor(self, scaling_factor: float):
+        self._scaling_factor = scaling_factor
+
     @property
     def threshold(self) -> float:
         return self._threshold
@@ -331,6 +335,10 @@ class BinaryClassificationMetric(Metric):
         metric : float
             Rounded metric score.
         """
+        assert self.scaling_factor, f"Scaling factor must be set before computing the {self.__class__.__name__}. Use " \
+                                    f"the method 'update_scaling_factor' or directly set the 'scaling_factor " \
+                                    f"attribute'."
+
         nonmissing_targets_idx = self.get_idx_of_nonmissing_targets(targets)
         if len(nonmissing_targets_idx) == 0:
             return np.nan
@@ -534,7 +542,7 @@ class SegmentationMetric(Metric):
         if not is_tensor(pred):
             pred, targets = self.convert_to_tensors(pred, targets)
 
-        return round(self._compute_metric(pred, targets, reduction), self.n_digits)
+        return round(self.perform_reduction(self._compute_metric(pred, targets), reduction), self.n_digits)
 
     @staticmethod
     def convert_to_tensors(
@@ -565,8 +573,7 @@ class SegmentationMetric(Metric):
     def _compute_metric(
             self,
             pred: Tensor,
-            targets: Tensor,
-            reduction: Optional[Union[MetricReduction, str]]
+            targets: Tensor
     ) -> float:
         """
         Computes the metric score.
@@ -577,8 +584,6 @@ class SegmentationMetric(Metric):
             (B, C, X, Y, Z) tensor with predicted labels
         targets : Tensor
             (B, C, X, Y, Z) tensor with ground truth
-        reduction : Optional[Union[MetricReduction, str]]
-            Reduction method to use.
 
         Returns
         -------
@@ -784,9 +789,8 @@ class DICEMetric(SegmentationMetric):
     def _compute_metric(
             self,
             pred: Tensor,
-            targets: Tensor,
-            reduction: Optional[Union[MetricReduction, str]]
-    ) -> float:
+            targets: Tensor
+    ) -> Tensor:
         """
         Returns the average of the DICE score.
 
@@ -796,14 +800,12 @@ class DICEMetric(SegmentationMetric):
             (B, C, X, Y, Z) tensor with predicted labels
         targets : Tensor
             (B, C, X, Y, Z) tensor with ground truth
-        reduction : Optional[Union[MetricReduction, str]]
-            Reduction method to use.
 
         Returns
         -------
-        metric : float
-            Score as a float.
+        metric : Tensor
+            (N, 1) tensor.
         """
         metric = DiceMetric(reduction="mean")
 
-        return self.perform_reduction(metric(y_pred=pred, y=targets), reduction)
+        return metric(y_pred=pred, y=targets)
