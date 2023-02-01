@@ -88,7 +88,7 @@ class CallbackList:
         for callback in self.callbacks:
             if callback.allow_duplicates is False:
                 if isinstance(callback, tuple(seen)):
-                    duplicates.append(callback.name)
+                    duplicates.append(callback.__class__.__name__)
                 else:
                     seen.append(type(callback))
 
