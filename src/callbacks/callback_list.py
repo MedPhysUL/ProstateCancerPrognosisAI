@@ -37,7 +37,8 @@ class CallbackList:
             "All callbacks must be instances of Callback."
 
         self.callbacks = list(callbacks)
-        self.check_duplicates()
+        self.check_for_duplicate_callback_classes()
+        self.check_for_duplicate_callback_names()
         self.sort()
 
     def __getitem__(self, idx: int) -> Callback:
@@ -78,22 +79,38 @@ class CallbackList:
         """
         return len(self.callbacks)
 
-    def check_duplicates(self):
+    def check_for_duplicate_callback_classes(self):
         """
-        Validates that the duplicated classes in the CallbackList are allowed duplicates.
+        Checks that the duplicated classes in the CallbackList are allowed duplicates.
         """
-        seen, duplicates = set(), []
+        seen, duplicates = [], []
 
         for callback in self.callbacks:
             if callback.allow_duplicates is False:
                 if isinstance(callback, tuple(seen)):
                     duplicates.append(callback.name)
                 else:
-                    seen.add(type(callback))
+                    seen.append(type(callback))
 
         if duplicates:
             raise AssertionError(f"Duplicates of 'Callback' with 'allow_duplicates' == False are not allowed in "
                                  f"'CallbackList'. Found duplicates {duplicates}.")
+
+    def check_for_duplicate_callback_names(self):
+        """
+        Check if there is any duplicate callback names in the CallbackList.
+        """
+        seen, duplicates = [], []
+
+        for callback in self.callbacks:
+            if callback.name in seen:
+                duplicates.append(callback.name)
+            else:
+                seen.append(callback.name)
+
+        if duplicates:
+            raise AssertionError(f"Duplicates callback names are not allowed in 'CallbackList'. Found duplicates "
+                                 f"{duplicates}.")
 
     def sort(self):
         """
@@ -112,7 +129,8 @@ class CallbackList:
         """
         assert isinstance(callback, Callback), "callback must be an instance of Callback"
         self.callbacks.append(callback)
-        self.check_duplicates()
+        self.check_for_duplicate_callback_classes()
+        self.check_for_duplicate_callback_names()
         self.sort()
 
     def remove(self, callback: Callback):
