@@ -36,7 +36,7 @@ from src.data.datasets.table_dataset import MaskType
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
 from src.models.base.base_model import BaseModel
 from src.utils.hyperparameters import CategoricalHP, Distribution, HP, NumericalContinuousHP, NumericalIntHP, Range
-from src.utils.score_metrics import Direction
+from src.utils.metrics import Direction
 
 
 class Objective:

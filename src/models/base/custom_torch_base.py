@@ -32,7 +32,7 @@ from src.training.early_stopper import EarlyStopper, EarlyStopperType, MetricEar
 from src.training.optimizer import SAM
 from src.utils.multi_task_losses import MultiTaskLoss
 from src.utils.reductions import MetricReduction
-from src.utils.score_metrics import Direction
+from src.utils.metrics import Direction
 from src.utils.tasks import ClassificationTask, SegmentationTask, Task
 from src.visualization.tools import visualize_epoch_progression
 

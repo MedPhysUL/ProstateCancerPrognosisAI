@@ -10,7 +10,7 @@
 
 import os
 
-from src.utils.score_metrics import BinaryBalancedAccuracy, DICEMetric
+from src.utils.metrics import BinaryBalancedAccuracy, DICEMetric
 from src.utils.losses import BinaryCrossEntropyWithLogitsLoss, DICELoss
 from src.utils.tasks import ClassificationTask, SegmentationTask
 

@@ -1,5 +1,5 @@
 """
-    @file:              score_metrics.py
+    @file:              metrics.py
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     07/2022
@@ -57,7 +57,6 @@ class Metric(ABC):
         n_digits : int
             Number of digits kept.
         """
-        # Protected attributes
         self.direction = Direction(direction).value
         self.reduction = MetricReduction(reduction).value
         self.n_digits = n_digits
