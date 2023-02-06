@@ -23,7 +23,7 @@ from matplotlib.ticker import MaxNLocator
 from src.callbacks.callback import Callback, Priority
 
 
-MeasurementType: TypeAlias = Dict[str, Dict[str, Union[float, List[float]]]]
+MeasurementsType: TypeAlias = Dict[str, Dict[str, Union[float, List[float]]]]
 
 
 @dataclass
@@ -33,7 +33,7 @@ class MeasurementsContainer:
 
     Elements
     --------
-    multi_task_losses: MeasurementType
+    multi_task_losses: MeasurementsType
         A dictionary containing multi-task losses. The keys are the names of the learning algorithm used, the values
         are dictionaries whose keys are the names of the losses while its values are a list of the losses measured each
         epoch. This list of losses can also just be a float, when the current class is used to represent a single
@@ -51,7 +51,7 @@ class MeasurementsContainer:
                 },
             }
 
-    single_task_losses: MeasurementType
+    single_task_losses: MeasurementsType
         A dictionary containing single task losses. The keys are the names of the tasks, the values are dictionaries
         whose keys are the names of the losses while its values are a list of the losses measured each epoch. This list
         of losses can also just be a float, when the current class is used to represent a single epoch state instead
@@ -67,7 +67,7 @@ class MeasurementsContainer:
                 },
             }
 
-    single_task_metrics : MeasurementType
+    single_task_metrics : MeasurementsType
         A dictionary containing metric values. The keys are the names of the tasks, the values are dictionaries whose
         keys are the names of the metrics while its values are a list of the metrics measured each epoch. This list of
         metrics can also just be a float, when the current class is used to represent a single epoch state instead of
@@ -85,9 +85,9 @@ class MeasurementsContainer:
                 },
             }
     """
-    multi_task_losses: MeasurementType = field(default_factory=dict)
-    single_task_losses: MeasurementType = field(default_factory=dict)
-    single_task_metrics: MeasurementType = field(default_factory=dict)
+    multi_task_losses: MeasurementsType = field(default_factory=dict)
+    single_task_losses: MeasurementsType = field(default_factory=dict)
+    single_task_metrics: MeasurementsType = field(default_factory=dict)
 
 
 @dataclass
