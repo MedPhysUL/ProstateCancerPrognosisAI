@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     12/2022
-    @Last modification: 12/2022
+    @Last modification: 02/2023
 
     @Description:       This file is used to define the 'CallbackList' class which essentially acts as a list of
                         callbacks. A lot of the logic behind the following code is borrowed from PyTorch Lightning
@@ -11,7 +11,7 @@
                         NeuroTorch (https://github.com/NeuroTorch/NeuroTorch).
 """
 
-from typing import Iterable, Optional, Iterator, Dict, Any
+from typing import Any, Dict, Optional, Iterable, Iterator
 
 from src.callbacks.callback import Callback
 
@@ -79,6 +79,21 @@ class CallbackList:
         """
         return len(self.callbacks)
 
+    def append(self, callback: Callback):
+        """
+        Append a callback to the list.
+
+        Parameters
+        ----------
+        callback : Callback
+            The callback to append.
+        """
+        assert isinstance(callback, Callback), "callback must be an instance of Callback"
+        self.callbacks.append(callback)
+        self.check_for_duplicate_callback_classes()
+        self.check_for_duplicate_callback_names()
+        self.sort()
+
     def check_for_duplicate_callback_classes(self):
         """
         Checks that the duplicated classes in the CallbackList are allowed duplicates.
@@ -112,27 +127,6 @@ class CallbackList:
             raise AssertionError(f"Duplicates callback names are not allowed in 'CallbackList'. Found duplicates "
                                  f"{duplicates}.")
 
-    def sort(self):
-        """
-        Sorts the callbacks using their priority.
-        """
-        self.callbacks.sort(key=lambda callback: callback.priority, reverse=True)
-
-    def append(self, callback: Callback):
-        """
-        Append a callback to the list.
-
-        Parameters
-        ----------
-        callback : Callback
-            The callback to append.
-        """
-        assert isinstance(callback, Callback), "callback must be an instance of Callback"
-        self.callbacks.append(callback)
-        self.check_for_duplicate_callback_classes()
-        self.check_for_duplicate_callback_names()
-        self.sort()
-
     def remove(self, callback: Callback):
         """
         Remove a callback from the list.
@@ -146,42 +140,24 @@ class CallbackList:
         self.callbacks.remove(callback)
         self.sort()
 
-    def load_checkpoint_state(self, trainer, checkpoint: dict):
+    def sort(self):
         """
-        For all callback in the list of callbacks, loads the state of the callback from a dictionary.
-
-        Parameters
-        ----------
-        trainer : Trainer
-            The trainer.
-        checkpoint : dict
-            The dictionary containing all the states of the trainer.
+        Sorts the callbacks using their priority.
         """
-        for callback in self.callbacks:
-            callback.load_checkpoint_state(trainer, checkpoint)
+        self.callbacks.sort(key=lambda callback: callback.priority, reverse=True)
 
-    def get_checkpoint_state(self, trainer) -> Dict[str, Any]:
+    def state_dict(self) -> Dict[str, Any]:
         """
         Collates the states of the callbacks in a dictionary. This is called when the checkpoint manager saves the
         state of the trainer. Then those states are saved in the checkpoint file with the name of the callback as the
         key.
-
-        Parameters
-        ----------
-        trainer : Trainer
-            The Trainer.
 
         Returns
         -------
         states: Dict[str, Any]
             The state of the callback.
         """
-        states = {
-            callback.name: callback.get_checkpoint_state(trainer)
-            for callback in self.callbacks
-        }
-        states = {key: value for key, value in states.items() if value is not None}
-        return states
+        return {callback.name: callback.state_dict() for callback in self.callbacks}
 
     def on_tuning_start(self, tuner, **kwargs):
         """

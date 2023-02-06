@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     10/2022
-    @Last modification: 01/2023
+    @Last modification: 02/2023
 
     @Description:       This file is used to define the Callback abstract class. A lot of the logic behind the
                         following code is borrowed from PyTorch Lightning
@@ -13,7 +13,6 @@
 
 from abc import ABC, abstractmethod
 from enum import IntEnum
-from typing import Optional
 
 
 class Priority(IntEnum):
@@ -48,7 +47,6 @@ class Callback(ABC):
             * Executes n_trials times:
             - `on_trial_start`
             - `on_fit_start`
-            - `load_checkpoint_state`
             * Executes n_epochs times:
                 - `on_epoch_start`
                 - `on_train_start`
@@ -74,8 +72,7 @@ class Callback(ABC):
     def __init__(
             self,
             name: str,
-            save_state: bool = True,
-            load_state: Optional[bool] = None
+            save_state: bool = True
     ):
         """
         Initialize name and state of the callback.
@@ -86,14 +83,24 @@ class Callback(ABC):
             The name of the callback.
         save_state : bool
             Whether to save the state of the callback in the checkpoint file. Default is True.
-        load_state : Optional[bool]
-            Whether to load from the checkpoint file. Default is equal to save_state.
         """
-        self.load_state = load_state if load_state is not None else save_state
         self.name = name
         self.save_state = save_state
         self.trainer = None
         self.tuner = None
+
+    @property
+    @abstractmethod
+    def allow_duplicates(self) -> bool:
+        """
+        Whether to allow duplicates of this specific Callback class in the 'CallbackList'.
+
+        Returns
+        -------
+        allow : bool
+            Allow duplicates.
+        """
+        raise NotImplementedError
 
     @property
     @abstractmethod
@@ -108,18 +115,18 @@ class Callback(ABC):
         """
         raise NotImplementedError
 
-    @property
-    @abstractmethod
-    def allow_duplicates(self) -> bool:
+    def state_dict(self) -> dict:
         """
-        Whether to allow duplicates of this specific Callback class in the 'CallbackList'.
+        Get the state of the callback. This is called when the checkpoint manager saves the state of the trainer. Then
+        this state is saved in the checkpoint file with the name of the callback as the key.
 
         Returns
         -------
-        allow : bool
-            Allow duplicates.
+        state : dict
+            The state of the callback.
         """
-        raise NotImplementedError
+        if self.save_state:
+            return {k: v for k, v in vars(self).items() if k not in self.UNSERIALIZABLE_ATTRIBUTES}
 
     def on_tuning_start(self, tuner, **kwargs):
         """
@@ -186,40 +193,6 @@ class Callback(ABC):
             The trainer.
         """
         pass
-
-    def load_checkpoint_state(self, trainer, checkpoint: dict, **kwargs):
-        """
-        Loads the state of the callback from a dictionary.
-
-        Parameters
-        ----------
-        trainer : Trainer
-            The trainer.
-        checkpoint : dict
-            The dictionary containing all the states of the trainer.
-        """
-        if self.load_state and checkpoint is not None:
-            state = checkpoint.get(self.name, None)
-            if state is not None:
-                vars(self).update(state)
-
-    def get_checkpoint_state(self, trainer, **kwargs) -> object:
-        """
-        Get the state of the callback. This is called when the checkpoint manager saves the state of the trainer. Then
-        this state is saved in the checkpoint file with the name of the callback as the key.
-
-        Parameters
-        ----------
-        trainer : Trainer
-            The trainer.
-
-        Returns
-        -------
-        state : object
-            The state of the callback.
-        """
-        if self.save_state:
-            return {k: v for k, v in vars(self).items() if k not in self.UNSERIALIZABLE_ATTRIBUTES}
 
     def on_epoch_start(self, trainer, **kwargs):
         """
