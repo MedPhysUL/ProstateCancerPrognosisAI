@@ -2,8 +2,8 @@
     @file:              metric_list.py
     @Author:            Maxence Larose
 
-    @Creation Date:     02/2022
-    @Last modification: 02/2022
+    @Creation Date:     02/2023
+    @Last modification: 02/2023
 
     @Description:       This file is used to define the `MetricList` class which essentially acts as a list of
                         metrics.
