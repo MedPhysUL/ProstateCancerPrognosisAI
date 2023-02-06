@@ -21,6 +21,8 @@ class Regularization(Module):
     Base class for regularization.
     """
 
+    LAMBDA = "lambda_"
+
     def __init__(
             self,
             params: Union[Iterable[Parameter], Dict[str, Parameter]],
@@ -62,8 +64,21 @@ class Regularization(Module):
         loss : Tensor
             The loss of the regularization.
         """
-        out = super(Regularization, self).__call__(*args, **kwargs)
+        out = super().__call__(*args, **kwargs)
         return self.lambda_ * out
+
+    def state_dict(self, **kwargs):
+        """
+        Get the state of the regularization.
+
+        Returns
+        -------
+        state: Dict[str, Any]
+            The state of the regularization.
+        """
+        state_dict = super().state_dict(**kwargs)
+        state_dict[self.LAMBDA] = self.lambda_
+        return state_dict
 
     @abstractmethod
     def forward(self, *args, **kwargs) -> Tensor:
@@ -161,19 +176,12 @@ class LpRegularization(Regularization):
         power : int
             The p parameter of the LP norm. Example: p=1 -> L1 norm, p=2 -> L2 norm.
         """
-        super(LpRegularization, self).__init__(params=params, lambda_=lambda_)
+        super().__init__(params=params, lambda_=lambda_)
         self.power = power
 
-    def forward(self, *args, **kwargs) -> Tensor:
+    def forward(self) -> Tensor:
         """
         Compute the forward pass of the regularization.
-
-        Parameters
-        ----------
-        args : Any
-            Args of the forward pass.
-        kwargs : dict
-            Kwargs of the forward pass.
 
         Returns
         -------
@@ -206,7 +214,7 @@ class L1Regularization(LpRegularization):
         lambda_ : float
             The weight of the regularization. In other words, the coefficient that multiplies the loss.
         """
-        super(L1Regularization, self).__init__(params=params, lambda_=lambda_, power=1)
+        super().__init__(params=params, lambda_=lambda_, power=1)
 
 
 class L2Regularization(LpRegularization):
@@ -229,4 +237,4 @@ class L2Regularization(LpRegularization):
         lambda_ : float
             The weight of the regularization. In other words, the coefficient that multiplies the loss.
         """
-        super(L2Regularization, self).__init__(params=params, lambda_=lambda_, power=2)
+        super().__init__(params=params, lambda_=lambda_, power=2)
