@@ -288,21 +288,19 @@ class TrainingHistory(Callback):
             if isinstance(v, dict):
                 self._append_state(container[k], v)
             elif isinstance(v, list):
-                values_to_add = state[k]
                 if k in container:
-                    if isinstance(values_to_add, list):
-                        for value in values_to_add:
-                            container[k].append(value)
-                    else:
-                        container[k].append(state[k])
+                    for value in v:
+                        container[k].append(value)
                 else:
-                    if isinstance(values_to_add, list):
-                        container[k] = values_to_add
-                    else:
-                        container[k] = [state[k]]
+                    container[k] = v
+            elif isinstance(v, (int, float)):
+                if k in container:
+                    container[k].append(state[k])
+                else:
+                    container[k] = [state[k]]
             else:
-                raise TypeError(f"'container' dictionary must contain values of type 'dict' or 'list'. Found "
-                                f"{type(v)}.")
+                raise TypeError(f"'container' dictionary must contain values of type 'dict', 'list', 'int' or 'float'. "
+                                f"Found {type(v)}.")
 
         self.container = from_dict(data_class=HistoryContainer, data=container)
 
