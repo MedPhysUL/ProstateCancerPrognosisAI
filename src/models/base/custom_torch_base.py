@@ -612,7 +612,7 @@ class TorchCustomModel(Module, ABC):
             for task in self._tasks:
                 scores[task.name] = {}
 
-                for metric in task.metrics:
+                for metric in task.unique_metrics:
                     scores[task.name][metric.name] = metric(
                         np.array(predictions[task.name]), np.array(targets[task.name])
                     )
@@ -648,7 +648,7 @@ class TorchCustomModel(Module, ABC):
             if isinstance(task, SegmentationTask):
                 segmentation_scores_dict[task.name] = {}
 
-                for metric in task.metrics:
+                for metric in task.unique_metrics:
                     segmentation_scores_dict[task.name][metric.name] = []
 
         non_segmentation_outputs_dict = {
@@ -670,7 +670,7 @@ class TorchCustomModel(Module, ABC):
 
                     if isinstance(task, SegmentationTask):
 
-                        for metric in task.metrics:
+                        for metric in task.unique_metrics:
                             segmentation_scores_dict[task.name][metric.name].append(
                                 metric(pred, target, MetricReduction.NONE)
                             )
@@ -680,13 +680,13 @@ class TorchCustomModel(Module, ABC):
 
             for task in self.tasks:
                 if isinstance(task, SegmentationTask):
-                    for metric in task.metrics:
+                    for metric in task.unique_metrics:
                         scores[task.name][metric.name] = metric.perform_reduction(
                             FloatTensor(segmentation_scores_dict[task.name][metric.name])
                         )
                 else:
                     output = non_segmentation_outputs_dict[task.name]
-                    for metric in task.metrics:
+                    for metric in task.unique_metrics:
                         scores[task.name][metric.name] = metric(np.array(output.predictions), np.array(output.targets))
 
         return scores
