@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     09/2022
-    @Last modification: 01/2023
+    @Last modification: 02/2023
 
     @Description:       This file is used to define the multi-task losses used to measure models' performance. The
                         ultimate goal is to implement a loss based on uncertainty. See :
@@ -12,13 +12,14 @@
                             3. https://github.com/yaringal/multi-task-learning-example
 """
 
-
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from copy import copy
+from typing import Any, Dict, List, Optional, Union
 
 from torch import nanmean, stack, Tensor
 
 from src.utils.tasks import Task
+from src.utils.task_list import TaskList
 
 
 class MultiTaskLoss(ABC):
@@ -26,32 +27,25 @@ class MultiTaskLoss(ABC):
     An abstract class that represents the skeleton of callable classes to use as multi-task optimization criteria.
     """
 
+    TORCH_LIKE_SERIALIZABLE_ATTRIBUTES = ["tasks"]
+
     def __init__(
             self,
-            name: str,
-            tasks: Optional[List[Task]] = None
+            name: Optional[str] = None,
+            tasks: Optional[Union[Task, TaskList, List[Task]]] = None,
     ):
         """
         Sets protected attributes.
 
         Parameters
         ----------
-        name : str
+        name : Optional[str]
             Name of the Loss.
-        tasks : Optional[List[Task]]
-            Tasks to include in the multi-task loss calculation. By default, we use all available tasks.
+        tasks : Optional[Union[Task, TaskList, List[Task]]]
+            Tasks to include in the multi-task loss calculation. By default, we use all available tasks in the dataset.
         """
-        # Protected attributes
         self.name = name if name is not None else f"{self.__class__.__name__}"
-        self._tasks = tasks
-
-    @property
-    def tasks(self) -> Optional[List[Task]]:
-        return self._tasks
-
-    @tasks.setter
-    def tasks(self, tasks: List[Task]) -> None:
-        self._tasks = tasks
+        self.tasks = TaskList(tasks)
 
     def __call__(
             self,
@@ -94,16 +88,38 @@ class MultiTaskLoss(ABC):
         """
         raise NotImplementedError
 
+    def state_dict(self) -> Dict[str, Any]:
+        """
+        Get the state of the multi-task loss.
+
+        Returns
+        -------
+        states: Dict[str, Any]
+            The state of the task.
+        """
+        state = {}
+
+        for k, v in vars(self).items():
+            if k in self.TORCH_LIKE_SERIALIZABLE_ATTRIBUTES:
+                if v:
+                    state[k] = v.state_dict()
+                else:
+                    state[k] = None
+            else:
+                state[k] = copy(v)
+
+        return state
+
 
 class MeanLoss(MultiTaskLoss):
     """
-    Callable class that computes the mean loss between all tasks. This is the most simple possible multi-task loss.
+    Callable class that computes the mean loss between all tasks.
     """
 
     def __init__(
             self,
             name: Optional[str] = None,
-            tasks: Optional[List[Task]] = None
+            tasks: Optional[Union[Task, TaskList, List[Task]]] = None
     ):
         """
         Sets protected attributes.
@@ -112,8 +128,8 @@ class MeanLoss(MultiTaskLoss):
         ----------
         name : Optional[str]
             Name of the multi-task loss.
-        tasks : Optional[List[Task]]
-            Tasks to include in the multi-task loss calculation. By default, we use all available tasks.
+        tasks : Optional[Union[Task, TaskList, List[Task]]]
+            Tasks to include in the multi-task loss calculation. By default, we use all available tasks in the dataset.
         """
         super().__init__(name=name, tasks=tasks)
 
