@@ -3,15 +3,17 @@
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
-    @Last modification: 01/2023
+    @Last modification: 02/2023
 
     @Description:       This file is used to define the different possible tasks.
 """
 
 from abc import ABC
-from typing import List, Optional, Type, Union
+from copy import copy
+from typing import Any, Dict, Iterable, Optional, Type, Union
 
-from src.utils.score_metrics import BinaryClassificationMetric, Metric, RegressionMetric, SegmentationMetric
+from src.utils.metric_list import MetricList
+from src.utils.metrics import BinaryClassificationMetric, Metric, RegressionMetric, SegmentationMetric
 from src.utils.losses import BinaryClassificationLoss, Loss, RegressionLoss, SegmentationLoss
 
 
@@ -20,14 +22,15 @@ class Task(ABC):
     An abstract class representing a task.
     """
 
-    _instance_names = []
+    PYTHON_LIKE_SERIALIZABLE_ATTRIBUTES = ["_hps_tuning_metric", "_criterion", "_early_stopping_metric"]
+    TORCH_LIKE_SERIALIZABLE_ATTRIBUTES = ["_evaluation_metrics"]
 
     def __init__(
             self,
             hps_tuning_metric: Metric,
             criterion: Optional[Loss] = None,
             early_stopping_metric: Optional[Metric] = None,
-            evaluation_metrics: Optional[List[Metric]] = None,
+            evaluation_metrics: Optional[Union[Metric, Iterable[Metric], MetricList]] = None,
             name: str = None
     ):
         """
@@ -41,79 +44,167 @@ class Task(ABC):
             A loss function.
         early_stopping_metric : Optional[Metric]
             A metric used for early stopping.
-        evaluation_metrics : Optional[List[Metric]]
+        evaluation_metrics : Optional[Union[Metric, Iterable[Metric], MetricList]]
             A list of metrics to evaluate the trained models on.
         name : str
             The name of the task.
         """
-        assert name not in self._instance_names, "Tasks name must be unique."
-        self._instance_names.append(name)
         self._name = name
 
         self._criterion = criterion
-
-        self._set_hps_tuning_metric(hps_tuning_metric)
-        self._set_early_stopping_metric(early_stopping_metric)
-        self._set_evaluation_metrics(evaluation_metrics)
+        self._early_stopping_metric = early_stopping_metric
+        self._evaluation_metrics = MetricList(evaluation_metrics)
+        self._hps_tuning_metric = hps_tuning_metric
 
     @property
     def criterion(self) -> Optional[Loss]:
+        """
+        Criterion.
+
+        Returns
+        -------
+        criterion : Optional[Loss]
+            A loss function.
+        """
         return self._criterion
 
     @property
-    def early_stopping_metric(self) -> Metric:
+    def early_stopping_metric(self) -> Optional[Metric]:
+        """
+        Early stopping metric.
+
+        Returns
+        -------
+        early_stopping_metric : Optional[Metric]
+            A metric used for early stopping.
+        """
         return self._early_stopping_metric
 
     @property
-    def evaluation_metrics(self) -> List[Metric]:
+    def evaluation_metrics(self) -> Optional[MetricList]:
+        """
+        Evaluation metrics.
+
+        Returns
+        -------
+        evaluation_metrics : Optional[MetricList]
+            A list of metrics to evaluate the trained models on.
+        """
         return self._evaluation_metrics
 
     @property
     def hps_tuning_metric(self) -> Metric:
+        """
+        Hyperparameters tuning metric.
+
+        Returns
+        -------
+        hps_tuning_metric : Metric
+            A metric used for Optuna hyperparameters optimization.
+        """
         return self._hps_tuning_metric
 
     @property
-    def metrics(self) -> List[Metric]:
-        return self._metrics
+    def metrics(self) -> MetricList:
+        """
+        'MetricList' containing all given metrics.
+
+        Returns
+        -------
+        metric_list : MetricList
+            A metric list containing all metrics.
+        """
+        metrics = [self.hps_tuning_metric]
+        if self.early_stopping_metric:
+            metrics.append(self.early_stopping_metric)
+        if self.evaluation_metrics:
+            metrics.extend(self.evaluation_metrics)
+
+        return MetricList(metrics)
 
     @property
     def name(self) -> str:
+        """
+        Task name
+
+        Returns
+        -------
+        name : str
+            Task name.
+        """
         return self._name
 
-    def _set_hps_tuning_metric(self, hps_tuning_metric: Metric):
-        self._hps_tuning_metric = hps_tuning_metric
-        self._unique_metric_names = {hps_tuning_metric.name}
-        self._metrics = [hps_tuning_metric]
+    @property
+    def unique_metrics(self) -> MetricList:
+        """
+        'MetricList' containing only the unique metrics. Metrics with the same name are considered identical.
 
-    def _set_early_stopping_metric(self, early_stopping_metric: Metric):
-        if early_stopping_metric:
-            self._early_stopping_metric = early_stopping_metric
-            if early_stopping_metric.name not in self._unique_metric_names:
-                self._unique_metric_names.add(early_stopping_metric.name)
-                self._metrics.append(early_stopping_metric)
-        else:
-            self._early_stopping_metric = self._hps_tuning_metric
+        Returns
+        -------
+        metric_list : MetricList
+            A metric list containing only the unique metrics.
+        """
+        unique_metrics, unique_names = [], []
+        for metric in self.metrics:
+            if metric.name not in unique_names:
+                unique_metrics.append(metric)
+                unique_names.append(metric.name)
 
-    def _set_evaluation_metrics(self, evaluation_metrics: List[Metric]):
-        if evaluation_metrics:
-            self._evaluation_metrics = evaluation_metrics
-            for m in evaluation_metrics:
-                if m.name not in self._unique_metric_names:
-                    self._unique_metric_names.add(m.name)
-                    self._metrics.append(m)
-        else:
-            self._evaluation_metrics = []
+        return MetricList(unique_metrics)
 
-    def _validate_metrics_type(self, type_: Type):
-        if self.metrics and not all(isinstance(m, type_) for m in self.metrics):
-            raise AssertionError(
-                f"All metrics of a '{self.__class__.__name__}' should be of type '{type_.__name__}'."
-            )
+    def state_dict(self) -> Dict[str, Any]:
+        """
+        Get the state of the task.
+
+        Returns
+        -------
+        state: Dict[str, Any]
+            The state of the task.
+        """
+        state = {}
+
+        for k, v in vars(self).items():
+            if k in self.TORCH_LIKE_SERIALIZABLE_ATTRIBUTES:
+                if v:
+                    state[k] = v.state_dict()
+                else:
+                    state[k] = None
+            elif k in self.PYTHON_LIKE_SERIALIZABLE_ATTRIBUTES:
+                if v:
+                    state[k] = vars(v).copy()
+                else:
+                    state[k] = None
+            else:
+                state[k] = copy(v)
+
+        return state
 
     def _validate_criterion_type(self, type_: Type):
+        """
+        Validate criterion type. Raise an AssertionError if the criterion is not of the required type.
+
+        Parameters
+        ----------
+        type_ : Type
+            Required criterion's type.
+        """
         if self._criterion and not isinstance(self._criterion, type_):
             raise AssertionError(
                 f"The 'criterion' of a '{self.__class__.__name__}' should be of type '{type_.__name__}'."
+            )
+
+    def _validate_metrics_type(self, type_: Type):
+        """
+        Validate all metrics type. Raise an AssertionError if any of the metric is not of the required type.
+
+        Parameters
+        ----------
+        type_ : Type
+            Required metrics' type.
+        """
+        if self.metrics and not all(isinstance(m, type_) for m in self.metrics):
+            raise AssertionError(
+                f"All metrics of a '{self.__class__.__name__}' should be of type '{type_.__name__}'."
             )
 
 
@@ -129,7 +220,7 @@ class TableTask(Task):
             target_column: str,
             criterion: Optional[Union[BinaryClassificationLoss, RegressionLoss]] = None,
             early_stopping_metric: Optional[Metric] = None,
-            evaluation_metrics: Optional[List[Metric]] = None,
+            evaluation_metrics: Optional[Union[Metric, Iterable[Metric], MetricList]] = None,
 
     ):
         """
@@ -147,7 +238,7 @@ class TableTask(Task):
             A loss function.
         early_stopping_metric : Optional[Metric]
             A metric used for early stopping.
-        evaluation_metrics : Optional[List[Metric]]
+        evaluation_metrics : Optional[Union[Metric, Iterable[Metric], MetricList]]
             A list of metrics to evaluate the trained models.
         """
         super().__init__(
@@ -162,6 +253,14 @@ class TableTask(Task):
 
     @property
     def target_column(self) -> str:
+        """
+        Target column.
+
+        Returns
+        -------
+        target_column : str
+            Name of the column containing the targets associated to this task.
+        """
         return self._target_column
 
 
@@ -170,14 +269,18 @@ class ClassificationTask(TableTask):
     A class used to define a Classification task.
     """
 
+    PYTHON_LIKE_SERIALIZABLE_ATTRIBUTES = TableTask.PYTHON_LIKE_SERIALIZABLE_ATTRIBUTES + ["_decision_threshold_metric"]
+
     def __init__(
             self,
+            decision_threshold_metric: BinaryClassificationMetric,
             hps_tuning_metric: BinaryClassificationMetric,
             target_column: str,
             criterion: Optional[BinaryClassificationLoss] = None,
-            decision_threshold_metric: Optional[BinaryClassificationMetric] = None,
             early_stopping_metric: Optional[BinaryClassificationMetric] = None,
-            evaluation_metrics: Optional[List[BinaryClassificationMetric]] = None,
+            evaluation_metrics: Optional[
+                Union[BinaryClassificationMetric, Iterable[BinaryClassificationMetric], MetricList]
+            ] = None,
             name: Optional[str] = None,
     ):
         """
@@ -185,22 +288,24 @@ class ClassificationTask(TableTask):
 
         Parameters
         ----------
+        decision_threshold_metric : BinaryClassificationMetric
+            A metric whose optimized threshold is used to make class predictions from probability predictions.
         hps_tuning_metric : BinaryClassificationMetric
             A metric used for Optuna hyperparameters optimization.
         target_column : str
             Name of the column containing the targets associated to this task.
         criterion : Optional[BinaryClassificationLoss]
             A loss function.
-        decision_threshold_metric : Optional[BinaryClassificationMetric]
-            A metric whose optimized threshold is used to make class predictions from probability predictions.
         early_stopping_metric : Optional[BinaryClassificationMetric]
             A metric used for early stopping.
-        evaluation_metrics : Optional[List[BinaryClassificationMetric]]
+        evaluation_metrics : Optional[
+                Union[BinaryClassificationMetric, Iterable[BinaryClassificationMetric], MetricList]
+            ]
             A list of metrics to evaluate the trained models.
         name : Optional[str]
             The name of the task.
         """
-        name = name if name is not None else f"{self.__class__.__name__}('target_column'={repr(target_column)})"
+        name = name if name else f"{self.__class__.__name__}('target_column'={repr(target_column)})"
 
         super().__init__(
             hps_tuning_metric=hps_tuning_metric,
@@ -211,43 +316,47 @@ class ClassificationTask(TableTask):
             evaluation_metrics=evaluation_metrics
         )
 
+        self._decision_threshold_metric = decision_threshold_metric
+
         self._validate_metrics_type(type_=BinaryClassificationMetric)
         self._validate_criterion_type(type_=BinaryClassificationLoss)
-
-        self._set_decision_threshold_metric(decision_threshold_metric)
 
     @property
     def criterion(self) -> Optional[BinaryClassificationLoss]:
         return self._criterion
 
     @property
-    def decision_threshold_metric(self) -> BinaryClassificationMetric:
+    def decision_threshold_metric(self) -> Optional[BinaryClassificationMetric]:
         return self._decision_threshold_metric
 
     @property
-    def early_stopping_metric(self) -> BinaryClassificationMetric:
-        return self._early_stopping_metric  # type: ignore
+    def early_stopping_metric(self) -> Optional[BinaryClassificationMetric]:
+        return self._early_stopping_metric
 
     @property
-    def evaluation_metrics(self) -> List[BinaryClassificationMetric]:
-        return self._evaluation_metrics  # type: ignore
+    def evaluation_metrics(self) -> Optional[MetricList[BinaryClassificationMetric]]:
+        return self._evaluation_metrics
 
     @property
     def hps_tuning_metric(self) -> BinaryClassificationMetric:
         return self._hps_tuning_metric  # type: ignore
 
     @property
-    def metrics(self) -> List[BinaryClassificationMetric]:
-        return self._metrics  # type: ignore
+    def metrics(self) -> MetricList[BinaryClassificationMetric]:
+        metrics = super().metrics
+        metrics.append(self.decision_threshold_metric)
+        return MetricList(metrics)
 
-    def _set_decision_threshold_metric(self, decision_threshold_metric: BinaryClassificationMetric):
-        if decision_threshold_metric:
-            self._decision_threshold_metric = decision_threshold_metric
-            if decision_threshold_metric.name not in self._unique_metric_names:
-                self._unique_metric_names.add(decision_threshold_metric.name)
-                self._metrics.append(decision_threshold_metric)
-        else:
-            self._decision_threshold_metric = self._hps_tuning_metric
+    @property
+    def unique_metrics(self) -> MetricList[BinaryClassificationMetric]:
+        unique_metrics = super().unique_metrics
+        unique_names = [metric.name for metric in unique_metrics]
+
+        if self.decision_threshold_metric.name not in unique_names:
+            unique_metrics.append(self.decision_threshold_metric)
+            unique_names.append(self.decision_threshold_metric.name)
+
+        return MetricList(unique_metrics)
 
 
 class RegressionTask(TableTask):
@@ -261,7 +370,7 @@ class RegressionTask(TableTask):
             target_column: str,
             criterion: Optional[RegressionLoss] = None,
             early_stopping_metric: Optional[RegressionMetric] = None,
-            evaluation_metrics: Optional[List[RegressionMetric]] = None,
+            evaluation_metrics: Optional[Union[RegressionMetric, Iterable[RegressionMetric], MetricList]] = None,
             name: Optional[str] = None
     ):
         """
@@ -277,12 +386,12 @@ class RegressionTask(TableTask):
             A loss function.
         early_stopping_metric : Optional[RegressionMetric]
             A metric used for early stopping.
-        evaluation_metrics : Optional[List[RegressionMetric]]
+        evaluation_metrics : Optional[Union[RegressionMetric, Iterable[RegressionMetric], MetricList]]
             A list of metrics to evaluate the trained models.
         name : Optional[str]
             The name of the task.
         """
-        name = name if name is not None else f"{self.__class__.__name__}('target_column'={repr(target_column)})"
+        name = name if name else f"{self.__class__.__name__}('target_column'={repr(target_column)})"
 
         super().__init__(
             hps_tuning_metric=hps_tuning_metric,
@@ -301,20 +410,24 @@ class RegressionTask(TableTask):
         return self._criterion
 
     @property
-    def early_stopping_metric(self) -> RegressionMetric:
-        return self._early_stopping_metric    # type: ignore
+    def early_stopping_metric(self) -> Optional[RegressionMetric]:
+        return self._early_stopping_metric
 
     @property
-    def evaluation_metrics(self) -> List[RegressionMetric]:
-        return self._evaluation_metrics    # type: ignore
+    def evaluation_metrics(self) -> Optional[MetricList[RegressionMetric]]:
+        return self._evaluation_metrics
 
     @property
     def hps_tuning_metric(self) -> RegressionMetric:
         return self._hps_tuning_metric  # type: ignore
 
     @property
-    def metrics(self) -> List[RegressionMetric]:
-        return super().metrics  # type: ignore
+    def metrics(self) -> MetricList[BinaryClassificationMetric]:
+        return super().metrics
+
+    @property
+    def unique_metrics(self) -> MetricList[BinaryClassificationMetric]:
+        return super().unique_metrics
 
 
 class SegmentationTask(Task):
@@ -329,7 +442,7 @@ class SegmentationTask(Task):
             modality: str,
             organ: str,
             early_stopping_metric: Optional[SegmentationMetric] = None,
-            evaluation_metrics: Optional[List[SegmentationMetric]] = None,
+            evaluation_metrics: Optional[Union[SegmentationMetric, Iterable[SegmentationMetric], MetricList]] = None,
             name: Optional[str] = None
     ):
         """
@@ -347,13 +460,13 @@ class SegmentationTask(Task):
             Segmented organ.
         early_stopping_metric : Optional[SegmentationMetric]
             A metric used for early stopping.
-        evaluation_metrics : Optional[List[SegmentationMetric]]
+        evaluation_metrics : Optional[Union[SegmentationMetric, Iterable[SegmentationMetric], MetricList]]
             A list of metrics to evaluate the trained models.
         name : Optional[str]
             The name of the task.
         """
         default_name = f"{self.__class__.__name__}('modality'={repr(modality)}, 'organ'={repr(organ)})"
-        name = name if name is not None else default_name
+        name = name if name else default_name
 
         super().__init__(
             hps_tuning_metric=hps_tuning_metric,
@@ -374,17 +487,21 @@ class SegmentationTask(Task):
         return self._criterion
 
     @property
-    def early_stopping_metric(self) -> SegmentationMetric:
-        return self._early_stopping_metric  # type: ignore
+    def early_stopping_metric(self) -> Optional[SegmentationMetric]:
+        return self._early_stopping_metric
 
     @property
-    def evaluation_metrics(self) -> List[SegmentationMetric]:
-        return self._evaluation_metrics  # type: ignore
+    def evaluation_metrics(self) -> Optional[MetricList[SegmentationMetric]]:
+        return self._evaluation_metrics
 
     @property
     def hps_tuning_metric(self) -> SegmentationMetric:
         return self._hps_tuning_metric  # type: ignore
 
     @property
-    def metrics(self) -> List[SegmentationMetric]:
-        return super().metrics  # type: ignore
+    def metrics(self) -> MetricList[SegmentationMetric]:
+        return super().metrics
+
+    @property
+    def unique_metrics(self) -> MetricList[SegmentationMetric]:
+        return super().unique_metrics
