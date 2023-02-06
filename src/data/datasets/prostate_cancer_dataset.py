@@ -3,12 +3,13 @@
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
-    @Last modification: 07/2022
+    @Last modification: 02/2023
 
-    @Description:       This file contains a custom torch dataset named ProstateCancerDataset.
+    @Description:       This file contains a custom torch dataset named 'ProstateCancerDataset'.
 """
 
 from typing import Dict, List, NamedTuple, Optional, Union
+from typing_extensions import TypeAlias
 
 import numpy as np
 from torch import Tensor
@@ -17,10 +18,10 @@ from torch.utils.data import Dataset, Subset
 from src.data.datasets.empty_dataset import DatasetType, EmptyDataset
 from src.data.datasets.image_dataset import ImageDataset
 from src.data.datasets.table_dataset import TableDataset
-from src.utils.tasks import Task
+from src.utils.task_list import TaskList
 
 
-TargetsType = Dict[str, Union[np.ndarray, Tensor]]
+TargetsType: TypeAlias = Dict[str, Union[np.ndarray, Tensor]]
 
 
 class FeaturesType(NamedTuple):
@@ -138,7 +139,7 @@ class ProstateCancerDataset(Dataset):
             raise ValueError("Index has to be integer or list.")
 
     @property
-    def tasks(self) -> List[Task]:
+    def tasks(self) -> TaskList:
         if isinstance(self.table_dataset, EmptyDataset):
             return self.image_dataset.tasks
         elif isinstance(self.image_dataset, EmptyDataset):
