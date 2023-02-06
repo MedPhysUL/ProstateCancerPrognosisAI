@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     12/2022
-    @Last modification: 01/2023
+    @Last modification: 02/2023
 
     @Description:       This file is used to define the 'TrainingHistory' class which is used to store losses and score
                         metrics values obtained during the training process.
