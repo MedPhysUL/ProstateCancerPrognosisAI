@@ -56,9 +56,13 @@ class ImageDataset(Dataset):
         **kwargs : dict
             Keywords arguments controlling images and segmentations format, and segmentations series to use.
         """
+        self.tasks = TaskList(tasks)
+        assert all([isinstance(task, SegmentationTask) for task in self.tasks]), (
+            f"All tasks must be instances of 'SegmentationTask'."
+        )
+
         self.database = database
         self.modalities = modalities
-        self.tasks = TaskList(tasks)
         self.transforms = transforms
         self.transposition = transposition
 
