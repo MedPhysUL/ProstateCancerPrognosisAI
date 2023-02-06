@@ -56,19 +56,19 @@ class ImageDataset(Dataset):
         **kwargs : dict
             Keywords arguments controlling images and segmentations format, and segmentations series to use.
         """
-        self.tasks = TaskList(tasks)
-        assert all([isinstance(task, SegmentationTask) for task in self.tasks]), (
+        self._tasks = TaskList(tasks)
+        assert all([isinstance(task, SegmentationTask) for task in self._tasks]), (
             f"All tasks must be instances of 'SegmentationTask'."
         )
 
-        self.database = database
-        self.modalities = modalities
-        self.transforms = transforms
-        self.transposition = transposition
+        self._database = database
+        self._modalities = modalities
+        self._transforms = transforms
+        self._transposition = transposition
 
-        self.img_format = kwargs.get("img_format", np.float16)
-        self.seg_format = kwargs.get("seg_format", np.int8)
-        self.seg_series = kwargs.get("seg_series", "0")
+        self._img_format = kwargs.get("img_format", np.float16)
+        self._seg_format = kwargs.get("seg_format", np.int8)
+        self._seg_series = kwargs.get("seg_series", "0")
 
     def __len__(self) -> int:
         """
@@ -79,7 +79,7 @@ class ImageDataset(Dataset):
         length : int
             Length of the database.
         """
-        return len(self.database)
+        return len(self._database)
 
     def __getitem__(
             self,
@@ -110,6 +110,10 @@ class ImageDataset(Dataset):
         else:
             raise AssertionError(f"'index' must be of type 'int', 'slice' or 'Sequence[int]'. Found type {type(index)}")
 
+    @property
+    def tasks(self) -> TaskList:
+        return self._tasks
+
     def _get_patient_data(self, index: int) -> Dict[str, np.ndarray]:
         """
         Gets a single patient images data from its index in the dataset.
@@ -124,20 +128,20 @@ class ImageDataset(Dataset):
         data : Dict[str, np.ndarray]
             A patient images data.
         """
-        patient_group = self.database[index]
+        patient_group = self._database[index]
 
         print(f"Loading {patient_group.name[1:]}.")  # TODO : Use logging instead of a print.
         img_dict, seg_dict = {}, {}
         for series_number in patient_group.keys():
             series = patient_group[series_number]
-            for modality in self.modalities:
-                if series.attrs[self.database.MODALITY] == modality:
-                    img_dict[modality] = self._transpose(series[self.database.IMAGE]).astype(self.img_format)
+            for modality in self._modalities:
+                if series.attrs[self._database.MODALITY] == modality:
+                    img_dict[modality] = self._transpose(series[self._database.IMAGE]).astype(self._img_format)
 
                     for task in self.tasks.segmentation_tasks:
                         if modality == task.modality:
-                            seg_array = series[self.seg_series][task.organ]
-                            seg_dict[task.organ] = self._transpose(seg_array).astype(self.seg_format)
+                            seg_array = series[self._seg_series][task.organ]
+                            seg_dict[task.organ] = self._transpose(seg_array).astype(self._seg_format)
 
         return dict(img_dict, **seg_dict)
 
@@ -155,7 +159,7 @@ class ImageDataset(Dataset):
         transformed_data : Dict[str, Union[np.array, MetaTensor]]
             The dictionary of transformed images and segmentation maps.
         """
-        return apply_transform(self.transforms, data) if self.transforms else data
+        return apply_transform(self._transforms, data) if self._transforms else data
 
     def _transpose(self, array: np.ndarray) -> np.array:
         """
@@ -171,4 +175,4 @@ class ImageDataset(Dataset):
         transposed_array : np.array
             The transposed array.
         """
-        return np.transpose(np.array(array), self.transposition)
+        return np.transpose(np.array(array), self._transposition)
