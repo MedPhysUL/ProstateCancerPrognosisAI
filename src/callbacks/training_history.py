@@ -9,10 +9,13 @@
                         metrics values obtained during the training process.
 """
 
+from dataclasses import asdict, dataclass, field
 from itertools import count
 import os
-from typing import Dict, List, Literal, Optional, Tuple, TypedDict, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
+from typing_extensions import TypeAlias
 
+from dacite import from_dict
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
@@ -20,19 +23,21 @@ from matplotlib.ticker import MaxNLocator
 from src.callbacks.callback import Callback, Priority
 
 
-MeasurementHistoryType = Dict[str, Dict[str, List[float]]]
+MeasurementType: TypeAlias = Dict[str, Dict[str, Union[float, List[float]]]]
 
 
-class MeasurementsHistoryDict(TypedDict):
+@dataclass
+class MeasurementsContainer:
     """
-    A TypeDict defining the data structure that contains the various measurements performed during a training process.
+    A data class defining the data structure that contains the various measurements performed during a training process.
 
     Elements
     --------
-    multi_task_losses: MeasurementHistoryType
+    multi_task_losses: MeasurementType
         A dictionary containing multi-task losses. The keys are the names of the learning algorithm used, the values
         are dictionaries whose keys are the names of the losses while its values are a list of the loss measured each
-        epoch.
+        epoch. This list of losses can also just be a float, when the current class is used to represent a single
+        epoch state instead of the entire history for example.
 
         Example (2 learning algorithms, 3 epochs) :
             multi_task_losses = {
@@ -46,9 +51,11 @@ class MeasurementsHistoryDict(TypedDict):
                 },
             }
 
-    single_task_losses: MeasurementHistoryType
+    single_task_losses: MeasurementType
         A dictionary containing single task losses. The keys are the names of the tasks, the values are dictionaries
-        whose keys are the names of the losses while its values are a list of the loss measured each epoch.
+        whose keys are the names of the losses while its values are a list of the loss measured each epoch. This list
+        of losses can also just be a float, when the current class is used to represent a single epoch state instead
+        of the entire history for example.
 
         Example (2 tasks, 3 epochs) :
             single_task_losses = {
@@ -60,9 +67,11 @@ class MeasurementsHistoryDict(TypedDict):
                 },
             }
 
-    single_task_metrics : MeasurementHistoryType
+    single_task_metrics : MeasurementType
         A dictionary containing metric values. The keys are the names of the tasks, the values are dictionaries whose
-        keys are the names of the metrics while its values are a list of the metric measured each epoch.
+        keys are the names of the metrics while its values are a list of the metric measured each epoch. This list of
+        metrics can also just be a float, when the current class is used to represent a single epoch state instead of
+        the entire history for example.
 
         Example (2 tasks, 3 epochs) :
 
@@ -76,24 +85,25 @@ class MeasurementsHistoryDict(TypedDict):
                 },
             }
     """
-    multi_task_losses: MeasurementHistoryType
-    single_task_losses: MeasurementHistoryType
-    single_task_metrics: MeasurementHistoryType
+    multi_task_losses: MeasurementType = field(default_factory=dict)
+    single_task_losses: MeasurementType = field(default_factory=dict)
+    single_task_metrics: MeasurementType = field(default_factory=dict)
 
 
-class HistoryDict(TypedDict):
+@dataclass
+class HistoryContainer:
     """
-    A TypeDict defining the data structure that contains the different sets measurements.
+    A data class defining the data structure that contains the different sets measurements.
 
     Elements
     --------
-    train : _Measures
+    train : MeasurementsContainer
         Training set measures.
-    valid : _Measures
+    valid : MeasurementsContainer
         Validation set measures.
     """
-    train: MeasurementsHistoryDict
-    valid: MeasurementsHistoryDict
+    train: MeasurementsContainer = field(default_factory=MeasurementsContainer)
+    valid: MeasurementsContainer = field(default_factory=MeasurementsContainer)
 
 
 class TrainingHistory(Callback):
@@ -103,18 +113,9 @@ class TrainingHistory(Callback):
 
     instance_counter = count()
 
-    TRAIN: Literal["train"] = "train"
-    VALID: Literal["valid"] = "valid"
-
-    MULTI_TASK_LOSSES: Literal["multi_task_losses"] = "multi_task_losses"
-    SINGLE_TASK_LOSSES: Literal["multi_task_losses"] = "single_task_losses"
-    SINGLE_TASK_METRICS: Literal["multi_task_losses"] = "single_task_metrics"
-
-    MEASUREMENT_CATEGORIES = [MULTI_TASK_LOSSES, SINGLE_TASK_LOSSES, SINGLE_TASK_METRICS]
-
     def __init__(
             self,
-            container: Optional[HistoryDict] = None,
+            container: Optional[Union[Dict[str, MeasurementsContainer], HistoryContainer]] = None,
             name: Optional[str] = None,
             **kwargs
     ):
@@ -123,7 +124,7 @@ class TrainingHistory(Callback):
 
         Parameters
         ----------
-        container : Optional[History]
+        container : Optional[Union[Dict[str, MeasurementsContainer], HistoryContainer]]
             History container.
         name : Optional[str]
             The name of the callback.
@@ -131,25 +132,69 @@ class TrainingHistory(Callback):
             The keyword arguments to pass to the Callback.
         """
         self.instance_id = next(self.instance_counter)
-        name = name if name is not None else f"{self.__class__.__name__}({self.instance_id})"
+        name = name if name else f"{self.__class__.__name__}({self.instance_id})"
         super().__init__(name=name, **kwargs)
 
-        self.container = container if container else self._get_empty_container()
+        if container:
+            if isinstance(container, HistoryContainer):
+                self.container = container
+            elif isinstance(container, dict):
+                self.container = from_dict(data_class=HistoryContainer, data=container)
+            else:
+                raise TypeError(f"'container' must be of type 'HistoryContainer' or 'dict'. Found {type(container)}.")
+        else:
+            self.container = HistoryContainer()
 
-    def __getitem__(self, item: Union[str, int, slice]) -> dict:
-        if isinstance(item, str):
-            return self.container[item]
-        elif isinstance(item, (int, slice)):
-            return self._get_state(self.container, item)
+    def __contains__(self, item: Any) -> bool:
+        """
+        Whether container contains given item.
 
-    def __contains__(self, item):
+        Parameters
+        ----------
+        item : Any
+            A given item.
+
+        Returns
+        -------
+        contains : bool
+            Whether container contains given item.
+        """
         return item in self.container
 
-    def __iter__(self):
-        return iter(self.container)
+    def __getitem__(
+            self,
+            item: Union[str, int, slice]
+    ) -> Union[HistoryContainer, MeasurementsContainer]:
+        """
+        Gets an item from the history container.
 
-    def __len__(self):
-        return len(self.container)
+        Parameters
+        ----------
+        item : Union[str, int, slice]
+            An item. If the item is a 'str', returns the 'MeasurementsContainer' associated to that string. If the item
+            is an 'int' or a 'slice', returns the entire 'HistoryContainer' at the given epoch (int) or epochs (slice).
+
+        Returns
+        -------
+        reduced_container : Union[HistoryContainer, MeasurementsContainer]
+            Reduced container.
+        """
+        if isinstance(item, str):
+            return from_dict(data_class=MeasurementsContainer, data=asdict(self.container)[item])
+        elif isinstance(item, (int, slice)):
+            return from_dict(data_class=HistoryContainer, data=self._get_state(asdict(self.container), item))
+
+    @property
+    def is_empty(self) -> bool:
+        """
+        Whether training history is empty.
+
+        Returns
+        -------
+        is_empty : bool
+            Whether training history is empty.
+        """
+        return self.container == HistoryContainer()
 
     @property
     def priority(self) -> int:
@@ -171,50 +216,37 @@ class TrainingHistory(Callback):
         Returns
         -------
         allow : bool
-            Allow duplicates.
+            Whether to allow duplicates.
         """
         return False
 
     @property
-    def training_set_history(self) -> MeasurementsHistoryDict:
+    def training_set_measurements(self) -> MeasurementsContainer:
         """
-        Training set losses and score metrics history.
+        Training set measurements.
 
         Returns
         -------
-        history : MeasuresHistoryTypedDict
-            Training set history.
+        measurements : MeasurementsContainer
+            Training set measurements.
         """
-        return self.container[self.TRAIN]
+        return self.container.train
 
     @property
-    def validation_set_history(self) -> MeasurementsHistoryDict:
+    def validation_set_measurements(self) -> MeasurementsContainer:
         """
-        Validation set losses and score metrics history.
+        Validation set measurements.
 
         Returns
         -------
-        history : MeasuresHistoryTypedDict
-            Validation set history.
+        measurements : MeasurementsContainer
+            Validation set measurements.
         """
-        return self.container[self.VALID]
+        return self.container.valid
 
-    @staticmethod
-    def _get_empty_container() -> HistoryDict:
+    def _get_state(self, container: dict, idx: Union[int, slice]) -> Dict[str, MeasurementsContainer]:
         """
-        Gets empty history container.
-
-        Returns
-        -------
-        container : HistoryDict
-            History container
-        """
-        empty_measure = MeasurementsHistoryDict(multi_task_losses={}, single_task_metrics={}, single_task_losses={})
-        return HistoryDict(train=empty_measure, valid=empty_measure)
-
-    def _get_state(self, container: dict, idx: Union[int, slice]) -> dict:
-        """
-        Get a specific epoch state dictionary, i.e. the state of the losses and metrics values at the specified epoch
+        Gets a specific epoch state dictionary, i.e. the state of the losses and metrics values at the specified epoch
         index.
 
         Parameters
@@ -226,7 +258,7 @@ class TrainingHistory(Callback):
 
         Returns
         -------
-        epoch_state : dict
+        epoch_state : Dict[str, MeasurementsContainer]
             Epoch dict.
         """
         epoch_state = {}
@@ -243,10 +275,12 @@ class TrainingHistory(Callback):
 
     def _append_state(self, container: dict, state: dict):
         """
-        Append an epoch state dictionary to the history container.
+        Appends an epoch state dictionary to the history container.
 
         Parameters
         ----------
+        container: dict
+            History container.
         state : dict
             Epoch state.
         """
@@ -270,21 +304,20 @@ class TrainingHistory(Callback):
                 raise TypeError(f"'container' dictionary must contain values of type 'dict' or 'list'. Found "
                                 f"{type(v)}.")
 
-        return container
+        self.container = from_dict(data_class=HistoryContainer, data=container)
 
     def _create_plot(
             self,
-            measurement_category: Literal["single_task_metrics", "multi_task_losses", "single_task_losses"],
+            measurement_category: str,
             task_key: str,
             **kwargs
     ) -> Tuple[plt.Figure, Dict[str, plt.Axes], Dict[str, List[plt.Line2D]]]:
         """
-        Create a plot of the given measurement category ('losses' or 'metrics') using the training and validation set
-        history.
+        Creates a plot of the given measurement category using the training and validation set measurements history.
 
         Parameters
         ----------
-        measurement_category : Literal["single_task_metrics", "multi_task_losses", "single_task_losses"]
+        measurement_category : str
             Measurement category, i.e 'multi_task_losses', 'single_task_losses' or 'metrics'.
         task_key : str
             Specific task key in the measurement category history.
@@ -296,8 +329,8 @@ class TrainingHistory(Callback):
         fig, axes, lines : Tuple[plt.Figure, Dict[str, plt.Axes], Dict[str, List[plt.Line2D]]]
             The figure, axes and lines of the plot.
         """
-        train_measurement_history = self.training_set_history[measurement_category]
-        valid_measurement_history = self.validation_set_history[measurement_category]
+        train_measurement_history = asdict(self.training_set_measurements)[measurement_category]
+        valid_measurement_history = asdict(self.validation_set_measurements)[measurement_category]
 
         if task_key in train_measurement_history:
             train_task_history = train_measurement_history[task_key]
@@ -318,9 +351,21 @@ class TrainingHistory(Callback):
         axes = np.ravel(axes)
         for i, (ax, key) in enumerate(zip(axes, all_tasks)):
             if key in train_tasks:
-                lines[key].append(ax.plot(train_task_history[key], label=self.TRAIN, linewidth=kwargs.get("lw", 3))[0])
+                lines[key].append(
+                    ax.plot(
+                        train_task_history[key],
+                        label=kwargs.get("train_label", "train"),
+                        linewidth=kwargs.get("lw", 3)
+                    )[0]
+                )
             if key in valid_tasks:
-                lines[key].append(ax.plot(valid_task_history[key], label=self.VALID, linewidth=kwargs.get("lw", 3))[0])
+                lines[key].append(
+                    ax.plot(
+                        valid_task_history[key],
+                        label=kwargs.get("valid_label", "valid"),
+                        linewidth=kwargs.get("lw", 3)
+                    )[0]
+                )
 
             ax.set_ylabel(key, fontsize=kwargs.get("fontsize", 16))
             ax.set_xlabel("Epochs [-]", fontsize=kwargs.get("fontsize", 16))
@@ -352,9 +397,9 @@ class TrainingHistory(Callback):
         """
         plt.close('all')
 
-        for measurement_category in self.MEASUREMENT_CATEGORIES:
-            training_set_task_keys = list(self.training_set_history[measurement_category].keys())
-            validation_set_task_keys = list(self.validation_set_history[measurement_category].keys())
+        for measurement_category in list(MeasurementsContainer.__annotations__.keys()):
+            training_set_task_keys = list(asdict(self.training_set_measurements)[measurement_category].keys())
+            validation_set_task_keys = list(asdict(self.validation_set_measurements)[measurement_category].keys())
             all_task_keys = list(set(training_set_task_keys + validation_set_task_keys))
 
             if path_to_save is not None:
@@ -374,7 +419,7 @@ class TrainingHistory(Callback):
 
     def on_epoch_end(self, trainer, **kwargs):
         """
-        Append the current train and valid losses and metric scores to the history.
+        Appends the current epoch state to the history.
 
         Parameters
         ----------
@@ -383,14 +428,14 @@ class TrainingHistory(Callback):
         kwargs : dict
             Keywords arguments.
         """
-        self._append_state(self.container, trainer.epoch_state.as_dict())
+        self._append_state(asdict(self.container), asdict(trainer.epoch_state))
 
 
 if __name__ == "__main__":
     history = TrainingHistory(
-        container={
-            "train": {
-                "single_task_metrics": {
+        container=HistoryContainer(
+            train=MeasurementsContainer(
+                single_task_metrics={
                     "PN_classification": {
                         "Accuracy": [0.6, 0.5, 0.9],
                         "AUC": [0.6, 0.7, 0.75]
@@ -399,7 +444,7 @@ if __name__ == "__main__":
                         "DICEMetric": [0.7, 0.76, 0.85]
                     },
                 },
-                "multi_task_losses": {
+                multi_task_losses={
                     "LearningAlgorithm_0": {
                         "mean_loss_without_regularization": [0.9, 0.7, 0.6],
                         "mean_loss_with_regularization": [1.1, 0.8, 0.7]
@@ -409,7 +454,7 @@ if __name__ == "__main__":
                         "median_loss_with_regularization": [2, 1.5, 1.1]
                     },
                 },
-                "single_task_losses": {
+                single_task_losses={
                     "PN_classification": {
                         "BinaryBalancedAccuracy": [0.6, 0.5, 0.9]
                     },
@@ -417,9 +462,9 @@ if __name__ == "__main__":
                         "DICELoss": [0.7, 0.76, 0.85]
                     },
                 }
-            },
-            "valid": {
-                "single_task_metrics": {
+            ),
+            valid=MeasurementsContainer(
+                single_task_metrics={
                     "PN_classification": {
                         "Accuracy": [0.55, 0.45, 0.85],
                         "AUC": [0.55, 0.65, 0.7]
@@ -428,7 +473,7 @@ if __name__ == "__main__":
                         "DICEMetric": [0.65, 0.71, 0.8]
                     },
                 },
-                "multi_task_losses": {
+                multi_task_losses={
                     "LearningAlgorithm_0": {
                         "mean_loss_without_regularization": [0.95, 0.75, 0.65],
                         "mean_loss_with_regularization": [1.15, 0.85, 0.75]
@@ -438,7 +483,7 @@ if __name__ == "__main__":
                         "median_loss_with_regularization": [2.05, 1.55, 1.15]
                     },
                 },
-                "single_task_losses": {
+                single_task_losses={
                     "PN_classification": {
                         "BinaryBalancedAccuracy": [0.65, 0.55, 0.95]
                     },
@@ -446,8 +491,8 @@ if __name__ == "__main__":
                         "DICELoss": [0.75, 0.81, 0.9]
                     },
                 }
-            },
-        }
+            )
+        )
     )
 
     history.plot(show=True)
