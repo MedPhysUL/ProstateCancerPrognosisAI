@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Mehdi Mitiche, Nicolas Raymond
 
     @Creation Date:     05/2022
-    @Last modification: 01/2023
+    @Last modification: 02/2023
 
     @Description:       This file is used to define the `EarlyStopper` object, used within a `LearningAlgorithm`.
 """
@@ -116,7 +116,7 @@ class MetricsEarlyStopper(EarlyStopper):
 
     def _initialize_best_val_metric_scores(self):
         """
-        Initializes best validation metric scores.
+        Initializes best validation metric scores depending on metrics' direction.
         """
         self._best_val_metric_scores = [
             np.inf if t.early_stopping_metric.direction == Direction.MINIMIZE.value
@@ -133,7 +133,14 @@ class MetricsEarlyStopper(EarlyStopper):
             The learning algorithm.
         """
         super().on_fit_start(learning_algorithm)
-        self._tasks = learning_algorithm.criterion.tasks
+
+        tasks = learning_algorithm.criterion.tasks
+        assert all(task.early_stopping_metric is not None for task in tasks), (
+            f"'MetricsEarlyStopper' requires that all tasks define the 'early_stopping_metric' attribute at instance "
+            f"initialization."
+        )
+
+        self._tasks = tasks
         self._initialize_best_val_metric_scores()
 
     def __call__(self, epoch_state: EpochState) -> bool:
@@ -150,7 +157,7 @@ class MetricsEarlyStopper(EarlyStopper):
         early_stop : bool
             Whether to early stop.
         """
-        val_scores = epoch_state.valid_single_task_metrics
+        val_scores = epoch_state.valid.single_task_losses
 
         new_scores_is_better = []
         for i, task, best_score in enumerate(zip(self._tasks, self._best_val_metric_scores)):
@@ -178,6 +185,7 @@ class MetricsEarlyStopper(EarlyStopper):
 
         return False
 
+    # TODO : Here, use logging instead of print.
     def print_early_stopping_message(
             self,
             epoch_state: EpochState
@@ -205,7 +213,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
             self,
             patience: int = 10,
             tolerance: float = 1e-4,
-            with_regularization: Optional[bool] = True
+            include_regularization: Optional[bool] = True
     ) -> None:
         """
         Sets protected attributes of early stopper and defines comparison methods according to the given tasks.
@@ -216,13 +224,13 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
             Number of consecutive epochs without improvement allowed.
         tolerance : float
             Permissible difference between measures.
-        with_regularization : Optional[bool]
+        include_regularization : Optional[bool]
             Whether to monitor the multi-task loss with or without regularization.
         """
         super().__init__(patience=patience, tolerance=tolerance)
 
         self.criterion_full_name = None
-        self.with_regularization = with_regularization
+        self.include_regularization = include_regularization
 
         self._best_val_loss = np.inf
 
@@ -240,7 +248,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         if not learning_algorithm.regularization:
             suffix = EpochState.SUFFIX_WITHOUT_REGULARIZATION
         else:
-            if self.with_regularization:
+            if self.include_regularization:
                 suffix = EpochState.SUFFIX_WITH_REGULARIZATION
             else:
                 suffix = EpochState.SUFFIX_WITHOUT_REGULARIZATION
@@ -273,7 +281,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         early_stop : bool
             Whether to early stop.
         """
-        val_loss = epoch_state.valid_multi_task_losses[self.learning_algorithm_name][self.criterion_full_name]
+        val_loss = epoch_state.valid.multi_task_losses[self.learning_algorithm_name][self.criterion_full_name]
 
         # if the score is worst than the best score we increment the counter
         if not (self._best_val_loss - val_loss) > self.tolerance:
@@ -290,6 +298,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
 
         return False
 
+    # TODO : Here, use logging instead of print.
     def print_early_stopping_message(
             self,
             epoch_state: EpochState
@@ -304,7 +313,6 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         """
         print(
             f"\n{self.learning_algorithm_name}: Early stopping occurred at epoch {epoch_state.idx} with best_epoch = "
-            f"{epoch_state.idx - self.patience}"
+            f"{epoch_state.idx - self.patience}. \nCriterion {self.criterion_full_name}, "
+            f"Loss :{round(self._best_val_loss, 4)}"
         )
-
-        print(f"\nCriterion {self.criterion_full_name}, Loss :{round(self._best_val_loss, 4)}")
