@@ -46,7 +46,7 @@ class MetricList(Generic[_SpecifiedMetricType]):
 
     def __getitem__(self, idx: int) -> Union[Metric, _SpecifiedMetricType]:
         """
-        Get a metric from the list.
+        Gets a metric from the list.
 
         Parameters
         ----------
@@ -62,7 +62,7 @@ class MetricList(Generic[_SpecifiedMetricType]):
 
     def __iter__(self) -> Iterator[Union[Metric, _SpecifiedMetricType]]:
         """
-        Get an iterator over the metrics.
+        Gets an iterator over the metrics.
 
         Returns
         -------
@@ -73,7 +73,7 @@ class MetricList(Generic[_SpecifiedMetricType]):
 
     def __len__(self) -> int:
         """
-        Get the number of metrics in the list.
+        Gets the number of metrics in the list.
 
         Returns
         -------
@@ -84,7 +84,7 @@ class MetricList(Generic[_SpecifiedMetricType]):
 
     def __add__(self, other: MetricList) -> MetricList:
         """
-        Add another MetricList to the current MetricList.
+        Adds another MetricList to the current MetricList.
 
         Parameters
         ----------
@@ -112,7 +112,7 @@ class MetricList(Generic[_SpecifiedMetricType]):
 
     def remove(self, metric: Metric):
         """
-        Remove a metric from the list.
+        Removes a metric from the list.
 
         Parameters
         ----------
