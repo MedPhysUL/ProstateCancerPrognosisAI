@@ -1,30 +1,45 @@
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Union
+"""
+    @file:              states.py
+    @Author:            Maxence Larose
+
+    @Creation Date:     02/2023
+    @Last modification: 02/2023
+
+    @Description:       This file is used to define the multiple useful states storing information about the training
+                        process.
+"""
+
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict
+from typing_extensions import TypeAlias
 
 from monai.data import DataLoader
 import numpy as np
 
-from src.callbacks.training_history import MeasurementHistoryType, TrainingHistory
+from src.callbacks.training_history import MeasurementsContainer, MeasurementsType, TrainingHistory
 from src.data.datasets.prostate_cancer_dataset import FeaturesType, TargetsType
-from src.utils.tasks import Task
+from src.utils.task_list import TaskList
 from src.utils.transforms import to_numpy
 
 
-MeasurementType = Dict[str, Dict[str, float]]
-MeasurementTypes = Union[MeasurementType, MeasurementHistoryType]
+MeasurementType: TypeAlias = Dict[str, Dict[str, float]]
 
 
 @dataclass
-class BaseState:
-
-    def __getstate__(self):
-        return {k: v for k, v in vars(self).items()}
-
-
-@dataclass
-class BatchState(BaseState):
+class State:
     """
-    This class is used to store the current batch state.
+    Abstract state.
+    """
+
+    def state_dict(self):
+        return asdict(self)
+
+
+@dataclass
+class BatchState(State):
+    """
+    This class is used to store the current batch state. It is extremely useful for the callbacks to access the
+    current batch state and to modify the training process.
 
     Elements
     --------
@@ -58,9 +73,10 @@ class BatchState(BaseState):
 
 
 @dataclass
-class BatchesState(BaseState):
+class BatchesState(State):
     """
-    This class is used to store the current batch state.
+    This class is used to store the current batch state. It is extremely useful for the callbacks to access the
+    current batches state and to modify the training process.
 
     Elements
     --------
@@ -77,11 +93,20 @@ class BatchesState(BaseState):
         whose keys are the names of the losses while its values are losses or list of losses measured in the current
         batch.
     """
-    multi_task_losses_with_regularization: MeasurementTypes = field(default_factory=dict)
-    multi_task_losses_without_regularization: MeasurementTypes = field(default_factory=dict)
-    single_task_losses: MeasurementTypes = field(default_factory=dict)
+    multi_task_losses_with_regularization: MeasurementsType = field(default_factory=dict)
+    multi_task_losses_without_regularization: MeasurementsType = field(default_factory=dict)
+    single_task_losses: MeasurementsType = field(default_factory=dict)
 
     def init(self, batch_state: BatchState):
+        """
+        Initializes the current 'BatchesState' using a single 'BatchState'. This method actually defines the keys of
+        the measurement dictionaries using the keys present in the given batch state.
+
+        Parameters
+        ----------
+        batch_state : BatchState
+            A batch state.
+        """
         for k, v in vars(batch_state).items():
             if k in vars(self):
                 vars(self)[k] = {}
@@ -94,7 +119,7 @@ class BatchesState(BaseState):
 
     def append(self, batch_state: BatchState):
         """
-        Append a batch state to the batches state container.
+        Appends a batch state to the batches state container.
 
         Parameters
         ----------
@@ -110,6 +135,10 @@ class BatchesState(BaseState):
                 pass
 
     def mean(self):
+        """
+        Calculates the average value of all measurements and updates the measurements' dictionaries of the current batch
+        state with these values. Be careful, the values of the measurements will become floats instead of lists.
+        """
         for k, v in vars(self).items():
             for name, measurements in v.items():
                 for key, value in measurements.items():
@@ -119,52 +148,51 @@ class BatchesState(BaseState):
 
 
 @dataclass
-class EpochState(BaseState):
+class EpochState(State):
 
     SUFFIX_WITH_REGULARIZATION = "('regularization'=True)"
     SUFFIX_WITHOUT_REGULARIZATION = "('regularization'=False)"
 
     """
-    This class is used to store the current epoch state.
+    This class is used to store the current epoch state. It is extremely useful for the callbacks to access the
+    current epoch state and to modify the training process.
 
     Elements
     --------
     idx : int
         The index of the current epoch.
-    train_multi_task_losses : MeasurementType
-        The multi-task losses of the training set in the current epoch.
-    valid_multi_task_losses : MeasurementType
-        The multi-task losses of the validation set in the current epoch.
-    train_single_task_losses : MeasurementType
-        The single task losses of the training set in the current epoch. Keys are task names.
-    valid_single_task_losses : MeasurementType
-        The single task losses of the validation set in the current epoch. Keys are task names.
-    train_single_task_metrics : MeasurementType
-        The single task metrics of the training set in the current epoch.
-    valid_single_task_metrics : MeasurementType
-        The single task metrics of the validation set in the current epoch.
+    train : MeasurementsContainer
+        Training set measurements in the current epoch.
+    valid : MeasurementsContainer
+        Validation set measurements in the current epoch.
     """
     idx: int = None
-    train_multi_task_losses: MeasurementType = field(default_factory=dict)
-    valid_multi_task_losses: MeasurementType = field(default_factory=dict)
-    train_single_task_losses: MeasurementType = field(default_factory=dict)
-    valid_single_task_losses: MeasurementType = field(default_factory=dict)
-    train_single_task_metrics: MeasurementType = field(default_factory=dict)
-    valid_single_task_metrics: MeasurementType = field(default_factory=dict)
+    train: MeasurementsContainer = field(default_factory=MeasurementsContainer)
+    valid: MeasurementsContainer = field(default_factory=MeasurementsContainer)
 
     def set_to_last_epoch_of_history(self, history: TrainingHistory):
+        """
+        Sets the epoch state to the last epoch state of the given training history.
+
+        Parameters
+        ----------
+        history : TrainingHistory
+            Training history.
+        """
         last_epoch_hist = history[-1]
-        train_measures, valid_measures = last_epoch_hist[TrainingHistory.TRAIN], last_epoch_hist[TrainingHistory.VALID]
-
-        self.train_multi_task_losses = train_measures[TrainingHistory.MULTI_TASK_LOSSES]
-        self.train_single_task_losses = train_measures[TrainingHistory.SINGLE_TASK_LOSSES]
-        self.train_single_task_metrics = train_measures[TrainingHistory.SINGLE_TASK_METRICS]
-
-        self.valid_multi_task_losses = valid_measures[TrainingHistory.MULTI_TASK_LOSSES]
-        self.valid_single_task_losses = valid_measures[TrainingHistory.SINGLE_TASK_LOSSES]
-        self.valid_single_task_metrics = valid_measures[TrainingHistory.SINGLE_TASK_METRICS]
+        self.train, self.valid = last_epoch_hist.train, last_epoch_hist.valid
 
     def set_losses_from_batches_state(self, batches_state: BatchesState, training: bool):
+        """
+        Sets the losses' measurements using the given batches state.
+
+        Parameters
+        ----------
+        batches_state : BatchesState
+            A batches state.
+        training : bool
+            Whether the model is currently being trained.
+        """
         batches_state.mean()
 
         multi_task_losses = {}
@@ -178,31 +206,15 @@ class EpochState(BaseState):
                     multi_task_losses[algo_name][f"{loss_name}{self.SUFFIX_WITH_REGULARIZATION}"] = loss_with_reg
 
         if training:
-            self.train_multi_task_losses = multi_task_losses
-            self.train_single_task_losses = batches_state.single_task_losses
+            self.train.multi_task_losses = multi_task_losses
+            self.train.single_task_losses = batches_state.single_task_losses
         else:
-            self.valid_multi_task_losses = multi_task_losses
-            self.valid_single_task_losses = batches_state.single_task_losses
-
-    def as_dict(self):
-        epoch_state_as_dict = {
-            TrainingHistory.TRAIN: {
-                TrainingHistory.MULTI_TASK_LOSSES: self.train_multi_task_losses,
-                TrainingHistory.SINGLE_TASK_LOSSES: self.train_single_task_losses,
-                TrainingHistory.SINGLE_TASK_METRICS: self.train_single_task_metrics
-            },
-            TrainingHistory.VALID: {
-                TrainingHistory.MULTI_TASK_LOSSES: self.valid_multi_task_losses,
-                TrainingHistory.SINGLE_TASK_LOSSES: self.valid_single_task_losses,
-                TrainingHistory.SINGLE_TASK_METRICS: self.valid_single_task_metrics
-            }
-        }
-
-        return epoch_state_as_dict
+            self.valid.multi_task_losses = multi_task_losses
+            self.valid.single_task_losses = batches_state.single_task_losses
 
 
 @dataclass
-class TrainingState(BaseState):
+class TrainingState(State):
     """
     This class is used to store the current training state. It is extremely useful for the callbacks to access the
     current training state and to modify the training process.
@@ -215,7 +227,7 @@ class TrainingState(BaseState):
         Total number of epochs.
     stop_training_flag : bool
         Whether the training should be stopped.
-    tasks: List[Task]
+    tasks: TaskList
         List of tasks that the model must learn to perform.
     train_dataloader : Dataloader
         Training set data loader.
@@ -225,10 +237,11 @@ class TrainingState(BaseState):
     info: Dict[str, Any] = field(default_factory=dict)
     n_epochs: int = None
     stop_training_flag: bool = False
-    tasks: List[Task] = field(default_factory=list)
+    tasks: TaskList = None
     train_dataloader: DataLoader = None
     valid_dataloader: DataLoader = None
 
-    def __getstate__(self):
+    def state_dict(self):
         unserializable = ["info", "tasks", "train_dataloader", "valid_dataloader"]
-        return {k: v for k, v in vars(self).items() if k not in unserializable}
+        state_dict = super().state_dict()
+        return {k: v for k, v in state_dict if k not in unserializable}
