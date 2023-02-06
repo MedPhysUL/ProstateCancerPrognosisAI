@@ -98,9 +98,9 @@ class HistoryContainer:
     Elements
     --------
     train : MeasurementsContainer
-        Training set measures.
+        Training set measurements.
     valid : MeasurementsContainer
-        Validation set measures.
+        Validation set measurements.
     """
     train: MeasurementsContainer = field(default_factory=MeasurementsContainer)
     valid: MeasurementsContainer = field(default_factory=MeasurementsContainer)
