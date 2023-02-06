@@ -23,6 +23,7 @@ from src.data.processing.preprocessing import preprocess_categoricals, preproces
 from src.data.processing.tools import MaskType
 from src.data.processing.transforms import CategoricalTransform as CaT
 from src.utils.tasks import ClassificationTask, TableTask
+from src.utils.task_list import TaskList
 
 
 class TableDataModel(NamedTuple):
@@ -44,7 +45,7 @@ class TableDataset(Dataset):
             self,
             df: pd.DataFrame,
             ids_col: str,
-            tasks: List[TableTask],
+            tasks: Union[TableTask, TaskList, List[TableTask]],
             cont_cols: Optional[List[str]] = None,
             cat_cols: Optional[List[str]] = None,
             feature_selection_groups: Optional[List[List[str]]] = None,
@@ -59,7 +60,7 @@ class TableDataset(Dataset):
             Dataframe with the original data.
         ids_col : str
             Name of the column containing the patient ids.
-        tasks : List[TableTask]
+        tasks : Union[TableTask, TaskList, List[TableTask]]
             List of tasks.
         cont_cols : Optional[List[str]]
             List of column names associated with continuous data.
@@ -79,16 +80,20 @@ class TableDataset(Dataset):
         for columns in [cont_cols, cat_cols]:
             self._check_columns_validity(df, columns)
 
+        self._tasks = TaskList(tasks)
+        assert all([isinstance(task, TableTask) for task in TaskList(self._tasks)]), (
+            f"All tasks must be instances of 'TableTask'."
+        )
+
         # Set default protected attributes
         self._cat_cols, self._cat_idx = cat_cols, []
-        self._tasks = tasks
         self._cont_cols, self._cont_idx = cont_cols, []
         self._ids_col = ids_col
         self._ids = list(df[ids_col].values)
         self._ids_to_row_idx = {id_: i for i, id_ in enumerate(self._ids)}
         self._n = df.shape[0]
         self._original_data = df
-        self._target_cols = [task.target_column for task in tasks]
+        self._target_cols = [task.target_column for task in self._tasks.table_tasks]
         self._to_tensor = to_tensor
         self._train_mask, self._valid_mask, self._test_mask = [], None, []
         self._x_cat, self._x_cont = None, None
@@ -154,7 +159,7 @@ class TableDataset(Dataset):
         return None
 
     @property
-    def tasks(self) -> List[TableTask]:
+    def tasks(self) -> TaskList:
         return self._tasks
 
     @property
@@ -548,15 +553,16 @@ class TableDataset(Dataset):
         """
         Sets scaling factor of all classification tasks.
         """
-        for idx, task in enumerate(self.tasks):
-            if isinstance(task, ClassificationTask):
-                # We set the scaling factors of all metrics
-                for metric in task.metrics:
-                    metric.update_scaling_factor(y_train=self.y[self.train_mask, idx])
+        for task in self.tasks.classification_tasks:
+            idx = self.target_cols.index(task.target_column)
 
-                # We set the scaling factor of the criterion
-                if task.criterion:
-                    task.criterion.update_scaling_factor(y_train=self.y[self.train_mask, idx])
+            # We set the scaling factors of all classification metrics
+            for metric in task.metrics:
+                metric.update_scaling_factor(y_train=self.y[self.train_mask, idx])
+
+            # We set the scaling factor of the criterion
+            if task.criterion:
+                task.criterion.update_scaling_factor(y_train=self.y[self.train_mask, idx])
 
     def _numerical_setter(
             self,
@@ -801,7 +807,7 @@ class TableDataset(Dataset):
 
     def _initialize_targets(
             self,
-            tasks: List[TableTask],
+            tasks: TaskList,
             target_to_tensor: bool
     ) -> Union[np.array, Tensor]:
         """
@@ -809,7 +815,7 @@ class TableDataset(Dataset):
 
         Parameters
         ----------
-        tasks : List[TableTask]
+        tasks : TaskList
             List of tasks.
         target_to_tensor : bool
             True if we want the targets to be in a tensor, false for numpy array.
