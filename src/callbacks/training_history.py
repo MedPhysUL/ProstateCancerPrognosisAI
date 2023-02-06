@@ -35,7 +35,7 @@ class MeasurementsContainer:
     --------
     multi_task_losses: MeasurementType
         A dictionary containing multi-task losses. The keys are the names of the learning algorithm used, the values
-        are dictionaries whose keys are the names of the losses while its values are a list of the loss measured each
+        are dictionaries whose keys are the names of the losses while its values are a list of the losses measured each
         epoch. This list of losses can also just be a float, when the current class is used to represent a single
         epoch state instead of the entire history for example.
 
@@ -53,7 +53,7 @@ class MeasurementsContainer:
 
     single_task_losses: MeasurementType
         A dictionary containing single task losses. The keys are the names of the tasks, the values are dictionaries
-        whose keys are the names of the losses while its values are a list of the loss measured each epoch. This list
+        whose keys are the names of the losses while its values are a list of the losses measured each epoch. This list
         of losses can also just be a float, when the current class is used to represent a single epoch state instead
         of the entire history for example.
 
@@ -69,7 +69,7 @@ class MeasurementsContainer:
 
     single_task_metrics : MeasurementType
         A dictionary containing metric values. The keys are the names of the tasks, the values are dictionaries whose
-        keys are the names of the metrics while its values are a list of the metric measured each epoch. This list of
+        keys are the names of the metrics while its values are a list of the metrics measured each epoch. This list of
         metrics can also just be a float, when the current class is used to represent a single epoch state instead of
         the entire history for example.
 
