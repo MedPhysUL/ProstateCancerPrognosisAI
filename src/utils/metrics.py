@@ -60,7 +60,11 @@ class Metric(ABC):
         self.direction = Direction(direction).value
         self.reduction = MetricReduction(reduction).value
         self.n_digits = n_digits
-        self.name = name if name is not None else f"{self.__class__.__name__}('reduction'={repr(self.reduction)})"
+
+        if name:
+            self.name = name
+        else:
+            self.name = f"{self.__class__.__name__}('reduction'={repr(self.reduction)}, 'n_digits'={n_digits})"
 
     @abstractmethod
     def __call__(

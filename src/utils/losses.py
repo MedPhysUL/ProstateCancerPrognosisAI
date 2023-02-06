@@ -38,9 +38,8 @@ class Loss(ABC):
         reduction : Union[LossReduction, str]
             Reduction method to use.
         """
-        # Protected attributes
         self.reduction = LossReduction(reduction).value
-        self.name = name if name is not None else f"{self.__class__.__name__}('reduction'={repr(self.reduction)})"
+        self.name = name if name else f"{self.__class__.__name__}('reduction'={repr(self.reduction)})"
 
     @abstractmethod
     def __call__(
