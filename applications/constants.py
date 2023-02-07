@@ -79,11 +79,13 @@ MODALITIES = {"CT"}
 TABLE_TASKS = [
     ClassificationTask(
         target_column=PN,
+        decision_threshold_metric=BinaryBalancedAccuracy(),
         hps_tuning_metric=BinaryBalancedAccuracy(),
         criterion=BinaryCrossEntropyWithLogitsLoss()
     ),
     ClassificationTask(
         target_column=BCR,
+        decision_threshold_metric=BinaryBalancedAccuracy(),
         hps_tuning_metric=BinaryBalancedAccuracy(),
         criterion=BinaryCrossEntropyWithLogitsLoss()
     )
