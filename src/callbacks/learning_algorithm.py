@@ -3,12 +3,13 @@
     @Author:            Maxence Larose
 
     @Creation Date:     12/2022
-    @Last modification: 01/2023
+    @Last modification: 02/2023
 
     @Description:       This file is used to define a 'LearningAlgorithm' which dictates how to update the model's
                         parameters during the training process.
 """
 
+from copy import copy
 from itertools import count
 from typing import Dict, Iterable, Optional, Union
 
@@ -16,7 +17,7 @@ from torch import Tensor
 from torch.optim import Optimizer
 
 from src.callbacks.callback import Callback, Priority
-from src.callbacks.utils.regularization import Regularization, RegularizationList
+from src.callbacks.utils.regularizer import Regularizer, RegularizerList
 from src.callbacks.utils.early_stopper import EarlyStopper
 from src.utils.multi_task_losses import MultiTaskLoss
 
@@ -37,8 +38,10 @@ class LearningAlgorithm(Callback):
 
     instance_counter = count()
 
-    CHECKPOINT_OPTIMIZER_STATE_KEY = "optimizer_state"
-    CHECKPOINT_LR_SCHEDULER_STATE_KEY = "lr_scheduler_state"
+    CLASS_NAME_KEY = "class_name"
+
+    TORCH_LIKE_SERIALIZABLE_ATTRIBUTES = ["criterion", "optimizer", "lr_scheduler", "regularizer"]
+    PYTHON_LIKE_SERIALIZABLE_ATTRIBUTES = ["early_stopper"]
 
     def __init__(
             self,
@@ -47,7 +50,7 @@ class LearningAlgorithm(Callback):
             early_stopper: Optional[EarlyStopper] = None,
             lr_scheduler: Optional[object] = None,
             name: Optional[str] = None,
-            regularization: Optional[Union[Regularization, RegularizationList, Iterable[Regularization]]] = None,
+            regularizer: Optional[Union[Regularizer, RegularizerList, Iterable[Regularizer]]] = None,
             **kwargs
     ):
         """
@@ -59,28 +62,25 @@ class LearningAlgorithm(Callback):
             Multi-task loss.
         optimizer : Optimizer
             A pytorch Optimizer.
+        early_stopper : Optional[EarlyStopper]
+            An early stopper.
         lr_scheduler : Optional[object]
             A pytorch learning rate scheduler.
         name : Optional[str]
             The name of the callback.
-        regularization : Optional[Union[Regularization, RegularizationList, Iterable[Regularization]]]
-            Regularization.
+        regularizer : Optional[Union[Regularizer, RegularizerList, Iterable[Regularizer]]]
+            Regularizer.
         """
         self.instance_id = next(self.instance_counter)
-        name = name if name is not None else f"{self.__class__.__name__}({self.instance_id})"
+        name = name if name else f"{self.__class__.__name__}({self.instance_id})"
         super().__init__(name=name, **kwargs)
 
         self.criterion = criterion
         self.early_stopper = early_stopper
         self.lr_scheduler = lr_scheduler
         self.optimizer = optimizer
-        self.regularization = regularization
-
-        self._stopped = False
-
-    @property
-    def stopped(self) -> bool:
-        return self._stopped
+        self.regularizer = RegularizerList(regularizer)
+        self.stopped = False
 
     @property
     def priority(self) -> int:
@@ -106,36 +106,9 @@ class LearningAlgorithm(Callback):
         """
         return True
 
-    def load_checkpoint_state(self, trainer, checkpoint: dict, **kwargs):
+    def state_dict(self) -> Optional[dict]:
         """
-        Loads the state of the callback from a dictionary.
-
-        Parameters
-        ----------
-        trainer : Trainer
-            The trainer.
-        checkpoint : dict
-            The dictionary containing all the states of the trainer.
-        """
-        if self.save_state:
-            state = checkpoint.get(self.name, {})
-
-            optimizer_state = state.get(self.CHECKPOINT_OPTIMIZER_STATE_KEY, None)
-            if optimizer_state:
-                self.optimizer.load_state_dict(optimizer_state)
-
-            lr_scheduler_state = state.get(self.CHECKPOINT_LR_SCHEDULER_STATE_KEY, None)
-            if lr_scheduler_state:
-                self.lr_scheduler.load_state_dict(lr_scheduler_state)
-
-    def get_checkpoint_state(self, trainer, **kwargs) -> Optional[dict]:
-        """
-        Get the state of the callback.
-
-        Parameters
-        ----------
-        trainer : Trainer
-            The trainer.
+        Gets the state of the callback.
 
         Returns
         -------
@@ -143,9 +116,25 @@ class LearningAlgorithm(Callback):
             The state of the callback.
         """
         if self.save_state:
-            state = {self.CHECKPOINT_OPTIMIZER_STATE_KEY: self.optimizer.state_dict()}
-            if self.lr_scheduler:
-                state[self.CHECKPOINT_LR_SCHEDULER_STATE_KEY] = self.lr_scheduler.state_dict()
+            state = {}
+            for k, v in vars(self).items():
+                if k not in self.UNSERIALIZABLE_ATTRIBUTES:
+                    if k in self.TORCH_LIKE_SERIALIZABLE_ATTRIBUTES:
+                        if v:
+                            attribute_state = v.state_dict()
+                            attribute_state[self.CLASS_NAME_KEY] = v.__class__.__name__
+                            state[k] = attribute_state
+                        else:
+                            state[k] = None
+                    elif k in self.PYTHON_LIKE_SERIALIZABLE_ATTRIBUTES:
+                        if v:
+                            attribute_state = vars(v).copy()
+                            attribute_state[self.CLASS_NAME_KEY] = v.__class__.__name__
+                            state[k] = attribute_state
+                        else:
+                            state[k] = None
+                    else:
+                        state[k] = copy(v)
 
             return state
 
@@ -158,6 +147,20 @@ class LearningAlgorithm(Callback):
             multi_task_loss_with_regularization: Optional[Tensor],
             trainer
     ):
+        """
+        Updates current batch state.
+
+        Parameters
+        ----------
+        single_task_losses : Dict[str, Tensor]
+            A dictionary containing single task losses. Keys are loss names and values are loss values.
+        multi_task_loss_without_regularization : Tensor
+            The multi-task loss, excluding the regularization term (penalty).
+        multi_task_loss_with_regularization : Optional[Tensor]
+            The multi-task loss, including the regularization term (penalty).
+        trainer : Trainer
+            The trainer.
+        """
         single_task_losses_dict = {
             task.name: {
                 task.criterion.name: single_task_losses[task.name].detach().item()
@@ -192,7 +195,7 @@ class LearningAlgorithm(Callback):
 
     def _compute_loss(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor], trainer) -> Tensor:
         """
-        Calls the criterion and add the elastic penalty.
+        Calls the criterion and add the elastic penalty to compute total loss.
 
         Parameters
         ----------
@@ -213,8 +216,9 @@ class LearningAlgorithm(Callback):
         loss_without_regularization = self.criterion(losses)
 
         loss_with_regularization = None
-        if self.regularization:
-            loss_with_regularization = loss_without_regularization + self.regularization()
+        if self.regularizer:
+            regularization = self.regularizer(device=loss_without_regularization.device)
+            loss_with_regularization = loss_without_regularization + regularization
 
         self._update_batch_state(losses, loss_without_regularization, loss_with_regularization, trainer)
 
@@ -239,7 +243,7 @@ class LearningAlgorithm(Callback):
 
     def _optimizer_step(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor], trainer):
         """
-        Performs an optimizer step, i.e calculates loss and performs backward pass.
+        Performs an optimizer step, i.e computes loss and performs backward pass.
 
         Parameters
         ----------
@@ -264,7 +268,7 @@ class LearningAlgorithm(Callback):
     @_pass_if_stopped
     def on_optimization_start(self, trainer, **kwargs):
         """
-        Calculates loss and update 'batch_loss' value in trainer state.
+        Computes loss and updates 'batch_loss' value in trainer state.
 
         Parameters
         ----------
@@ -310,7 +314,7 @@ class LearningAlgorithm(Callback):
     @_pass_if_stopped
     def on_epoch_end(self, trainer, **kwargs):
         """
-        Performs a learning rate scheduler step.
+        Performs a learning rate scheduler step and checks if early stop needs to occur.
 
         Parameters
         ----------
@@ -325,5 +329,5 @@ class LearningAlgorithm(Callback):
         early_stop = self.early_stopper(trainer.epoch_state)
 
         if early_stop:
-            self._stopped = True
+            self.stopped = True
             self.early_stopper.print_early_stopping_message(trainer.epoch_state)
