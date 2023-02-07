@@ -10,7 +10,7 @@
 """
 
 from abc import abstractmethod
-from typing import Dict, Iterable, Iterator, Optional, Union
+from typing import Any, Dict, Iterable, Iterator, Optional, Union
 
 from torch import device as torch_device
 from torch import linalg, stack, sum, tensor, Tensor
@@ -27,7 +27,8 @@ class Regularizer(Module):
     def __init__(
             self,
             params: Union[Iterable[Parameter], Dict[str, Parameter]],
-            lambda_: float = 1.0
+            lambda_: float = 1.0,
+            name: Optional[str] = None
     ):
         """
         Constructor of the Regularizer class.
@@ -38,6 +39,8 @@ class Regularizer(Module):
             The parameters which are regularized.
         lambda_ : float
             The weight of the regularizer. In other words, the coefficient that multiplies the loss.
+        name : Optional[str]
+            The name of the regularizer.
         """
         super().__init__()
 
@@ -48,6 +51,7 @@ class Regularizer(Module):
 
         self.params = ParameterList(params)
         self.lambda_ = lambda_
+        self.name = name if name else f"{self.__class__.__name__}('lambda_'={lambda_})"
 
     def __call__(self, *args, **kwargs) -> Tensor:
         """
@@ -68,19 +72,6 @@ class Regularizer(Module):
         out = super().__call__(*args, **kwargs)
         return self.lambda_ * out
 
-    def state_dict(self, **kwargs):
-        """
-        Get the state of the regularizer.
-
-        Returns
-        -------
-        state: Dict[str, Any]
-            The state of the regularizer.
-        """
-        state_dict = super().state_dict(**kwargs)
-        state_dict[self.LAMBDA] = self.lambda_
-        return state_dict
-
     @abstractmethod
     def forward(self, *args, **kwargs) -> Tensor:
         """
@@ -99,6 +90,19 @@ class Regularizer(Module):
             The regularization loss.
         """
         raise NotImplementedError
+
+    def state_dict(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get the state of the regularizer.
+
+        Returns
+        -------
+        state: Dict[str, Any]
+            The state of the regularizer.
+        """
+        state_dict = super().state_dict(**kwargs)
+        state_dict[self.LAMBDA] = self.lambda_
+        return state_dict
 
 
 class RegularizerList(Module):
@@ -177,6 +181,17 @@ class RegularizerList(Module):
         else:
             return tensor(0.0, requires_grad=True).to(device)
 
+    def state_dict(self, **kwargs) -> Dict[str, Any]:
+        """
+        Collates the states of the regularizers in a dictionary.
+
+        Returns
+        -------
+        states: Dict[str, Any]
+            The state of the regularizers.
+        """
+        return {regularizer.name: regularizer.state_dict(**kwargs) for regularizer in self.regularizers}
+
 
 class LpRegularizer(Regularizer):
     """
@@ -187,7 +202,8 @@ class LpRegularizer(Regularizer):
             self,
             params: Union[Iterable[Parameter], Dict[str, Parameter]],
             lambda_: float = 1.0,
-            power: int = 1
+            power: int = 1,
+            name: Optional[str] = None
     ):
         """
         Constructor of the LP class.
@@ -200,8 +216,10 @@ class LpRegularizer(Regularizer):
             The weight of the regularization. In other words, the coefficient that multiplies the loss.
         power : int
             The p parameter of the LP norm. Example: p=1 -> L1 norm, p=2 -> L2 norm.
+        name : Optional[str]
+            The name of the regularizer.
         """
-        super().__init__(params=params, lambda_=lambda_)
+        super().__init__(params=params, lambda_=lambda_, name=name)
         self.power = power
 
     def forward(self) -> Tensor:
@@ -227,7 +245,8 @@ class L1Regularizer(LpRegularizer):
     def __init__(
             self,
             params: Union[Iterable[Parameter], Dict[str, Parameter]],
-            lambda_: float = 1.0
+            lambda_: float = 1.0,
+            name: Optional[str] = None
     ):
         """
         Constructor of the L1 class.
@@ -238,8 +257,10 @@ class L1Regularizer(LpRegularizer):
             The parameters which are regularized.
         lambda_ : float
             The weight of the regularization. In other words, the coefficient that multiplies the loss.
+        name : Optional[str]
+            The name of the regularizer.
         """
-        super().__init__(params=params, lambda_=lambda_, power=1)
+        super().__init__(params=params, lambda_=lambda_, name=name, power=1)
 
 
 class L2Regularizer(LpRegularizer):
@@ -250,7 +271,8 @@ class L2Regularizer(LpRegularizer):
     def __init__(
             self,
             params: Union[Iterable[Parameter], Dict[str, Parameter]],
-            lambda_: float = 1.0
+            lambda_: float = 1.0,
+            name: Optional[str] = None
     ):
         """
         Constructor of the L2 class.
@@ -261,5 +283,7 @@ class L2Regularizer(LpRegularizer):
             The parameters which are regularized.
         lambda_ : float
             The weight of the regularization. In other words, the coefficient that multiplies the loss.
+        name : Optional[str]
+            The name of the regularizer.
         """
-        super().__init__(params=params, lambda_=lambda_, power=2)
+        super().__init__(params=params, lambda_=lambda_, name=name, power=2)
