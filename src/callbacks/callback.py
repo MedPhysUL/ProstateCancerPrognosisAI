@@ -50,14 +50,14 @@ class Callback(ABC):
             * Executes n_epochs times:
                 - `on_epoch_start`
                 - `on_train_start`
-                * Executes n_batches times:
+                * Executes n_train_batches times:
                     - `on_train_batch_start`
                     - `on_optimization_start`
                     - `on_optimization_end`
                     - `on_train_batch_end`
                 - `on_train_end`
                 - `on_validation_start`
-                * Executes validation_set_size times:
+                * Executes n_valid_batches times:
                     - `on_validation_batch_start`
                     - `on_validation_batch_end`
                 - `on_validation_end`
