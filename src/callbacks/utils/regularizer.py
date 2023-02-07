@@ -12,7 +12,8 @@
 from abc import abstractmethod
 from typing import Dict, Iterable, Iterator, Optional, Union
 
-from torch import linalg, tensor, Tensor
+from torch import device as torch_device
+from torch import linalg, stack, sum, tensor, Tensor
 from torch.nn import Module, Parameter, ParameterList
 
 
@@ -100,7 +101,7 @@ class Regularizer(Module):
         raise NotImplementedError
 
 
-class RegularizerList:
+class RegularizerList(Module):
     """
     Holds regularizers in a list.
     """
@@ -117,6 +118,8 @@ class RegularizerList:
         regularizers : Optional[Union[Regularizer, Iterable[Regularizer]]]
             The regularizers to apply.
         """
+        super().__init__()
+
         if regularizers is None:
             regularizers = []
         if isinstance(regularizers, Regularizer):
@@ -129,9 +132,20 @@ class RegularizerList:
 
         self.regularizers = list(regularizers)
 
+    def __len__(self) -> int:
+        """
+        Length of the 'RegularizerList'.
+
+        Returns
+        -------
+        length : int
+            Length of the list.
+        """
+        return len(self.regularizers)
+
     def __iter__(self) -> Iterator:
         """
-        Iterate over the regularizers.
+        Iterates over the regularizers.
 
         Returns
         -------
@@ -140,12 +154,14 @@ class RegularizerList:
         """
         return iter(self.regularizers)
 
-    def forward(self, *args, **kwargs) -> Tensor:
+    def forward(self, device: torch_device, *args, **kwargs) -> Tensor:
         """
-        Compute the forward pass of the regularizer.
+        Computes the forward pass of the regularizer.
 
         Parameters
         ----------
+        device : torch_device
+            Torch device.
         args : Any
             Args of the forward pass.
         kwargs : dict
@@ -156,10 +172,10 @@ class RegularizerList:
         loss : Tensor
             The regularization loss.
         """
-        if len(self.regularizers) == 0:
-            return tensor(0)
-        loss = sum([regularizer(*args, **kwargs) for regularizer in self.regularizers])
-        return loss
+        if self:
+            return sum(stack([regularizer(*args, **kwargs) for regularizer in self.regularizers])).to(device)
+        else:
+            return tensor(0.0, requires_grad=True).to(device)
 
 
 class LpRegularizer(Regularizer):
@@ -190,7 +206,7 @@ class LpRegularizer(Regularizer):
 
     def forward(self) -> Tensor:
         """
-        Compute the forward pass of the regularizer.
+        Computes the forward pass of the regularizer.
 
         Returns
         -------
