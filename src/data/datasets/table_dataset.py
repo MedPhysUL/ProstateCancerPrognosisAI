@@ -81,7 +81,7 @@ class TableDataset(Dataset):
             self._check_columns_validity(df, columns)
 
         self._tasks = TaskList(tasks)
-        assert all([isinstance(task, TableTask) for task in TaskList(self._tasks)]), (
+        assert all(isinstance(task, TableTask) for task in TaskList(self._tasks)), (
             f"All tasks must be instances of 'TableTask'."
         )
 

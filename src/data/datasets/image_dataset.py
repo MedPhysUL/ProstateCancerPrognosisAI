@@ -57,7 +57,7 @@ class ImageDataset(Dataset):
             Keywords arguments controlling images and segmentations format, and segmentations series to use.
         """
         self._tasks = TaskList(tasks)
-        assert all([isinstance(task, SegmentationTask) for task in self._tasks]), (
+        assert all(isinstance(task, SegmentationTask) for task in self._tasks), (
             f"All tasks must be instances of 'SegmentationTask'."
         )
 
