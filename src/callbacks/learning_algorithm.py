@@ -35,6 +35,9 @@ def _pass_if_stopped(_func):
 
 
 class LearningAlgorithm(Callback):
+    """
+    This class is used to dictate how to update the model's parameters during the training process.
+    """
 
     instance_counter = count()
 
