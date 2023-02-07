@@ -1,11 +1,11 @@
 """
-    @file:              regularization.py
+    @file:              regularizer.py
     @Author:            Maxence Larose
 
     @Creation Date:     12/2022
-    @Last modification: 12/2022
+    @Last modification: 02/2023
 
-    @Description:       This file is used to define regularizations which are used to add some penalty to the loss
+    @Description:       This file is used to define regularizers which are used to add some penalty to the loss
                         function.
 """
 
@@ -16,9 +16,9 @@ from torch import linalg, tensor, Tensor
 from torch.nn import Module, Parameter, ParameterList
 
 
-class Regularization(Module):
+class Regularizer(Module):
     """
-    Base class for regularization.
+    Base class for regularizer.
     """
 
     LAMBDA = "lambda_"
@@ -29,14 +29,14 @@ class Regularization(Module):
             lambda_: float = 1.0
     ):
         """
-        Constructor of the BaseRegularization class.
+        Constructor of the Regularizer class.
 
         Parameters
         ----------
         params : Union[Iterable[Parameter], Dict[str, Parameter]]
             The parameters which are regularized.
         lambda_ : float
-            The weight of the regularization. In other words, the coefficient that multiplies the loss.
+            The weight of the regularizer. In other words, the coefficient that multiplies the loss.
         """
         super().__init__()
 
@@ -50,7 +50,7 @@ class Regularization(Module):
 
     def __call__(self, *args, **kwargs) -> Tensor:
         """
-        Call the forward pass of the regularization and scale it by the 'lambda_' attribute.
+        Call the forward pass of the regularizer and scale it by the 'lambda_' attribute.
 
         Parameters
         ----------
@@ -62,19 +62,19 @@ class Regularization(Module):
         Returns
         -------
         loss : Tensor
-            The loss of the regularization.
+            The regularization loss.
         """
         out = super().__call__(*args, **kwargs)
         return self.lambda_ * out
 
     def state_dict(self, **kwargs):
         """
-        Get the state of the regularization.
+        Get the state of the regularizer.
 
         Returns
         -------
         state: Dict[str, Any]
-            The state of the regularization.
+            The state of the regularizer.
         """
         state_dict = super().state_dict(**kwargs)
         state_dict[self.LAMBDA] = self.lambda_
@@ -83,7 +83,7 @@ class Regularization(Module):
     @abstractmethod
     def forward(self, *args, **kwargs) -> Tensor:
         """
-        Compute the forward pass of the regularization.
+        Compute the forward pass of the regularizer.
 
         Parameters
         ----------
@@ -95,44 +95,54 @@ class Regularization(Module):
         Returns
         -------
         loss : Tensor
-            The loss of the regularization.
+            The regularization loss.
         """
         raise NotImplementedError
 
 
-class RegularizationList:
+class RegularizerList:
     """
-    Holds regularizations in a list.
+    Holds regularizers in a list.
     """
 
     def __init__(
             self,
-            regularizations: Optional[Iterable[Regularization]] = None
+            regularizers: Optional[Union[Regularizer, Iterable[Regularizer]]] = None
     ):
         """
-        Constructor of the RegularizationList class.
+        Constructor of the RegularizerList class.
 
         Parameters
         ----------
-        regularizations : Optional[Iterable[Regularization]]
-            The regularizations to apply.
+        regularizers : Optional[Union[Regularizer, Iterable[Regularizer]]]
+            The regularizers to apply.
         """
-        self.regularizations = regularizations if regularizations is not None else []
+        if regularizers is None:
+            regularizers = []
+        if isinstance(regularizers, Regularizer):
+            regularizers = [regularizers]
+
+        assert isinstance(regularizers, Iterable), "regularizers must be an Iterable."
+        assert all(isinstance(regularizer, Regularizer) for regularizer in regularizers), (
+            "All regularizer must be instances of Regularizer."
+        )
+
+        self.regularizers = list(regularizers)
 
     def __iter__(self) -> Iterator:
         """
-        Iterate over the regularizations.
+        Iterate over the regularizers.
 
         Returns
         -------
         iterator : Iterator
-            An iterator over the regularizations.
+            An iterator over the regularizers.
         """
-        return iter(self.regularizations)
+        return iter(self.regularizers)
 
     def forward(self, *args, **kwargs) -> Tensor:
         """
-        Compute the forward pass of the regularization.
+        Compute the forward pass of the regularizer.
 
         Parameters
         ----------
@@ -144,28 +154,27 @@ class RegularizationList:
         Returns
         -------
         loss : Tensor
-            The loss of the regularization.
+            The regularization loss.
         """
-        if len(self.regularizations) == 0:
+        if len(self.regularizers) == 0:
             return tensor(0)
-        loss = sum([regularization(*args, **kwargs) for regularization in self.regularizations])
+        loss = sum([regularizer(*args, **kwargs) for regularizer in self.regularizers])
         return loss
 
 
-class LpRegularization(Regularization):
+class LpRegularizer(Regularizer):
     """
-    Regularization that applies LP norm.
+    Regularizer that applies LP norm.
     """
 
     def __init__(
             self,
             params: Union[Iterable[Parameter], Dict[str, Parameter]],
             lambda_: float = 1.0,
-            power: int = 1,
-            **kwargs
+            power: int = 1
     ):
         """
-        Constructor of the L1 class.
+        Constructor of the LP class.
 
         Parameters
         ----------
@@ -181,12 +190,12 @@ class LpRegularization(Regularization):
 
     def forward(self) -> Tensor:
         """
-        Compute the forward pass of the regularization.
+        Compute the forward pass of the regularizer.
 
         Returns
         -------
         loss : Tensor
-            The loss of the regularization.
+            The regularization loss.
         """
         loss = tensor(0.0, requires_grad=True).to(self.params[0].device)
         for param in self.params:
@@ -194,9 +203,9 @@ class LpRegularization(Regularization):
         return loss
 
 
-class L1Regularization(LpRegularization):
+class L1Regularizer(LpRegularizer):
     """
-    Regularization that applies L1 norm.
+    Regularizer that applies L1 norm.
     """
 
     def __init__(
@@ -217,9 +226,9 @@ class L1Regularization(LpRegularization):
         super().__init__(params=params, lambda_=lambda_, power=1)
 
 
-class L2Regularization(LpRegularization):
+class L2Regularizer(LpRegularizer):
     """
-    Regularization that applies L2 norm.
+    Regularizer that applies L2 norm.
     """
 
     def __init__(
