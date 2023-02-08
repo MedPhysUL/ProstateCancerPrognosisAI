@@ -10,8 +10,8 @@
 
 import pandas as pd
 
-from src.data.datasets.table_dataset import MaskType, TableDataset
-from src.data.processing.sampling import RandomStratifiedSampler
+from src.data.datasets import TableDataset
+from src.data.processing.sampling import MaskType, RandomStratifiedSampler
 
 from constants import *
 

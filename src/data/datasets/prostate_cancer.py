@@ -1,5 +1,5 @@
 """
-    @file:              prostate_cancer_dataset.py
+    @file:              prostate_cancer.py
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
@@ -15,10 +15,10 @@ import numpy as np
 from torch import Tensor
 from torch.utils.data import Dataset, Subset
 
-from src.data.datasets.empty_dataset import DatasetType, EmptyDataset
-from src.data.datasets.image_dataset import ImageDataset
-from src.data.datasets.table_dataset import TableDataset
-from src.utils.task_list import TaskList
+from src.data.datasets.empty import DatasetType, EmptyDataset
+from src.data.datasets.image import ImageDataset
+from src.data.datasets.table import TableDataset
+from src.tasks.task_list import TaskList
 
 
 TargetsType: TypeAlias = Dict[str, Union[np.ndarray, Tensor]]

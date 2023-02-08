@@ -16,10 +16,10 @@ from typing import Dict, Iterable, Optional, Union
 from torch import Tensor
 from torch.optim import Optimizer
 
-from src.callbacks.callback import Callback, Priority
-from src.callbacks.utils.regularizer import Regularizer, RegularizerList
-from src.callbacks.utils.early_stopper import EarlyStopper
-from src.utils.multi_task_losses import MultiTaskLoss
+from src.losses.multi_task import MultiTaskLoss
+from src.training.callbacks.callback import Callback, Priority
+from src.training.callbacks.utils.regularizer import Regularizer, RegularizerList
+from src.training.callbacks.utils.early_stopper import EarlyStopper
 
 
 def _pass_if_stopped(_func):

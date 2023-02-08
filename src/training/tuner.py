@@ -32,11 +32,11 @@ from optuna.visualization import (
 import ray
 from torch import mean, tensor
 
-from src.data.datasets.table_dataset import MaskType
-from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
+from src.data.processing.tools import MaskType
+from src.data.datasets import ProstateCancerDataset
+from src.metrics.metric import Direction
 from src.models.base.base_model import BaseModel
 from src.utils.hyperparameters import CategoricalHP, Distribution, HP, NumericalContinuousHP, NumericalIntHP, Range
-from src.utils.metrics import Direction
 
 
 class Objective:

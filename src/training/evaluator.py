@@ -20,7 +20,7 @@ from pandas import DataFrame
 import ray
 from torch import is_tensor, from_numpy, manual_seed, stack
 
-from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset, TableDataset
+from src.data.datasets import ProstateCancerDataset, TableDataset
 from src.data.processing.feature_selection import FeatureSelector
 from src.data.processing.tools import MaskType
 from src.models.base.base_model import BaseModel
@@ -29,7 +29,7 @@ from src.recording.recorder import Recorder
 from src.recording.tools import (compare_prediction_recordings, get_evaluation_recap, plot_feature_importance_charts,
                                  plot_hps_importance_chart)
 from src.training.tuner import Objective, Tuner
-from src.utils.tasks import ClassificationTask, SegmentationTask
+from src.tasks import BinaryClassificationTask, SegmentationTask
 
 
 class Evaluator:
@@ -411,7 +411,7 @@ class Evaluator:
         model.fix_thresholds_to_optimal_values(dataset=subset)
 
         # Record thresholds
-        classification_tasks = [task for task in subset.tasks if isinstance(task, ClassificationTask)]
+        classification_tasks = [task for task in subset.tasks if isinstance(task, BinaryClassificationTask)]
         for task in classification_tasks:
             for metric in task.metrics:
                 recorder.record_data_info(f"{task.name}_{metric.name}_Threshold", str(metric.threshold))
@@ -458,7 +458,7 @@ class Evaluator:
                     if not is_tensor(pred):
                         pred = from_numpy(pred)
 
-                    if isinstance(task, ClassificationTask):
+                    if isinstance(task, BinaryClassificationTask):
                         # We get the final predictions from the soft predictions
                         pred = (pred >= task.decision_threshold_metric.threshold).long()
 

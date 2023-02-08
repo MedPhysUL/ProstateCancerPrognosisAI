@@ -1,5 +1,5 @@
 """
-    @file:              table_dataset.py
+    @file:              table.py
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     05/2022
@@ -22,8 +22,9 @@ from torch.utils.data import Dataset
 from src.data.processing.preprocessing import preprocess_categoricals, preprocess_continuous
 from src.data.processing.tools import MaskType
 from src.data.processing.transforms import CategoricalTransform as CaT
-from src.utils.tasks import ClassificationTask, TableTask
-from src.utils.task_list import TaskList
+from src.tasks import BinaryClassificationTask
+from src.tasks.table_task import TableTask
+from src.tasks.task_list import TaskList
 
 
 class TableDataModel(NamedTuple):
@@ -830,9 +831,9 @@ class TableDataset(Dataset):
             # Set targets protected attribute according to task
             t = self.original_data[task.target_column].to_numpy(dtype=float)
 
-            if (not isinstance(task, ClassificationTask)) and target_to_tensor:
+            if (not isinstance(task, BinaryClassificationTask)) and target_to_tensor:
                 t = from_numpy(t).float()
-            elif isinstance(task, ClassificationTask):
+            elif isinstance(task, BinaryClassificationTask):
                 if target_to_tensor:
                     t = from_numpy(t).long()
                 else:

@@ -13,7 +13,7 @@
 
 from typing import Any, Dict, Optional, Iterable, Iterator
 
-from src.callbacks.callback import Callback
+from src.training.callbacks.callback import Callback
 
 
 class CallbackList:

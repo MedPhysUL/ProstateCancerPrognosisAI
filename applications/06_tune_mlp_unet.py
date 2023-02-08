@@ -21,9 +21,7 @@ from torch import float32
 
 from constants import *
 from hps import MLP_HPS
-from src.data.datasets.image_dataset import ImageDataset
-from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
-from src.data.datasets.table_dataset import TableDataset
+from src.data.datasets import ImageDataset, ProstateCancerDataset, TableDataset
 from src.data.processing.sampling import extract_masks
 
 from src.models.mlp_unet import MLPUnet

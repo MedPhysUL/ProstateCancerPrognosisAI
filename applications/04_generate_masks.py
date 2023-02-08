@@ -4,7 +4,7 @@ from os.path import join
 from constants import *
 import pandas as pd
 
-from src.data.datasets.table_dataset import TableDataset
+from src.data.datasets import TableDataset
 from src.data.processing.sampling import RandomStratifiedSampler
 
 

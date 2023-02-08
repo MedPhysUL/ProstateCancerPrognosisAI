@@ -18,7 +18,7 @@ from sklearn.model_selection import train_test_split
 from torch import Tensor
 from tqdm import tqdm
 
-from src.data.datasets.table_dataset import MaskType, TableDataset
+from src.data.datasets.table import MaskType, TableDataset
 
 
 class RandomStratifiedSampler:

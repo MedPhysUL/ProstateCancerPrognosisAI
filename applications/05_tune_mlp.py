@@ -14,13 +14,12 @@ import pandas as pd
 from constants import *
 from hps import MLP_HPS
 
-from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
-from src.data.datasets.table_dataset import TableDataset
+from src.data.datasets import ProstateCancerDataset, TableDataset
 from src.data.processing.sampling import extract_masks
 from src.models.mlp import MLP
 from src.training.evaluator import Evaluator
 from src.training.early_stopper import EarlyStopperType
-from src.utils.multi_task_losses import MeanLoss
+from src.losses import MeanLoss
 
 
 if __name__ == '__main__':

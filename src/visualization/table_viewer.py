@@ -17,7 +17,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from src.data.datasets.table_dataset import MaskType, TableDataset
+from src.data.datasets import TableDataset
+from src.data.processing.tools import MaskType
 
 
 class TableViewer:

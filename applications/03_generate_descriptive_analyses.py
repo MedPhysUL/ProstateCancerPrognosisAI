@@ -10,7 +10,7 @@
 
 import pandas as pd
 
-from src.data.datasets.table_dataset import TableDataset
+from src.data.datasets import TableDataset
 from src.visualization.table_viewer import TableViewer
 
 from constants import *

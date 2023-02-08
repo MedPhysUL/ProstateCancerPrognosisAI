@@ -14,11 +14,11 @@ from typing import Optional, TYPE_CHECKING
 
 import numpy as np
 
+from src.metrics.metric import Direction
 from src.training.states import EpochState
-from src.utils.metrics import Direction
 
 if TYPE_CHECKING:
-    from src.callbacks.learning_algorithm import LearningAlgorithm
+    from src.training.callbacks.learning_algorithm import LearningAlgorithm
 
 
 class EarlyStopper(ABC):

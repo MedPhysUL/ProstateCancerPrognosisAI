@@ -19,12 +19,10 @@ from torch import cuda, no_grad, Tensor
 from torch.utils.data import SubsetRandomSampler
 from tqdm.auto import tqdm
 
-from src.callbacks.callback import Callback
-from src.callbacks.callback_list import CallbackList
-from src.callbacks.checkpoint import Checkpoint
-from src.callbacks.learning_algorithm import LearningAlgorithm
-from src.callbacks.training_history import TrainingHistory
-from src.data.datasets.prostate_cancer_dataset import FeaturesType, ProstateCancerDataset, TargetsType
+from src.training.callbacks.callback import Callback
+from src.training.callbacks.callback_list import CallbackList
+from src.training.callbacks import Checkpoint, LearningAlgorithm, TrainingHistory
+from src.data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from src.models.base.custom_torch_base import TorchCustomModel
 from src.training.states import BatchState, BatchesState, EpochState, TrainingState
 from src.utils.transforms import ToTensor

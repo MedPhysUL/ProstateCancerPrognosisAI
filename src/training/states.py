@@ -16,9 +16,9 @@ from typing_extensions import TypeAlias
 from monai.data import DataLoader
 import numpy as np
 
-from src.callbacks.training_history import MeasurementsContainer, MeasurementsType, TrainingHistory
-from src.data.datasets.prostate_cancer_dataset import FeaturesType, TargetsType
-from src.utils.task_list import TaskList
+from src.training.callbacks.training_history import MeasurementsContainer, MeasurementsType, TrainingHistory
+from src.data.datasets.prostate_cancer import FeaturesType, TargetsType
+from src.tasks.task_list import TaskList
 from src.utils.transforms import to_numpy
 
 

@@ -20,7 +20,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
-from src.callbacks.callback import Callback, Priority
+from src.training.callbacks.callback import Callback, Priority
 
 
 MeasurementsType: TypeAlias = Dict[str, Dict[str, Union[float, List[float]]]]

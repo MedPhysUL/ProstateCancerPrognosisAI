@@ -1,5 +1,5 @@
 """
-    @file:              image_dataset.py
+    @file:              image.py
     @Author:            Raphael Brodeur, Maxence Larose
 
     @Creation Date:     05/2022
@@ -18,8 +18,8 @@ from monai.transforms import apply_transform, Compose, MapTransform
 import numpy as np
 from torch.utils.data import Dataset, Subset
 
-from src.utils.tasks import SegmentationTask
-from src.utils.task_list import TaskList
+from src.tasks import SegmentationTask
+from src.tasks.task_list import TaskList
 
 
 class ImageDataset(Dataset):

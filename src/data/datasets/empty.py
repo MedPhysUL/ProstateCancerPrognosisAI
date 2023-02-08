@@ -1,5 +1,5 @@
 """
-    @file:              empty_dataset.py
+    @file:              empty.py
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
@@ -13,7 +13,7 @@ from typing import Dict, List, Union
 
 from torch.utils.data import Dataset
 
-from src.data.datasets.table_dataset import TableDataModel
+from src.data.datasets.table import TableDataModel
 
 
 class DatasetType(Enum):
