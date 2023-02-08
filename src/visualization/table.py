@@ -1,5 +1,5 @@
 """
-    @file:              table_viewer.py
+    @file:              table.py
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022

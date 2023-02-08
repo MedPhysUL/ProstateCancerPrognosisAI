@@ -29,7 +29,7 @@ from torch.utils.data.dataset import random_split
 from src.data.extraction.local import LocalDatabaseManager
 from src.data.datasets.image_dataset import ImageDataset
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
-from src.visualization.image_viewer import ImageViewer
+from src.visualization.image import ImageViewer
 
 if __name__ == '__main__':
     set_determinism(seed=1010710)

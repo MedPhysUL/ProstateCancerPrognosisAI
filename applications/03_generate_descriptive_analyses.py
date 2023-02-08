@@ -11,7 +11,7 @@
 import pandas as pd
 
 from src.data.datasets import TableDataset
-from src.visualization.table_viewer import TableViewer
+from src.visualization import TableViewer
 
 from constants import *
 

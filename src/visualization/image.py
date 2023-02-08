@@ -1,5 +1,5 @@
 """
-    @file:              image_viewer.py
+    @file:              image.py
     @Author:            Maxence Larose, Raphael Brodeur
 
     @Creation Date:     06/2022
