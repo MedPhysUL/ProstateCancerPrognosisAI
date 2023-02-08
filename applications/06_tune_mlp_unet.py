@@ -25,9 +25,9 @@ from src.data.datasets import ImageDataset, ProstateCancerDataset, TableDataset
 from src.data.processing.sampling import extract_masks
 
 from src.models.mlp_unet import MLPUnet
-from src.training.evaluator import Evaluator
+from src.evaluating import Evaluator
 from src.training.early_stopper import EarlyStopperType
-from src.utils.multi_task_losses import MeanLoss
+from src.losses import MeanLoss
 
 
 if __name__ == '__main__':

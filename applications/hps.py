@@ -1,5 +1,5 @@
 from src.models.mlp import MLPHP
-from src.utils.hyperparameters import Range
+from src.tuning.hyperparameters import Range
 
 MLP_HPS = {
     MLPHP.ACTIVATION.name: {

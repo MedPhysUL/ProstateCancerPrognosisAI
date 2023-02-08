@@ -28,8 +28,8 @@ from src.recording.constants import (PREDICTION, RECORDS_FILE, TEST_RESULTS, TRA
 from src.recording.recorder import Recorder
 from src.recording.tools import (compare_prediction_recordings, get_evaluation_recap, plot_feature_importance_charts,
                                  plot_hps_importance_chart)
-from src.training.tuner import Objective, Tuner
 from src.tasks import BinaryClassificationTask, SegmentationTask
+from src.tuning import Objective, Tuner
 
 
 class Evaluator:
