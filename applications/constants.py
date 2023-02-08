@@ -10,9 +10,9 @@
 
 import os
 
-from src.utils.metrics import BinaryBalancedAccuracy, DICEMetric
-from src.utils.losses import BinaryCrossEntropyWithLogitsLoss, DICELoss
-from src.utils.tasks import ClassificationTask, SegmentationTask
+from src.losses import BinaryCrossEntropyWithLogitsLoss, DiceLoss
+from src.metrics import BinaryBalancedAccuracy, DiceMetric
+from src.tasks import BinaryClassificationTask, SegmentationTask
 
 # SEED
 SEED = 1010710
@@ -77,13 +77,13 @@ MODALITIES = {"CT"}
 
 # TASKS
 TABLE_TASKS = [
-    ClassificationTask(
+    BinaryClassificationTask(
         target_column=PN,
         decision_threshold_metric=BinaryBalancedAccuracy(),
         hps_tuning_metric=BinaryBalancedAccuracy(),
         criterion=BinaryCrossEntropyWithLogitsLoss()
     ),
-    ClassificationTask(
+    BinaryClassificationTask(
         target_column=BCR,
         decision_threshold_metric=BinaryBalancedAccuracy(),
         hps_tuning_metric=BinaryBalancedAccuracy(),
@@ -92,8 +92,8 @@ TABLE_TASKS = [
 ]
 IMAGE_TASKS = [
     SegmentationTask(
-        criterion=DICELoss(),
-        hps_tuning_metric=DICEMetric(),
+        criterion=DiceLoss(),
+        hps_tuning_metric=DiceMetric(),
         organ="Prostate",
         modality="CT"
     )

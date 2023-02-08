@@ -1,5 +1,5 @@
 """
-    @file:              multi_task_losses.py
+    @file:              multi_task.py
     @Author:            Maxence Larose
 
     @Creation Date:     09/2022
@@ -18,8 +18,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from torch import nanmean, stack, Tensor
 
-from src.utils.tasks import Task
-from src.utils.task_list import TaskList
+from src.tasks.task import Task
+from src.tasks.task_list import TaskList
 
 
 class MultiTaskLoss(ABC):

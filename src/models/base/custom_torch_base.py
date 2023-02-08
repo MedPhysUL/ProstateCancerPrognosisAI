@@ -27,13 +27,14 @@ from torch.utils.data import SubsetRandomSampler
 from src.data.datasets.prostate_cancer_dataset import FeaturesType, ProstateCancerDataset, TargetsType
 from src.data.processing.tools import MaskType
 # from src.data.processing.gnn_datasets import PetaleKGNNDataset
+from src.losses.multi_task import MultiTaskLoss
+from src.metrics.metric import Direction
 from src.models.base.blocks.embeddings import EntityEmbeddingBlock
 from src.training.early_stopper import EarlyStopper, EarlyStopperType, MetricEarlyStopper, MultiTaskLossEarlyStopper
 from src.training.optimizer import SAM
-from src.utils.multi_task_losses import MultiTaskLoss
 from src.utils.reductions import MetricReduction
-from src.utils.metrics import Direction
-from src.utils.tasks import ClassificationTask, SegmentationTask, Task
+from src.tasks.task import Task
+from src.tasks import BinaryClassificationTask, SegmentationTask
 from src.visualization.tools import visualize_epoch_progression
 
 
@@ -708,7 +709,7 @@ class TorchCustomModel(Module, ABC):
 
         thresholds = np.linspace(start=0.01, stop=0.95, num=95)
 
-        classification_tasks = [task for task in self.tasks if isinstance(task, ClassificationTask)]
+        classification_tasks = [task for task in self.tasks if isinstance(task, BinaryClassificationTask)]
         outputs_dict = {task.name: Output(predictions=[], targets=[]) for task in classification_tasks}
 
         # Set model for evaluation

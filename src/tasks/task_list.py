@@ -12,7 +12,9 @@
 from __future__ import annotations
 from typing import Any, Dict, Generic, Iterable, Iterator, Optional, TypeVar, Union
 
-from src.utils.tasks import ClassificationTask, RegressionTask, SegmentationTask, TableTask, Task
+from src.tasks import BinaryClassificationTask, RegressionTask, SegmentationTask
+from src.tasks.task import Task
+from src.tasks.table_task import TableTask
 
 _SpecifiedTaskType = TypeVar("_SpecifiedTaskType")
 
@@ -97,16 +99,16 @@ class TaskList(Generic[_SpecifiedTaskType]):
         return TaskList(self.tasks + other.tasks)
 
     @property
-    def classification_tasks(self) -> TaskList[ClassificationTask]:
+    def binary_classification_tasks(self) -> TaskList[BinaryClassificationTask]:
         """
-        Returns a 'TaskList' of all classification tasks contained in the current 'TaskList'.
+        Returns a 'TaskList' of all binary classification tasks contained in the current 'TaskList'.
 
         Returns
         -------
-        classification_tasks : TaskList[ClassificationTask]
-            Classification tasks.
+        binary_classification_tasks : TaskList[BinaryClassificationTask]
+            Binary classification tasks.
         """
-        return TaskList([task for task in self.tasks if isinstance(task, ClassificationTask)])
+        return TaskList([task for task in self.tasks if isinstance(task, BinaryClassificationTask)])
 
     @property
     def regression_tasks(self) -> TaskList[RegressionTask]:
