@@ -20,7 +20,7 @@ from torch import cat, from_numpy, stack, Tensor
 from torch.utils.data import Dataset
 
 from src.data.processing.preprocessing import preprocess_categoricals, preprocess_continuous
-from src.data.processing.tools import MaskType
+from src.data.processing.sampling import Mask
 from src.data.processing.transforms import CategoricalTransform as CaT
 from src.tasks import BinaryClassificationTask
 from src.tasks.table_task import TableTask
@@ -537,7 +537,7 @@ class TableDataset(Dataset):
         df = self._retrieve_subset_from_original(self._cont_cols, self._cat_cols)
 
         # We add the new feature
-        df = pd.merge(df, data, on=[self._ids_col], how=MaskType.INNER)
+        df = pd.merge(df, data, on=[self._ids_col], how=Mask.INNER)
 
         # We update the columns list
         feature_name = [f for f in data.columns if f != self._ids_col]
@@ -552,9 +552,9 @@ class TableDataset(Dataset):
 
     def _set_scaling_factors(self):
         """
-        Sets scaling factor of all classification tasks.
+        Sets scaling factor of all binary classification tasks.
         """
-        for task in self.tasks.classification_tasks:
+        for task in self.tasks.binary_classification_tasks:
             idx = self.target_cols.index(task.target_column)
 
             # We set the scaling factors of all classification metrics

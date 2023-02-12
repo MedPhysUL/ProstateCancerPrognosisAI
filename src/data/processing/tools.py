@@ -13,20 +13,6 @@ from typing import List, Optional
 import pandas as pd
 
 
-class MaskType:
-    """
-    Stores the constant related to mask types
-    """
-
-    TRAIN: str = "train"
-    VALID: str = "valid"
-    TEST: str = "test"
-    INNER: str = "inner"
-
-    def __iter__(self):
-        return iter([self.TRAIN, self.VALID, self.TEST])
-
-
 def is_categorical(
         data: pd.Series
 ) -> bool:
