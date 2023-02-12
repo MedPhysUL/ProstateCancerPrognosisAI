@@ -15,9 +15,9 @@ import numpy as np
 from torch import Tensor
 from torch.utils.data import Dataset, Subset
 
-from src.data.datasets.empty import DatasetType, EmptyDataset
-from src.data.datasets.image import ImageDataset
-from src.data.datasets.table import TableDataset
+from .empty import DatasetType, EmptyDataset
+from .image import ImageDataset
+from .table import TableDataset
 from src.tasks.task_list import TaskList
 
 

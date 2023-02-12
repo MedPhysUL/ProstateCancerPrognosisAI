@@ -17,8 +17,7 @@ from hps import MLP_HPS
 from src.data.datasets import ProstateCancerDataset, TableDataset
 from src.data.processing.sampling import extract_masks
 from src.models.mlp import MLP
-from src.evaluating import Evaluator
-from src.training.callbacks.learning_algorithm import EarlyStopper
+from src.evaluation import Evaluator
 from src.losses import MeanLoss
 
 
