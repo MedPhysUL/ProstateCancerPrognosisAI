@@ -18,7 +18,7 @@ from src.metrics.metric import Direction
 from src.training.states import EpochState
 
 if TYPE_CHECKING:
-    from src.training.callbacks.learning_algorithm import LearningAlgorithm
+    from ..learning_algorithm import LearningAlgorithm
 
 
 class EarlyStopper(ABC):

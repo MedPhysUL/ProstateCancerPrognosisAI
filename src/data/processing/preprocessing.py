@@ -13,8 +13,8 @@ from typing import List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-from src.data.processing.transforms import ContinuousTransform as ConT
-from src.data.processing.transforms import CategoricalTransform as CaT
+from .transforms import ContinuousTransform as ConT
+from .transforms import CategoricalTransform as CaT
 
 
 ENCODINGS = ["ordinal", "one-hot"]

@@ -13,7 +13,7 @@ from typing import Dict, List, Union
 
 from torch.utils.data import Dataset
 
-from src.data.datasets.table import TableDataModel
+from .table import TableDataModel
 
 
 class DatasetType(Enum):

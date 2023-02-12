@@ -15,7 +15,7 @@ from typing import List, NamedTuple, Union
 from monai.transforms import Compose
 from torch.utils.data import ConcatDataset, Subset
 
-from src.data.datasets.image_dataset import ImageDataset
+from src.data.datasets import ImageDataset
 
 
 class AugmentationTransforms(NamedTuple):

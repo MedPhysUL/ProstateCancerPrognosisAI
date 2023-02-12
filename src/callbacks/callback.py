@@ -44,7 +44,7 @@ class Callback(ABC):
 
     Callback methods are called in the following order:
         - `on_tuning_start`
-            * Executes n_trials times:
+        * Executes n_trials times:
             - `on_trial_start`
             - `on_fit_start`
             * Executes n_epochs times:

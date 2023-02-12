@@ -20,8 +20,8 @@ import numpy as np
 import pandas as pd
 from scipy.stats import chi2
 
-from src.data.processing.tools import retrieve_numerical_var
-from src.data.processing.transforms import ContinuousTransform as ConT
+from .tools import retrieve_numerical_var
+from .transforms import ContinuousTransform as ConT
 
 
 class DataCleaner:

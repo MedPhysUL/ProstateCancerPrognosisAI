@@ -16,7 +16,7 @@ from typing import Any, Dict, Mapping, Optional, Union
 
 import torch
 
-from src.training.callbacks.callback import Callback, Priority
+from .callback import Callback, Priority
 
 
 @dataclass
