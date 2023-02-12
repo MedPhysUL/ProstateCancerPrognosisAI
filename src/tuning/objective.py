@@ -19,7 +19,14 @@ from torch import mean, tensor
 from src.data.processing.tools import MaskType
 from src.data.datasets import ProstateCancerDataset
 from src.models.base.base_model import BaseModel
-from src.tuning.hyperparameters import CategoricalHP, Distribution, HP, NumericalContinuousHP, NumericalIntHP, Range
+from src.tuning.hyperparameters import (
+    CategoricalHP,
+    Distribution,
+    Hyperparameter,
+    NumericalContinuousHP,
+    NumericalIntHP,
+    Range
+)
 
 
 class Objective:
@@ -53,7 +60,7 @@ class Objective:
             Whether we want to use a GPU.
         """
         # We validate the given hyperparameters
-        for hp in model_constructor.get_hps():
+        for hp in model_constructor.get_hyperparameters():
             if not (hp.name in list(hps.keys())):
                 raise ValueError(f"'{hp}' is missing from hps dictionary")
 
@@ -107,7 +114,7 @@ class Objective:
         Defines the different optuna sampling function for each hyperparameter.
         """
         # For each hyperparameter associated to the model we are tuning
-        for hp in self._model_constructor.get_hps():
+        for hp in self._model_constructor.get_hyperparameters():
 
             # We check if a value was predefined for this hyperparameter,
             # in this case, no value we'll be sampled by Optuna
@@ -126,14 +133,14 @@ class Objective:
 
     def _build_constant_getter(
             self,
-            hp: HP
+            hp: Hyperparameter
     ) -> Callable:
         """
         Builds a function that extracts the given predefined hyperparameter value.
 
         Parameters
         ----------
-        hp : HP
+        hp : Hyperparameter
             hyperparameter
 
         Returns
@@ -155,7 +162,7 @@ class Objective:
 
         Parameters
         ----------
-        hp : CategoricalHP
+        hp : CategoricalHyperparameter
             Categorical hyperparameter.
 
         Returns
@@ -177,7 +184,7 @@ class Objective:
 
         Parameters
         ----------
-        hp : NumericalIntHP
+        hp : NumericalIntHyperparameter
             Numerical discrete hyperparameter.
 
         Returns
@@ -199,7 +206,7 @@ class Objective:
 
         Parameters
         ----------
-        hp : NumericalContinuousHP
+        hp : NumericalContinuousHyperparameter
             Numerical continuous hyperparameter.
 
         Returns
@@ -297,4 +304,4 @@ class Objective:
             Dictionary with hyperparameters' values.
         """
         return {hp.name: self._hps[hp.name].get(Range.VALUE, trial.params.get(hp.name))
-                for hp in self._model_constructor.get_hps()}
+                for hp in self._model_constructor.get_hyperparameters()}

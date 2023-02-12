@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     07/2022
-    @Last modification: 07/2022
+    @Last modification: 02/2023
 
     @Description:       This file is used to define classes related to hyperparameters.
 """
@@ -29,7 +29,7 @@ class Range:
     VALUE: str = "value"
 
 
-class HP:
+class Hyperparameter:
     """
     A class that represents a hyperparameter.
     """
@@ -58,7 +58,7 @@ class HP:
         return self.name
 
 
-class CategoricalHP(HP):
+class CategoricalHP(Hyperparameter):
     """
     A class that defines a Categorical hyperparameter.
     """
@@ -78,7 +78,7 @@ class CategoricalHP(HP):
         super().__init__(name=name, distribution=Distribution.CATEGORICAL)
 
 
-class NumericalIntHP(HP):
+class NumericalIntHP(Hyperparameter):
     """
     A class that defines a Numerical integer hyperparameter.
     """
@@ -97,7 +97,7 @@ class NumericalIntHP(HP):
         super().__init__(name=name, distribution=Distribution.INT)
 
 
-class NumericalContinuousHP(HP):
+class NumericalContinuousHP(Hyperparameter):
     """
     Numerical continuous hyperparameter
     """

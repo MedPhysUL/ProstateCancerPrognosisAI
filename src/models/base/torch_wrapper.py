@@ -163,13 +163,13 @@ class TorchWrapper(BaseModel):
         save(self._model.state_dict(), os.path.join(path, "torch_model.pt"))
 
     @staticmethod
-    def get_hps() -> List[HP]:
+    def get_hyperparameters() -> List[HP]:
         """
         Returns a list with the hyperparameters associated to the model.
 
         Returns
         -------
-        list_hp : List[HP]
+        list_hp : List[Hyperparameter]
             list of hyperparameters
         """
         raise NotImplementedError

@@ -13,7 +13,7 @@ from typing import List, Optional
 from src.models.base.torch_wrapper import TorchWrapper
 from src.models.base.mlp_unet_base_model import MLPUnetBaseModel
 from src.training.early_stopper import EarlyStopperType
-from src.utils.hyperparameters import CategoricalHP, HP, NumericalContinuousHP, NumericalIntHP
+from src.tuning.hyperparameters import CategoricalHP, Hyperparameter, NumericalContinuousHP, NumericalIntHP
 from src.utils.multi_task_losses import MultiTaskLoss
 
 
@@ -130,7 +130,7 @@ class MLPUnet(TorchWrapper):
         )
 
     @staticmethod
-    def get_hps() -> List[HP]:
+    def get_hyperparameters() -> List[HP]:
         """
         Returns a list with the hyperparameters associated to the model
         Returns: list of hyperparameters

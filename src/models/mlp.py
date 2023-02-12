@@ -130,7 +130,7 @@ class MLP(TorchWrapper):
         )
 
     @staticmethod
-    def get_hps() -> List[HP]:
+    def get_hyperparameters() -> List[HP]:
         """
         Returns a list with the hyperparameters associated to the model
         Returns: list of hyperparameters
