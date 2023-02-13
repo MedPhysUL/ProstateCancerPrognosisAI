@@ -58,7 +58,7 @@ class Hyperparameter:
         return self.name
 
 
-class CategoricalHP(Hyperparameter):
+class CategoricalHyperparameter(Hyperparameter):
     """
     A class that defines a Categorical hyperparameter.
     """
@@ -78,7 +78,7 @@ class CategoricalHP(Hyperparameter):
         super().__init__(name=name, distribution=Distribution.CATEGORICAL)
 
 
-class NumericalIntHP(Hyperparameter):
+class NumericalIntHyperparameter(Hyperparameter):
     """
     A class that defines a Numerical integer hyperparameter.
     """
@@ -97,7 +97,7 @@ class NumericalIntHP(Hyperparameter):
         super().__init__(name=name, distribution=Distribution.INT)
 
 
-class NumericalContinuousHP(Hyperparameter):
+class NumericalContinuousHyperparameter(Hyperparameter):
     """
     Numerical continuous hyperparameter
     """

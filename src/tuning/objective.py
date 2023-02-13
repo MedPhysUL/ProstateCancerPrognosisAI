@@ -19,11 +19,11 @@ from torch import mean, tensor
 from ..data.processing.sampling import Mask
 from ..data.datasets import ProstateCancerDataset
 from .hyperparameters import (
-    CategoricalHP,
+    CategoricalHyperparameter,
     Distribution,
     Hyperparameter,
-    NumericalContinuousHP,
-    NumericalIntHP,
+    NumericalContinuousHyperparameter,
+    NumericalIntHyperparameter,
     Range
 )
 from ..models.base.base_model import BaseModel
@@ -155,7 +155,7 @@ class Objective:
 
     def _build_categorical_getter(
             self,
-            hp: CategoricalHP
+            hp: CategoricalHyperparameter
     ) -> Callable:
         """
         Builds a function that extracts optuna's suggestion for the categorical hyperparameter.
@@ -177,7 +177,7 @@ class Objective:
 
     def _build_numerical_int_getter(
             self,
-            hp: NumericalIntHP
+            hp: NumericalIntHyperparameter
     ) -> Callable:
         """
          Builds a function that extracts optuna's suggestion for the numerical discrete hyperparameter.
@@ -199,7 +199,7 @@ class Objective:
 
     def _build_numerical_cont_getter(
             self,
-            hp: NumericalContinuousHP
+            hp: NumericalContinuousHyperparameter
     ) -> Callable:
         """
         Builds a function that extracts optuna's suggestion for the numerical continuous hyperparameter.
