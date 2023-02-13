@@ -8,70 +8,12 @@
     @Description:      This file contains simple functions related to visualization, mostly during training.
 """
 
-import os
-from typing import Dict, List
+from typing import Dict
 
 from matplotlib import pyplot as plt
 import numpy as np
 
-from ..data.processing.sampling import Mask
 from ..recording.constants import MEAN, STD
-
-
-# Epochs progression figure name
-EPOCHS_PROGRESSION_FIG: str = "epochs_progression.png"
-
-
-def visualize_epoch_progression(
-        train_history: List[List[float]],
-        valid_history: List[List[float]],
-        progression_type: List[str],
-        path: str
-) -> None:
-    """
-    Visualizes train and test loss histories over training epoch.
-
-    Parameters
-    ----------
-    train_history : List[List[float]]
-        A list of (E,) lists of loss values/evaluation metrics values across epochs where E is the number of epochs
-    valid_history : List[List[float]]
-        A list of (E,) list.
-    progression_type : List[str]
-        A list of string specifying the type of the progressions to visualize.
-    path :
-        Path where to save the plots.
-    """
-    plt.figure(figsize=(12, 8))
-
-    # If there is only one plot to show (related to the loss)
-    if len(train_history) == 1:
-
-        x = range(len(train_history[0]))
-        plt.plot(x, train_history[0], label=Mask.TRAIN)
-        plt.plot(x, valid_history[0], label=Mask.VALID)
-
-        plt.legend()
-        plt.xlabel('Epochs')
-        plt.ylabel(progression_type[0])
-
-    # If there are multiple plots to show (one for the loss and one or many for the evaluation metric)
-    else:
-        for i in range(len(train_history)):
-
-            nb_epochs = len(train_history[i])
-            plt.subplot(1, len(train_history), i+1)
-            plt.plot(range(nb_epochs), train_history[i], label=Mask.TRAIN)
-            if len(valid_history[i]) != 0:
-                plt.plot(range(nb_epochs), valid_history[i], label=Mask.VALID)
-
-            plt.legend()
-            plt.xlabel('Epochs')
-            plt.ylabel(progression_type[i])
-
-    plt.tight_layout()
-    plt.savefig(os.path.join(path, EPOCHS_PROGRESSION_FIG))
-    plt.close()
 
 
 def visualize_importance(
