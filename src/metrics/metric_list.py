@@ -12,7 +12,7 @@
 from __future__ import annotations
 from typing import Any, Dict, Generic, Iterable, Iterator, Optional, TypeVar, Union
 
-from src.metrics.metric import Metric
+from .metric import Metric
 
 _SpecifiedMetricType = TypeVar("_SpecifiedMetricType")
 

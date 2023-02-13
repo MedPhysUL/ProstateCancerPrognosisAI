@@ -5,7 +5,7 @@ from constants import *
 import pandas as pd
 
 from src.data.datasets import TableDataset
-from src.data.processing.sampling import RandomStratifiedSampler
+from src.data.processing.sampling import Sampler
 
 
 if __name__ == '__main__':
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                 Sampling                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
-    sampler = RandomStratifiedSampler(
+    sampler = Sampler(
         dataset=table_dataset,
         n_out_split=2,
         n_in_split=2,

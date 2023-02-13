@@ -3,7 +3,7 @@
     @Author:            Raphael Brodeur, Maxence Larose
 
     @Creation Date:     07/2022
-    @Last modification: 07/2022
+    @Last modification: 02/2023
 
     @Description:       This file contains the Augmentation class which makes it possible to manage image/segmentation
                         augmentations.
@@ -15,7 +15,7 @@ from typing import List, NamedTuple, Union
 from monai.transforms import Compose
 from torch.utils.data import ConcatDataset, Subset
 
-from src.data.datasets import ImageDataset
+from ..datasets import ImageDataset
 
 
 class AugmentationTransforms(NamedTuple):

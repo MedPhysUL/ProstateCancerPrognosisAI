@@ -16,7 +16,7 @@ from monai.metrics import DiceMetric as _MonaiDiceMetric
 import numpy as np
 from torch import from_numpy, is_tensor, Tensor
 
-from src.metrics.metric import Direction, Metric, MetricReduction
+from .metric import Direction, Metric, MetricReduction
 
 
 class SegmentationMetric(Metric, ABC):

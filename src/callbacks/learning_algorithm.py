@@ -17,9 +17,9 @@ from torch import Tensor
 from torch.optim import Optimizer
 
 from .callback import Callback, Priority
+from ..losses.multi_task import MultiTaskLoss
 from .utils.early_stopper import EarlyStopper
 from .utils.regularizer import Regularizer, RegularizerList
-from src.losses.multi_task import MultiTaskLoss
 
 
 def _pass_if_stopped(_func):

@@ -11,7 +11,7 @@
 import pandas as pd
 
 from src.data.datasets import TableDataset
-from src.data.processing.sampling import MaskType, RandomStratifiedSampler
+from src.data.processing.sampling import Mask, Sampler
 
 from constants import *
 
@@ -39,7 +39,7 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                 Sampling                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
-    rss = RandomStratifiedSampler(
+    rss = Sampler(
         dataset=table_dataset,
         n_out_split=1,
         n_in_split=0,
@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
     masks = rss()
     rss.visualize_splits(masks)
-    learning_idx, holdout_idx = masks[0][MaskType.TRAIN], masks[0][MaskType.TEST]
+    learning_idx, holdout_idx = masks[0][Mask.TRAIN], masks[0][Mask.TEST]
     learning_df, holdout_df = df.iloc[learning_idx, :], df.iloc[holdout_idx, :]
 
     # ----------------------------------------------------------------------------------------------------------- #

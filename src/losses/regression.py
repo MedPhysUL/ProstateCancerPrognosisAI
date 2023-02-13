@@ -15,7 +15,7 @@ from typing import List, Tuple, Union
 import numpy as np
 from torch import from_numpy, isnan, is_tensor, nan, tensor, Tensor, where
 
-from src.losses.loss import Loss, LossReduction
+from .loss import Loss, LossReduction
 
 
 class RegressionLoss(Loss, ABC):

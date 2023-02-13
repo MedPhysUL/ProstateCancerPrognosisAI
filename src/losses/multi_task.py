@@ -18,8 +18,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from torch import nanmean, stack, Tensor
 
-from src.tasks.task import Task
-from src.tasks.task_list import TaskList
+from ..tasks.task import Task
+from ..tasks.task_list import TaskList
 
 
 class MultiTaskLoss(ABC):

@@ -11,12 +11,12 @@
 from abc import ABC
 from typing import Iterable, Optional, Union
 
-from src.losses.binary_classification import BinaryClassificationLoss
-from src.losses.regression import RegressionLoss
-from src.metrics.binary_classification import BinaryClassificationMetric
-from src.metrics.regression import RegressionMetric
-from src.metrics.metric_list import MetricList
-from src.tasks.task import Task
+from ..losses.binary_classification import BinaryClassificationLoss
+from ..losses.regression import RegressionLoss
+from ..metrics.binary_classification import BinaryClassificationMetric
+from ..metrics.regression import RegressionMetric
+from ..metrics.metric_list import MetricList
+from .task import Task
 
 
 class TableTask(Task, ABC):

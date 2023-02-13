@@ -11,7 +11,7 @@
 import pandas as pd
 
 from constants import *
-from src.data.processing.cleaning import DataCleaner
+from src.data.processing.cleaning import Cleaner
 
 
 if __name__ == '__main__':
@@ -31,7 +31,7 @@ if __name__ == '__main__':
 
     learning_set_data_cleaner(df=learning_df)
 
-    data_cleaner = DataCleaner(
+    data_cleaner = Cleaner(
         records_path=f"{OUTLIERS_RECORDS_PATH}/holdout_set",
         ids_col=ID,
     )

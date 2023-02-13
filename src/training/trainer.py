@@ -19,13 +19,13 @@ from torch import cuda, no_grad, Tensor
 from torch.utils.data import SubsetRandomSampler
 from tqdm.auto import tqdm
 
+from ..callbacks.callback import Callback
+from ..callbacks.callback_list import CallbackList
+from ..callbacks import Checkpoint, LearningAlgorithm, TrainingHistory
+from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
+from ..models.base.custom_torch_base import TorchCustomModel
+from .states import BatchState, BatchesState, EpochState, TrainingState
 from .transforms import ToTensor
-from src.callbacks.callback import Callback
-from src.callbacks.callback_list import CallbackList
-from src.callbacks import Checkpoint, LearningAlgorithm, TrainingHistory
-from src.data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
-from src.models.base.custom_torch_base import TorchCustomModel
-from src.training.states import BatchState, BatchesState, EpochState, TrainingState
 
 
 class Trainer:

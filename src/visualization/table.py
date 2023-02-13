@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
-    @Last modification: 07/2022
+    @Last modification: 02/2023
 
     @Description:       This file contains the TableViewer class which is used to visualize a dataset.
 """
@@ -17,8 +17,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from src.data.datasets import TableDataset
-from src.data.processing.tools import MaskType
+from ..data.datasets import TableDataset
+from ..data.processing.sampling import Mask
 
 
 class TableViewer:
@@ -65,7 +65,7 @@ class TableViewer:
         """
         nonempty_masks = []
         masks = [self.dataset.train_mask, self.dataset.valid_mask, self.dataset.test_mask]
-        masks_names = [MaskType.TRAIN, MaskType.VALID, MaskType.TEST]
+        masks_names = [Mask.TRAIN, Mask.VALID, Mask.TEST]
 
         available_masks = [(name, mask) for name, mask in zip(masks_names, masks) if mask]
 

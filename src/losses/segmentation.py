@@ -16,7 +16,7 @@ from monai.losses import DiceLoss as _MonaiDiceLoss
 import numpy as np
 from torch import from_numpy, is_tensor, Tensor
 
-from src.losses.loss import Loss, LossReduction
+from .loss import Loss, LossReduction
 
 
 class SegmentationLoss(Loss, ABC):

@@ -15,7 +15,7 @@ from typing import List, Optional, Tuple, Union
 import numpy as np
 from torch import from_numpy, is_tensor, nan, nn, tensor, Tensor, where
 
-from src.losses.loss import Loss, LossReduction
+from .loss import Loss, LossReduction
 
 
 class BinaryClassificationLoss(Loss, ABC):

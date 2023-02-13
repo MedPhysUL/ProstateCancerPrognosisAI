@@ -10,10 +10,10 @@
 
 from typing import Iterable, Optional, Union
 
-from src.losses.regression import RegressionLoss
-from src.metrics.regression import RegressionMetric
-from src.metrics.metric_list import MetricList
-from src.tasks.table_task import TableTask
+from ..losses.regression import RegressionLoss
+from ..metrics.regression import RegressionMetric
+from ..metrics.metric_list import MetricList
+from .table_task import TableTask
 
 
 class RegressionTask(TableTask):

@@ -12,9 +12,9 @@
 from __future__ import annotations
 from typing import Any, Dict, Generic, Iterable, Iterator, Optional, TypeVar, Union
 
-from src.tasks import BinaryClassificationTask, RegressionTask, SegmentationTask
-from src.tasks.task import Task
-from src.tasks.table_task import TableTask
+from .table_task import TableTask
+from .task import Task
+from ..tasks import BinaryClassificationTask, RegressionTask, SegmentationTask
 
 _SpecifiedTaskType = TypeVar("_SpecifiedTaskType")
 

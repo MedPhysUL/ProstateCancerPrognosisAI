@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Nicolas Raymond, Mehdi Mitiche
 
     @Creation Date:     03/2022
-    @Last modification: 01/2023
+    @Last modification: 02/2023
 
     @Description:      This file is used to define the Evaluator class in charge of comparing models against each other.
 """
@@ -20,16 +20,16 @@ from pandas import DataFrame
 import ray
 from torch import is_tensor, from_numpy, manual_seed, stack
 
-from src.data.datasets import ProstateCancerDataset, TableDataset
-from src.data.processing.feature_selection import FeatureSelector
-from src.data.processing.tools import MaskType
-from src.models.base.base_model import BaseModel
-from src.recording.constants import (PREDICTION, RECORDS_FILE, TEST_RESULTS, TRAIN_RESULTS, VALID_RESULTS)
-from src.recording.recorder import Recorder
-from src.recording.tools import (compare_prediction_recordings, get_evaluation_recap, plot_feature_importance_charts,
+from ..data.datasets import ProstateCancerDataset, TableDataset
+from ..data.processing.feature_selection import FeatureSelector
+from ..data.processing.sampling import Mask
+from ..models.base.base_model import BaseModel
+from ..recording.constants import (PREDICTION, RECORDS_FILE, TEST_RESULTS, TRAIN_RESULTS, VALID_RESULTS)
+from ..recording.recorder import Recorder
+from ..recording.tools import (compare_prediction_recordings, get_evaluation_recap, plot_feature_importance_charts,
                                  plot_hps_importance_chart)
-from src.tasks import BinaryClassificationTask, SegmentationTask
-from src.tuning import Objective, Tuner
+from ..tasks import BinaryClassificationTask, SegmentationTask
+from ..tuning import Objective, Tuner
 
 
 class Evaluator:
@@ -194,8 +194,8 @@ class Evaluator:
         for k, v in self._masks.items():
 
             # We extract the masks
-            train_mask, valid_mask = v[MaskType.TRAIN], v[MaskType.VALID]
-            test_mask, in_masks = v[MaskType.TEST], v[MaskType.INNER]
+            train_mask, valid_mask = v[Mask.TRAIN], v[Mask.VALID]
+            test_mask, in_masks = v[Mask.TEST], v[Mask.INNER]
 
             # We update the dataset's masks
             self._dataset.update_masks(train_mask=train_mask, valid_mask=valid_mask, test_mask=test_mask)
@@ -417,9 +417,9 @@ class Evaluator:
                 recorder.record_data_info(f"{task.name}_{metric.name}_Threshold", str(metric.threshold))
 
         for mask, mask_type in [
-            (subset.train_mask, MaskType.TRAIN),
-            (subset.test_mask, MaskType.TEST),
-            (subset.valid_mask, MaskType.VALID)
+            (subset.train_mask, Mask.TRAIN),
+            (subset.test_mask, Mask.TEST),
+            (subset.valid_mask, Mask.VALID)
         ]:
 
             if len(mask) > 0:

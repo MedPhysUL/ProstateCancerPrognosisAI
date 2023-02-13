@@ -18,8 +18,8 @@ from monai.transforms import apply_transform, Compose, MapTransform
 import numpy as np
 from torch.utils.data import Dataset, Subset
 
-from src.tasks import SegmentationTask
-from src.tasks.task_list import TaskList
+from ...tasks import SegmentationTask
+from ...tasks.task_list import TaskList
 
 
 class ImageDataset(Dataset):

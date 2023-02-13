@@ -3,14 +3,17 @@
     @Author:            Maxence Larose, Nicolas Raymond, Mehdi Mitiche
 
     @Creation Date:     05/2022
-    @Last modification: 05/2022
+    @Last modification: 02/2023
 
     @Description:       This file contains helpful functions and classes used for pandas dataframe manipulations.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import pandas as pd
+
+from .transforms import ContinuousTransform as ConT
+from .transforms import CategoricalTransform as CaT
 
 
 def is_categorical(
@@ -37,6 +40,70 @@ def is_categorical(
         return False
 
     return True
+
+
+def preprocess_categoricals(
+        df: pd.DataFrame,
+        encoding: str = "ordinal",
+        mode: Optional[pd.Series] = None,
+        encodings: Optional[dict] = None
+) -> Tuple[pd.DataFrame, Optional[dict]]:
+    """
+    Applies all categorical transforms to a dataframe containing only continuous data
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe containing all data.
+    encoding : str
+        One option in ("ordinal", "one-hot").
+    mode : Optional[pd.Series]
+        Pandas series with modes of columns.
+    encodings : Optional[dict]
+        Dict of dict with integers to use as encoding for each category's values
+
+    Returns
+    -------
+    df, encodings : Tuple[pd.DataFrame, Optional[dict]]
+        Pandas dataframe, dictionary of encodings.
+    """
+    if encoding not in ["ordinal", "one-hot"]:
+        raise ValueError("Encoding option not available")
+
+    # We ensure that all columns are considered as categories
+    df = CaT.fill_missing(df, mode)
+
+    if encoding == "ordinal":
+        df, encodings_dict = CaT.ordinal_encode(df, encodings)
+        return df, encodings_dict
+
+    else:
+        return CaT.one_hot_encode(df), None
+
+
+def preprocess_continuous(
+        df: pd.DataFrame,
+        mean: Optional[pd.Series] = None,
+        std: Optional[pd.Series] = None
+) -> pd.DataFrame:
+    """
+    Applies all continuous transforms to a dataframe containing only continuous data.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe containing all data.
+    mean : Optional[pd.Series]
+        Pandas series with mean.
+    std : Optional[pd.Series]
+        Pandas series with standard deviations
+
+    Returns
+    -------
+    preprocessed_dataframe : pd.DataFrame
+        Dataframe containing data on which all continuous transforms have been applied.
+    """
+    return ConT.normalize(ConT.fill_missing(df, mean), mean, std)
 
 
 def retrieve_numerical_var(

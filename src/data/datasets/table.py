@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     05/2022
-    @Last modification: 01/2023
+    @Last modification: 02/2023
 
     @Description:       This file contains a custom torch dataset named TableDataset. We follow
                         https://ieeexplore.ieee.org/document/8892612 setting for multi-output learning. This class
@@ -19,12 +19,12 @@ import pandas as pd
 from torch import cat, from_numpy, stack, Tensor
 from torch.utils.data import Dataset
 
-from src.data.processing.preprocessing import preprocess_categoricals, preprocess_continuous
-from src.data.processing.sampling import Mask
-from src.data.processing.transforms import CategoricalTransform as CaT
-from src.tasks import BinaryClassificationTask
-from src.tasks.table_task import TableTask
-from src.tasks.task_list import TaskList
+from ..processing.tools import preprocess_categoricals, preprocess_continuous
+from ..processing.sampling import Mask
+from ..processing.transforms import CategoricalTransform as CaT
+from ...tasks import BinaryClassificationTask
+from ...tasks.table_task import TableTask
+from ...tasks.task_list import TaskList
 
 
 class TableDataModel(NamedTuple):

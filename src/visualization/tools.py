@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     09/2022
-    @Last modification: 09/2022
+    @Last modification: 02/2023
 
     @Description:      This file contains simple functions related to visualization, mostly during training.
 """
@@ -13,10 +13,9 @@ from typing import Dict, List
 
 from matplotlib import pyplot as plt
 import numpy as np
-from torch import Tensor
 
-from src.data.processing.tools import MaskType
-from src.recording.constants import MEAN, STD
+from ..data.processing.sampling import Mask
+from ..recording.constants import MEAN, STD
 
 
 # Epochs progression figure name
@@ -49,8 +48,8 @@ def visualize_epoch_progression(
     if len(train_history) == 1:
 
         x = range(len(train_history[0]))
-        plt.plot(x, train_history[0], label=MaskType.TRAIN)
-        plt.plot(x, valid_history[0], label=MaskType.VALID)
+        plt.plot(x, train_history[0], label=Mask.TRAIN)
+        plt.plot(x, valid_history[0], label=Mask.VALID)
 
         plt.legend()
         plt.xlabel('Epochs')
@@ -62,9 +61,9 @@ def visualize_epoch_progression(
 
             nb_epochs = len(train_history[i])
             plt.subplot(1, len(train_history), i+1)
-            plt.plot(range(nb_epochs), train_history[i], label=MaskType.TRAIN)
+            plt.plot(range(nb_epochs), train_history[i], label=Mask.TRAIN)
             if len(valid_history[i]) != 0:
-                plt.plot(range(nb_epochs), valid_history[i], label=MaskType.VALID)
+                plt.plot(range(nb_epochs), valid_history[i], label=Mask.VALID)
 
             plt.legend()
             plt.xlabel('Epochs')

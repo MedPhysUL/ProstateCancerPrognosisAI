@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     05/2022
-    @Last modification: 05/2022
+    @Last modification: 02/2023
 
     @Description:       This file contains two classes, ContinuousTransform and CategoricalTransform, which simply list
                         methods that defines transformations that can be applied on data during preprocessing.
@@ -14,7 +14,7 @@ from typing import Optional, Tuple
 import pandas as pd
 from torch import int64, float32, Tensor
 
-from src.training.transforms import ToTensor
+from ...training.transforms import ToTensor
 
 
 class ContinuousTransform:

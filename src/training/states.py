@@ -16,10 +16,10 @@ from typing_extensions import TypeAlias
 from monai.data import DataLoader
 import numpy as np
 
+from ..callbacks.training_history import MeasurementsContainer, MeasurementsType, TrainingHistory
+from ..data.datasets.prostate_cancer import FeaturesType, TargetsType
+from ..tasks.task_list import TaskList
 from .transforms import to_numpy
-from src.callbacks.training_history import MeasurementsContainer, MeasurementsType, TrainingHistory
-from src.data.datasets.prostate_cancer import FeaturesType, TargetsType
-from src.tasks.task_list import TaskList
 
 
 MeasurementType: TypeAlias = Dict[str, Dict[str, float]]

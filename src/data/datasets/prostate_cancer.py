@@ -18,7 +18,7 @@ from torch.utils.data import Dataset, Subset
 from .empty import DatasetType, EmptyDataset
 from .image import ImageDataset
 from .table import TableDataset
-from src.tasks.task_list import TaskList
+from ...tasks.task_list import TaskList
 
 
 TargetsType: TypeAlias = Dict[str, Union[np.ndarray, Tensor]]

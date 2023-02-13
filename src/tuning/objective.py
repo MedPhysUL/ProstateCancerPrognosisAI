@@ -16,10 +16,9 @@ from optuna.trial import FrozenTrial, Trial
 import ray
 from torch import mean, tensor
 
-from src.data.processing.tools import MaskType
-from src.data.datasets import ProstateCancerDataset
-from src.models.base.base_model import BaseModel
-from src.tuning.hyperparameters import (
+from ..data.processing.sampling import Mask
+from ..data.datasets import ProstateCancerDataset
+from .hyperparameters import (
     CategoricalHP,
     Distribution,
     Hyperparameter,
@@ -27,6 +26,7 @@ from src.tuning.hyperparameters import (
     NumericalIntHP,
     Range
 )
+from ..models.base.base_model import BaseModel
 
 
 class Objective:
@@ -261,7 +261,7 @@ class Objective:
                 List of score values.
             """
             # We extract masks
-            train_idx, valid_idx, test_idx = masks[MaskType.TRAIN], masks[MaskType.VALID], masks[MaskType.TEST]
+            train_idx, valid_idx, test_idx = masks[Mask.TRAIN], masks[Mask.VALID], masks[Mask.TEST]
 
             # We create a copy of the current dataset and update its masks
             dts = deepcopy(self._dataset)

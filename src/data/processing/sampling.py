@@ -3,10 +3,10 @@
     @Author:            Maxence Larose, Nicolas Raymond, Raphael Brodeur
 
     @Creation Date:     05/2022
-    @Last modification: 06/2022
+    @Last modification: 02/2023
 
-    @Description:       This file contains the RandomStratifiedSampler class used to separate test sets and valid sets
-                        from train sets. Also contains few functions used to extract specific datasets.
+    @Description:       This file contains the 'Sampler' class used to separate test sets and valid sets from train
+                        sets. Also contains few functions used to extract specific datasets.
 """
 
 from copy import deepcopy
@@ -18,7 +18,7 @@ from sklearn.model_selection import train_test_split
 from torch import Tensor
 from tqdm import tqdm
 
-from src.data.datasets.table import TableDataset
+from ..datasets.table import TableDataset
 
 
 class Mask:
@@ -35,10 +35,10 @@ class Mask:
         return iter([self.TRAIN, self.VALID, self.TEST])
 
 
-class RandomStratifiedSampler:
+class Sampler:
     """
-    A class used to generate lists of indexes to use as train, valid and test masks for outer and inner validation
-    loops.
+    A random stratified sampler used to generate lists of indexes to use as train, valid and test masks for outer and
+    inner validation loops.
     """
 
     def __init__(

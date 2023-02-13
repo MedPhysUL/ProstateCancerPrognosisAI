@@ -10,10 +10,10 @@
 
 from typing import Iterable, Optional, Union
 
-from src.losses.segmentation import SegmentationLoss
-from src.metrics.segmentation import SegmentationMetric
-from src.metrics.metric_list import MetricList
-from src.tasks.task import Task
+from ..losses.segmentation import SegmentationLoss
+from ..metrics.segmentation import SegmentationMetric
+from ..metrics.metric_list import MetricList
+from .task import Task
 
 
 class SegmentationTask(Task):

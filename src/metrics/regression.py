@@ -15,7 +15,7 @@ from typing import List, Tuple, Union
 import numpy as np
 from torch import from_numpy, isnan, is_tensor, Tensor, where
 
-from src.metrics.metric import Direction, Metric, MetricReduction
+from .metric import Direction, Metric, MetricReduction
 
 
 class RegressionMetric(Metric, ABC):

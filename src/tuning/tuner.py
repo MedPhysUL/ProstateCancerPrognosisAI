@@ -29,8 +29,8 @@ from optuna.visualization import (
 )
 import ray
 
-from src.metrics.metric import Direction
-from src.tuning.objective import Objective
+from ..metrics.metric import Direction
+from .objective import Objective
 
 
 class Tuner:

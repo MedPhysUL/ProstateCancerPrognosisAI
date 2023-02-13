@@ -16,7 +16,7 @@ import numpy as np
 from sklearn.metrics import roc_auc_score
 from torch import from_numpy, is_tensor, Tensor, where, zeros
 
-from src.metrics.metric import Direction, Metric, MetricReduction
+from .metric import Direction, Metric, MetricReduction
 
 
 class BinaryClassificationMetric(Metric, ABC):

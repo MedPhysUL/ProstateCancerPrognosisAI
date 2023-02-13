@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     05/2022
-    @Last modification: 05/2022
+    @Last modification: 02/2023
 
     @Description:       This file defines the class FeatureSelector, that is used to remove unimportant features.
 """
@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
-from src.data.datasets import TableDataset
+from ..datasets import TableDataset
 
 
 class FeatureSelector:
