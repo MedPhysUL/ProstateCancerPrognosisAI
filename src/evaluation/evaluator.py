@@ -194,8 +194,8 @@ class Evaluator:
         for k, v in self._masks.items():
 
             # We extract the masks
-            train_mask, valid_mask = v[Mask.TRAIN], v[Mask.VALID]
-            test_mask, in_masks = v[Mask.TEST], v[Mask.INNER]
+            train_mask, valid_mask = v[Mask.TRAIN.value], v[Mask.VALID.value]
+            test_mask, in_masks = v[Mask.TEST.value], v[Mask.INNER.value]
 
             # We update the dataset's masks
             self._dataset.update_masks(train_mask=train_mask, valid_mask=valid_mask, test_mask=test_mask)
@@ -417,9 +417,9 @@ class Evaluator:
                 recorder.record_data_info(f"{task.name}_{metric.name}_Threshold", str(metric.threshold))
 
         for mask, mask_type in [
-            (subset.train_mask, Mask.TRAIN),
-            (subset.test_mask, Mask.TEST),
-            (subset.valid_mask, Mask.VALID)
+            (subset.train_mask, Mask.TRAIN.value),
+            (subset.test_mask, Mask.TEST.value),
+            (subset.valid_mask, Mask.VALID.value)
         ]:
 
             if len(mask) > 0:
