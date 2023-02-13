@@ -1,11 +1,13 @@
 dacite==1.8.0
 delia==1.0.11
 h5py==3.8.0
+kaleido==0.1.0
 matplotlib==3.6.3
 monai==1.1.0
 numpy==1.24.2
 optuna==3.1.0
 pandas==1.5.3
+plotly==5.13.0
 scikit-learn==1.2.1
 seaborn==0.12.2
 torch==2.0.0.dev20230212+cu118
