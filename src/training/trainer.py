@@ -15,7 +15,7 @@ from typing import Generator, List, Optional, Union
 
 from monai.data import DataLoader
 from torch import device as torch_device
-from torch import cuda, no_grad, Tensor
+from torch import cuda, no_grad
 from torch.utils.data import SubsetRandomSampler
 from tqdm.auto import tqdm
 
@@ -23,9 +23,9 @@ from ..callbacks.callback import Callback
 from ..callbacks.callback_list import CallbackList
 from ..callbacks import Checkpoint, LearningAlgorithm, TrainingHistory
 from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
-from ..models.base.custom_torch_base import TorchCustomModel
+from ..models.base.torch_model import TorchModel
 from .states import BatchState, BatchesState, EpochState, TrainingState
-from .transforms import ToTensor
+from ..tools.transforms import batch_to_device, ToTensor
 
 
 class Trainer:
@@ -35,7 +35,7 @@ class Trainer:
 
     def __init__(
             self,
-            model: TorchCustomModel,
+            model: TorchModel,
             callbacks: Union[Callback, CallbackList, List[Callback]],
             device: Optional[torch_device] = None,
             verbose: bool = True,
@@ -47,7 +47,7 @@ class Trainer:
 
         Parameters
         ----------
-        model : TorchCustomModel
+        model : TorchModel
             Model to train.
         callbacks : Union[Callback, CallbackList, List[Callback]]
             Callbacks to use during training. Each callback will be called at different times during training. See the
@@ -476,8 +476,8 @@ class Trainer:
         y_batch : TargetsType
             Targets batch.
         """
-        x_batch = self.x_transform(self._batch_to_device(x_batch))
-        y_batch = self.y_transform(self._batch_to_device(y_batch))
+        x_batch = self.x_transform(batch_to_device(x_batch, self.device))
+        y_batch = self.y_transform(batch_to_device(y_batch, self.device))
 
         self.batch_state.x = x_batch
         self.batch_state.y = y_batch
@@ -497,28 +497,6 @@ class Trainer:
             self.callbacks.on_train_batch_end(self)
         else:
             self.callbacks.on_validation_batch_end(self)
-
-    def _batch_to_device(
-            self,
-            batch: Union[dict, FeaturesType, Tensor]
-    ) -> Union[dict, FeaturesType, Tensor]:
-        """
-        Sends batch to device.
-
-        Parameters
-        ----------
-        batch : Union[dict, FeaturesType, Tensor]
-            Batch data.
-        """
-        if isinstance(batch, FeaturesType):
-            image_features = {k: self._batch_to_device(v) for k, v in batch.image.items()}
-            table_features = {k: self._batch_to_device(v) for k, v in batch.table.items()}
-            return FeaturesType(image=image_features, table=table_features)
-        if isinstance(batch, dict):
-            return {k: self._batch_to_device(v) for k, v in batch.items()}
-        if isinstance(batch, Tensor):
-            return batch.to(self.device)
-        return batch
 
     def _exec_metrics(
             self,

@@ -9,12 +9,40 @@
 """
 
 import numbers
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import numpy as np
 import pandas as pd
-from torch import device, float32, from_numpy, tensor, Tensor
+from torch import device as torch_device
+from torch import float32, from_numpy, tensor, Tensor
 from torch.nn import Module
+
+from ..data.datasets.prostate_cancer import FeaturesType
+
+
+def batch_to_device(
+        batch: Union[dict, FeaturesType, Tensor],
+        device: torch_device
+) -> Union[dict, FeaturesType, Tensor]:
+    """
+    Sends batch to device.
+
+    Parameters
+    ----------
+    batch : Union[dict, FeaturesType, Tensor]
+        Batch data.
+    device : torch_device
+        Torch device
+    """
+    if isinstance(batch, FeaturesType):
+        image_features = {k: batch_to_device(v, device) for k, v in batch.image.items()}
+        table_features = {k: batch_to_device(v, device) for k, v in batch.table.items()}
+        return FeaturesType(image=image_features, table=table_features)
+    if isinstance(batch, dict):
+        return {k: batch_to_device(v, device) for k, v in batch.items()}
+    if isinstance(batch, Tensor):
+        return batch.to(device)
+    return batch
 
 
 def to_tensor(x: Any, dtype=float32):
@@ -46,7 +74,7 @@ def to_numpy(x: Any, dtype=np.float32):
 
 
 class ToDevice(Module):
-    def __init__(self, device: device, non_blocking: bool = True):
+    def __init__(self, device: torch_device, non_blocking: bool = True):
         super().__init__()
         self.device = device
         self.non_blocking = non_blocking
@@ -67,7 +95,7 @@ class ToDevice(Module):
 
 
 class ToTensor(Module):
-    def __init__(self, dtype=float32, device: Optional[device] = None):
+    def __init__(self, dtype=float32, device: Optional[torch_device] = None):
         super().__init__()
         self.dtype = dtype
         self.device = device

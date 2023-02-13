@@ -14,7 +14,7 @@ from typing import Optional, Tuple
 import pandas as pd
 from torch import int64, float32, Tensor
 
-from ...training.transforms import ToTensor
+from ...tools.transforms import ToTensor
 
 
 class ContinuousTransform:
