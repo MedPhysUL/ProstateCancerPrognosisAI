@@ -219,7 +219,7 @@ class BinaryCrossEntropyWithLogitsLoss(BinaryClassificationLoss):
         """
         super().__init__(name=name, reduction=reduction, weight=weight)
 
-        if self.reduction not in (LossReduction.MEAN.value, LossReduction.SUM.value):
+        if self.reduction not in (LossReduction.MEAN, LossReduction.SUM):
             raise ValueError(f"Unsupported reduction: {self.reduction}, available options are ['mean', 'sum'].")
 
     def _compute_loss(

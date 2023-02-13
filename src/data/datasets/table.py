@@ -537,7 +537,7 @@ class TableDataset(Dataset):
         df = self._retrieve_subset_from_original(self._cont_cols, self._cat_cols)
 
         # We add the new feature
-        df = pd.merge(df, data, on=[self._ids_col], how=Mask.INNER.value)
+        df = pd.merge(df, data, on=[self._ids_col], how=Mask.INNER)
 
         # We update the columns list
         feature_name = [f for f in data.columns if f != self._ids_col]

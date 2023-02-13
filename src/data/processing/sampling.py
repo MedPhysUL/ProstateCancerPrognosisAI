@@ -10,7 +10,7 @@
 """
 
 from copy import deepcopy
-from enum import Enum
+from enum import auto, StrEnum
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
@@ -22,14 +22,14 @@ from tqdm import tqdm
 from ..datasets.table import TableDataset
 
 
-class Mask(Enum):
+class Mask(StrEnum):
     """
     Stores the constant related to mask categories.
     """
-    TRAIN = "train"
-    VALID = "valid"
-    TEST = "test"
-    INNER = "inner"
+    TRAIN = auto()
+    VALID = auto()
+    TEST = auto()
+    INNER = auto()
 
 
 class Sampler:
@@ -149,13 +149,13 @@ class Sampler:
             for i in range(self.n_out_split):
 
                 # We create outer split masks
-                masks[i] = {**self.split(idx, targets_c), Mask.INNER.value: {}}
+                masks[i] = {**self.split(idx, targets_c), Mask.INNER: {}}
                 bar.update()
 
                 for j in range(self.n_in_split):
 
                     # We create the inner split masks
-                    masks[i][Mask.INNER.value][j] = self.split(masks[i][Mask.TRAIN.value], targets_c)
+                    masks[i][Mask.INNER][j] = self.split(masks[i][Mask.TRAIN], targets_c)
                     bar.update()
 
         # We turn arrays of idx into lists of idx
@@ -209,7 +209,7 @@ class Sampler:
                 if not mask_ok:
                     raise Exception("The sampler could not find a proper train, valid and test split.")
 
-                return {Mask.TRAIN.value: train_mask, Mask.VALID.value: valid_mask, Mask.TEST.value: test_mask}
+                return {Mask.TRAIN: train_mask, Mask.VALID: valid_mask, Mask.TEST: test_mask}
         else:
             # Split must extract train and test masks only
             def split(idx: np.array, targets: List[np.array]) -> Dict[str, np.array]:
@@ -232,7 +232,7 @@ class Sampler:
                 if not mask_ok:
                     raise Exception("The sampler could not find a proper train and test split")
 
-                return {Mask.TRAIN.value: train_mask, Mask.VALID.value: None, Mask.TEST.value: test_mask}
+                return {Mask.TRAIN: train_mask, Mask.VALID: None, Mask.TEST: test_mask}
 
         return split
 
@@ -343,13 +343,13 @@ class Sampler:
         masks : Dict[int, Dict[str, Union[np.array, Dict[str, np.array]]]]
             Dictionary of masks
         """
-        mask_keys = [Mask.TRAIN.value, Mask.VALID.value, Mask.TEST.value]
+        mask_keys = [Mask.TRAIN, Mask.VALID, Mask.TEST]
         for k, v in masks.items():
             for t1 in mask_keys:
                 masks[k][t1] = v[t1].tolist() if v[t1] is not None else None
-            for in_k, in_v in masks[k][Mask.INNER.value].items():
+            for in_k, in_v in masks[k][Mask.INNER].items():
                 for t2 in mask_keys:
-                    masks[k][Mask.INNER.value][in_k][t2] = in_v[t2].tolist() if in_v[t2] is not None else None
+                    masks[k][Mask.INNER][in_k][t2] = in_v[t2].tolist() if in_v[t2] is not None else None
 
     @staticmethod
     def visualize_splits(
@@ -367,14 +367,14 @@ class Sampler:
         for k, v in datasets.items():
             print(f"Split {k+1} \n")
             print(f"Outer :")
-            valid = v[Mask.VALID.value] if v[Mask.VALID.value] is not None else []
-            print(f"Train {len(v[Mask.TRAIN.value])} - Valid {len(valid)} - Test {len(v[Mask.TEST.value])}")
-            if v[Mask.INNER.value]:
-                print(f"{Mask.INNER.value} :")
-            for k1, v1 in v[Mask.INNER.value].items():
-                valid = v1[Mask.VALID.value] if v1[Mask.VALID.value] is not None else []
-                print(f"{k+1}.{k1} -> Train {len(v1[Mask.TRAIN.value])} - Valid {len(valid)} -"
-                      f" Test {len(v1[Mask.TEST.value])}")
+            valid = v[Mask.VALID] if v[Mask.VALID] is not None else []
+            print(f"Train {len(v[Mask.TRAIN])} - Valid {len(valid)} - Test {len(v[Mask.TEST])}")
+            if v[Mask.INNER]:
+                print(f"{Mask.INNER} :")
+            for k1, v1 in v[Mask.INNER].items():
+                valid = v1[Mask.VALID] if v1[Mask.VALID] is not None else []
+                print(f"{k+1}.{k1} -> Train {len(v1[Mask.TRAIN])} - Valid {len(valid)} -"
+                      f" Test {len(v1[Mask.TEST])}")
             print("#----------------------------------#")
 
 
@@ -411,19 +411,19 @@ def extract_masks(
     all_masks = load(f)
 
     # Extraction of masks subset
-    mask_keys = [Mask.TRAIN.value, Mask.VALID.value, Mask.TEST.value]
+    mask_keys = [Mask.TRAIN, Mask.VALID, Mask.TEST]
     masks = {}
     for i in map(str, range(k)):
         int_i = int(i)
         masks[int_i] = {}
         for t in mask_keys:
             masks[int_i][t] = all_masks[i][t]
-        masks[int_i][Mask.INNER.value] = {}
+        masks[int_i][Mask.INNER] = {}
         for j in map(str, range(l)):
             int_j = int(j)
-            masks[int_i][Mask.INNER.value][int_j] = {}
+            masks[int_i][Mask.INNER][int_j] = {}
             for t in mask_keys:
-                masks[int_i][Mask.INNER.value][int_j][t] = all_masks[i][Mask.INNER.value][j][t]
+                masks[int_i][Mask.INNER][int_j][t] = all_masks[i][Mask.INNER][j][t]
 
     # Closing file
     f.close()

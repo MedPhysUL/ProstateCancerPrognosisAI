@@ -8,8 +8,7 @@
     @Description:       This file contains a custom torch dataset named 'ProstateCancerDataset'.
 """
 
-from typing import Dict, List, NamedTuple, Optional, Union
-from typing_extensions import TypeAlias
+from typing import Dict, List, NamedTuple, Optional, TypeAlias, Union
 
 import numpy as np
 from torch import Tensor

@@ -12,8 +12,7 @@
 from dataclasses import asdict, dataclass, field
 from itertools import count
 import os
-from typing import Any, Dict, List, Optional, Tuple, Union
-from typing_extensions import TypeAlias
+from typing import Any, Dict, List, Optional, Tuple, TypeAlias, Union
 
 from dacite import from_dict
 import numpy as np
@@ -206,7 +205,7 @@ class TrainingHistory(Callback):
         priority: int
             Callback priority.
         """
-        return Priority.HIGH_PRIORITY.value
+        return Priority.HIGH_PRIORITY
 
     @property
     def allow_duplicates(self) -> bool:

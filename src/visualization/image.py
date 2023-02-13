@@ -87,21 +87,21 @@ class ImageViewer:
         returns : Config
             A Config pertaining to the visualization.
         """
-        max_slice = img.shape[plane.value] - 1
+        max_slice = img.shape[plane] - 1
         img_max = np.max(img)
         img_min = np.min(img)
-        img_plane = np.moveaxis(img, plane.value, 0)
+        img_plane = np.moveaxis(img, plane, 0)
         initial_img = img_plane[int(max_slice / 2)]
-        seg_plane = np.moveaxis(seg, plane.value, 0)
+        seg_plane = np.moveaxis(seg, plane, 0)
         initial_seg = seg_plane[int(max_slice / 2)]
 
-        img_plot = axes[plane.value].imshow(
+        img_plot = axes[plane].imshow(
             initial_img,
             cmap=kwargs.get("cmap", "Greys_r"),
             vmax=img_max,
             vmin=img_min
         )
-        seg_plot = axes[plane.value].imshow(
+        seg_plot = axes[plane].imshow(
             initial_seg,
             vmax=1,
             vmin=0,
@@ -109,7 +109,7 @@ class ImageViewer:
         )
 
         ax_slice = plt.axes(
-            [0.14 + plane.value * 0.27, 0.15, 0.2, 0.02],
+            [0.14 + float(plane) * 0.27, 0.15, 0.2, 0.02],
             facecolor='lightgoldenrodyellow'
         )
         slice_index = Slider(
@@ -232,13 +232,13 @@ class ImageViewer:
         returns : Config
             A Config pertaining to the visualization.
         """
-        max_slice = img.shape[AnatomicalPlane.AXIAL.value] - 1
+        max_slice = img.shape[AnatomicalPlane.AXIAL] - 1
         img_max = np.max(img)
         img_min = np.min(img)
-        img_axial = np.moveaxis(img, AnatomicalPlane.AXIAL.value, 0)
+        img_axial = np.moveaxis(img, AnatomicalPlane.AXIAL, 0)
         initial_img = img_axial[int(max_slice / 2)]
 
-        axes[plot.value].set_title(plot.name)
+        axes[plot].set_title(plot.name)
 
         img_plot = axes[plot].imshow(
             initial_img,
@@ -247,8 +247,8 @@ class ImageViewer:
             vmin=img_min
         )
 
-        if plot.value == 1:
-            seg_axial = np.moveaxis(seg_truth, AnatomicalPlane.AXIAL.value, 0)
+        if plot == 1:
+            seg_axial = np.moveaxis(seg_truth, AnatomicalPlane.AXIAL, 0)
             initial_seg = seg_axial[int(max_slice / 2)]
 
             seg_plot = axes[1].imshow(
@@ -279,8 +279,8 @@ class ImageViewer:
                 seg_plot=seg_plot
             )
 
-        if plot.value == 2:
-            seg_axial = np.moveaxis(seg_pred, AnatomicalPlane.AXIAL.value, 0)
+        if plot == 2:
+            seg_axial = np.moveaxis(seg_pred, AnatomicalPlane.AXIAL, 0)
             initial_seg = seg_axial[int(max_slice / 2)]
 
             seg_plot = axes[2].imshow(
@@ -441,9 +441,9 @@ class ImageViewer:
         fig, axes = plt.subplots(1, 3)
         img_max = np.max(img)
         img_min = np.min(img)
-        img_axial = np.moveaxis(img, AnatomicalPlane.AXIAL.value, 0)
-        seg_truth_axial = np.moveaxis(seg_truth, AnatomicalPlane.AXIAL.value, 0)
-        seg_pred_axial = np.moveaxis(seg_pred, AnatomicalPlane.AXIAL.value, 0)
+        img_axial = np.moveaxis(img, AnatomicalPlane.AXIAL, 0)
+        seg_truth_axial = np.moveaxis(seg_truth, AnatomicalPlane.AXIAL, 0)
+        seg_pred_axial = np.moveaxis(seg_pred, AnatomicalPlane.AXIAL, 0)
 
         axes[0].set_title("Image")
         axes[0].imshow(

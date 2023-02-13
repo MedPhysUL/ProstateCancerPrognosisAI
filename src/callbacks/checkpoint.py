@@ -138,7 +138,7 @@ class Checkpoint(Callback):
         priority: int
             Callback priority.
         """
-        return Priority.LOW_PRIORITY.value
+        return Priority.LOW_PRIORITY
 
     def save(self, trainer) -> bool:
         """

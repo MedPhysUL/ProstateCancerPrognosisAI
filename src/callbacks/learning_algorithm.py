@@ -95,7 +95,7 @@ class LearningAlgorithm(Callback):
         priority: int
             Callback priority.
         """
-        return Priority.MEDIUM_PRIORITY.value
+        return Priority.MEDIUM_PRIORITY
 
     @property
     def allow_duplicates(self) -> bool:

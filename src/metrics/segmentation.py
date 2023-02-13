@@ -149,7 +149,7 @@ class DiceMetric(SegmentationMetric):
         """
         super().__init__(direction=Direction.MAXIMIZE, name=name, reduction=reduction, n_digits=n_digits)
 
-        if self.reduction not in (MetricReduction.MEAN.value, MetricReduction.SUM.value):
+        if self.reduction not in (MetricReduction.MEAN, MetricReduction.SUM):
             raise ValueError(f"Unsupported reduction: {self.reduction}, available options are ['mean', 'sum'].")
 
     def _compute_metric(

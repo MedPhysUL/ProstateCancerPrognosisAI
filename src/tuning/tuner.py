@@ -157,7 +157,7 @@ class Tuner:
                 target_name=task.name
             )
 
-            if task.hps_tuning_metric.direction == Direction.MAXIMIZE.value:
+            if task.hps_tuning_metric.direction == Direction.MAXIMIZE:
                 fig.data[0]["line"].reversescale = False
 
             # We save the graph

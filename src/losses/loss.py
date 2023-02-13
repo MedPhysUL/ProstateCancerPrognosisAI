@@ -9,19 +9,19 @@
 """
 
 from abc import ABC, abstractmethod
-from enum import Enum
+from enum import auto, StrEnum
 from typing import Optional, Union
 
 from torch import nanmean, nansum, Tensor
 
 
-class LossReduction(Enum):
+class LossReduction(StrEnum):
     """
     Custom enum for reduction methods used to reduce the losses of multiple samples to a common loss.
     """
-    NONE = "none"
-    MEAN = "mean"
-    SUM = "sum"
+    NONE = auto()
+    MEAN = auto()
+    SUM = auto()
 
 
 class Loss(ABC):
@@ -44,7 +44,7 @@ class Loss(ABC):
         reduction : Union[LossReduction, str]
             Reduction method to use.
         """
-        self.reduction = LossReduction(reduction).value
+        self.reduction = LossReduction(reduction)
         self.name = name if name else f"{self.__class__.__name__}('reduction'={repr(self.reduction)})"
 
     @abstractmethod
@@ -86,11 +86,11 @@ class Loss(ABC):
         if reduction is None:
             reduction = self.reduction
         else:
-            reduction = LossReduction(reduction).value
+            reduction = LossReduction(reduction)
 
-        if reduction == LossReduction.NONE.value:
+        if reduction == LossReduction.NONE:
             return x
-        elif reduction == LossReduction.MEAN.value:
+        elif reduction == LossReduction.MEAN:
             return nanmean(x)
-        elif reduction == LossReduction.SUM.value:
+        elif reduction == LossReduction.SUM:
             return nansum(x)

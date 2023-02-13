@@ -9,31 +9,28 @@
 """
 
 from abc import ABC, abstractmethod
-from enum import Enum
+from enum import auto, StrEnum
 from typing import Optional, Union
 
 from torch import any, nanmean, pow, prod, nansum, Tensor
 
 
-class Direction(Enum):
+class Direction(StrEnum):
     """
     Custom enum for optimization directions
     """
-    MAXIMIZE = "maximize"
-    MINIMIZE = "minimize"
-
-    def __iter__(self):
-        return iter([self.MAXIMIZE, self.MINIMIZE])
+    MAXIMIZE = auto()
+    MINIMIZE = auto()
 
 
-class MetricReduction(Enum):
+class MetricReduction(StrEnum):
     """
     Custom enum for reduction methods used to reduce the scores of multiple samples to a common score.
     """
-    NONE = "none"
-    MEAN = "mean"
-    SUM = "sum"
-    GEOMETRIC_MEAN = "geometric_mean"
+    NONE = auto()
+    MEAN = auto()
+    SUM = auto()
+    GEOMETRIC_MEAN = auto()
 
 
 class Metric(ABC):
@@ -62,8 +59,8 @@ class Metric(ABC):
         n_digits : int
             Number of digits kept.
         """
-        self.direction = Direction(direction).value
-        self.reduction = MetricReduction(reduction).value
+        self.direction = Direction(direction)
+        self.reduction = MetricReduction(reduction)
         self.n_digits = n_digits
 
         if name:
@@ -110,17 +107,17 @@ class Metric(ABC):
         if reduction is None:
             reduction = self.reduction
         else:
-            reduction = MetricReduction(reduction).value
+            reduction = MetricReduction(reduction)
 
-        if reduction == MetricReduction.NONE.value:
+        if reduction == MetricReduction.NONE:
             if isinstance(x, float):
                 return x
             else:
                 return x.item()
-        elif reduction == MetricReduction.MEAN.value:
+        elif reduction == MetricReduction.MEAN:
             return nanmean(x).item()
-        elif reduction == MetricReduction.SUM.value:
+        elif reduction == MetricReduction.SUM:
             return nansum(x).item()
-        elif reduction == MetricReduction.GEOMETRIC_MEAN.value:
+        elif reduction == MetricReduction.GEOMETRIC_MEAN:
             filtered_x = x[~any(x.isnan(), dim=1)]
             return pow(prod(filtered_x), exponent=(1 / filtered_x.shape[0])).item()

@@ -119,7 +119,7 @@ class MetricsEarlyStopper(EarlyStopper):
         Initializes best validation metric scores depending on metrics' direction.
         """
         self._best_val_metric_scores = [
-            np.inf if t.early_stopping_metric.direction == Direction.MINIMIZE.value
+            np.inf if t.early_stopping_metric.direction == Direction.MINIMIZE
             else -np.inf for t in self._tasks
         ]
 
@@ -163,7 +163,7 @@ class MetricsEarlyStopper(EarlyStopper):
         for i, task, best_score in enumerate(zip(self._tasks, self._best_val_metric_scores)):
             val_score = val_scores[task.name][task.early_stopping_metric.name]
 
-            if task.early_stopping_metric.direction == Direction.MINIMIZE.value:
+            if task.early_stopping_metric.direction == Direction.MINIMIZE:
                 new_score_is_better = (best_score - val_score) > self.tolerance
             else:
                 new_score_is_better = (val_score - best_score) > self.tolerance

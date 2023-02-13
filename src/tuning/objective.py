@@ -261,7 +261,7 @@ class Objective:
                 List of score values.
             """
             # We extract masks
-            train_idx, valid_idx, test_idx = masks[Mask.TRAIN.value], masks[Mask.VALID.value], masks[Mask.TEST.value]
+            train_idx, valid_idx, test_idx = masks[Mask.TRAIN], masks[Mask.VALID], masks[Mask.TEST]
 
             # We create a copy of the current dataset and update its masks
             dts = deepcopy(self._dataset)

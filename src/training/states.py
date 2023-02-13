@@ -10,8 +10,7 @@
 """
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict
-from typing_extensions import TypeAlias
+from typing import Any, Dict, TypeAlias
 
 from monai.data import DataLoader
 import numpy as np

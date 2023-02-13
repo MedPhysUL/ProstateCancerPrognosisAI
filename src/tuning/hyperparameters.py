@@ -8,25 +8,27 @@
     @Description:       This file is used to define classes related to hyperparameters.
 """
 
+from enum import auto, StrEnum
 
-class Distribution:
+
+class Distribution(StrEnum):
     """
     Stores possible types of distribution.
     """
-    INT: str = "int"                # Int uniform
-    UNIFORM: str = "uniform"
-    CATEGORICAL: str = "categorical"
+    INT = auto()
+    UNIFORM = auto()
+    CATEGORICAL = auto()
 
 
-class Range:
+class Range(StrEnum):
     """
     Stores possible hyperparameters' range types.
     """
-    MIN: str = "min"
-    MAX: str = "max"
-    STEP: str = "step"
-    VALUES: str = "values"
-    VALUE: str = "value"
+    MIN = auto()
+    MAX = auto()
+    STEP = auto()
+    VALUES = auto()
+    VALUE = auto()
 
 
 class Hyperparameter:
