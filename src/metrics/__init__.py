@@ -3,7 +3,6 @@ from .binary_classification import (
     BinaryAccuracy,
     BinaryBalancedAccuracy
 )
+from .segmentation import DiceMetric
 
-from .segmentation import (
-    DiceMetric
-)
+from .metric_list import MetricList
