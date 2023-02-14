@@ -10,9 +10,9 @@
 
 from typing import Iterable, Optional, Union
 
-from ..losses.binary_classification import BinaryClassificationLoss
-from ..metrics.binary_classification import BinaryClassificationMetric
-from ..metrics.metric_list import MetricList
+from ..losses.single_task.binary_classification import BinaryClassificationLoss
+from ..metrics.single_task.base import SingleTaskMetricList
+from ..metrics.single_task.binary_classification import BinaryClassificationMetric
 from .table import TableTask
 
 
@@ -34,7 +34,7 @@ class BinaryClassificationTask(TableTask):
                 Union[
                     BinaryClassificationMetric,
                     Iterable[BinaryClassificationMetric],
-                    MetricList[BinaryClassificationMetric]
+                    SingleTaskMetricList[BinaryClassificationMetric]
                 ]
             ] = None,
             name: Optional[str] = None,
@@ -58,7 +58,7 @@ class BinaryClassificationTask(TableTask):
                 Union[
                     BinaryClassificationMetric,
                     Iterable[BinaryClassificationMetric],
-                    MetricList[BinaryClassificationMetric]
+                    SingleTaskMetricList[BinaryClassificationMetric]
                 ]
             ]
             A list of metrics to evaluate the trained models.
@@ -94,7 +94,7 @@ class BinaryClassificationTask(TableTask):
         return self._early_stopping_metric
 
     @property
-    def evaluation_metrics(self) -> Optional[MetricList[BinaryClassificationMetric]]:
+    def evaluation_metrics(self) -> Optional[SingleTaskMetricList[BinaryClassificationMetric]]:
         return self._evaluation_metrics
 
     @property
@@ -102,13 +102,13 @@ class BinaryClassificationTask(TableTask):
         return self._hps_tuning_metric  # type: ignore
 
     @property
-    def metrics(self) -> MetricList[BinaryClassificationMetric]:
+    def metrics(self) -> SingleTaskMetricList[BinaryClassificationMetric]:
         metrics = super().metrics
         metrics.append(self.decision_threshold_metric)
-        return MetricList(metrics)
+        return SingleTaskMetricList(metrics)
 
     @property
-    def unique_metrics(self) -> MetricList[BinaryClassificationMetric]:
+    def unique_metrics(self) -> SingleTaskMetricList[BinaryClassificationMetric]:
         unique_metrics = super().unique_metrics
         unique_names = [metric.name for metric in unique_metrics]
 
@@ -116,4 +116,4 @@ class BinaryClassificationTask(TableTask):
             unique_metrics.append(self.decision_threshold_metric)
             unique_names.append(self.decision_threshold_metric.name)
 
-        return MetricList(unique_metrics)
+        return SingleTaskMetricList(unique_metrics)

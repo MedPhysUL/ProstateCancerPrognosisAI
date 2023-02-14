@@ -10,8 +10,8 @@
 
 import os
 
-from src.losses import BinaryCrossEntropyWithLogitsLoss, DiceLoss
-from src.metrics import BinaryBalancedAccuracy, DiceMetric
+from src.losses.single_task import BCEWithLogitsLoss, DiceLoss
+from src.metrics.single_task import BinaryBalancedAccuracy, DiceMetric
 from src.tasks import BinaryClassificationTask, SegmentationTask
 
 # SEED
@@ -81,13 +81,13 @@ TABLE_TASKS = [
         target_column=PN,
         decision_threshold_metric=BinaryBalancedAccuracy(),
         hps_tuning_metric=BinaryBalancedAccuracy(),
-        criterion=BinaryCrossEntropyWithLogitsLoss()
+        criterion=BCEWithLogitsLoss()
     ),
     BinaryClassificationTask(
         target_column=BCR,
         decision_threshold_metric=BinaryBalancedAccuracy(),
         hps_tuning_metric=BinaryBalancedAccuracy(),
-        criterion=BinaryCrossEntropyWithLogitsLoss()
+        criterion=BCEWithLogitsLoss()
     )
 ]
 IMAGE_TASKS = [

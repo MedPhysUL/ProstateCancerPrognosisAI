@@ -10,9 +10,9 @@
 
 from typing import Iterable, Optional, Union
 
-from ..losses.segmentation import SegmentationLoss
-from ..metrics.segmentation import SegmentationMetric
-from ..metrics.metric_list import MetricList
+from ..losses.single_task.segmentation import SegmentationLoss
+from ..metrics.single_task.base import SingleTaskMetricList
+from ..metrics.single_task.segmentation import SegmentationMetric
 from .task import Task
 
 
@@ -32,7 +32,7 @@ class SegmentationTask(Task):
                 Union[
                     SegmentationMetric,
                     Iterable[SegmentationMetric],
-                    MetricList[SegmentationMetric]
+                    SingleTaskMetricList[SegmentationMetric]
                 ]
             ] = None,
             name: Optional[str] = None
@@ -56,7 +56,7 @@ class SegmentationTask(Task):
                 Union[
                     SegmentationMetric,
                     Iterable[SegmentationMetric],
-                    MetricList[SegmentationMetric]
+                    SingleTaskMetricList[SegmentationMetric]
                 ]
             ]
             A list of metrics to evaluate the trained models.
@@ -89,7 +89,7 @@ class SegmentationTask(Task):
         return self._early_stopping_metric
 
     @property
-    def evaluation_metrics(self) -> Optional[MetricList[SegmentationMetric]]:
+    def evaluation_metrics(self) -> Optional[SingleTaskMetricList[SegmentationMetric]]:
         return self._evaluation_metrics
 
     @property
@@ -97,10 +97,10 @@ class SegmentationTask(Task):
         return self._hps_tuning_metric  # type: ignore
 
     @property
-    def metrics(self) -> MetricList[SegmentationMetric]:
+    def metrics(self) -> SingleTaskMetricList[SegmentationMetric]:
         return super().metrics
 
     @property
-    def unique_metrics(self) -> MetricList[SegmentationMetric]:
+    def unique_metrics(self) -> SingleTaskMetricList[SegmentationMetric]:
         return super().unique_metrics
 

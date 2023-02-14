@@ -24,7 +24,7 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                 Cleaner                                                     #
     # ----------------------------------------------------------------------------------------------------------- #
-    learning_set_data_cleaner = DataCleaner(
+    learning_set_data_cleaner = Cleaner(
         records_path=f"{OUTLIERS_RECORDS_PATH}/learning_set",
         ids_col=ID,
     )

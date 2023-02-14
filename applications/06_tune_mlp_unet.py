@@ -26,7 +26,7 @@ from src.data.processing.sampling import extract_masks
 
 from src.evaluation import Evaluator
 from src.models.mlp_unet import MLPUnet
-from src.losses import MeanLoss
+from src.losses.multi_task import MeanLoss
 
 
 if __name__ == '__main__':

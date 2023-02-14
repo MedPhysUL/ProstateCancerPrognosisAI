@@ -11,11 +11,11 @@
 from abc import ABC
 from typing import Iterable, Optional, Union
 
-from ..losses.binary_classification import BinaryClassificationLoss
-from ..losses.regression import RegressionLoss
-from ..metrics.binary_classification import BinaryClassificationMetric
-from ..metrics.regression import RegressionMetric
-from ..metrics.metric_list import MetricList
+from ..losses.single_task.binary_classification import BinaryClassificationLoss
+from ..losses.single_task.regression import RegressionLoss
+from ..metrics.single_task.base import SingleTaskMetricList
+from ..metrics.single_task.binary_classification import BinaryClassificationMetric
+from ..metrics.single_task.regression import RegressionMetric
 from .task import Task
 
 
@@ -35,7 +35,7 @@ class TableTask(Task, ABC):
                 Union[
                     Union[BinaryClassificationMetric, RegressionMetric],
                     Iterable[Union[BinaryClassificationMetric, RegressionMetric]],
-                    MetricList[Union[BinaryClassificationMetric, RegressionMetric]]
+                    SingleTaskMetricList[Union[BinaryClassificationMetric, RegressionMetric]]
                 ]
             ] = None,
 
@@ -59,7 +59,7 @@ class TableTask(Task, ABC):
                 Union[
                     Union[BinaryClassificationMetric, RegressionMetric],
                     Iterable[Union[BinaryClassificationMetric, RegressionMetric]],
-                    MetricList[Union[BinaryClassificationMetric, RegressionMetric]]
+                    SingleTaskMetricList[Union[BinaryClassificationMetric, RegressionMetric]]
                 ]
             ]
             A list of metrics to evaluate the trained models.

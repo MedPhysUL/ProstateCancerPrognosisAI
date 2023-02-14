@@ -10,9 +10,9 @@
 
 from typing import Iterable, Optional, Union
 
-from ..losses.regression import RegressionLoss
-from ..metrics.regression import RegressionMetric
-from ..metrics.metric_list import MetricList
+from ..losses.single_task.regression import RegressionLoss
+from ..metrics.single_task.base import SingleTaskMetricList
+from ..metrics.single_task.regression import RegressionMetric
 from .table import TableTask
 
 
@@ -31,7 +31,7 @@ class RegressionTask(TableTask):
                 Union[
                     RegressionMetric,
                     Iterable[RegressionMetric],
-                    MetricList[RegressionMetric]
+                    SingleTaskMetricList[RegressionMetric]
                 ]
             ] = None,
             name: Optional[str] = None
@@ -53,7 +53,7 @@ class RegressionTask(TableTask):
                 Union[
                     RegressionMetric,
                     Iterable[RegressionMetric],
-                    MetricList[RegressionMetric]
+                    SingleTaskMetricList[RegressionMetric]
                 ]
             ]
             A list of metrics to evaluate the trained models.
@@ -83,7 +83,7 @@ class RegressionTask(TableTask):
         return self._early_stopping_metric
 
     @property
-    def evaluation_metrics(self) -> Optional[MetricList[RegressionMetric]]:
+    def evaluation_metrics(self) -> Optional[SingleTaskMetricList[RegressionMetric]]:
         return self._evaluation_metrics
 
     @property
@@ -91,9 +91,9 @@ class RegressionTask(TableTask):
         return self._hps_tuning_metric  # type: ignore
 
     @property
-    def metrics(self) -> MetricList[RegressionMetric]:
+    def metrics(self) -> SingleTaskMetricList[RegressionMetric]:
         return super().metrics
 
     @property
-    def unique_metrics(self) -> MetricList[RegressionMetric]:
+    def unique_metrics(self) -> SingleTaskMetricList[RegressionMetric]:
         return super().unique_metrics

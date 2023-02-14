@@ -29,7 +29,7 @@ from optuna.visualization import (
 )
 import ray
 
-from ..metrics.metric import Direction
+from ..metrics.single_task.base import Direction
 from .objective import Objective
 
 

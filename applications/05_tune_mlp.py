@@ -18,7 +18,7 @@ from src.data.datasets import ProstateCancerDataset, TableDataset
 from src.data.processing.sampling import extract_masks
 from src.models.mlp import MLP
 from src.evaluation import Evaluator
-from src.losses import MeanLoss
+from src.losses.multi_task import MeanLoss
 
 
 if __name__ == '__main__':

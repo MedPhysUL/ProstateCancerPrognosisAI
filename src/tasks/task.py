@@ -12,9 +12,9 @@ from abc import ABC
 from copy import copy
 from typing import Any, Dict, Iterable, Optional, Type, Union
 
-from ..losses.loss import Loss
-from ..metrics.metric import Metric
-from ..metrics.metric_list import MetricList
+from ..losses.single_task.base import SingleTaskLoss
+from ..metrics.single_task.base import SingleTaskMetric
+from ..metrics.single_task.base import SingleTaskMetricList
 
 
 class Task(ABC):
@@ -27,10 +27,12 @@ class Task(ABC):
 
     def __init__(
             self,
-            hps_tuning_metric: Metric,
-            criterion: Optional[Loss] = None,
-            early_stopping_metric: Optional[Metric] = None,
-            evaluation_metrics: Optional[Union[Metric, Iterable[Metric], MetricList]] = None,
+            hps_tuning_metric: SingleTaskMetric,
+            criterion: Optional[SingleTaskLoss] = None,
+            early_stopping_metric: Optional[SingleTaskMetric] = None,
+            evaluation_metrics: Optional[
+                Union[SingleTaskMetric, Iterable[SingleTaskMetric], SingleTaskMetricList]
+            ] = None,
             name: str = None
     ):
         """
@@ -38,13 +40,13 @@ class Task(ABC):
 
         Parameters
         ----------
-        hps_tuning_metric : Metric
+        hps_tuning_metric : SingleTaskMetric
             A metric used for Optuna hyperparameters optimization.
-        criterion : Optional[Loss]
+        criterion : Optional[SingleTaskLoss]
             A loss function.
         early_stopping_metric : Optional[Metric]
             A metric used for early stopping.
-        evaluation_metrics : Optional[Union[Metric, Iterable[Metric], MetricList]]
+        evaluation_metrics : Optional[Union[SingleTaskMetric, Iterable[SingleTaskMetric], SingleTaskMetricList]]
             A list of metrics to evaluate the trained models on.
         name : str
             The name of the task.
@@ -53,65 +55,65 @@ class Task(ABC):
 
         self._criterion = criterion
         self._early_stopping_metric = early_stopping_metric
-        self._evaluation_metrics = MetricList(evaluation_metrics)
+        self._evaluation_metrics = SingleTaskMetricList(evaluation_metrics)
         self._hps_tuning_metric = hps_tuning_metric
 
     @property
-    def criterion(self) -> Optional[Loss]:
+    def criterion(self) -> Optional[SingleTaskLoss]:
         """
         Criterion.
 
         Returns
         -------
-        criterion : Optional[Loss]
+        criterion : Optional[SingleTaskLoss]
             A loss function.
         """
         return self._criterion
 
     @property
-    def early_stopping_metric(self) -> Optional[Metric]:
+    def early_stopping_metric(self) -> Optional[SingleTaskMetric]:
         """
         Early stopping metric.
 
         Returns
         -------
-        early_stopping_metric : Optional[Metric]
+        early_stopping_metric : Optional[SingleTaskMetric]
             A metric used for early stopping.
         """
         return self._early_stopping_metric
 
     @property
-    def evaluation_metrics(self) -> Optional[MetricList]:
+    def evaluation_metrics(self) -> Optional[SingleTaskMetricList]:
         """
         Evaluation metrics.
 
         Returns
         -------
-        evaluation_metrics : Optional[MetricList]
+        evaluation_metrics : Optional[SingleTaskMetricList]
             A list of metrics to evaluate the trained models on.
         """
         return self._evaluation_metrics
 
     @property
-    def hps_tuning_metric(self) -> Metric:
+    def hps_tuning_metric(self) -> SingleTaskMetric:
         """
         Hyperparameters tuning metric.
 
         Returns
         -------
-        hps_tuning_metric : Metric
+        hps_tuning_metric : SingleTaskMetric
             A metric used for Optuna hyperparameters optimization.
         """
         return self._hps_tuning_metric
 
     @property
-    def metrics(self) -> MetricList:
+    def metrics(self) -> SingleTaskMetricList:
         """
         'MetricList' containing all given metrics.
 
         Returns
         -------
-        metric_list : MetricList
+        metric_list : SingleTaskMetricList
             A metric list containing all metrics.
         """
         metrics = [self.hps_tuning_metric]
@@ -120,7 +122,7 @@ class Task(ABC):
         if self.evaluation_metrics:
             metrics.extend(self.evaluation_metrics)
 
-        return MetricList(metrics)
+        return SingleTaskMetricList(metrics)
 
     @property
     def name(self) -> str:
@@ -135,13 +137,13 @@ class Task(ABC):
         return self._name
 
     @property
-    def unique_metrics(self) -> MetricList:
+    def unique_metrics(self) -> SingleTaskMetricList:
         """
         'MetricList' containing only the unique metrics. Metrics with the same name are considered identical.
 
         Returns
         -------
-        metric_list : MetricList
+        metric_list : SingleTaskMetricList
             A metric list containing only the unique metrics.
         """
         unique_metrics, unique_names = [], []
@@ -150,7 +152,7 @@ class Task(ABC):
                 unique_metrics.append(metric)
                 unique_names.append(metric.name)
 
-        return MetricList(unique_metrics)
+        return SingleTaskMetricList(unique_metrics)
 
     def state_dict(self) -> Dict[str, Any]:
         """
