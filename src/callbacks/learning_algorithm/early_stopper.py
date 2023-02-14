@@ -15,10 +15,10 @@ from typing import Optional, TYPE_CHECKING
 import numpy as np
 
 from ...metrics.single_task.base import Direction
-from ...training.states import EpochState
 
 if TYPE_CHECKING:
     from ..learning_algorithm import LearningAlgorithm
+    from ...training.states import EpochState
 
 
 class EarlyStopper(ABC):
@@ -209,6 +209,10 @@ class MetricsEarlyStopper(EarlyStopper):
 
 class MultiTaskLossEarlyStopper(EarlyStopper):
 
+    # Identical suffix as EpochState
+    SUFFIX_WITH_REGULARIZATION = "('regularization'=True)"
+    SUFFIX_WITHOUT_REGULARIZATION = "('regularization'=False)"
+
     def __init__(
             self,
             patience: int = 10,
@@ -245,13 +249,13 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         """
         basic_name = learning_algorithm.criterion.name
 
-        if not learning_algorithm.regularization:
-            suffix = EpochState.SUFFIX_WITHOUT_REGULARIZATION
+        if not learning_algorithm.regularizer:
+            suffix = self.SUFFIX_WITHOUT_REGULARIZATION
         else:
             if self.include_regularization:
-                suffix = EpochState.SUFFIX_WITH_REGULARIZATION
+                suffix = self.SUFFIX_WITH_REGULARIZATION
             else:
-                suffix = EpochState.SUFFIX_WITHOUT_REGULARIZATION
+                suffix = self.SUFFIX_WITHOUT_REGULARIZATION
 
         self.criterion_full_name = f"{basic_name}{suffix}"
 
