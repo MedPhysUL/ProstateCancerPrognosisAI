@@ -17,7 +17,7 @@ from torch import Tensor, save, zeros
 from torch.nn import Module
 
 from src.data.processing.tools import MaskType
-from src.models.base.base_model import BaseModel
+from src.models.base.model import BaseModel
 from src.recording.constants import *
 
 

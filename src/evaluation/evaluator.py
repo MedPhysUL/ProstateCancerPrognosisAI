@@ -23,7 +23,7 @@ from torch import is_tensor, from_numpy, manual_seed, stack
 from ..data.datasets import ProstateCancerDataset, TableDataset
 from ..data.processing.feature_selection import FeatureSelector
 from ..data.processing.sampling import Mask
-from ..models.base.base_model import BaseModel
+from ..models.base.model import Model
 from ..recording.constants import (PREDICTION, RECORDS_FILE, TEST_RESULTS, TRAIN_RESULTS, VALID_RESULTS)
 from ..recording.recorder import Recorder
 from ..recording.tools import (compare_prediction_recordings, get_evaluation_recap, plot_feature_importance_charts,
@@ -390,7 +390,7 @@ class Evaluator:
 
     @staticmethod
     def _record_scores_and_pred(
-            model: BaseModel,
+            model: Model,
             recorder: Recorder,
             subset: ProstateCancerDataset
     ) -> None:
@@ -399,7 +399,7 @@ class Evaluator:
 
         Parameters
         ----------
-        model : BaseModel
+        model : Model
             Model trained with best found hyperparameters.
         recorder : Recorder
             Object recording information about splits evaluations.

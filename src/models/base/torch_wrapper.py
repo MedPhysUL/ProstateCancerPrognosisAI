@@ -14,12 +14,12 @@ from typing import Any, Callable, Dict, List, Optional
 from torch import save
 
 from src.data.datasets.prostate_cancer_dataset import FeaturesType, ProstateCancerDataset, TargetsType
-from src.models.base.base_model import BaseModel
+from src.models.base.model import Model
 from src.models.base.custom_torch_base import TorchCustomModel
 from src.utils.hyperparameters import HP
 
 
-class TorchWrapper(BaseModel):
+class TorchWrapper(Model):
     """
     Class used as a wrapper for model inheriting from TorchCustomModel
     """

@@ -26,7 +26,7 @@ from .hyperparameters import (
     NumericalIntHyperparameter,
     Range
 )
-from ..models.base.base_model import BaseModel
+from ..models.base.model import Model
 
 
 class Objective:
@@ -38,9 +38,9 @@ class Objective:
             self,
             dataset: ProstateCancerDataset,
             masks: Dict[int, Dict[str, List[int]]],
-            hps: Dict[str, Dict[str, Any]],
+            hyperparameters: Dict[str, Dict[str, Any]],
             fixed_params: Optional[Dict[str, Any]],
-            model_constructor: BaseModel,
+            model_constructor: Model,
             gpu_device: bool = False
     ) -> None:
         """
@@ -52,22 +52,22 @@ class Objective:
             Custom dataset containing all the data needed for our evaluations.
         masks : Dict[int, Dict[str, List[int]]]
             Dict with list of idx to use as train, valid and test masks.
-        hps : Dict[str, Dict[str, Any]]
+        hyperparameters : Dict[str, Dict[str, Any]]
             Dictionary with information on the hyperparameters we want to tune.
-        model_constructor : BaseModel
+        model_constructor : Model
             Callable object that builds a model using hyperparameters and fixed params.
         gpu_device : bool
             Whether we want to use a GPU.
         """
         # We validate the given hyperparameters
         for hp in model_constructor.get_hyperparameters():
-            if not (hp.name in list(hps.keys())):
+            if not (hp.name in list(hyperparameters.keys())):
                 raise ValueError(f"'{hp}' is missing from hps dictionary")
 
         # We set protected attributes
         self._dataset = dataset
         self._fixed_params = fixed_params if fixed_params is not None else {}
-        self._hps = hps
+        self._hyperparameters = hyperparameters
         self._masks = masks
         self._model_constructor = model_constructor
         self._getters = {}
@@ -118,7 +118,7 @@ class Objective:
 
             # We check if a value was predefined for this hyperparameter,
             # in this case, no value we'll be sampled by Optuna
-            if Range.VALUE in self._hps[hp.name].keys():
+            if Range.VALUE in self._hyperparameters[hp.name].keys():
                 self._getters[hp.name] = self._build_constant_getter(hp)
 
             # Otherwise we build the suggestion function appropriate to the hyperparameter
@@ -149,7 +149,7 @@ class Objective:
             Constant getter
         """
         def getter(trial: Trial) -> Any:
-            return self._hps[hp.name][Range.VALUE]
+            return self._hyperparameters[hp.name][Range.VALUE]
 
         return getter
 
@@ -171,7 +171,7 @@ class Objective:
             Categorical getter
         """
         def getter(trial: Trial) -> str:
-            return trial.suggest_categorical(hp.name, self._hps[hp.name][Range.VALUES])
+            return trial.suggest_categorical(hp.name, self._hyperparameters[hp.name][Range.VALUES])
 
         return getter
 
@@ -193,8 +193,12 @@ class Objective:
             Categorical getter
         """
         def getter(trial: Trial) -> int:
-            return trial.suggest_int(hp.name, self._hps[hp.name][Range.MIN], self._hps[hp.name][Range.MAX],
-                                     step=self._hps[hp.name].get(Range.STEP, 1))
+            return trial.suggest_int(
+                hp.name,
+                self._hyperparameters[hp.name][Range.MIN],
+                self._hyperparameters[hp.name][Range.MAX],
+                step=self._hyperparameters[hp.name].get(Range.STEP, 1)
+            )
         return getter
 
     def _build_numerical_cont_getter(
@@ -215,7 +219,11 @@ class Objective:
             Categorical getter
         """
         def getter(trial: Trial) -> Union[float]:
-            return trial.suggest_uniform(hp.name, self._hps[hp.name][Range.MIN], self._hps[hp.name][Range.MAX])
+            return trial.suggest_uniform(
+                hp.name,
+                self._hyperparameters[hp.name][Range.MIN],
+                self._hyperparameters[hp.name][Range.MAX]
+            )
 
         return getter
 
@@ -267,7 +275,7 @@ class Objective:
             dts = deepcopy(self._dataset)
             dts.update_masks(train_mask=train_idx, valid_mask=valid_idx, test_mask=test_idx)
 
-            # We build a model using hps and fixed params (BaseModel)
+            # We build a model using hps and fixed params (Model)
             model = self._model_constructor(**hps, **self._fixed_params)
 
             # We train the model
@@ -303,5 +311,7 @@ class Objective:
         dictionary : Dict[str, Any]
             Dictionary with hyperparameters' values.
         """
-        return {hp.name: self._hps[hp.name].get(Range.VALUE, trial.params.get(hp.name))
-                for hp in self._model_constructor.get_hyperparameters()}
+        return {
+            hp.name: self._hyperparameters[hp.name].get(Range.VALUE, trial.params.get(hp.name))
+            for hp in self._model_constructor.get_hyperparameters()
+        }
