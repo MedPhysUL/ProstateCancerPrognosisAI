@@ -12,7 +12,7 @@
 from __future__ import annotations
 from typing import Any, Dict, Generic, Iterable, Iterator, Optional, TypeVar, Union
 
-from .table_task import TableTask
+from .table import TableTask
 from .task import Task
 from ..tasks import BinaryClassificationTask, RegressionTask, SegmentationTask
 

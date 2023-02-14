@@ -23,7 +23,7 @@ from ..processing.tools import preprocess_categoricals, preprocess_continuous
 from ..processing.sampling import Mask
 from ..processing.transforms import CategoricalTransform as CaT
 from ...tasks import BinaryClassificationTask
-from ...tasks.table_task import TableTask
+from ...tasks.table import TableTask
 from ...tasks.task_list import TaskList
 
 

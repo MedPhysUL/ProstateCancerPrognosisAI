@@ -13,7 +13,7 @@ from typing import Iterable, Optional, Union
 from ..losses.regression import RegressionLoss
 from ..metrics.regression import RegressionMetric
 from ..metrics.metric_list import MetricList
-from .table_task import TableTask
+from .table import TableTask
 
 
 class RegressionTask(TableTask):

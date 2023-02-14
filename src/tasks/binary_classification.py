@@ -13,7 +13,7 @@ from typing import Iterable, Optional, Union
 from ..losses.binary_classification import BinaryClassificationLoss
 from ..metrics.binary_classification import BinaryClassificationMetric
 from ..metrics.metric_list import MetricList
-from .table_task import TableTask
+from .table import TableTask
 
 
 class BinaryClassificationTask(TableTask):

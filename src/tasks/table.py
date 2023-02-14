@@ -1,5 +1,5 @@
 """
-    @file:              table_task.py
+    @file:              table.py
     @Author:            Maxence Larose
 
     @Creation Date:     09/2022
