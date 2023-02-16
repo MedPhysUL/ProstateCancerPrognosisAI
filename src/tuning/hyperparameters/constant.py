@@ -10,7 +10,9 @@
 
 from typing import Any
 
-from .hyperparameter import Hyperparameter
+from optuna.trial import Trial
+
+from .base import Hyperparameter
 
 
 class ConstantHyperparameter(Hyperparameter):
@@ -20,7 +22,6 @@ class ConstantHyperparameter(Hyperparameter):
 
     def __init__(
             self,
-            name: str,
             value: Any
     ) -> None:
         """
@@ -28,10 +29,27 @@ class ConstantHyperparameter(Hyperparameter):
 
         Parameters
         ----------
-        name : str
-            Name of the hyperparameter.
         value : Any
             The hyperparameter constant value.
         """
-        super().__init__(name=name)
+        super().__init__(name=self.__class__.__name__)
         self.value = value
+
+    def get_suggestion(
+            self,
+            trial: Trial
+    ) -> Any:
+        """
+        Gets optuna's suggestion. In this case, the suggestion is always the same and equals the given 'value'.
+
+        Parameters
+        ----------
+        trial : Trial
+            Optuna's hyperparameter optimization trial.
+
+        Returns
+        -------
+        suggestion : Any
+            Constant value of this hyperparameter.
+        """
+        return self.value

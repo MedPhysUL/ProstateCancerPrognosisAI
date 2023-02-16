@@ -8,9 +8,11 @@
     @Description:       This file is used to define the `CategoricalHyperparameter` object.
 """
 
-from typing import Any, Iterable
+from typing import Any, Sequence
 
-from .hyperparameter import Hyperparameter
+from optuna.trial import Trial
+
+from .base import Hyperparameter
 
 
 class CategoricalHyperparameter(Hyperparameter):
@@ -21,7 +23,7 @@ class CategoricalHyperparameter(Hyperparameter):
     def __init__(
             self,
             name: str,
-            values: Iterable[Any]
+            choices: Sequence[Any]
     ) -> None:
         """
         Sets attribute using parent's constructor.
@@ -30,8 +32,27 @@ class CategoricalHyperparameter(Hyperparameter):
         ----------
         name : str
             Name of the hyperparameter.
-        values : Iterable[Any]
-            Search space of the hyperparameter, i.e. a list of the categorical values to try.
+        choices : Sequence[Any]
+            Parameter value candidates.
         """
         super().__init__(name=name)
-        self.values = values
+        self.choices = choices
+
+    def get_suggestion(
+            self,
+            trial: Trial
+    ) -> Any:
+        """
+        Gets optuna's suggestion.
+
+        Parameters
+        ----------
+        trial : Trial
+            Optuna's hyperparameter optimization trial.
+
+        Returns
+        -------
+        suggestion : Any
+            Optuna's current suggestion for this hyperparameter.
+        """
+        return trial.suggest_categorical(name=self.name, choices=self.choices)
