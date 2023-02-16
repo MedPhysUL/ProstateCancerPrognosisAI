@@ -10,7 +10,7 @@
                         pytorch models.
 """
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Dict, List, NamedTuple, Optional
 
 from monai.data import DataLoader
@@ -78,8 +78,27 @@ class TorchModel(Model, ABC):
             f"'TorchModel' requires that all tasks define the 'criterion' attribute at instance initialization."
         )
         super().build(dataset=dataset)
-        # table_input_size = len(self._dataset.table_dataset.cont_cols) + len(self._dataset.table_dataset.cat_cols)
-        # output size = len(dataset.tasks)
+
+    @check_if_built
+    @abstractmethod
+    def forward(
+            self,
+            features: FeaturesType
+    ) -> TargetsType:
+        """
+        Executes the forward pass.
+
+        Parameters
+        ----------
+        features : FeaturesType
+            Batch data items.
+
+        Returns
+        -------
+        predictions : TargetsType
+            Predictions.
+        """
+        raise NotImplementedError
 
     @check_if_built
     def fix_thresholds_to_optimal_values(
@@ -150,7 +169,10 @@ class TorchModel(Model, ABC):
             outputs = self(features)
 
             for task in self._tasks.binary_classification_tasks:
-                predictions[task.name] = sigmoid(outputs[task.name])
+                if probability:
+                    predictions[task.name] = sigmoid(outputs[task.name])
+                else:
+                    predictions[task.name] = (sigmoid(outputs[task.name]) >= task.decision_threshold_metric.threshold)
             for task in self._tasks.regression_tasks:
                 predictions[task.name] = outputs[task.name]
             for task in self._tasks.segmentation_tasks:
