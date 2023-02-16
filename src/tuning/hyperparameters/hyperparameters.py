@@ -5,30 +5,11 @@
     @Creation Date:     07/2022
     @Last modification: 02/2023
 
-    @Description:       This file is used to define classes related to hyperparameters.
+    @Description:       This file is used to define hyperparameters categories.
 """
 
-from enum import auto, StrEnum
-
-
-class Distribution(StrEnum):
-    """
-    Stores possible types of distribution.
-    """
-    INT = auto()
-    UNIFORM = auto()
-    CATEGORICAL = auto()
-
-
-class Range(StrEnum):
-    """
-    Stores possible hyperparameters' range types.
-    """
-    MIN = auto()
-    MAX = auto()
-    STEP = auto()
-    VALUES = auto()
-    VALUE = auto()
+from .spaces import Space
+from .distribution import Distribution
 
 
 class Hyperparameter:
@@ -38,26 +19,25 @@ class Hyperparameter:
 
     def __init__(
             self,
+            distribution: Distribution,
             name: str,
-            distribution: str
+            space: Space
     ) -> None:
         """
         Sets the name of the hp and the distribution from which the suggestion must be sampled.
 
         Parameters
         ----------
-        name : str
-            Name of the hyperparameter.
         distribution : str
             Optuna distribution from which it must be sampled.
+        name : str
+            Name of the hyperparameter.
+        space : Space
+            Search space of the hyperparameter
         """
+        self.space = space
         self.name = name
         self.distribution = distribution
-
-    def __repr__(
-            self
-    ) -> str:
-        return self.name
 
 
 class CategoricalHyperparameter(Hyperparameter):
@@ -67,7 +47,8 @@ class CategoricalHyperparameter(Hyperparameter):
 
     def __init__(
             self,
-            name: str
+            name: str,
+            space: Space
     ) -> None:
         """
         Sets attribute using parent's constructor.
@@ -76,8 +57,10 @@ class CategoricalHyperparameter(Hyperparameter):
         ----------
         name : str
             Name of the hyperparameter.
+        space : Space
+            Search space of the hyperparameter
         """
-        super().__init__(name=name, distribution=Distribution.CATEGORICAL)
+        super().__init__(name=name, distribution=Distribution.CATEGORICAL, space=space)
 
 
 class NumericalIntHyperparameter(Hyperparameter):
@@ -86,7 +69,8 @@ class NumericalIntHyperparameter(Hyperparameter):
     """
     def __init__(
             self,
-            name: str
+            name: str,
+            space: Space
     ) -> None:
         """
         Sets attribute using parent's constructor.
@@ -95,8 +79,10 @@ class NumericalIntHyperparameter(Hyperparameter):
         ----------
         name : str
             Name of the hyperparameter.
+        space : Space
+            Search space of the hyperparameter
         """
-        super().__init__(name=name, distribution=Distribution.INT)
+        super().__init__(name=name, distribution=Distribution.INT, space=space)
 
 
 class NumericalContinuousHyperparameter(Hyperparameter):
@@ -106,7 +92,8 @@ class NumericalContinuousHyperparameter(Hyperparameter):
 
     def __init__(
             self,
-            name: str
+            name: str,
+            space: Space
     ) -> None:
         """
         Sets attribute using parent's constructor.
@@ -115,5 +102,7 @@ class NumericalContinuousHyperparameter(Hyperparameter):
         ----------
         name : str
             Name of the hyperparameter.
+        space : Space
+            Search space of the hyperparameter
         """
-        super().__init__(name=name, distribution=Distribution.UNIFORM)
+        super().__init__(name=name, distribution=Distribution.UNIFORM, space=space)
