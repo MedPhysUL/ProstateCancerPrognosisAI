@@ -25,7 +25,6 @@ class ObjectHyperparameter(Hyperparameter):
 
     def __init__(
             self,
-            name: str,
             constructor: Callable,
             hyperparameters: Dict[str, Hyperparameter]
     ) -> None:
@@ -35,8 +34,6 @@ class ObjectHyperparameter(Hyperparameter):
 
         Parameters
         ----------
-        name : str
-            Name of the current object hyperparameter.
         constructor : Callable
             The class constructor (also named 'class blueprint' or 'class object'). This constructor is used to build
             an object given the hyperparameters.
@@ -47,7 +44,7 @@ class ObjectHyperparameter(Hyperparameter):
         assert all(isinstance(hp, Hyperparameter) for hp in hyperparameters.values()), (
             "All objects in 'hyperparameters' must be instances of 'Hyperparameter'."
         )
-        super().__init__(name=name)
+        super().__init__(name=constructor.__name__)
         self.hyperparameters = hyperparameters
         self._constructor = constructor
 
