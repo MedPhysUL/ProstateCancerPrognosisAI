@@ -15,7 +15,7 @@ from typing import Callable, Dict, List
 from optuna.trial import Trial
 
 from .base import Hyperparameter
-from .constant import ConstantHyperparameter
+from .fixed import FixedHyperparameter
 
 
 class ObjectHyperparameter(Hyperparameter):
@@ -90,7 +90,7 @@ class ObjectHyperparameter(Hyperparameter):
         seen, duplicates = [], []
 
         for hp in hyperparameters.values():
-            if isinstance(hp, ConstantHyperparameter):
+            if isinstance(hp, FixedHyperparameter):
                 continue
             elif isinstance(hp, ObjectHyperparameter):
                 hp_names = self._check_hyperparameter_names_uniqueness(hp.hyperparameters)

@@ -1,11 +1,11 @@
 """
-    @file:              constant.py
+    @file:              fixed.py
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     07/2022
     @Last modification: 02/2023
 
-    @Description:       This file is used to define the `ConstantHyperparameter` object.
+    @Description:       This file is used to define the `FixedHyperparameter` object.
 """
 
 from typing import Any
@@ -15,9 +15,9 @@ from optuna.trial import Trial
 from .base import Hyperparameter
 
 
-class ConstantHyperparameter(Hyperparameter):
+class FixedHyperparameter(Hyperparameter):
     """
-    A constant hyperparameter.
+    A fixed hyperparameter.
     """
 
     def __init__(
@@ -30,7 +30,7 @@ class ConstantHyperparameter(Hyperparameter):
         Parameters
         ----------
         value : Any
-            The hyperparameter constant value.
+            The hyperparameter fixed value.
         """
         super().__init__(name=self.__class__.__name__)
         self.value = value
@@ -50,6 +50,6 @@ class ConstantHyperparameter(Hyperparameter):
         Returns
         -------
         suggestion : Any
-            Constant value of this hyperparameter.
+            Fixed value of this hyperparameter.
         """
         return self.value
