@@ -73,19 +73,6 @@ class Model(Module, ABC):
         self._dataset = dataset
         self._is_built = True
 
-    @property
-    @abstractmethod
-    def hyperparameters(self) -> List[Hyperparameter]:
-        """
-        Returns a list with the hyperparameters associated to the model.
-
-        Returns
-        -------
-        hyperparameters : List[Hyperparameter]
-            Hyperparameters.
-        """
-        raise NotImplementedError
-
     @check_if_built
     @abstractmethod
     def fix_thresholds_to_optimal_values(
@@ -93,6 +80,27 @@ class Model(Module, ABC):
     ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
+        """
+        raise NotImplementedError
+
+    @check_if_built
+    @abstractmethod
+    def forward(
+            self,
+            features: FeaturesType
+    ) -> TargetsType:
+        """
+        Executes the forward pass.
+
+        Parameters
+        ----------
+        features : FeaturesType
+            Batch data items.
+
+        Returns
+        -------
+        predictions : TargetsType
+            Predictions.
         """
         raise NotImplementedError
 
