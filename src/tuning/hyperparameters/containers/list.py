@@ -12,7 +12,7 @@ from typing import Any, List, Union
 
 from optuna.trial import Trial
 
-from .container import Hyperparameter, HyperparameterContainer
+from .base import Hyperparameter, HyperparameterContainer
 
 
 class HyperparameterList(HyperparameterContainer):

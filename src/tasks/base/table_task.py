@@ -1,5 +1,5 @@
 """
-    @file:              table.py
+    @file:              table_task.py
     @Author:            Maxence Larose
 
     @Creation Date:     09/2022
@@ -11,11 +11,11 @@
 from abc import ABC
 from typing import Iterable, Optional, Union
 
-from ..losses.single_task.binary_classification import BinaryClassificationLoss
-from ..losses.single_task.regression import RegressionLoss
-from ..metrics.single_task.base import SingleTaskMetricList
-from ..metrics.single_task.binary_classification import BinaryClassificationMetric
-from ..metrics.single_task.regression import RegressionMetric
+from ...losses.single_task.binary_classification import BinaryClassificationLoss
+from ...losses.single_task.regression import RegressionLoss
+from ...metrics.single_task.binary_classification import BinaryClassificationMetric
+from ...metrics.single_task.containers import SingleTaskMetricList
+from ...metrics.single_task.regression import RegressionMetric
 from .task import Task
 
 

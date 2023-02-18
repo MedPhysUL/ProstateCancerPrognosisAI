@@ -22,9 +22,8 @@ from torch.utils.data import Dataset
 from ..processing.tools import preprocess_categoricals, preprocess_continuous
 from ..processing.sampling import Mask
 from ..processing.transforms import CategoricalTransform as CaT
-from ...tasks import BinaryClassificationTask
-from ...tasks.table import TableTask
-from ...tasks.task_list import TaskList
+from ...tasks import BinaryClassificationTask, TaskList
+from ...tasks.base import TableTask
 
 
 class TableDataModel(NamedTuple):

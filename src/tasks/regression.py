@@ -10,10 +10,10 @@
 
 from typing import Iterable, Optional, Union
 
+from .base import TableTask
 from ..losses.single_task.regression import RegressionLoss
-from ..metrics.single_task.base import SingleTaskMetricList
+from ..metrics.single_task.containers import SingleTaskMetricList
 from ..metrics.single_task.regression import RegressionMetric
-from .table import TableTask
 
 
 class RegressionTask(TableTask):

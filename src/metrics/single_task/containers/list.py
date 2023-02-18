@@ -1,5 +1,5 @@
 """
-    @file:              metric_list.py
+    @file:              list.py
     @Author:            Maxence Larose
 
     @Creation Date:     02/2023
@@ -12,7 +12,7 @@
 from __future__ import annotations
 from typing import Any, Dict, Generic, Iterable, Iterator, Optional, TypeVar, Union
 
-from .metric import SingleTaskMetric
+from ..base import SingleTaskMetric
 
 _SpecifiedMetricType = TypeVar("_SpecifiedMetricType")
 

@@ -1,5 +1,5 @@
 """
-    @file:              task_list.py
+    @file:              list.py
     @Author:            Maxence Larose
 
     @Creation Date:     02/2022
@@ -12,9 +12,8 @@
 from __future__ import annotations
 from typing import Any, Dict, Generic, Iterable, Iterator, Optional, TypeVar, Union
 
-from .table import TableTask
-from .task import Task
-from ..tasks import BinaryClassificationTask, RegressionTask, SegmentationTask
+from ..base import TableTask, Task
+from ...tasks import BinaryClassificationTask, RegressionTask, SegmentationTask
 
 _SpecifiedTaskType = TypeVar("_SpecifiedTaskType")
 

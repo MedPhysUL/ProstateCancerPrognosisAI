@@ -14,7 +14,7 @@ from typing import Callable, Dict, Union
 
 from optuna.trial import Trial
 
-from .container import Hyperparameter, HyperparameterContainer
+from .base import Hyperparameter, HyperparameterContainer
 
 
 class HyperparameterObject(HyperparameterContainer):

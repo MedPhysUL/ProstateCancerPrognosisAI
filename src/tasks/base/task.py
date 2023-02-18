@@ -12,9 +12,9 @@ from abc import ABC
 from copy import copy
 from typing import Any, Dict, Iterable, Optional, Type, Union
 
-from ..losses.single_task.base import SingleTaskLoss
-from ..metrics.single_task.base import SingleTaskMetric
-from ..metrics.single_task.base import SingleTaskMetricList
+from ...losses.single_task.base import SingleTaskLoss
+from ...metrics.single_task.base import SingleTaskMetric
+from ...metrics.single_task.containers import SingleTaskMetricList
 
 
 class Task(ABC):

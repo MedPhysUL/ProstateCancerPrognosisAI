@@ -5,4 +5,4 @@ from .binary_classification import (
 )
 from .segmentation import DiceMetric
 
-from .base import SingleTaskMetricList
+from .containers import SingleTaskMetricList

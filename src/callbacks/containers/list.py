@@ -1,5 +1,5 @@
 """
-    @file:              callback_list.py
+    @file:              list.py
     @Author:            Maxence Larose
 
     @Creation Date:     12/2022
@@ -13,7 +13,7 @@
 
 from typing import Any, Dict, Optional, Iterable, Iterator
 
-from .callback import Callback
+from ..base import Callback
 
 
 class CallbackList:

@@ -10,10 +10,10 @@
 
 from typing import Iterable, Optional, Union
 
+from .base import TableTask
 from ..losses.single_task.binary_classification import BinaryClassificationLoss
-from ..metrics.single_task.base import SingleTaskMetricList
 from ..metrics.single_task.binary_classification import BinaryClassificationMetric
-from .table import TableTask
+from ..metrics.single_task.containers import SingleTaskMetricList
 
 
 class BinaryClassificationTask(TableTask):

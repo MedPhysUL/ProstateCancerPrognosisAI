@@ -13,8 +13,8 @@ from typing import Dict, List, Optional, Union
 from torch import nanmean, stack, Tensor
 
 from .base import MultiTaskLoss
-from ...tasks.task import Task
-from ...tasks.task_list import TaskList
+from ...tasks.base import Task
+from ...tasks.containers import TaskList
 
 
 class MeanLoss(MultiTaskLoss):

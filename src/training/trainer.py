@@ -19,7 +19,8 @@ from torch import cuda, no_grad
 from torch.utils.data import SubsetRandomSampler
 from tqdm.auto import tqdm
 
-from ..callbacks.base import Callback, CallbackList
+from ..callbacks.base import Callback
+from ..callbacks.containers import CallbackList
 from ..callbacks import Checkpoint, LearningAlgorithm, TrainingHistory
 from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ..models.base.torch_model import TorchModel
