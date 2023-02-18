@@ -61,7 +61,6 @@ class Trainer:
             y_transform : Module
                 Transform to apply to the target data before passing it to the model.
         """
-        assert model.is_built, "Model must be built before training"
         self.model = model
 
         self.callbacks = callbacks
@@ -301,6 +300,8 @@ class Trainer:
         training_history : TrainingHistory
             The training history.
         """
+        self.model.build(dataset=dataset)
+
         train_dataloader = self._create_train_dataloader(dataset=dataset, batch_size=batch_size)
         valid_dataloader = self._create_valid_dataloader(dataset=dataset)
 
