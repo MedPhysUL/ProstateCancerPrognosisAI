@@ -1,5 +1,5 @@
 """
-    @file:              base.py
+    @file:              hyperparameter.py
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     07/2022
@@ -24,7 +24,7 @@ class Hyperparameter(ABC):
             name: str
     ) -> None:
         """
-        Sets the name of the hp and the distribution from which the suggestion must be sampled.
+        Sets the name of the hp.
 
         Parameters
         ----------
