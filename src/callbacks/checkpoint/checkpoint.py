@@ -64,8 +64,6 @@ class Checkpoint(Callback):
         name = name if name else f"{self.__class__.__name__}({self.instance_id})"
         super().__init__(name=name, save_state=False)
 
-        os.makedirs(path_to_checkpoint_folder, exist_ok=True)
-
         self.epoch_to_start_save = epoch_to_start_save
         self.path_to_checkpoint_folder = path_to_checkpoint_folder
         self.save_freq = save_freq
