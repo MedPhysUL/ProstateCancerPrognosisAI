@@ -18,8 +18,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from torch import Tensor
 
-from ...tasks.task import Task
-from ...tasks.task_list import TaskList
+from ...tasks.base import Task
+from ...tasks.containers import TaskList
 
 
 class MultiTaskLoss(ABC):
