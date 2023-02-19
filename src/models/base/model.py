@@ -17,7 +17,6 @@ from torch import cuda
 from torch import device as torch_device
 
 from ...data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
-from ...tuning.hyperparameters.base import Hyperparameter
 
 
 def check_if_built(_func):
