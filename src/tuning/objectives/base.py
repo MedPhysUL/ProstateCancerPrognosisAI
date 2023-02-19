@@ -60,6 +60,18 @@ class Objective(ABC):
         self._num_gpus = num_gpus
         self._run_trial = self._build_trial_runner()
 
+    @property
+    def dataset(self) -> ProstateCancerDataset:
+        """
+        Dataset.
+
+        Returns
+        -------
+        dataset : ProstateCancerDataset
+            Dataset.
+        """
+        return self._dataset
+
     def __call__(
             self,
             trial: Trial
