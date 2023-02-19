@@ -189,6 +189,18 @@ class Trainer:
         assert len(training_histories) == 1, "There should be one and only one `TrainingHistory` callback."
         self._training_history = training_histories[0]
 
+    def set_checkpoint_path(self, path: str):
+        """
+        Sets checkpoint path.
+
+        Parameters
+        ----------
+        path : str
+            Path to the folder to save the checkpoints to.
+        """
+        if self._checkpoint:
+            self._checkpoint.path_to_checkpoint_folder = path
+
     def _check_if_training_can_be_stopped(self):
         """
         Checks if the training process can be stopped. Training can be stopped if all learning algorithms are stopped.
