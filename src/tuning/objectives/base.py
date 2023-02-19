@@ -93,7 +93,9 @@ class Objective(ABC):
         suggested_hps = self.hyperparameters.get_suggestion(trial)
 
         # We execute parallel evaluations
-        futures = [self._run_trial.remote(masks=m, hyperparameters=suggested_hps) for m in self._masks.values()]
+        futures = [
+            self._run_trial.remote(masks=m, hyperparameters=deepcopy(suggested_hps)) for m in self._masks.values()
+        ]
         scores = ray.get(futures)
 
         # We take the mean of the scores
