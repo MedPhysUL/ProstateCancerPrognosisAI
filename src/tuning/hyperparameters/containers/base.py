@@ -10,9 +10,9 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Any, List, Sequence, Union
+from typing import Any, Dict, List, Sequence, Union
 
-from optuna.trial import Trial
+from optuna.trial import FrozenTrial, Trial
 
 from ..base import Hyperparameter
 from ..fixed import FixedHyperparameter
@@ -126,3 +126,25 @@ class HyperparameterContainer(ABC):
             Optuna's current suggestion for the hyperparameters.
         """
         raise NotImplementedError
+
+    def get_tested_values(
+            self,
+            trial: FrozenTrial
+    ) -> Dict[str, Any]:
+        """
+        Extracts model hyperparameters in a dictionary with the appropriate keys given an optuna trial.
+
+        Parameters
+        ----------
+        trial : FrozenTrial
+            Optuna frozen trial.
+
+        Returns
+        -------
+        dictionary : Dict[str, Any]
+            Dictionary with hyperparameters' values.
+        """
+        fixed_hps = {hp.name: hp.value for hp in self.fixed_hyperparameters}
+        tunable_hps = {hp.name: trial.params.get(hp.name) for hp in self.tunable_hyperparameters}
+
+        return {**fixed_hps, **tunable_hps}
