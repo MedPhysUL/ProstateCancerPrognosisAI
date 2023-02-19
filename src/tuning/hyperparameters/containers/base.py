@@ -28,7 +28,7 @@ class HyperparameterContainer(ABC):
             sequence: Sequence[Union[Hyperparameter, HyperparameterContainer]]
     ) -> None:
         """
-        Initialize the hyperparameter container.
+        Initializes the hyperparameter container.
 
         Parameters
         ----------
@@ -39,37 +39,73 @@ class HyperparameterContainer(ABC):
             "All objects in 'sequence' must be instances of 'Hyperparameter' or 'HyperparameterContainer'."
         )
         self._sequence = sequence
-        self._check_hyperparameter_names_uniqueness()
+        self._set_hyperparameters()
 
-    def _check_hyperparameter_names_uniqueness(self):
+    @property
+    def hyperparameters(self) -> List[Hyperparameter]:
+        """
+        List of hyperparameters contained in the sequence.
+
+        Returns
+        -------
+        hps : List[Hyperparameter]
+            Hyperparameters.
+        """
+        return self._hyperparameters
+
+    @property
+    def fixed_hyperparameters(self) -> List[FixedHyperparameter]:
+        """
+        List of fixed hyperparameters contained in the sequence.
+
+        Returns
+        -------
+        fixed_hps : List[FixedHyperparameter]
+            Fixed hyperparameters.
+        """
+        return [hp for hp in self.hyperparameters if isinstance(hp, FixedHyperparameter)]
+
+    @property
+    def tunable_hyperparameters(self) -> List[Hyperparameter]:
+        """
+        List of tunable hyperparameters contained in the sequence.
+
+        Returns
+        -------
+        tunable_hps : List[Hyperparameter]
+            Tunable hyperparameters.
+        """
+        return [
+            hp for hp in self.hyperparameters
+            if isinstance(hp, Hyperparameter) and not isinstance(hp, FixedHyperparameter)
+        ]
+
+    def _set_hyperparameters(self):
+        """
+        Sets list of hyperparameters and checks hyperparameters names uniqueness.
+        """
+        hyperparameters = []
+        for hp in self._sequence:
+            if isinstance(hp, Hyperparameter):
+                hyperparameters += [hp]
+            elif isinstance(hp, HyperparameterContainer):
+                hyperparameters += hp.hyperparameters
+            else:
+                raise AssertionError(
+                    "All objects in 'sequence' must be instances of 'Hyperparameter' or 'HyperparameterContainer'."
+                )
+
+        self._hyperparameters = hyperparameters
+        self._check_hyperparameters_names_uniqueness()
+
+    def _check_hyperparameters_names_uniqueness(self):
         """
         Raises an assertion error if there is any hyperparameter with the same name.
         """
         seen = set()
-        duplicates = [name for name in self.names if name in seen or seen.add(name)]
+        duplicates = [hp.name for hp in self.hyperparameters if hp.name in seen or seen.add(hp.name)]
 
-        assert not duplicates, f"Duplicates hyperparameter names are not allowed. Found duplicates {duplicates}."
-
-    @property
-    def names(self) -> List[str]:
-        """
-        The names the hyperparameters contained in the sequence.
-
-        Returns
-        -------
-        names : List[str]
-            Hyperparameter names.
-        """
-        names = []
-        for hp in self._sequence:
-            if isinstance(hp, FixedHyperparameter):
-                pass
-            elif isinstance(hp, HyperparameterContainer):
-                names += hp.names
-            else:
-                names += [hp.name]
-
-        return names
+        assert not duplicates, f"Duplicate hyperparameters names are not allowed. Found duplicates {duplicates}."
 
     @abstractmethod
     def get_suggestion(

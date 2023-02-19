@@ -22,6 +22,7 @@ class FixedHyperparameter(Hyperparameter):
 
     def __init__(
             self,
+            name: str,
             value: Any
     ) -> None:
         """
@@ -29,10 +30,12 @@ class FixedHyperparameter(Hyperparameter):
 
         Parameters
         ----------
+        name : str
+            Name of the hyperparameter.
         value : Any
             The hyperparameter fixed value.
         """
-        super().__init__(name=self.__class__.__name__)
+        super().__init__(name=name)
         self.value = value
 
     def get_suggestion(
