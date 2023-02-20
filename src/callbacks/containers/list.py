@@ -183,29 +183,77 @@ class CallbackList:
         for callback in self.callbacks:
             callback.on_tuning_end(tuner, **kwargs)
 
-    def on_trial_start(self, tuner, **kwargs):
+    def on_outer_split_start(self, tuner, **kwargs):
+        """
+        Called when the outer split starts.
+
+        Parameters
+        ----------
+        tuner : Tuner
+            The tuner.
+        """
+        for callback in self.callbacks:
+            callback.on_outer_split_start(tuner, **kwargs)
+
+    def on_outer_split_end(self, tuner, **kwargs):
+        """
+        Called when the outer split ends.
+
+        Parameters
+        ----------
+        tuner : Tuner
+            The tuner.
+        """
+        for callback in self.callbacks:
+            callback.on_outer_split_end(tuner, **kwargs)
+
+    def on_trial_start(self, objective, **kwargs):
         """
         Called when the trial starts.
 
         Parameters
         ----------
-        tuner : Tuner
-            The tuner.
+        objective : Objective
+            The objective.
         """
         for callback in self.callbacks:
-            callback.on_trial_start(tuner, **kwargs)
+            callback.on_trial_start(objective, **kwargs)
 
-    def on_trial_end(self, tuner, **kwargs):
+    def on_trial_end(self, objective, **kwargs):
         """
         Called when the trial ends.
 
         Parameters
         ----------
-        tuner : Tuner
-            The tuner.
+        objective : Objective
+            The objective.
         """
         for callback in self.callbacks:
-            callback.on_trial_end(tuner, **kwargs)
+            callback.on_trial_end(objective, **kwargs)
+
+    def on_inner_split_start(self, objective, **kwargs):
+        """
+        Called when the inner split starts.
+
+        Parameters
+        ----------
+        objective : Objective
+            The objective.
+        """
+        for callback in self.callbacks:
+            callback.on_inner_split_start(objective, **kwargs)
+
+    def on_inner_split_end(self, objective, **kwargs):
+        """
+        Called when the inner split ends.
+
+        Parameters
+        ----------
+        objective : Objective
+            The objective.
+        """
+        for callback in self.callbacks:
+            callback.on_inner_split_end(objective, **kwargs)
 
     def on_fit_start(self, trainer, **kwargs):
         """
