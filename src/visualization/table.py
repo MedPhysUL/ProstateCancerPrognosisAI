@@ -399,7 +399,7 @@ class TableViewer:
     def visualize(
             self,
             path_to_save: Optional[str] = None,
-            show: Optional[bool] = True
+            show: Optional[bool] = False
     ):
         """
         Visualizes dataset.
