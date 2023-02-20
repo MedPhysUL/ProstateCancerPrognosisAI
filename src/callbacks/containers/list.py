@@ -183,9 +183,9 @@ class CallbackList:
         for callback in self.callbacks:
             callback.on_tuning_end(tuner, **kwargs)
 
-    def on_outer_split_start(self, tuner, **kwargs):
+    def on_outer_loop_start(self, tuner, **kwargs):
         """
-        Called when the outer split starts.
+        Called when the outer loop starts.
 
         Parameters
         ----------
@@ -193,11 +193,11 @@ class CallbackList:
             The tuner.
         """
         for callback in self.callbacks:
-            callback.on_outer_split_start(tuner, **kwargs)
+            callback.on_outer_loop_start(tuner, **kwargs)
 
-    def on_outer_split_end(self, tuner, **kwargs):
+    def on_outer_loop_end(self, tuner, **kwargs):
         """
-        Called when the outer split ends.
+        Called when the outer loop ends.
 
         Parameters
         ----------
@@ -205,7 +205,7 @@ class CallbackList:
             The tuner.
         """
         for callback in self.callbacks:
-            callback.on_outer_split_end(tuner, **kwargs)
+            callback.on_outer_loop_end(tuner, **kwargs)
 
     def on_trial_start(self, objective, **kwargs):
         """
@@ -231,9 +231,9 @@ class CallbackList:
         for callback in self.callbacks:
             callback.on_trial_end(objective, **kwargs)
 
-    def on_inner_split_start(self, objective, **kwargs):
+    def on_inner_loop_start(self, objective, **kwargs):
         """
-        Called when the inner split starts.
+        Called when the inner loop starts.
 
         Parameters
         ----------
@@ -241,11 +241,11 @@ class CallbackList:
             The objective.
         """
         for callback in self.callbacks:
-            callback.on_inner_split_start(objective, **kwargs)
+            callback.on_inner_loop_start(objective, **kwargs)
 
-    def on_inner_split_end(self, objective, **kwargs):
+    def on_inner_loop_end(self, objective, **kwargs):
         """
-        Called when the inner split ends.
+        Called when the inner loop ends.
 
         Parameters
         ----------
@@ -253,7 +253,7 @@ class CallbackList:
             The objective.
         """
         for callback in self.callbacks:
-            callback.on_inner_split_end(objective, **kwargs)
+            callback.on_inner_loop_end(objective, **kwargs)
 
     def on_fit_start(self, trainer, **kwargs):
         """

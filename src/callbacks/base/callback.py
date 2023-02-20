@@ -28,7 +28,7 @@ class Callback(ABC):
         - Fit: The process of fitting a model to the given dataset.
         - Forward pass: The process of calculating the values of the output layer from the input layer.
         - Optimization: The process of calculating the training loss on a batch and executing a backward pass.
-        - Split: The process of splitting the dataset in subsets for tuning (nested cross-validation).
+        - Loop: The process of looping through the dataset in subsets for tuning (nested cross-validation).
         - Train: Passing through the entire training dataset (in batches).
         - Train batch: One forward and backward pass through a single batch. Usually called an 'iteration'.
         - Trial: The process of evaluating an objective function with a given set of hyperparameters.
@@ -38,12 +38,12 @@ class Callback(ABC):
 
     Callback methods are called in the following order:
         - `on_tuning_start`
-        * Executes n_outer_splits times :
-            - `on_outer_split_start`
+        * Executes n_outer_loops times :
+            - `on_outer_loop_start`
             * Executes n_trials times:
                 - `on_trial_start`
-                * Executes n_inner_splits_times (in parallel if possible):
-                    - `on_inner_split_start`
+                * Executes n_inner_loops_times (in parallel if possible):
+                    - `on_inner_loop_start`
                     - `on_fit_start`
                     * Executes n_epochs times:
                         - `on_epoch_start`
@@ -60,10 +60,10 @@ class Callback(ABC):
                             - `on_validation_batch_end`
                         - `on_validation_end`
                         - `on_epoch_end`
-                    - `on_inner_split_end`
+                    - `on_inner_loop_end`
                     - `on_fit_end`
                 - `on_trial_end`
-            - `on_outer_split_end`
+            - `on_outer_loop_end`
         - `on_tuning_end`
     """
 
@@ -150,9 +150,9 @@ class Callback(ABC):
         """
         pass
 
-    def on_outer_split_start(self, tuner, **kwargs):
+    def on_outer_loop_start(self, tuner, **kwargs):
         """
-        Called when the outer split starts.
+        Called when the outer loop starts.
 
         Parameters
         ----------
@@ -161,9 +161,9 @@ class Callback(ABC):
         """
         pass
 
-    def on_outer_split_end(self, tuner, **kwargs):
+    def on_outer_loop_end(self, tuner, **kwargs):
         """
-        Called when the outer split ends.
+        Called when the outer loop ends.
 
         Parameters
         ----------
@@ -194,9 +194,9 @@ class Callback(ABC):
         """
         pass
 
-    def on_inner_split_start(self, objective, **kwargs):
+    def on_inner_loop_start(self, objective, **kwargs):
         """
-        Called when the inner split starts.
+        Called when the inner loop starts.
 
         Parameters
         ----------
@@ -205,9 +205,9 @@ class Callback(ABC):
         """
         pass
 
-    def on_inner_split_end(self, objective, **kwargs):
+    def on_inner_loop_end(self, objective, **kwargs):
         """
-        Called when the inner split ends.
+        Called when the inner loop ends.
 
         Parameters
         ----------
