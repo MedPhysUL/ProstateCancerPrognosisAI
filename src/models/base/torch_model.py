@@ -185,7 +185,7 @@ class TorchModel(Model, ABC):
             self,
             mask: List[int],
             probability: bool = True
-    ) -> TargetsType:
+    ) -> Optional[TargetsType]:
         """
         Returns predictions for all samples in a particular subset of the dataset, determined using the 'mask'
         parameter, particularly :
@@ -219,7 +219,10 @@ class TorchModel(Model, ABC):
                 for task in self._dataset.tasks.table_tasks:
                     predictions[task.name].append(pred[task.name])
 
-        return {task.name: stack(predictions[task.name], dim=0) for task in self._dataset.tasks.table_tasks}
+        if self._dataset.tasks.table_tasks:
+            return {task.name: stack(predictions[task.name], dim=0) for task in self._dataset.tasks.table_tasks}
+        else:
+            return None
 
     @check_if_built
     def score(
