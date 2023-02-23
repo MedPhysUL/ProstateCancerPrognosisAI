@@ -9,6 +9,9 @@
                         process.
 """
 
+from __future__ import annotations
+from copy import deepcopy
+from dacite import from_dict
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, TypeAlias
 
@@ -134,17 +137,25 @@ class BatchesState(State):
             else:
                 pass
 
-    def mean(self):
+    def get_mean(self) -> BatchesState:
         """
-        Calculates the average value of all measurements and updates the measurements' dictionaries of the current batch
-        state with these values. Be careful, the values of the measurements will become floats instead of lists.
+        Calculates the average value of all measurements and returns the measurements' dictionaries of the current batch
+        state with these values. Be careful, the values of the returned measurements are floats instead of lists.
+
+        Returns
+        -------
+        mean_batches_state : BatchesState
+            Mean batches state.
         """
-        for k, v in vars(self).items():
+        mean_dict = deepcopy(vars(self))
+        for k, v in mean_dict.items():
             for name, measurements in v.items():
                 for key, value in measurements.items():
-                    vars(self)[k][name][key] = np.nanmean(value)
+                    mean_dict[k][name][key] = np.nanmean(value)
             else:
                 pass
+
+        return from_dict(data_class=BatchesState, data=mean_dict)
 
 
 @dataclass
@@ -193,24 +204,24 @@ class EpochState(State):
         training : bool
             Whether the model is currently being trained.
         """
-        batches_state.mean()
+        batches_mean_state = batches_state.get_mean()
 
         multi_task_losses = {}
-        for algo_name, v in batches_state.multi_task_losses_without_regularization.items():
+        for algo_name, v in batches_mean_state.multi_task_losses_without_regularization.items():
             multi_task_losses[algo_name] = {}
             for loss_name, loss_value in v.items():
                 multi_task_losses[algo_name][f"{loss_name}{self.SUFFIX_WITHOUT_REGULARIZATION}"] = loss_value
 
-                if batches_state.multi_task_losses_with_regularization:
-                    loss_with_reg = batches_state.multi_task_losses_with_regularization[algo_name][loss_name]
+                if batches_mean_state.multi_task_losses_with_regularization:
+                    loss_with_reg = batches_mean_state.multi_task_losses_with_regularization[algo_name][loss_name]
                     multi_task_losses[algo_name][f"{loss_name}{self.SUFFIX_WITH_REGULARIZATION}"] = loss_with_reg
 
         if training:
             self.train.multi_task_losses = multi_task_losses
-            self.train.single_task_losses = batches_state.single_task_losses
+            self.train.single_task_losses = batches_mean_state.single_task_losses
         else:
             self.valid.multi_task_losses = multi_task_losses
-            self.valid.single_task_losses = batches_state.single_task_losses
+            self.valid.single_task_losses = batches_mean_state.single_task_losses
 
 
 @dataclass
