@@ -51,7 +51,7 @@ class Trainer:
             Model to train.
         callbacks : Union[TrainingCallback, TrainingCallbackList, List[TrainingCallback]]
             Callbacks to use during training. Each callback will be called at different times during training. See the
-            documentation of `Callback` for more information.
+            documentation of `TrainingCallback` for more information.
         device : Optional[torch_device]
             Device to use for the training process. Default is the device of the model.
         verbose : bool
