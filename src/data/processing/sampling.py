@@ -103,14 +103,14 @@ class Sampler:
 
     def __call__(
             self
-    ) -> Dict[int, Dict[str, Union[List[int], Dict[str, List[int]]]]]:
+    ) -> Dict[int, Dict[str, Union[List[int], Dict[int, Dict[str, List[int]]]]]]:
         """
         Returns lists of indexes to use as train, valid and test masks for outer and inner validation loops.
         The proportion of each class is conserved within each split.
 
         Returns
         -------
-        masks : Dict[int, Dict[str, Union[List[int], Dict[str, List[int]]]]]
+        masks : Dict[int, Dict[str, Union[List[int], Dict[int, Dict[str, List[int]]]]]]
             Dictionary of dictionaries with list of indexes.
 
         Example
