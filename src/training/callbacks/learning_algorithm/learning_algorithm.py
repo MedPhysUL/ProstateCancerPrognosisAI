@@ -16,9 +16,9 @@ from typing import Dict, Iterable, Optional, Union
 from torch import Tensor
 from torch.optim import Optimizer
 
-from ..base import Callback, Priority
+from ..base import Priority, TrainingCallback
 from .early_stopper import EarlyStopper
-from ...losses.multi_task.base import MultiTaskLoss
+from ....losses.multi_task.base import MultiTaskLoss
 from .regularizer import Regularizer, RegularizerList
 
 
@@ -34,7 +34,7 @@ def _pass_if_stopped(_func):
     return wrapper
 
 
-class LearningAlgorithm(Callback):
+class LearningAlgorithm(TrainingCallback):
     """
     This class is used to dictate how to update the model's parameters during the training process.
     """
@@ -100,7 +100,7 @@ class LearningAlgorithm(Callback):
     @property
     def allow_duplicates(self) -> bool:
         """
-        Whether to allow duplicates of this specific Callback class in the 'CallbackList'.
+        Whether to allow duplicates of this specific Callback class in the 'TrainingCallbackList'.
 
         Returns
         -------

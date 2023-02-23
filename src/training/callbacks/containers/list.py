@@ -5,7 +5,7 @@
     @Creation Date:     12/2022
     @Last modification: 02/2023
 
-    @Description:       This file is used to define the 'CallbackList' class which essentially acts as a list of
+    @Description:       This file is used to define the 'TrainingCallbackList' class which essentially acts as a list of
                         callbacks. A lot of the logic behind the following code is borrowed from PyTorch Lightning
                         (https://pytorch-lightning.readthedocs.io/en/stable/extensions/callbacks.html) and
                         NeuroTorch (https://github.com/NeuroTorch/NeuroTorch).
@@ -13,35 +13,36 @@
 
 from typing import Any, Dict, Optional, Iterable, Iterator
 
-from ..base import Callback
+from ..base import TrainingCallback
 
 
-class CallbackList:
+class TrainingCallbackList:
     """
     Holds callbacks in a list. Each callback in the list is called in the order it is stored in the list.
     """
 
-    def __init__(self, callbacks: Optional[Iterable[Callback]] = None):
+    def __init__(self, callbacks: Optional[Iterable[TrainingCallback]] = None):
         """
-        Constructor of the Callbacks class.
+        Constructor of the TrainingCallbackList class.
 
         Parameters
         ----------
-        callbacks : Iterable[Callback]
+        callbacks : Iterable[TrainingCallback]
             The callbacks to use.
         """
         if callbacks is None:
             callbacks = []
         assert isinstance(callbacks, Iterable), "callbacks must be an Iterable."
-        assert all(isinstance(callback, Callback) for callback in callbacks), \
-            "All callbacks must be instances of Callback."
+        assert all(isinstance(callback, TrainingCallback) for callback in callbacks), (
+            "All callbacks must be instances of TrainingCallback."
+        )
 
         self.callbacks = list(callbacks)
         self.check_for_duplicate_callback_classes()
         self.check_for_duplicate_callback_names()
         self.sort()
 
-    def __getitem__(self, idx: int) -> Callback:
+    def __getitem__(self, idx: int) -> TrainingCallback:
         """
         Get a callback from the list.
 
@@ -57,13 +58,13 @@ class CallbackList:
         """
         return self.callbacks[idx]
 
-    def __iter__(self) -> Iterator[Callback]:
+    def __iter__(self) -> Iterator[TrainingCallback]:
         """
         Get an iterator over the callbacks.
 
         Returns
         -------
-        iterator : Iterator[Callback]
+        iterator : Iterator[TrainingCallback]
             An iterator over the callbacks.
         """
         return iter(self.callbacks)
@@ -79,7 +80,7 @@ class CallbackList:
         """
         return len(self.callbacks)
 
-    def append(self, callback: Callback):
+    def append(self, callback: TrainingCallback):
         """
         Append a callback to the list.
 
@@ -88,7 +89,7 @@ class CallbackList:
         callback : Callback
             The callback to append.
         """
-        assert isinstance(callback, Callback), "callback must be an instance of Callback"
+        assert isinstance(callback, TrainingCallback), "callback must be an instance of TrainingCallback"
         self.callbacks.append(callback)
         self.check_for_duplicate_callback_classes()
         self.check_for_duplicate_callback_names()
@@ -108,12 +109,14 @@ class CallbackList:
                     seen.append(type(callback))
 
         if duplicates:
-            raise AssertionError(f"Duplicates of 'Callback' with 'allow_duplicates' == False are not allowed in "
-                                 f"'CallbackList'. Found duplicates {duplicates}.")
+            raise AssertionError(
+                f"Duplicates of 'TrainingCallback' with 'allow_duplicates' == False are not allowed in "
+                f"'TrainingCallbackList'. Found duplicates {duplicates}."
+            )
 
     def check_for_duplicate_callback_names(self):
         """
-        Check if there is any duplicate callback names in the CallbackList.
+        Check if there is any duplicate callback names in the TrainingCallbackList.
         """
         seen, duplicates = [], []
 
@@ -124,10 +127,11 @@ class CallbackList:
                 seen.append(callback.name)
 
         if duplicates:
-            raise AssertionError(f"Duplicates callback names are not allowed in 'CallbackList'. Found duplicates "
-                                 f"{duplicates}.")
+            raise AssertionError(
+                f"Duplicates callback names are not allowed in 'TrainingCallbackList'. Found duplicates {duplicates}."
+            )
 
-    def remove(self, callback: Callback):
+    def remove(self, callback: TrainingCallback):
         """
         Remove a callback from the list.
 
@@ -136,7 +140,7 @@ class CallbackList:
         callback : Callback
             The callback to remove.
         """
-        assert isinstance(callback, Callback), "callback must be an instance of Callback"
+        assert isinstance(callback, TrainingCallback), "callback must be an instance of TrainingCallback"
         self.callbacks.remove(callback)
         self.sort()
 
@@ -158,102 +162,6 @@ class CallbackList:
             The state of the callback.
         """
         return {callback.name: callback.state_dict() for callback in self.callbacks}
-
-    def on_tuning_start(self, tuner, **kwargs):
-        """
-        Called when the tuning starts.
-
-        Parameters
-        ----------
-        tuner : Tuner
-            The tuner.
-        """
-        for callback in self.callbacks:
-            callback.on_tuning_start(tuner, **kwargs)
-
-    def on_tuning_end(self, tuner, **kwargs):
-        """
-        Called when the tuning ends.
-
-        Parameters
-        ----------
-        tuner : Tuner
-            The tuner.
-        """
-        for callback in self.callbacks:
-            callback.on_tuning_end(tuner, **kwargs)
-
-    def on_outer_loop_start(self, tuner, **kwargs):
-        """
-        Called when the outer loop starts.
-
-        Parameters
-        ----------
-        tuner : Tuner
-            The tuner.
-        """
-        for callback in self.callbacks:
-            callback.on_outer_loop_start(tuner, **kwargs)
-
-    def on_outer_loop_end(self, tuner, **kwargs):
-        """
-        Called when the outer loop ends.
-
-        Parameters
-        ----------
-        tuner : Tuner
-            The tuner.
-        """
-        for callback in self.callbacks:
-            callback.on_outer_loop_end(tuner, **kwargs)
-
-    def on_trial_start(self, objective, **kwargs):
-        """
-        Called when the trial starts.
-
-        Parameters
-        ----------
-        objective : Objective
-            The objective.
-        """
-        for callback in self.callbacks:
-            callback.on_trial_start(objective, **kwargs)
-
-    def on_trial_end(self, objective, **kwargs):
-        """
-        Called when the trial ends.
-
-        Parameters
-        ----------
-        objective : Objective
-            The objective.
-        """
-        for callback in self.callbacks:
-            callback.on_trial_end(objective, **kwargs)
-
-    def on_inner_loop_start(self, objective, **kwargs):
-        """
-        Called when the inner loop starts.
-
-        Parameters
-        ----------
-        objective : Objective
-            The objective.
-        """
-        for callback in self.callbacks:
-            callback.on_inner_loop_start(objective, **kwargs)
-
-    def on_inner_loop_end(self, objective, **kwargs):
-        """
-        Called when the inner loop ends.
-
-        Parameters
-        ----------
-        objective : Objective
-            The objective.
-        """
-        for callback in self.callbacks:
-            callback.on_inner_loop_end(objective, **kwargs)
 
     def on_fit_start(self, trainer, **kwargs):
         """

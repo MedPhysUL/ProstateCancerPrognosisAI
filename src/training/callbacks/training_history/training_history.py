@@ -19,11 +19,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
-from ..base import Callback, Priority
+from ..base import Priority, TrainingCallback
 from .containers import HistoryContainer, MeasurementsContainer
 
 
-class TrainingHistory(Callback):
+class TrainingHistory(TrainingCallback):
     """
     This class is used to store losses and score metrics values obtained during the training process.
     """
@@ -128,7 +128,7 @@ class TrainingHistory(Callback):
     @property
     def allow_duplicates(self) -> bool:
         """
-        Whether to allow duplicates of this specific Callback class in the 'CallbackList'.
+        Whether to allow duplicates of this specific Callback class in the 'TrainingCallbackList'.
 
         Returns
         -------

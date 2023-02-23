@@ -16,11 +16,11 @@ from typing import Any, Dict, Mapping, Optional, Union
 
 import torch
 
-from ..base import Callback, Priority
+from ..base import Priority, TrainingCallback
 from .state import CheckpointState
 
 
-class Checkpoint(Callback):
+class Checkpoint(TrainingCallback):
     """
     This class is used to manage and create the checkpoints of a model during the training process.
     """
@@ -31,7 +31,7 @@ class Checkpoint(Callback):
     CHECKPOINT_EPOCHS_KEY: str = "epochs"
     CHECKPOINT_METADATA_KEY: str = 'metadata'
 
-    TRAINING_HISTORY_FIGURE_NAME = "training_history.png"
+    TRAINING_HISTORY_FIGURES_FOLDER_NAME = "training_history_figures"
 
     def __init__(
             self,
@@ -94,7 +94,7 @@ class Checkpoint(Callback):
     @property
     def allow_duplicates(self) -> bool:
         """
-        Whether to allow duplicates of this specific Callback class in the 'CallbackList'.
+        Whether to allow duplicates of this specific Callback class in the 'TrainingCallbackList'.
 
         Returns
         -------
@@ -127,7 +127,7 @@ class Checkpoint(Callback):
         """
         return Priority.LOW_PRIORITY
 
-    def save(self, trainer) -> bool:
+    def save(self, trainer):
         """
         Saves the checkpoint if the current epoch is a checkpoint epoch.
 
@@ -135,11 +135,6 @@ class Checkpoint(Callback):
         ----------
         trainer : Trainer
             The trainer.
-
-        Returns
-        -------
-        saved : bool
-            Whether the checkpoint was saved.
         """
         self._save_checkpoint(
             epoch=trainer.epoch_state.idx,
@@ -148,13 +143,6 @@ class Checkpoint(Callback):
             model_state=trainer.model.state_dict(),
             callbacks_state=trainer.callbacks.state_dict()
         )
-
-        trainer.training_history.plot(
-            save_path=os.path.join(self.path_to_checkpoint_folder, self.TRAINING_HISTORY_FIGURE_NAME),
-            show=False
-        )
-
-        return True
 
     def _create_new_checkpoint_metadata(self, epoch: int) -> dict:
         """
@@ -328,3 +316,8 @@ class Checkpoint(Callback):
         """
         if trainer.epoch_state.idx < trainer.training_state.max_epochs:
             self.save(trainer)
+
+        trainer.training_history.plot(
+            path_to_save=os.path.join(self.path_to_checkpoint_folder, self.TRAINING_HISTORY_FIGURES_FOLDER_NAME),
+            show=False
+        )

@@ -19,9 +19,9 @@ from torch import cuda, no_grad
 from torch.utils.data import SubsetRandomSampler
 from tqdm.auto import tqdm
 
-from ..callbacks.base import Callback
-from ..callbacks.containers import CallbackList
-from ..callbacks import Checkpoint, LearningAlgorithm, TrainingHistory
+from .callbacks.base import TrainingCallback
+from .callbacks.containers import TrainingCallbackList
+from .callbacks import Checkpoint, LearningAlgorithm, TrainingHistory
 from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ..models.base.torch_model import TorchModel
 from .states import BatchState, BatchesState, EpochState, TrainingState
@@ -36,7 +36,7 @@ class Trainer:
     def __init__(
             self,
             model: TorchModel,
-            callbacks: Union[Callback, CallbackList, List[Callback]],
+            callbacks: Union[TrainingCallback, TrainingCallbackList, List[TrainingCallback]],
             device: Optional[torch_device] = None,
             verbose: bool = True,
             **kwargs
@@ -49,7 +49,7 @@ class Trainer:
         ----------
         model : TorchModel
             Model to train.
-        callbacks : Union[Callback, CallbackList, List[Callback]]
+        callbacks : Union[TrainingCallback, TrainingCallbackList, List[TrainingCallback]]
             Callbacks to use during training. Each callback will be called at different times during training. See the
             documentation of `Callback` for more information.
         device : Optional[torch_device]
@@ -77,7 +77,7 @@ class Trainer:
         self.y_transform = kwargs.get("y_transform", ToTensor())
 
     @property
-    def callbacks(self) -> CallbackList:
+    def callbacks(self) -> TrainingCallbackList:
         """
         Callbacks to use during the training process.
 
@@ -89,24 +89,26 @@ class Trainer:
         return self._callbacks
 
     @callbacks.setter
-    def callbacks(self, callbacks: Union[Callback, CallbackList, List[Callback]]):
+    def callbacks(self, callbacks: Union[TrainingCallback, TrainingCallbackList, List[TrainingCallback]]):
         """
         Sets the callbacks attribute as a CallbackList and sorts the callbacks in this list. Also, automatically sets
         the training_history, learning_algorithms and checkpoint trainer's attributes.
 
         Parameters
         ----------
-        callbacks : Union[Callback, CallbackList, List[Callback]]
+        callbacks : Union[TrainingCallback, TrainingCallbackList, List[TrainingCallback]]
             The callbacks to set the callbacks attribute to.
         """
-        if not isinstance(callbacks, (Callback, CallbackList, list)):
-            raise AssertionError("'callbacks must be of type 'Callback', 'CallbackList' or 'List[Callback]'.")
-        if isinstance(callbacks, Callback):
+        if not isinstance(callbacks, (TrainingCallback, TrainingCallbackList, list)):
+            raise AssertionError(
+                "'callbacks must be of type 'TrainingCallback', 'TrainingCallbackList' or 'List[TrainingCallback]'."
+            )
+        if isinstance(callbacks, TrainingCallback):
             callbacks = [callbacks]
         if not any([isinstance(callback, TrainingHistory) for callback in callbacks]):
             callbacks.append(TrainingHistory())
 
-        self._callbacks = CallbackList(callbacks)
+        self._callbacks = TrainingCallbackList(callbacks)
         self.sort_callbacks()
 
         self._set_training_history()
