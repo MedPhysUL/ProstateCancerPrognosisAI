@@ -114,8 +114,6 @@ class BatchesState(State):
                     vars(self)[k][name] = {}
                     for key, value in measurements.items():
                         vars(self)[k][name][key] = [to_numpy(value)]
-            else:
-                pass
 
     def append(self, batch_state: BatchState):
         """
@@ -131,8 +129,6 @@ class BatchesState(State):
                 for name, measurements in v.items():
                     for key, value in measurements.items():
                         vars(self)[k][name][key].append(to_numpy(value))
-            else:
-                pass
 
     def mean(self):
         """
@@ -143,8 +139,6 @@ class BatchesState(State):
             for name, measurements in v.items():
                 for key, value in measurements.items():
                     vars(self)[k][name][key] = np.nanmean(value)
-            else:
-                pass
 
 
 @dataclass
