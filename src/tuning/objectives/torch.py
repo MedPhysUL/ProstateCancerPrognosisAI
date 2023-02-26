@@ -1,6 +1,6 @@
 """
     @file:              torch.py
-    @Author:            Maxence Larose, Mehdi Mitiche, Nicolas Raymond
+    @Author:            Maxence Larose
 
     @Creation Date:     05/2022
     @Last modification: 02/2023
@@ -8,14 +8,14 @@
     @Description:       This file is used to define the `TorchObjective` class used for hyperparameters tuning.
 """
 
-from os import cpu_count
-from typing import Any, Callable, Dict, List
+from os import cpu_count, path
+from typing import Any, Callable, Dict
 
 import ray
 
-from .base import Objective
-from ...data.datasets import ProstateCancerDataset
+from .base import Objective, ScoreContainer
 from ..hyperparameters import HyperparameterDict, HyperparameterObject
+from ...training import Trainer
 
 
 class TorchObjective(Objective):
@@ -28,8 +28,6 @@ class TorchObjective(Objective):
 
     def __init__(
             self,
-            dataset: ProstateCancerDataset,
-            masks: Dict[int, Dict[str, List[int]]],
             trainer_constructor_hps: HyperparameterObject,
             train_method_hps: HyperparameterDict,
             num_cpus: int = cpu_count(),
@@ -40,10 +38,6 @@ class TorchObjective(Objective):
 
         Parameters
         ----------
-        dataset : ProstateCancerDataset
-            Custom dataset containing all the data needed for our evaluations.
-        masks : Dict[int, Dict[str, List[int]]]
-            Dict with list of idx to use as train, valid and test masks.
         trainer_constructor_hps : HyperparameterObject
             Trainer constructor hyperparameters.
         train_method_hps : HyperparameterDict
@@ -57,12 +51,7 @@ class TorchObjective(Objective):
             The quantity of GPUs to reserve for the tuning task. This parameter does not affect the device used for
             training the model during each trial.
         """
-        super().__init__(
-            dataset=dataset,
-            masks=masks,
-            num_cpus=num_cpus,
-            num_gpus=num_gpus
-        )
+        super().__init__(num_cpus=num_cpus, num_gpus=num_gpus)
 
         self._hyperparameters = HyperparameterDict(
             {
@@ -83,56 +72,76 @@ class TorchObjective(Objective):
         """
         return self._hyperparameters
 
-    def _build_trial_runner(self) -> Callable:
+    def _build_inner_loop_runner(self) -> Callable:
         """
         Builds the function run in parallel for each set of hyperparameters and return the score.
 
         Returns
         -------
-        run_function : Callable
+        run_inner_loop : Callable
             Function that train a single model using given masks and trial.
         """
 
-        @ray.remote(num_cpus=self._num_cpus, num_gpus=self._num_gpus)
-        def run_trial(
-                masks: Dict[str, List[int]],
+        @ray.remote(num_cpus=self.num_cpus, num_gpus=self.num_gpus)
+        def run_inner_loop(
                 hyperparameters: Dict[str, Any]
-        ) -> List[float]:
+        ) -> ScoreContainer:
             """
             Trains a single model using given masks and hyperparameters.
 
             Parameters
             ----------
-            masks : Dict[str, List[int]]
-                Dictionary with list of integers for train, valid and test mask.
             hyperparameters : Dict[str, Any]
                 Suggested hyperparameters for this trial.
 
             Returns
             -------
-            scores : List[float]
-                List of score values.
+            score : ScoreContainer
+                Score values.
             """
+            self.inner_loop_state.callbacks.on_inner_loop_start(self)
+
             # We retrieve the trainer instance and the train method parameters from the suggested hyperparameters
             trainer_instance = hyperparameters[self.TRAINER_INSTANCE_KEY]
             train_method_params = hyperparameters[self.TRAIN_METHOD_PARAMS_KEY]
 
-            # We create a copy of the current dataset and update its masks
-            subset = self._get_subset(masks=masks)
-            train_method_params[self.DATASET_KEY] = subset
+            # We prepare the trainer instance
+            self.set_checkpoint_path(trainer_instance)
+
+            # We prepare the train method parameters
+            dataset = self.inner_loop_state.dataset
+            train_method_params[self.DATASET_KEY] = dataset
 
             # We train the model using the suggested hyperparameters
             trainer_instance.train(**train_method_params)
 
             # We find the optimal threshold for each classification tasks
-            trainer_instance.model.fix_thresholds_to_optimal_values(subset)
+            trainer_instance.model.fix_thresholds_to_optimal_values(dataset)
 
-            # We calculate the scores on the different tasks
-            test_set_scores = trainer_instance.model.scores_dataset(dataset=subset, mask=subset.test_mask)
+            # We calculate the scores on the different tasks on the different sets
+            train_set_scores = trainer_instance.model.scores_dataset(dataset, dataset.train_mask)
+            valid_set_scores = trainer_instance.model.scores_dataset(dataset, dataset.valid_mask)
+            test_set_scores = trainer_instance.model.scores_dataset(dataset, dataset.test_mask)
+            score = ScoreContainer(train=train_set_scores, valid=valid_set_scores, test=test_set_scores)
 
-            # We retrieve the score associated to the tuning metric
-            scores = [test_set_scores[task.name][task.hps_tuning_metric.name] for task in subset.tasks]
+            self.inner_loop_state.score = score
+            self.inner_loop_state.callbacks.on_inner_loop_end(self)
 
-            return scores
+            return score
 
-        return run_trial
+        return run_inner_loop
+
+    def set_checkpoint_path(self, trainer: Trainer):
+        """
+        Sets checkpoint path.
+
+        Parameters
+        ----------
+        trainer : Trainer
+            Trainer.
+        """
+        if trainer.checkpoint:
+            trainer.checkpoint.path_to_checkpoint_folder = path.join(
+                self.inner_loop_state.path_to_inner_loop_folder,
+                path.basename(trainer.checkpoint.path_to_checkpoint_folder)
+            )
