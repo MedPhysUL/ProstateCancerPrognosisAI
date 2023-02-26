@@ -74,12 +74,7 @@ class TrialState:
             Trial history container.
         """
         history = HistoryContainer()
-
-        for score_idx, score in enumerate(self.scores):
-            if score_idx == 0:
-                history.init(score)
-            else:
-                history.append(score)
+        history.build(self.scores)
 
         return history
 
@@ -94,6 +89,6 @@ class TrialState:
             Statistics container.
         """
         statistics = StatisticsContainer()
-        statistics.set_from_history(self.history)
+        statistics.build(self.history)
 
         return statistics
