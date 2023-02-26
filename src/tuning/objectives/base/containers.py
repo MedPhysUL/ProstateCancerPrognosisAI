@@ -33,7 +33,6 @@ class ScoreContainer:
     test: Dict[str, Dict[str, float]] = field(default_factory=dict)
 
 
-@dataclass
 class HistoryContainer:
     """
     This class is used to store scores' history.
@@ -51,7 +50,22 @@ class HistoryContainer:
     valid: Dict[str, Dict[str, List[float]]] = field(default_factory=dict)
     test: Dict[str, Dict[str, List[float]]] = field(default_factory=dict)
 
-    def init(self, score: ScoreContainer):
+    def build(self, scores: List[ScoreContainer]):
+        """
+        Builds history container from list of score.
+
+        Parameters
+        ----------
+        scores : List[ScoreContainer]
+            A list of score container.
+        """
+        for score_idx, score in enumerate(scores):
+            if score_idx == 0:
+                self._init(score)
+            else:
+                self._append(score)
+
+    def _init(self, score: ScoreContainer):
         """
         Initializes history using a single score.
 
@@ -68,7 +82,7 @@ class HistoryContainer:
                     for metric_name, value in metrics.items():
                         vars(self)[k][task_name][metric_name] = [value]
 
-    def append(self, score: ScoreContainer):
+    def _append(self, score: ScoreContainer):
         """
         Appends a single score to the history.
 
@@ -118,9 +132,9 @@ class StatisticsContainer:
     valid: Dict[str, Dict[str, ScoreStatisticsContainer]] = field(default_factory=dict)
     test: Dict[str, Dict[str, ScoreStatisticsContainer]] = field(default_factory=dict)
 
-    def set_from_history(self, history: HistoryContainer):
+    def build(self, history: HistoryContainer):
         """
-        Sets statistics from history.
+        Builds statistics container from history.
 
         Parameters
         ----------
