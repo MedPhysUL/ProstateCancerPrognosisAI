@@ -8,7 +8,7 @@
     @Description:       This file is used to define the `FloatHyperparameter` object.
 """
 
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from optuna.trial import Trial
 
@@ -69,3 +69,22 @@ class FloatHyperparameter(Hyperparameter):
             Optuna's current suggestion for this hyperparameter.
         """
         return trial.suggest_float(name=self.name, low=self.low, high=self.high, step=self.step, log=self.log)
+
+    def get_fixed_value(
+            self,
+            parameters: Dict[str, Any]
+    ) -> Any:
+        """
+        Gets the value of the hyperparameter using the given parameters dictionary.
+
+        Parameters
+        ----------
+        parameters : Dict[str, Any]
+            A dictionary containing hyperparameters' values.
+
+        Returns
+        -------
+        fixed_value : Any
+            The fixed value of the hyperparameter.
+        """
+        return parameters[self.name]

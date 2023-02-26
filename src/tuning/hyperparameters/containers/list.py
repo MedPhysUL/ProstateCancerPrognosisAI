@@ -8,7 +8,7 @@
     @Description:       This file is used to define the `HyperparameterList` object.
 """
 
-from typing import Any, List, Union
+from typing import Any, Dict, List, Union
 
 from optuna.trial import Trial
 
@@ -52,3 +52,23 @@ class HyperparameterList(HyperparameterContainer):
             Optuna's current suggestions for all hyperparameters in the list.
         """
         return [hp.get_suggestion(trial) for hp in self._sequence]
+
+    def get_fixed_value(
+            self,
+            parameters: Dict[str, Any]
+    ) -> List[Any]:
+        """
+        Gets the value of the hyperparameter container using the given parameters dictionary.
+
+        Parameters
+        ----------
+        parameters : Dict[str, Any]
+            A dictionary containing hyperparameters' values.
+
+        Returns
+        -------
+        fixed_value : Any
+            The fixed value of the hyperparameter container.
+        """
+        self.verify_params_keys(parameters)
+        return [hp.get_fixed_value(parameters) for hp in self._sequence]

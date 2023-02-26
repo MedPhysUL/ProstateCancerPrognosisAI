@@ -12,7 +12,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Sequence, Union
 
-from optuna.trial import FrozenTrial, Trial
+from optuna.trial import Trial
 
 from ..base import Hyperparameter
 from ..fixed import FixedHyperparameter
@@ -126,3 +126,39 @@ class HyperparameterContainer(ABC):
             Optuna's current suggestion for the hyperparameters.
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def get_fixed_value(
+            self,
+            parameters: Dict[str, Any]
+    ) -> Any:
+        """
+        Gets the value of the hyperparameter container using the given parameters dictionary.
+
+        Parameters
+        ----------
+        parameters : Dict[str, Any]
+            A dictionary containing hyperparameters' values.
+
+        Returns
+        -------
+        fixed_value : Any
+            The fixed value of the hyperparameter container.
+        """
+        raise NotImplementedError
+
+    def verify_params_keys(
+            self,
+            parameters: Dict[str, Any]
+    ):
+        """
+        Verify that the params dictionary sets all tunable hyperparameters.
+
+        Parameters
+        ----------
+        parameters : Dict[str, Any]
+            Parameters dictionary.
+        """
+        assert all(hp.name in parameters.keys for hp in self.tunable_hyperparameters), (
+            f"'params' must set all hyperparameter values of the current container."
+        )

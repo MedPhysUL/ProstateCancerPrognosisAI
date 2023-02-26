@@ -53,3 +53,23 @@ class HyperparameterDict(HyperparameterContainer):
             Optuna's current suggestions for all hyperparameters in the dict.
         """
         return {name: hp.get_suggestion(trial) for name, hp in self._container.items()}
+
+    def get_fixed_value(
+            self,
+            parameters: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Gets the value of the hyperparameter container using the given parameters dictionary.
+
+        Parameters
+        ----------
+        parameters : Dict[str, Any]
+            A dictionary containing hyperparameters' values.
+
+        Returns
+        -------
+        fixed_value : Any
+            The fixed value of the hyperparameter container.
+        """
+        self.verify_params_keys(parameters)
+        return {name: hp.get_fixed_value(parameters) for name, hp in self._container.items()}

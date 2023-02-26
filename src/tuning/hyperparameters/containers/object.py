@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 from copy import deepcopy
-from typing import Callable, Dict, Union
+from typing import Any, Callable, Dict, Union
 
 from optuna.trial import Trial
 
@@ -63,3 +63,26 @@ class HyperparameterObject(HyperparameterContainer):
         self_copy = deepcopy(self)
         params = {name: hp.get_suggestion(trial) for name, hp in self_copy._parameters.items()}
         return self_copy._constructor(**params)
+
+    def get_fixed_value(
+            self,
+            parameters: Dict[str, Any]
+    ) -> object:
+        """
+        Gets the value of the hyperparameter container using the given parameters dictionary.
+
+        Parameters
+        ----------
+        parameters : Dict[str, Any]
+            A dictionary containing hyperparameters' values.
+
+        Returns
+        -------
+        fixed_value : Any
+            The fixed value of the hyperparameter container.
+        """
+        self.verify_params_keys(parameters)
+
+        self_copy = deepcopy(self)
+        constructor_params = {name: hp.get_fixed_value(parameters) for name, hp in self_copy._parameters.items()}
+        return self_copy._constructor(**constructor_params)

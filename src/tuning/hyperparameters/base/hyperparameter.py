@@ -9,7 +9,7 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Dict
 
 from optuna.trial import Trial
 
@@ -50,5 +50,25 @@ class Hyperparameter(ABC):
         -------
         suggestion : Any
             Optuna's current suggestion for this hyperparameter.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_fixed_value(
+            self,
+            parameters: Dict[str, Any]
+    ) -> Any:
+        """
+        Gets the value of the hyperparameter using the given parameters dictionary.
+
+        Parameters
+        ----------
+        parameters : Dict[str, Any]
+            A dictionary containing hyperparameters' values.
+
+        Returns
+        -------
+        fixed_value : Any
+            The fixed value of the hyperparameter.
         """
         raise NotImplementedError

@@ -8,7 +8,7 @@
     @Description:       This file is used to define the `FixedHyperparameter` object.
 """
 
-from typing import Any
+from typing import Any, Dict
 
 from optuna.trial import Trial
 
@@ -54,5 +54,24 @@ class FixedHyperparameter(Hyperparameter):
         -------
         suggestion : Any
             Fixed value of this hyperparameter.
+        """
+        return self.value
+
+    def get_fixed_value(
+            self,
+            parameters: Dict[str, Any]
+    ) -> Any:
+        """
+        Gets the value of the hyperparameter using the given parameters dictionary.
+
+        Parameters
+        ----------
+        parameters : Dict[str, Any]
+            A dictionary containing hyperparameters' values.
+
+        Returns
+        -------
+        fixed_value : Any
+            The fixed value of the hyperparameter.
         """
         return self.value
