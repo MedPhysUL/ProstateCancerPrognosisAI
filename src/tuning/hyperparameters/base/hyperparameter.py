@@ -9,9 +9,9 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any
 
-from optuna.trial import Trial
+from optuna.trial import FrozenTrial, Trial
 
 
 class Hyperparameter(ABC):
@@ -56,15 +56,15 @@ class Hyperparameter(ABC):
     @abstractmethod
     def retrieve_suggestion(
             self,
-            parameters: Dict[str, Any]
+            trial: FrozenTrial
     ) -> Any:
         """
         Gets the value of the hyperparameter using the given parameters dictionary.
 
         Parameters
         ----------
-        parameters : Dict[str, Any]
-            A dictionary containing hyperparameters' values.
+        trial : FrozenTrial
+            Optuna's hyperparameter optimization frozen trial.
 
         Returns
         -------

@@ -10,7 +10,7 @@
 
 from typing import Any, Dict, Union
 
-from optuna.trial import Trial
+from optuna.trial import FrozenTrial, Trial
 
 from .base import Hyperparameter, HyperparameterContainer
 
@@ -56,20 +56,20 @@ class HyperparameterDict(HyperparameterContainer):
 
     def retrieve_suggestion(
             self,
-            parameters: Dict[str, Any]
+            trial: FrozenTrial
     ) -> Dict[str, Any]:
         """
-        Gets the value of the hyperparameter container using the given parameters dictionary.
+        Gets the value of the hyperparameter using the given parameters dictionary.
 
         Parameters
         ----------
-        parameters : Dict[str, Any]
-            A dictionary containing hyperparameters' values.
+        trial : FrozenTrial
+            Optuna's hyperparameter optimization frozen trial.
 
         Returns
         -------
-        fixed_value : Any
-            The fixed value of the hyperparameter container.
+        fixed_value : Dict[str, Any]
+            The fixed value of the hyperparameter.
         """
-        self.verify_params_keys(parameters)
-        return {name: hp.retrieve_suggestion(parameters) for name, hp in self._container.items()}
+        self.verify_params_keys(trial)
+        return {name: hp.retrieve_suggestion(trial) for name, hp in self._container.items()}

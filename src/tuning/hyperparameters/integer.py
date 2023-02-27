@@ -8,9 +8,7 @@
     @Description:       This file is used to define the `IntegerHyperparameter` object.
 """
 
-from typing import Any, Dict
-
-from optuna.trial import Trial
+from optuna.trial import FrozenTrial, Trial
 
 from .base import Hyperparameter
 
@@ -72,19 +70,19 @@ class IntegerHyperparameter(Hyperparameter):
 
     def retrieve_suggestion(
             self,
-            parameters: Dict[str, Any]
-    ) -> Any:
+            trial: FrozenTrial
+    ) -> int:
         """
         Gets the value of the hyperparameter using the given parameters dictionary.
 
         Parameters
         ----------
-        parameters : Dict[str, Any]
-            A dictionary containing hyperparameters' values.
+        trial : FrozenTrial
+            Optuna's hyperparameter optimization frozen trial.
 
         Returns
         -------
-        fixed_value : Any
+        fixed_value : int
             The fixed value of the hyperparameter.
         """
-        return parameters[self.name]
+        return trial.params[self.name]

@@ -10,9 +10,9 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Sequence, Union
+from typing import Any, List, Sequence, Union
 
-from optuna.trial import Trial
+from optuna.trial import FrozenTrial, Trial
 
 from ..base import Hyperparameter
 from ..fixed import FixedHyperparameter
@@ -130,35 +130,35 @@ class HyperparameterContainer(ABC):
     @abstractmethod
     def retrieve_suggestion(
             self,
-            parameters: Dict[str, Any]
+            trial: FrozenTrial
     ) -> Any:
         """
-        Gets the value of the hyperparameter container using the given parameters dictionary.
+        Gets the value of the hyperparameter using the given parameters dictionary.
 
         Parameters
         ----------
-        parameters : Dict[str, Any]
-            A dictionary containing hyperparameters' values.
+        trial : FrozenTrial
+            Optuna's hyperparameter optimization frozen trial.
 
         Returns
         -------
         fixed_value : Any
-            The fixed value of the hyperparameter container.
+            The fixed value of the hyperparameter.
         """
         raise NotImplementedError
 
     def verify_params_keys(
             self,
-            parameters: Dict[str, Any]
+            trial: FrozenTrial
     ):
         """
         Verify that the params dictionary sets all tunable hyperparameters.
 
         Parameters
         ----------
-        parameters : Dict[str, Any]
-            Parameters dictionary.
+        trial : FrozenTrial
+            Optuna's hyperparameter optimization frozen trial.
         """
-        assert all(hp.name in parameters.keys for hp in self.tunable_hyperparameters), (
+        assert all(hp.name in trial.params.keys for hp in self.tunable_hyperparameters), (
             f"'params' must set all hyperparameter values of the current container."
         )

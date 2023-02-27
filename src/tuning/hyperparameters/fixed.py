@@ -8,9 +8,9 @@
     @Description:       This file is used to define the `FixedHyperparameter` object.
 """
 
-from typing import Any, Dict
+from typing import Any
 
-from optuna.trial import Trial
+from optuna.trial import FrozenTrial, Trial
 
 from .base import Hyperparameter
 
@@ -59,15 +59,15 @@ class FixedHyperparameter(Hyperparameter):
 
     def retrieve_suggestion(
             self,
-            parameters: Dict[str, Any]
+            trial: FrozenTrial
     ) -> Any:
         """
         Gets the value of the hyperparameter using the given parameters dictionary.
 
         Parameters
         ----------
-        parameters : Dict[str, Any]
-            A dictionary containing hyperparameters' values.
+        trial : FrozenTrial
+            Optuna's hyperparameter optimization frozen trial.
 
         Returns
         -------

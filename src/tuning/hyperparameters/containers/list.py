@@ -8,9 +8,9 @@
     @Description:       This file is used to define the `HyperparameterList` object.
 """
 
-from typing import Any, Dict, List, Union
+from typing import Any, List, Union
 
-from optuna.trial import Trial
+from optuna.trial import FrozenTrial, Trial
 
 from .base import Hyperparameter, HyperparameterContainer
 
@@ -55,20 +55,20 @@ class HyperparameterList(HyperparameterContainer):
 
     def retrieve_suggestion(
             self,
-            parameters: Dict[str, Any]
+            trial: FrozenTrial
     ) -> List[Any]:
         """
-        Gets the value of the hyperparameter container using the given parameters dictionary.
+        Gets the value of the hyperparameter using the given parameters dictionary.
 
         Parameters
         ----------
-        parameters : Dict[str, Any]
-            A dictionary containing hyperparameters' values.
+        trial : FrozenTrial
+            Optuna's hyperparameter optimization frozen trial.
 
         Returns
         -------
-        fixed_value : Any
-            The fixed value of the hyperparameter container.
+        fixed_value : List[Any]
+            The fixed value of the hyperparameter.
         """
-        self.verify_params_keys(parameters)
-        return [hp.retrieve_suggestion(parameters) for hp in self._sequence]
+        self.verify_params_keys(trial)
+        return [hp.retrieve_suggestion(trial) for hp in self._sequence]

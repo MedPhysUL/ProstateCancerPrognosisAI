@@ -8,9 +8,9 @@
     @Description:       This file is used to define the `FloatHyperparameter` object.
 """
 
-from typing import Any, Dict, Optional
+from typing import Optional
 
-from optuna.trial import Trial
+from optuna.trial import FrozenTrial, Trial
 
 from .base import Hyperparameter
 
@@ -72,19 +72,19 @@ class FloatHyperparameter(Hyperparameter):
 
     def retrieve_suggestion(
             self,
-            parameters: Dict[str, Any]
-    ) -> Any:
+            trial: FrozenTrial
+    ) -> float:
         """
         Gets the value of the hyperparameter using the given parameters dictionary.
 
         Parameters
         ----------
-        parameters : Dict[str, Any]
-            A dictionary containing hyperparameters' values.
+        trial : FrozenTrial
+            Optuna's hyperparameter optimization frozen trial.
 
         Returns
         -------
-        fixed_value : Any
+        fixed_value : float
             The fixed value of the hyperparameter.
         """
-        return parameters[self.name]
+        return trial.params[self.name]

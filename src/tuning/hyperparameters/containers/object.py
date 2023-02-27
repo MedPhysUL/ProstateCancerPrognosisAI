@@ -10,9 +10,9 @@
 
 from __future__ import annotations
 from copy import deepcopy
-from typing import Any, Callable, Dict, Union
+from typing import Callable, Dict, Union
 
-from optuna.trial import Trial
+from optuna.trial import FrozenTrial, Trial
 
 from .base import Hyperparameter, HyperparameterContainer
 
@@ -66,23 +66,23 @@ class HyperparameterObject(HyperparameterContainer):
 
     def retrieve_suggestion(
             self,
-            parameters: Dict[str, Any]
+            trial: FrozenTrial
     ) -> object:
         """
-        Gets the value of the hyperparameter container using the given parameters dictionary.
+        Gets the value of the hyperparameter using the given parameters dictionary.
 
         Parameters
         ----------
-        parameters : Dict[str, Any]
-            A dictionary containing hyperparameters' values.
+        trial : FrozenTrial
+            Optuna's hyperparameter optimization frozen trial.
 
         Returns
         -------
-        fixed_value : Any
-            The fixed value of the hyperparameter container.
+        fixed_value : object
+            The fixed value of the hyperparameter.
         """
-        self.verify_params_keys(parameters)
+        self.verify_params_keys(trial)
 
         self_copy = deepcopy(self)
-        constructor_params = {name: hp.retrieve_suggestion(parameters) for name, hp in self_copy._parameters.items()}
+        constructor_params = {name: hp.retrieve_suggestion(trial) for name, hp in self_copy._parameters.items()}
         return self_copy._constructor(**constructor_params)

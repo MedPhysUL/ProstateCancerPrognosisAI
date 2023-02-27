@@ -8,9 +8,9 @@
     @Description:       This file is used to define the `CategoricalHyperparameter` object.
 """
 
-from typing import Any, Dict, Sequence
+from typing import Any, Sequence
 
-from optuna.trial import Trial
+from optuna.trial import FrozenTrial, Trial
 
 from .base import Hyperparameter
 
@@ -59,19 +59,19 @@ class CategoricalHyperparameter(Hyperparameter):
 
     def retrieve_suggestion(
             self,
-            parameters: Dict[str, Any]
+            trial: FrozenTrial
     ) -> Any:
         """
         Gets the value of the hyperparameter using the given parameters dictionary.
 
         Parameters
         ----------
-        parameters : Dict[str, Any]
-            A dictionary containing hyperparameters' values.
+        trial : FrozenTrial
+            Optuna's hyperparameter optimization frozen trial.
 
         Returns
         -------
         fixed_value : Any
             The fixed value of the hyperparameter.
         """
-        return parameters[self.name]
+        return trial.params[self.name]
