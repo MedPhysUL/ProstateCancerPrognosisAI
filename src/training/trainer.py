@@ -35,9 +35,11 @@ class Trainer:
 
     def __init__(
             self,
-            model: TorchModel,
             callbacks: Union[TrainingCallback, TrainingCallbackList, List[TrainingCallback]],
+            batch_size: int = 8,
             device: Optional[torch_device] = None,
+            exec_metrics_on_train: bool = True,
+            max_epochs: int = 100,
             verbose: bool = True,
             **kwargs
     ):
@@ -47,13 +49,18 @@ class Trainer:
 
         Parameters
         ----------
-        model : TorchModel
-            Model to train.
         callbacks : Union[TrainingCallback, TrainingCallbackList, List[TrainingCallback]]
             Callbacks to use during training. Each callback will be called at different times during training. See the
             documentation of `TrainingCallback` for more information.
+        batch_size : int
+            Size of the batches in the training loader. Default is 8.
         device : Optional[torch_device]
             Device to use for the training process. Default is the device of the model.
+        exec_metrics_on_train : bool
+            Whether to compute metrics on the training set. This is useful when you want to save time by not computing
+            the metrics on the training set. Default is True.
+        max_epochs : int
+            Maximum number of epochs for training. Default is 100.
         verbose : bool
             Whether to print out the trace of the trainer.
         **kwargs : dict
@@ -62,16 +69,18 @@ class Trainer:
             y_transform : Module
                 Transform to apply to the target data before passing it to the model.
         """
-        self.model = model
-
         self.callbacks = callbacks
-        self.device = device if device else model.device
+
+        self.batch_size = batch_size
+        self.device = device
+        self.exec_metrics_on_train = exec_metrics_on_train
+        self.model = None
         self.verbose = verbose
 
         self.batch_state = BatchState()
         self.batches_state = BatchesState()
         self.epoch_state = EpochState()
-        self.training_state = TrainingState()
+        self.training_state = TrainingState(max_epochs=max_epochs)
 
         self.x_transform = kwargs.get("x_transform", ToTensor())
         self.y_transform = kwargs.get("y_transform", ToTensor())
@@ -269,10 +278,8 @@ class Trainer:
 
     def train(
             self,
+            model: TorchModel,
             dataset: ProstateCancerDataset,
-            batch_size: int = 8,
-            exec_metrics_on_train: bool = True,
-            max_epochs: int = 100,
             p_bar_position: Optional[int] = None,
             p_bar_leave: Optional[bool] = None,
             **kwargs
@@ -282,15 +289,10 @@ class Trainer:
 
         Parameters
         ----------
+        model : TorchModel
+            Model to train.
         dataset : ProstateCancerDataset
             Prostate cancer dataset used to feed the dataloaders.
-        batch_size : int
-            Size of the batches in the training loader. Default is 8.
-        exec_metrics_on_train : bool
-            Whether to compute metrics on the training set. This is useful when you want to save time by not computing
-            the metrics on the training set. Default is True.
-        max_epochs : int
-            Maximum number of epochs for training. Default is 100.
         p_bar_position : Optional[int]
             The position of the progress bar. See https://tqdm.github.io documentation for more information.
         p_bar_leave :  Optional[bool]
@@ -303,12 +305,13 @@ class Trainer:
         training_history : TrainingHistory
             The training history.
         """
-        self.model.build(dataset=dataset)
+        model.build(dataset=dataset)
+        self.model = model
+        self.device = self.device if self.device else model.device
 
-        train_dataloader = self._create_train_dataloader(dataset=dataset, batch_size=batch_size)
+        train_dataloader = self._create_train_dataloader(dataset=dataset, batch_size=self.batch_size)
         valid_dataloader = self._create_valid_dataloader(dataset=dataset)
 
-        self.training_state.max_epochs = max_epochs
         self.training_state.train_dataloader = train_dataloader
         self.training_state.valid_dataloader = valid_dataloader
         self.training_state.tasks = dataset.tasks
@@ -336,9 +339,9 @@ class Trainer:
 
             self._exec_epoch(self.training_state.train_dataloader, self.training_state.valid_dataloader)
 
-            if exec_metrics_on_train or valid_dataloader:
+            if self.exec_metrics_on_train or valid_dataloader:
                 self.model.fix_thresholds_to_optimal_values(dataset)
-            if exec_metrics_on_train:
+            if self.exec_metrics_on_train:
                 self._exec_metrics(dataset=dataset, training=True)
             if valid_dataloader is not None:
                 self._exec_metrics(dataset=dataset, training=False)
