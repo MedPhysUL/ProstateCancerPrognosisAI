@@ -140,7 +140,7 @@ class TableDataset(Dataset):
             A data element.
         """
         x = dict((col, self.x[idx, i]) for i, col in enumerate(self.features_cols))
-        y = dict((col, self.y[idx, i]) for i, col in enumerate(self.target_cols))
+        y = dict((task.name, self.y[idx, i]) for i, task in enumerate(self.tasks))
 
         return TableDataModel(x=x, y=y)
 
