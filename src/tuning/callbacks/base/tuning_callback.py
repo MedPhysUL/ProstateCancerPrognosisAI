@@ -163,25 +163,25 @@ class TuningCallback(ABC):
         """
         pass
 
-    def on_best_model_evaluation_start(self, objective, **kwargs):
+    def on_best_model_evaluation_start(self, tuner, **kwargs):
         """
         Called when the model model evaluation starts.
 
         Parameters
         ----------
-        objective : Objective
-            Objective.
+        tuner : Tuner
+            Tuner.
         """
         pass
 
-    def on_best_model_evaluation_end(self, objective, **kwargs):
+    def on_best_model_evaluation_end(self, tuner, **kwargs):
         """
         Called when the model model evaluation ends.
 
         Parameters
         ----------
-        objective : Objective
-            Objective.
+        tuner : Tuner
+            Tuner.
         """
         pass
 
