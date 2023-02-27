@@ -17,8 +17,7 @@ from torch import manual_seed
 
 from .callbacks.base import TuningCallback
 from .callbacks.containers import TuningCallbackList
-from ..data.datasets import ProstateCancerDataset
-from ..data.processing.sampling import Mask
+from ..data.datasets import Mask, ProstateCancerDataset
 from .search_algorithm import Objective, SearchAlgorithm
 from .states import BestModelState, OuterLoopState, StudyState, TuningState
 

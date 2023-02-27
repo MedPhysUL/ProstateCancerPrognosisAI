@@ -10,7 +10,6 @@
 """
 
 from copy import deepcopy
-from enum import auto, StrEnum
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
@@ -19,17 +18,7 @@ from sklearn.model_selection import train_test_split
 from torch import Tensor
 from tqdm import tqdm
 
-from ..datasets.table import TableDataset
-
-
-class Mask(StrEnum):
-    """
-    Stores the constant related to mask categories.
-    """
-    TRAIN = auto()
-    VALID = auto()
-    TEST = auto()
-    INNER = auto()
+from ..datasets import Mask, TableDataset
 
 
 class Sampler:

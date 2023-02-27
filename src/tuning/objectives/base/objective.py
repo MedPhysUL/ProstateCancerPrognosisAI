@@ -17,8 +17,7 @@ import ray
 
 from ...callbacks.containers import TuningCallbackList
 from .containers import ModelEvaluationContainer, ScoreContainer
-from ....data.datasets import ProstateCancerDataset
-from ....data.processing.sampling import Mask
+from ....data.datasets import Mask, ProstateCancerDataset
 from ...hyperparameters import HyperparameterDict
 from .states import InnerLoopState, TrialState
 
