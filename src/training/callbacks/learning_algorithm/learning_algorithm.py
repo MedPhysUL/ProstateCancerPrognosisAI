@@ -330,8 +330,9 @@ class LearningAlgorithm(TrainingCallback):
         if self.lr_scheduler:
             self.lr_scheduler.step()
 
-        early_stop = self.early_stopper(trainer.epoch_state)
+        if self.early_stopper:
+            early_stop = self.early_stopper(trainer.epoch_state)
 
-        if early_stop:
-            self.stopped = True
-            self.early_stopper.print_early_stopping_message(trainer.epoch_state)
+            if early_stop:
+                self.stopped = True
+                self.early_stopper.print_early_stopping_message(trainer.epoch_state)
