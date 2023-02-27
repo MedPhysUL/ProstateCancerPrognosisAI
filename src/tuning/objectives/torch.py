@@ -9,11 +9,10 @@
 """
 
 from os import cpu_count, path
-from typing import Any, Callable, Dict
-
-import ray
+from typing import Any, Dict
 
 from .base import Objective, ScoreContainer
+from ...data.datasets import ProstateCancerDataset
 from ..hyperparameters import HyperparameterDict, HyperparameterObject
 from ...training import Trainer
 
@@ -72,76 +71,65 @@ class TorchObjective(Objective):
         """
         return self._hyperparameters
 
-    def _build_inner_loop_runner(self) -> Callable:
+    def _test_hyperparameters(
+            self,
+            dataset: ProstateCancerDataset,
+            hyperparameters: Dict[str, Any],
+            path_to_save: str
+    ) -> ScoreContainer:
         """
-        Builds the function run in parallel for each set of hyperparameters and return the score.
+        Tests hyperparameters and returns the train, valid and test scores.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            The dataset used for the current trial.
+        hyperparameters : Dict[str, Any]
+            Suggested hyperparameters for this trial.
+        path_to_save : str
+            Path to the directory to save the current scores.
 
         Returns
         -------
-        run_inner_loop : Callable
-            Function that train a single model using given masks and trial.
+        score : ScoreContainer
+            Score values.
         """
+        # We retrieve the trainer instance and the train method parameters from the suggested hyperparameters
+        trainer_instance = hyperparameters[self.TRAINER_INSTANCE_KEY]
+        train_method_params = hyperparameters[self.TRAIN_METHOD_PARAMS_KEY]
 
-        @ray.remote(num_cpus=self.num_cpus, num_gpus=self.num_gpus)
-        def run_inner_loop(
-                hyperparameters: Dict[str, Any]
-        ) -> ScoreContainer:
-            """
-            Trains a single model using given masks and hyperparameters.
+        # We prepare the trainer instance
+        self._set_checkpoint_path(path_to_save, trainer_instance)
+        train_method_params[self.DATASET_KEY] = dataset
 
-            Parameters
-            ----------
-            hyperparameters : Dict[str, Any]
-                Suggested hyperparameters for this trial.
+        # We train the model using the suggested hyperparameters
+        trainer_instance.train(**train_method_params)
 
-            Returns
-            -------
-            score : ScoreContainer
-                Score values.
-            """
-            self.inner_loop_state.callbacks.on_inner_loop_start(self)
+        # We find the optimal threshold for each classification tasks
+        trainer_instance.model.fix_thresholds_to_optimal_values(dataset)
 
-            # We retrieve the trainer instance and the train method parameters from the suggested hyperparameters
-            trainer_instance = hyperparameters[self.TRAINER_INSTANCE_KEY]
-            train_method_params = hyperparameters[self.TRAIN_METHOD_PARAMS_KEY]
+        # We calculate the scores on the different tasks on the different sets
+        train_set_scores = trainer_instance.model.scores_dataset(dataset, dataset.train_mask)
+        valid_set_scores = trainer_instance.model.scores_dataset(dataset, dataset.valid_mask)
+        test_set_scores = trainer_instance.model.scores_dataset(dataset, dataset.test_mask)
+        score = ScoreContainer(train=train_set_scores, valid=valid_set_scores, test=test_set_scores)
 
-            # We prepare the trainer instance
-            self.set_checkpoint_path(trainer_instance)
+        return score
 
-            # We prepare the train method parameters
-            dataset = self.inner_loop_state.dataset
-            train_method_params[self.DATASET_KEY] = dataset
-
-            # We train the model using the suggested hyperparameters
-            trainer_instance.train(**train_method_params)
-
-            # We find the optimal threshold for each classification tasks
-            trainer_instance.model.fix_thresholds_to_optimal_values(dataset)
-
-            # We calculate the scores on the different tasks on the different sets
-            train_set_scores = trainer_instance.model.scores_dataset(dataset, dataset.train_mask)
-            valid_set_scores = trainer_instance.model.scores_dataset(dataset, dataset.valid_mask)
-            test_set_scores = trainer_instance.model.scores_dataset(dataset, dataset.test_mask)
-            score = ScoreContainer(train=train_set_scores, valid=valid_set_scores, test=test_set_scores)
-
-            self.inner_loop_state.score = score
-            self.inner_loop_state.callbacks.on_inner_loop_end(self)
-
-            return score
-
-        return run_inner_loop
-
-    def set_checkpoint_path(self, trainer: Trainer):
+    @staticmethod
+    def _set_checkpoint_path(path_to_directory: str, trainer: Trainer):
         """
         Sets checkpoint path.
 
         Parameters
         ----------
+        path_to_directory : str
+            Path to directory.
         trainer : Trainer
             Trainer.
         """
         if trainer.checkpoint:
             trainer.checkpoint.path_to_checkpoint_folder = path.join(
-                self.inner_loop_state.path_to_inner_loop_folder,
+                path_to_directory,
                 path.basename(trainer.checkpoint.path_to_checkpoint_folder)
             )

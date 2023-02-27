@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from os import cpu_count
 from typing import Any, Callable, Dict, List
 
-from optuna.trial import Trial
+from optuna.trial import FrozenTrial, Trial
 import ray
 
 from ...callbacks.containers import TuningCallbackList
@@ -20,7 +20,7 @@ from .containers import ScoreContainer
 from ....data.datasets import ProstateCancerDataset
 from ....data.processing.sampling import Mask
 from ...hyperparameters import HyperparameterDict
-from .states import InnerLoopState, TrialState
+from .states import BestModelState, InnerLoopState, TrialState
 
 
 class Objective(ABC):
@@ -51,6 +51,7 @@ class Objective(ABC):
         """
         self.num_cpus = num_cpus
         self.num_gpus = num_gpus
+        self.best_model_state = BestModelState()
         self.inner_loop_state = InnerLoopState()
         self.trial_state = TrialState()
 
@@ -87,12 +88,11 @@ class Objective(ABC):
         futures = []
         for idx, mask in enumerate(masks.values()):
             dataset.update_masks(mask[Mask.TRAIN], mask[Mask.VALID], mask[Mask.TEST])
-            self.inner_loop_state.callbacks = callbacks
             self.inner_loop_state.dataset = dataset
             self.inner_loop_state.idx = idx
 
             self._run_inner_loop = self._build_inner_loop_runner()
-            score = self._run_inner_loop.remote(hyperparameters=suggested_hps)
+            score = self._run_inner_loop.remote(callbacks=callbacks, hyperparameters=suggested_hps)
             futures.append(score)
 
         self.trial_state.scores = ray.get(futures)
@@ -119,10 +119,9 @@ class Objective(ABC):
         """
         raise NotImplementedError
 
-    @abstractmethod
     def _build_inner_loop_runner(self) -> Callable:
         """
-        Builds the function run in parallel for each inner split and return the score.
+        Builds the function run in parallel for each set of hyperparameters and return the score.
 
         Returns
         -------
@@ -132,6 +131,7 @@ class Objective(ABC):
 
         @ray.remote(num_cpus=self.num_cpus, num_gpus=self.num_gpus)
         def run_inner_loop(
+                callbacks: TuningCallbackList,
                 hyperparameters: Dict[str, Any]
         ) -> ScoreContainer:
             """
@@ -139,14 +139,88 @@ class Objective(ABC):
 
             Parameters
             ----------
+            callbacks : TuningCallbackList
+                Callbacks to use during tuning.
             hyperparameters : Dict[str, Any]
                 Suggested hyperparameters for this trial.
 
             Returns
             -------
-            scores : ScoreContainer
+            score : ScoreContainer
                 Score values.
             """
-            raise NotImplementedError
+            callbacks.on_inner_loop_start(self)
+            score = self._test_hyperparameters(
+                dataset=self.inner_loop_state.dataset,
+                hyperparameters=hyperparameters,
+                path_to_save=self.inner_loop_state.path_to_inner_loop_folder
+            )
+            self.inner_loop_state.score = score
+            callbacks.on_inner_loop_end(self)
+
+            return score
 
         return run_inner_loop
+
+    def evaluate_best_model(
+            self,
+            best_trial: FrozenTrial,
+            callbacks: TuningCallbackList,
+            dataset: ProstateCancerDataset
+    ) -> ScoreContainer:
+        """
+        Evaluates the best model.
+
+        Parameters
+        ----------
+        best_trial : FrozenTrial
+            Optuna trial.
+        callbacks : TuningCallbackList
+            Callbacks to use during tuning.
+        dataset : ProstateCancerDataset
+            The dataset used for the current trial.
+
+        Returns
+        -------
+        score : ScoreContainer
+            Score values.
+        """
+        best_hyperparameters = self.hyperparameters.retrieve_suggestion(best_trial)
+        self.best_model_state.dataset = dataset
+
+        callbacks.on_best_model_evaluation_start(self)
+        score = self._test_hyperparameters(
+            dataset=dataset,
+            hyperparameters=best_hyperparameters,
+            path_to_save=self.best_model_state.path_to_best_model_folder
+        )
+        self.best_model_state.score = score
+        callbacks.on_best_model_evaluation_end(self)
+
+        return score
+
+    @abstractmethod
+    def _test_hyperparameters(
+            self,
+            dataset: ProstateCancerDataset,
+            hyperparameters: Dict[str, Any],
+            path_to_save: str
+    ) -> ScoreContainer:
+        """
+        Tests hyperparameters and returns the train, valid and test scores.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            The dataset used for the current trial.
+        hyperparameters : Dict[str, Any]
+            Suggested hyperparameters for this trial.
+        path_to_save : str
+            Path to the directory to save the current scores.
+
+        Returns
+        -------
+        score : ScoreContainer
+            Score values.
+        """
+        raise NotImplementedError

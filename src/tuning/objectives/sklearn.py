@@ -9,11 +9,10 @@
 """
 
 from os import cpu_count
-from typing import Any, Callable, Dict
-
-import ray
+from typing import Any, Dict
 
 from .base import Objective, ScoreContainer
+from ...data.datasets import ProstateCancerDataset
 from ..hyperparameters import HyperparameterDict, HyperparameterObject
 
 
@@ -71,56 +70,45 @@ class SklearnObjective(Objective):
         """
         return self._hyperparameters
 
-    def _build_inner_loop_runner(self) -> Callable:
+    def _test_hyperparameters(
+            self,
+            dataset: ProstateCancerDataset,
+            hyperparameters: Dict[str, Any],
+            path_to_save: str
+    ) -> ScoreContainer:
         """
-        Builds the function run in parallel for each set of hyperparameters and return the score.
+        Tests hyperparameters and returns the train, valid and test scores.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            The dataset used for the current trial.
+        hyperparameters : Dict[str, Any]
+            Suggested hyperparameters for this trial.
+        path_to_save : str
+            Path to the directory to save the current scores.
 
         Returns
         -------
-        run_inner_loop : Callable
-            Function that train a single model using given masks and trial.
+        score : ScoreContainer
+            Score values.
         """
+        # We retrieve the model instance and the fit method parameters from the suggested hyperparameters
+        model_instance = hyperparameters[self.MODEL_INSTANCE_KEY]
+        fit_method_params = hyperparameters[self.FIT_METHOD_PARAMS_KEY]
+        dataset = self.inner_loop_state.dataset
+        fit_method_params[self.DATASET_KEY] = dataset
 
-        @ray.remote(num_cpus=self.num_cpus, num_gpus=self.num_gpus)
-        def run_inner_loop(
-                hyperparameters: Dict[str, Any]
-        ) -> ScoreContainer:
-            """
-            Trains a single model using given masks and hyperparameters.
+        # We train the model using the suggested hyperparameters
+        model_instance.fit(**fit_method_params)
 
-            Parameters
-            ----------
-            hyperparameters : Dict[str, Any]
-                Suggested hyperparameters for this trial.
+        # We find the optimal threshold for each classification tasks
+        model_instance.fix_thresholds_to_optimal_values(dataset)
 
-            Returns
-            -------
-            score : ScoreContainer
-                Score values.
-            """
-            self.inner_loop_state.callbacks.on_inner_loop_start(self)
+        # We calculate the scores on the different tasks on the different sets
+        train_set_scores = model_instance.scores_dataset(dataset, dataset.train_mask)
+        valid_set_scores = model_instance.scores_dataset(dataset, dataset.valid_mask)
+        test_set_scores = model_instance.scores_dataset(dataset, dataset.test_mask)
+        score = ScoreContainer(train=train_set_scores, valid=valid_set_scores, test=test_set_scores)
 
-            # We retrieve the model instance and the fit method parameters from the suggested hyperparameters
-            model_instance = hyperparameters[self.MODEL_INSTANCE_KEY]
-            fit_method_params = hyperparameters[self.FIT_METHOD_PARAMS_KEY]
-            dataset = self.inner_loop_state.dataset
-            fit_method_params[self.DATASET_KEY] = dataset
-
-            # We train the model using the suggested hyperparameters
-            model_instance.fit(**fit_method_params)
-
-            # We find the optimal threshold for each classification tasks
-            model_instance.fix_thresholds_to_optimal_values(dataset)
-
-            # We calculate the scores on the different tasks on the different sets
-            train_set_scores = model_instance.scores_dataset(dataset, dataset.train_mask)
-            valid_set_scores = model_instance.scores_dataset(dataset, dataset.valid_mask)
-            test_set_scores = model_instance.scores_dataset(dataset, dataset.test_mask)
-            score = ScoreContainer(train=train_set_scores, valid=valid_set_scores, test=test_set_scores)
-
-            self.inner_loop_state.score = score
-            self.inner_loop_state.callbacks.on_inner_loop_end(self)
-
-            return score
-
-        return run_inner_loop
+        return score
