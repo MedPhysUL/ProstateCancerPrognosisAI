@@ -117,13 +117,18 @@ class SearchAlgorithm:
             The objective.
         n_trials : int
             Number of sets of hyperparameters tested.
-        verbose : bool
-            Whether we want optuna to show a progress bar.
         study_name : str
             Study's name. If this argument is set to None, a unique name is generated automatically.
+        verbose : bool
+            Whether we want optuna to show a progress bar.
+
+        Returns
+        -------
+        study : Study
+            Study object.
         """
         # We check ray status
-        ray_already_init = self._check_ray_status()
+        ray_already_init = self._is_ray_initialized()
 
         study = self._create_new_study(dataset, study_name)
 
@@ -143,13 +148,14 @@ class SearchAlgorithm:
         return study
 
     @staticmethod
-    def _check_ray_status() -> bool:
+    def _is_ray_initialized() -> bool:
         """
         Checks if ray was already initialized and initialize it if it's not.
 
         Returns
         -------
-        Whether ray was already initialized.
+        already_init : bool
+            Whether ray was already initialized.
         """
         # We initialize ray if it is not initialized yet
         ray_was_init = True
