@@ -12,9 +12,7 @@
 from typing import Optional, Tuple
 
 import pandas as pd
-from torch import int64, float32, Tensor
-
-from ...tools.transforms import ToTensor
+from torch import from_numpy, Tensor
 
 
 class ContinuousTransform:
@@ -66,9 +64,7 @@ class ContinuousTransform:
         df_tensor : Tensor
             Dataframe as a tensor.
         """
-        transform = ToTensor(dtype=float32)
-
-        return transform(df)
+        return from_numpy(df.to_numpy()).float()
 
 
 class CategoricalTransform:
@@ -136,6 +132,4 @@ class CategoricalTransform:
         df_tensor : Tensor
             Dataframe as a tensor.
         """
-        transform = ToTensor(dtype=int64)
-
-        return transform(df)
+        return from_numpy(df.to_numpy()).long()
