@@ -242,7 +242,8 @@ class LearningAlgorithm(TrainingCallback):
         if self.criterion.tasks is None:
             self.criterion.tasks = trainer.training_state.tasks
 
-        self.early_stopper.on_fit_start(self)
+        if self.early_stopper:
+            self.early_stopper.on_fit_start(self)
 
     def _optimizer_step(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor], trainer):
         """
