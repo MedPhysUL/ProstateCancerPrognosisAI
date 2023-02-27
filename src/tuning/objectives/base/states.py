@@ -88,23 +88,3 @@ class TrialState:
         statistics.build(self.history)
 
         return statistics
-
-
-@dataclass
-class BestModelState:
-    """
-    This class is used to store the current best model state. It is extremely useful for the callbacks to access the
-    current best model state and to modify the tuning process.
-
-    Elements
-    --------
-    dataset : ProstateCancerDataset
-        The current dataset.
-    path_to_best_model_folder: str
-        The path to the current folder containing the best model records.
-    score : ScoreContainer
-        The current best model score.
-    """
-    dataset: ProstateCancerDataset = None
-    path_to_best_model_folder: str = None
-    score: ScoreContainer = None

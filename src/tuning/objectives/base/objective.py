@@ -20,7 +20,7 @@ from .containers import ScoreContainer
 from ....data.datasets import ProstateCancerDataset
 from ....data.processing.sampling import Mask
 from ...hyperparameters import HyperparameterDict
-from .states import BestModelState, InnerLoopState, TrialState
+from .states import InnerLoopState, TrialState
 
 
 class Objective(ABC):
@@ -51,7 +51,6 @@ class Objective(ABC):
         """
         self.num_cpus = num_cpus
         self.num_gpus = num_gpus
-        self.best_model_state = BestModelState()
         self.inner_loop_state = InnerLoopState()
         self.trial_state = TrialState()
 
@@ -165,8 +164,8 @@ class Objective(ABC):
     def evaluate_best_model(
             self,
             best_trial: FrozenTrial,
-            callbacks: TuningCallbackList,
-            dataset: ProstateCancerDataset
+            dataset: ProstateCancerDataset,
+            path_to_save: str
     ) -> ScoreContainer:
         """
         Evaluates the best model.
@@ -175,10 +174,10 @@ class Objective(ABC):
         ----------
         best_trial : FrozenTrial
             Optuna trial.
-        callbacks : TuningCallbackList
-            Callbacks to use during tuning.
         dataset : ProstateCancerDataset
             The dataset used for the current trial.
+        path_to_save : str
+            Path to save.
 
         Returns
         -------
@@ -186,16 +185,11 @@ class Objective(ABC):
             Score values.
         """
         best_hyperparameters = self.hyperparameters.retrieve_suggestion(best_trial)
-        self.best_model_state.dataset = dataset
-
-        callbacks.on_best_model_evaluation_start(self)
         score = self._test_hyperparameters(
             dataset=dataset,
             hyperparameters=best_hyperparameters,
-            path_to_save=self.best_model_state.path_to_best_model_folder
+            path_to_save=path_to_save
         )
-        self.best_model_state.score = score
-        callbacks.on_best_model_evaluation_end(self)
 
         return score
 
