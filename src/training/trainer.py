@@ -79,7 +79,7 @@ class Trainer:
         self.verbose = verbose
 
         self.batch_state, self.batches_state, self.epoch_state, self.training_state = None, None, None, None
-        self.initialize_states()
+        self._initialize_states()
 
         self.x_transform = kwargs.get("x_transform", ToTensor())
         self.y_transform = kwargs.get("y_transform", ToTensor())
@@ -133,7 +133,7 @@ class Trainer:
         """
         self._callbacks.sort()
 
-    def initialize_states(self):
+    def _initialize_states(self):
         """
         Initializes all states.
         """
@@ -313,10 +313,10 @@ class Trainer:
         training_history : TrainingHistory
             The training history.
         """
+        self._initialize_states()
         model.build(dataset=dataset)
         self.model = model
         self.device = self.device if self.device else model.device
-        self.initialize_states()
 
         train_dataloader = self._create_train_dataloader(dataset=dataset, batch_size=self.batch_size)
         valid_dataloader = self._create_valid_dataloader(dataset=dataset)
