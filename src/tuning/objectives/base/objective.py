@@ -90,8 +90,8 @@ class Objective(ABC):
             self.inner_loop_state.dataset = dataset
             self.inner_loop_state.idx = idx
 
-            self._run_inner_loop = self._build_inner_loop_runner()
-            score = self._run_inner_loop.remote(callbacks=callbacks, hyperparameters=suggested_hps)
+            self._exec_inner_loop = self._build_inner_loop_runner()
+            score = self._exec_inner_loop.remote(callbacks=callbacks, hyperparameters=suggested_hps)
             futures.append(score)
 
         self.trial_state.scores = ray.get(futures)
@@ -129,7 +129,7 @@ class Objective(ABC):
         """
 
         @ray.remote(num_cpus=self.num_cpus, num_gpus=self.num_gpus)
-        def run_inner_loop(
+        def exec_inner_loop(
                 callbacks: TuningCallbackList,
                 hyperparameters: Dict[str, Any]
         ) -> ScoreContainer:
@@ -159,9 +159,9 @@ class Objective(ABC):
 
             return score
 
-        return run_inner_loop
+        return exec_inner_loop
 
-    def evaluate_best_model(
+    def exec_best_model_evaluation(
             self,
             best_trial: FrozenTrial,
             dataset: ProstateCancerDataset,
