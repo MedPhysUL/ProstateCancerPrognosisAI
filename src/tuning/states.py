@@ -13,8 +13,9 @@ from dataclasses import dataclass
 from optuna.study import Study
 from optuna.trial import FrozenTrial
 
-from .objectives.base import ScoreContainer
 from ..data.datasets import ProstateCancerDataset
+from ..models.base.model import Model
+from .objectives.base import ScoreContainer
 
 
 @dataclass
@@ -28,9 +29,12 @@ class BestModelState:
         The path to the current folder containing the best model records.
     score : ScoreContainer
         The current best model score.
+    model : Model
+        Best model.
     """
     path_to_best_model_folder: str = None
     score: ScoreContainer = None
+    model: Model = None
 
 
 @dataclass

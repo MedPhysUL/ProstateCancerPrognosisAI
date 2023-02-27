@@ -13,6 +13,8 @@ from typing import Dict, List
 
 import numpy as np
 
+from ....models.base.model import Model
+
 
 @dataclass
 class ScoreContainer:
@@ -151,3 +153,19 @@ class StatisticsContainer:
                             mean=float(np.mean(value)),
                             std=float(np.std(value))
                         )
+
+
+@dataclass
+class ModelEvaluationContainer:
+    """
+    This class is used to store model evaluation.
+
+    Elements
+    --------
+    trained_model : Model
+        Model state.
+    score : ScoreContainer
+        Model score.
+    """
+    trained_model: Model = None
+    score: ScoreContainer = None

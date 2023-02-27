@@ -16,7 +16,7 @@ from optuna.trial import FrozenTrial, Trial
 import ray
 
 from ...callbacks.containers import TuningCallbackList
-from .containers import ScoreContainer
+from .containers import ModelEvaluationContainer, ScoreContainer
 from ....data.datasets import ProstateCancerDataset
 from ....data.processing.sampling import Mask
 from ...hyperparameters import HyperparameterDict
@@ -149,11 +149,12 @@ class Objective(ABC):
                 Score values.
             """
             callbacks.on_inner_loop_start(self)
-            score = self._test_hyperparameters(
+            model_evaluation = self._test_hyperparameters(
                 dataset=self.inner_loop_state.dataset,
                 hyperparameters=hyperparameters,
                 path_to_save=self.inner_loop_state.path_to_inner_loop_folder
             )
+            score = model_evaluation.score
             self.inner_loop_state.score = score
             callbacks.on_inner_loop_end(self)
 
@@ -166,7 +167,7 @@ class Objective(ABC):
             best_trial: FrozenTrial,
             dataset: ProstateCancerDataset,
             path_to_save: str
-    ) -> ScoreContainer:
+    ) -> ModelEvaluationContainer:
         """
         Evaluates the best model.
 
@@ -181,17 +182,17 @@ class Objective(ABC):
 
         Returns
         -------
-        score : ScoreContainer
-            Score values.
+        model_evaluation : ModelEvaluationContainer
+            Model evaluation.
         """
         best_hyperparameters = self.hyperparameters.retrieve_suggestion(best_trial)
-        score = self._test_hyperparameters(
+        model_evaluation = self._test_hyperparameters(
             dataset=dataset,
             hyperparameters=best_hyperparameters,
             path_to_save=path_to_save
         )
 
-        return score
+        return model_evaluation
 
     @abstractmethod
     def _test_hyperparameters(
@@ -199,7 +200,7 @@ class Objective(ABC):
             dataset: ProstateCancerDataset,
             hyperparameters: Dict[str, Any],
             path_to_save: str
-    ) -> ScoreContainer:
+    ) -> ModelEvaluationContainer:
         """
         Tests hyperparameters and returns the train, valid and test scores.
 
@@ -214,7 +215,7 @@ class Objective(ABC):
 
         Returns
         -------
-        score : ScoreContainer
-            Score values.
+        model_evaluation : ModelEvaluationContainer
+            Model evaluation.
         """
         raise NotImplementedError

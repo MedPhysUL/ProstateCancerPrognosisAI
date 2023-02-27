@@ -11,7 +11,7 @@
 from os import cpu_count
 from typing import Any, Dict
 
-from .base import Objective, ScoreContainer
+from .base import ModelEvaluationContainer, Objective, ScoreContainer
 from ...data.datasets import ProstateCancerDataset
 from ..hyperparameters import HyperparameterDict, HyperparameterObject
 
@@ -75,7 +75,7 @@ class SklearnObjective(Objective):
             dataset: ProstateCancerDataset,
             hyperparameters: Dict[str, Any],
             path_to_save: str
-    ) -> ScoreContainer:
+    ) -> ModelEvaluationContainer:
         """
         Tests hyperparameters and returns the train, valid and test scores.
 
@@ -90,8 +90,8 @@ class SklearnObjective(Objective):
 
         Returns
         -------
-        score : ScoreContainer
-            Score values.
+        model_evaluation : ModelEvaluationContainer
+            Model evaluation.
         """
         # We retrieve the model instance and the fit method parameters from the suggested hyperparameters
         model_instance = hyperparameters[self.MODEL_INSTANCE_KEY]
@@ -111,4 +111,4 @@ class SklearnObjective(Objective):
         test_set_scores = model_instance.scores_dataset(dataset, dataset.test_mask)
         score = ScoreContainer(train=train_set_scores, valid=valid_set_scores, test=test_set_scores)
 
-        return score
+        return ModelEvaluationContainer(trained_model=model_instance, score=score)
