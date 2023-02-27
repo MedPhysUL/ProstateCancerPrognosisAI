@@ -194,6 +194,30 @@ class TuningCallbackList:
         for callback in self.callbacks:
             callback.on_outer_loop_end(tuner, **kwargs)
 
+    def on_best_model_evaluation_start(self, objective, **kwargs):
+        """
+        Called when the model model evaluation starts.
+
+        Parameters
+        ----------
+        objective : Objective
+            Objective.
+        """
+        for callback in self.callbacks:
+            callback.on_best_model_evaluation_start(objective, **kwargs)
+
+    def on_best_model_evaluation_end(self, objective, **kwargs):
+        """
+        Called when the model model evaluation ends.
+
+        Parameters
+        ----------
+        objective : Objective
+            Objective.
+        """
+        for callback in self.callbacks:
+            callback.on_best_model_evaluation_start(objective, **kwargs)
+
     def on_study_start(self, tuner, **kwargs):
         """
         Called when the study starts.

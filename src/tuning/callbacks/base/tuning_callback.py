@@ -35,6 +35,8 @@ class TuningCallback(ABC):
                     - " MODEL TRAINING "
                 - `on_trial_end`
             - `on_study_end`
+            - `on_best_model_evaluation_start`
+            - `on_best_model_evaluation_end`
             - `on_outer_loop_end`
         - `on_tuning_end`
 
@@ -67,6 +69,8 @@ class TuningCallback(ABC):
                     - `on_fit_end`
                 - `on_trial_end`
             - `on_study_end`
+            - `on_best_model_evaluation_start`
+            - `on_best_model_evaluation_end`
             - `on_outer_loop_end`
         - `on_tuning_end`
 
@@ -156,6 +160,28 @@ class TuningCallback(ABC):
         ----------
         tuner : Tuner
             Tuner.
+        """
+        pass
+
+    def on_best_model_evaluation_start(self, objective, **kwargs):
+        """
+        Called when the model model evaluation starts.
+
+        Parameters
+        ----------
+        objective : Objective
+            Objective.
+        """
+        pass
+
+    def on_best_model_evaluation_end(self, objective, **kwargs):
+        """
+        Called when the model model evaluation ends.
+
+        Parameters
+        ----------
+        objective : Objective
+            Objective.
         """
         pass
 
