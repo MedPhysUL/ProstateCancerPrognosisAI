@@ -65,7 +65,10 @@ class TorchModel(Model, ABC):
         """
         super().__init__(device=device, name=name)
 
-    def build(self, dataset: ProstateCancerDataset):
+    def build(
+            self,
+            dataset: ProstateCancerDataset
+    ):
         """
         Builds the model using information contained in the dataset with which the model is going to be trained.
 
@@ -102,15 +105,21 @@ class TorchModel(Model, ABC):
 
     @check_if_built
     def fix_thresholds_to_optimal_values(
-            self
+            self,
+            dataset: ProstateCancerDataset
     ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
         """
-        subset = self._dataset[self._dataset.train_mask]
+        subset = dataset[dataset.train_mask]
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
 
-        tasks, binary_classification_tasks = self._dataset.tasks, self._dataset.tasks.binary_classification_tasks
+        tasks, binary_classification_tasks = dataset.tasks, dataset.tasks.binary_classification_tasks
         outputs_dict = {task.name: Output(predictions=[], targets=[]) for task in binary_classification_tasks}
 
         thresholds = linspace(start=0.01, stop=0.95, num=95)
@@ -119,7 +128,7 @@ class TorchModel(Model, ABC):
             for features, targets in data_loader:
                 features, targets = batch_to_device(features, self.device), batch_to_device(targets, self.device)
 
-                predictions = self.predict(features, tasks=tasks)
+                predictions = self.predict(features)
 
                 for task in binary_classification_tasks:
                     outputs_dict[task.name].predictions.append(predictions[task.name].item())
@@ -183,6 +192,7 @@ class TorchModel(Model, ABC):
     @check_if_built
     def predict_on_dataset(
             self,
+            dataset: ProstateCancerDataset,
             mask: List[int],
             probability: bool = True
     ) -> Optional[TargetsType]:
@@ -197,6 +207,8 @@ class TorchModel(Model, ABC):
 
         Parameters
         ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
         mask : List[int]
             A list of dataset idx for which we want to obtain the predictions.
         probability : bool
@@ -208,19 +220,19 @@ class TorchModel(Model, ABC):
         predictions : TargetsType
             Predictions (except segmentation map).
         """
-        subset = self._dataset[mask]
+        subset = dataset[mask]
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
 
-        predictions = {task.name: [] for task in self._dataset.tasks}
+        predictions = {task.name: [] for task in dataset.tasks}
         with no_grad():
             for features, _ in data_loader:
-                pred = self.predict(features=features, tasks=self._dataset.tasks, probability=probability)
+                pred = self.predict(features=features, tasks=dataset.tasks, probability=probability)
 
-                for task in self._dataset.tasks.table_tasks:
+                for task in dataset.tasks.table_tasks:
                     predictions[task.name].append(pred[task.name])
 
-        if self._dataset.tasks.table_tasks:
-            return {task.name: stack(predictions[task.name], dim=0) for task in self._dataset.tasks.table_tasks}
+        if dataset.tasks.table_tasks:
+            return {task.name: stack(predictions[task.name], dim=0) for task in dataset.tasks.table_tasks}
         else:
             return None
 
@@ -259,6 +271,7 @@ class TorchModel(Model, ABC):
     @check_if_built
     def score_on_dataset(
             self,
+            dataset: ProstateCancerDataset,
             mask: List[int]
     ) -> Dict[str, Dict[str, float]]:
         """
@@ -266,6 +279,8 @@ class TorchModel(Model, ABC):
 
         Parameters
         ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
         mask : List[int]
             A list of dataset idx for which we want to obtain the mean score.
 
@@ -274,10 +289,10 @@ class TorchModel(Model, ABC):
         scores : Dict[str, Dict[str, float]]
             Score for each tasks and each metrics.
         """
-        subset = self._dataset[mask]
+        subset = dataset[mask]
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
 
-        tasks = self._dataset.tasks
+        tasks = dataset.tasks
         table_tasks, seg_tasks = tasks.table_tasks, tasks.segmentation_tasks
 
         scores = {task.name: {} for task in tasks}
@@ -287,7 +302,7 @@ class TorchModel(Model, ABC):
             for features, targets in data_loader:
                 features, targets = batch_to_device(features, self.device), batch_to_device(targets, self.device)
 
-                predictions = self.predict(features=features, tasks=tasks)
+                predictions = self.predict(features=features)
 
                 for task in seg_tasks:
                     for metric in task.unique_metrics:
