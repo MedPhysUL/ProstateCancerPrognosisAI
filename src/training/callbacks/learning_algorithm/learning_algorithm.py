@@ -239,7 +239,7 @@ class LearningAlgorithm(TrainingCallback):
         kwargs : dict
             Keyword arguments.
         """
-        if self.criterion.tasks is None:
+        if not self.criterion.tasks:
             self.criterion.tasks = trainer.training_state.tasks
 
         if self.early_stopper:
