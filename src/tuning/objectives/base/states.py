@@ -26,8 +26,6 @@ class InnerLoopState:
 
     Elements
     --------
-    callbacks : TuningCallbackList
-        Callbacks to use during tuning.
     dataset : ProstateCancerDataset
         The current dataset.
     idx : int
@@ -37,7 +35,6 @@ class InnerLoopState:
     score : ScoreContainer
         The current inner loop score.
     """
-    callbacks: TuningCallbackList = None
     dataset: ProstateCancerDataset = None
     idx: int = None
     path_to_inner_loop_folder: str = None
