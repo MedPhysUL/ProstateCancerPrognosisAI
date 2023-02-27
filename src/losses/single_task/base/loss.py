@@ -37,7 +37,7 @@ class SingleTaskLoss(ABC):
             Reduction method to use.
         """
         self.reduction = LossReduction(reduction)
-        self.name = name if name else f"{self.__class__.__name__}('reduction'={repr(self.reduction)})"
+        self.name = name if name else f"{self.__class__.__name__}('reduction'='{self.reduction}')"
 
     @abstractmethod
     def __call__(
