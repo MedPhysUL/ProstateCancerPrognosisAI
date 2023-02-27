@@ -190,6 +190,29 @@ class TrainingHistory(TrainingCallback):
 
         return epoch_state
 
+    def _init(self, container: dict, state: dict):
+        """
+        Initializes container using the first epoch state.
+
+        Parameters
+        ----------
+        container: dict
+            History container.
+        state : dict
+            Epoch state.
+        """
+        for k, v in state.items():
+            if k in container:
+                container[k] = {}
+                for measurement_type_name, tasks in v.items():
+                    container[k][measurement_type_name] = {}
+                    for task_name, measurements in tasks.items():
+                        container[k][measurement_type_name][task_name] = {}
+                        for measurement_name, value in measurements.items():
+                            container[k][measurement_type_name][task_name][measurement_name] = [value]
+
+        self.container = from_dict(data_class=HistoryContainer, data=container)
+
     def _append_state(self, container: dict, state: dict):
         """
         Appends an epoch state dictionary to the history container.
@@ -343,7 +366,10 @@ class TrainingHistory(TrainingCallback):
         kwargs : dict
             Keywords arguments.
         """
-        self._append_state(asdict(self.container), asdict(trainer.epoch_state))
+        if trainer.epoch_state.idx == 0:
+            self._init(asdict(self.container), asdict(trainer.epoch_state))
+        else:
+            self._append_state(asdict(self.container), asdict(trainer.epoch_state))
 
 
 if __name__ == "__main__":
