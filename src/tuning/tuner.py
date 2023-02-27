@@ -1,198 +1,223 @@
 """
     @file:              tuner.py
-    @Author:            Maxence Larose, Mehdi Mitiche, Nicolas Raymond
+    @Author:            Maxence Larose, Nicolas Raymond, Mehdi Mitiche
 
-    @Creation Date:     05/2022
+    @Creation Date:     03/2022
     @Last modification: 02/2023
 
-    @Description:       This file is used to define the Tuner classes used for hyperparameter tuning using
-                        https://dl.acm.org/doi/10.1145/3377930.3389817.
+    @Description:      This file is used to define the `Tuner` class in charge of tuning the hyperparameters.
 """
 
-from os import makedirs
-from os.path import join
-from time import strftime
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, List, Optional, Union
 
-from optuna import create_study
-from optuna.logging import FATAL, set_verbosity
-from optuna.importance import FanovaImportanceEvaluator, get_param_importances
-from optuna.pruners import NopPruner
-from optuna.samplers import TPESampler
-from optuna.study import Study
-from optuna.trial import FrozenTrial
-from optuna.visualization import (
-    plot_parallel_coordinate,
-    plot_param_importances,
-    plot_pareto_front,
-    plot_optimization_history
-)
+from numpy.random import seed as np_seed
 import ray
+from optuna.trial import FrozenTrial
+from torch import manual_seed
 
-from ..metrics.single_task.base import Direction
-from .objective import Objective
+from .callbacks.base import TuningCallback
+from .callbacks.containers import TuningCallbackList
+from ..data.datasets import ProstateCancerDataset
+from ..data.processing.sampling import Mask
+from .search_algorithm import Objective, SearchAlgorithm
+from .states import BestModelState, OuterLoopState, StudyState, TuningState
 
 
 class Tuner:
     """
-    Object in charge of hyperparameter tuning.
+    Object in charge of evaluating a model over multiple different data splits and tuning the hyperparameters.
     """
 
-    # HYPERPARAMETERS IMPORTANCE SEED
-    HP_IMPORTANCE_SEED: int = 42
-
-    # FIGURES NAME
-    HPS_IMPORTANCE_FIG: str = "hp_importance.png"
-    PARALLEL_COORD_FIG: str = "parallel_coordinates.png"
-    PARETO_FRONT_FIG: str = "pareto_front.png"
-    OPTIMIZATION_HIST_FIG: str = "optimization_history.png"
+    SPLIT_PREFIX: str = "split"
 
     def __init__(
             self,
-            n_trials: int,
-            path: str,
-            study_name: Optional[str] = None,
-            objective: Objective = None,
-            save_hps_importance: Optional[bool] = False,
-            save_parallel_coordinates: Optional[bool] = False,
-            save_pareto_front: Optional[bool] = False,
-            save_optimization_history: Optional[bool] = False
+            search_algorithm: SearchAlgorithm,
+            callbacks: Optional[Union[TuningCallback, TuningCallbackList, List[TuningCallback]]] = None,
+            n_trials: int = 100,
+            seed: Optional[int] = None,
+            verbose: bool = False
     ):
         """
-        Sets all protected and public attributes.
+        Set protected and public attributes.
 
         Parameters
         ----------
+        search_algorithm : SearchAlgorithm
+            Search algorithm used to search for the optimal set of hyperparameters.
+        callbacks : Optional[Union[TuningCallback, TuningCallbackList, List[TuningCallback]]]
+            The tuning callbacks.
         n_trials : int
             Number of sets of hyperparameters tested.
-        path : str
-            Path of the directory used to store graphs created.
-        study_name : Optional[str]
-            Name of the optuna study.
-        objective : Objective
-            Objective function to optimize.
-        save_hps_importance : Optional[bool]
-            Whether we want to plot the hyperparameters importance graph after tuning.
-        save_parallel_coordinates : Optional[bool]
-            Whether we want to plot the parallel coordinates graph after tuning.
-        save_pareto_front : Optional[bool]
-            Whether we want to plot the pareto front after tuning.
-        save_optimization_history : Optional[bool]
-            Whether we want to plot the optimization history graph after tuning.
+        seed : Optional[int]
+            Random state used for reproducibility.
+        verbose : bool
+            Whether to print out the trace of the tuner.
         """
-
-        # We set protected attributes
-        self._objective = objective
-        self._study = self._new_study(study_name) if study_name is not None else None
-
-        # We set public attributes
+        self.callbacks = callbacks
         self.n_trials = n_trials
-        self.path = join(path, f"{strftime('%Y%m%d-%H%M%S')}")
-        self.save_hps_importance = save_hps_importance
-        self.save_parallel_coordinates = save_parallel_coordinates
-        self.save_pareto_front = save_pareto_front
-        self.save_optimization_history = save_optimization_history
+        self.search_algorithm = search_algorithm
+        self.seed = seed
+        self.verbose = verbose
 
-        # We make sure that the path given exists
-        makedirs(self.path, exist_ok=True)
+        self.best_model_state, self.outer_loop_state, self.study_state, self.tuning_state = None, None, None, None
+        self._initialize_states()
 
-    def _new_study(
-            self,
-            study_name: str
-    ) -> Study:
+    @property
+    def callbacks(self) -> TuningCallbackList:
         """
-        Creates a new optuna study.
-
-        Parameters
-        ----------
-        study_name : str
-            Name of the optuna study.
+        Callbacks to use during the training process.
 
         Returns
         -------
-        study : Study
-            Study object.
+        callbacks : TuningCallbackList
+            Callback list
         """
-        directions = [task.hps_tuning_metric.direction for task in self._objective.dataset.tasks]
+        return self._callbacks
 
-        study = create_study(
-            directions=directions,
-            study_name=study_name,
-            sampler=TPESampler(
-                n_startup_trials=20,
-                n_ei_candidates=20,
-                multivariate=True,
-                constant_liar=True
-            ),
-            pruner=NopPruner()
+    @callbacks.setter
+    def callbacks(self, callbacks: Optional[Union[TuningCallback, TuningCallbackList, List[TuningCallback]]]):
+        """
+        Sets the callbacks attribute as a CallbackList and sorts the callbacks in this list.
+
+        Parameters
+        ----------
+        callbacks : Optional[Union[TuningCallback, TuningCallbackList, List[TuningCallback]]]
+            The callbacks to set the callbacks attribute to.
+        """
+        if callbacks is None:
+            callbacks = []
+        if not isinstance(callbacks, (TuningCallback, TuningCallbackList, list)):
+            raise AssertionError(
+                "'callbacks must be of type 'TuningCallback', 'TuningCallbackList' or 'List[TuningCallback]'."
+            )
+        if isinstance(callbacks, TuningCallback):
+            callbacks = [callbacks]
+
+        self._callbacks = TuningCallbackList(callbacks)
+        self._callbacks.sort()
+
+    def _initialize_states(self):
+        """
+        Initializes all states.
+        """
+        self.best_model_state = BestModelState()
+        self.outer_loop_state = OuterLoopState()
+        self.study_state = StudyState()
+        self.tuning_state = TuningState()
+
+    def tune(
+            self,
+            objective: Objective,
+            dataset: ProstateCancerDataset,
+            masks: Dict[int, Dict[str, Union[List[int], Dict[int, Dict[str, List[int]]]]]]
+    ) -> None:
+        """
+        Performs nested subsampling validations to evaluate a model and tune the hyperparameters.
+
+        Parameters
+        ----------
+        objective : Objective
+            The objective to optimize.
+        dataset : ProstateCancerDataset
+            Custom dataset containing the whole learning dataset needed for our evaluations.
+        masks : Dict[int, Dict[str, Union[List[int], Dict[int, Dict[str, List[int]]]]]]
+            Dict with list of idx to use as train, valid and test masks.
+        """
+        self._initialize_states()
+        self._set_seed()
+        ray.init()
+
+        self.callbacks.on_tuning_start(self)
+        self.outer_loop_state.scores = []
+        for k, v in masks.items():
+            self.outer_loop_state.idx = k
+
+            train_mask, valid_mask, test_mask, inner_masks = v[Mask.TRAIN], v[Mask.VALID], v[Mask.TEST], v[Mask.INNER]
+            dataset.update_masks(train_mask=train_mask, valid_mask=valid_mask, test_mask=test_mask)
+            self.outer_loop_state.dataset = dataset
+
+            self.callbacks.on_outer_loop_start(self)
+            self._exec_study(dataset=dataset, inner_masks=inner_masks, objective=objective)
+
+            dataset.update_masks(train_mask=train_mask, valid_mask=valid_mask, test_mask=test_mask)
+            self._exec_best_model_evaluation(dataset=dataset, objective=objective)
+            self.callbacks.on_outer_loop_end(self)
+
+        # We shutdown ray
+        ray.shutdown()
+        self.callbacks.on_tuning_end(self)
+
+    def _exec_study(
+            self,
+            dataset: ProstateCancerDataset,
+            inner_masks: Dict[int, Dict[str, List[int]]],
+            objective: Objective
+    ):
+        """
+        Executes a single study.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            The dataset used for the current trial.
+        inner_masks : Dict[int, Dict[str, List[int]]]
+            Dictionary of inner loops masks, i.e a dictionary with list of idx to use as train, valid and test masks.
+        objective : Objective
+            The objective.
+        """
+        self.callbacks.on_study_start(self)
+
+        study = self.search_algorithm.search(
+            objective=objective,
+            n_trials=self.n_trials,
+            masks=inner_masks,
+            dataset=dataset,
+            callbacks=self.callbacks,
+            study_name=f"{self.SPLIT_PREFIX}_{self.outer_loop_state.idx}",
+            verbose=self.verbose
         )
+        self.study_state.study = study
+        self.study_state.best_trial = self._get_best_trial()
+        self.callbacks.on_study_end(self)
 
-        return study
-
-    def _plot_hps_importance_graph(self) -> None:
+    def _exec_best_model_evaluation(
+            self,
+            dataset: ProstateCancerDataset,
+            objective: Objective
+    ):
         """
-        Plots the hyperparameters importance graph and save it in an html file.
-        """
-        # We generate the hyperparameters importance graph with optuna
-        for idx, task in enumerate(self._objective.dataset.tasks):
-            fig = plot_param_importances(
-                self._study,
-                evaluator=FanovaImportanceEvaluator(seed=Tuner.HP_IMPORTANCE_SEED),
-                target=lambda t: t.values[idx],
-                target_name=task.name
-            )
+        Executes the evaluation of the model using the best trial hyperparameters.
 
-            # We save the graph
-            fig.write_image(join(self.path, f"{task.name}_{Tuner.HPS_IMPORTANCE_FIG}"))
-
-    def _plot_parallel_coordinates_graph(self) -> None:
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            The dataset used for the current trial.
+        objective : Objective
+            The objective.
         """
-        Plots the parallel coordinates graph and save it in an html file.
-        """
-        # We generate the parallel coordinate graph with optuna
-        for idx, task in enumerate(self._objective.dataset.tasks):
-            fig = plot_parallel_coordinate(
-                self._study,
-                target=lambda t: t.values[idx],
-                target_name=task.name
-            )
+        self.callbacks.on_best_model_evaluation_start(self)
 
-            if task.hps_tuning_metric.direction == Direction.MAXIMIZE:
-                fig.data[0]["line"].reversescale = False
-
-            # We save the graph
-            fig.write_image(join(self.path, f"{task.name}_{Tuner.PARALLEL_COORD_FIG}"))
-
-    def _plot_pareto_front(self) -> None:
-        """
-        Plots the pareto front.
-        """
-        fig = plot_pareto_front(
-            self._study,
-            target_names=[task.name for task in self._objective.dataset.tasks]
+        model_evaluation = objective.exec_best_model_evaluation(
+            best_trial=self.study_state.best_trial,
+            dataset=dataset,
+            path_to_save=self.best_model_state.path_to_best_model_folder
         )
+        self.best_model_state.score = model_evaluation.score
+        self.best_model_state.model = model_evaluation.trained_model
+        self.callbacks.on_best_model_evaluation_end(self)
 
-        # We save the graph
-        fig.write_image(join(self.path, f"{Tuner.PARETO_FRONT_FIG}"))
-
-    def _plot_optimization_history_graph(self) -> None:
+    def _set_seed(self):
         """
-        Plots the optimization history graph and save it in a html file.
+        Sets numpy and torch seed.
         """
-        # We generate the optimization history graph with optuna
-        for idx, task in enumerate(self._objective.dataset.tasks):
-            fig = plot_optimization_history(
-                self._study,
-                target=lambda t: t.values[idx],
-                target_name=task.name
-            )
+        if self.seed is not None:
+            np_seed(self.seed)
+            manual_seed(self.seed)
 
-            # We save the graph
-            fig.write_image(join(self.path, f"{task.name}_{Tuner.OPTIMIZATION_HIST_FIG}"))
-
-    def get_best_trial(self) -> FrozenTrial:
+    def _get_best_trial(self) -> FrozenTrial:
         """
-        Retrieves the best trial among all the trials on the pareto front.
+        Retrieves the best trial among all the trials on the pareto front of the current study.
 
         Returns
         -------
@@ -202,115 +227,4 @@ class Tuner:
         # TODO : Find a way to choose the best hps set among all the sets on the pareto front. For now, we arbitrarily
         #  choose the first in the list.
 
-        return self._study.best_trials[0]
-
-    def get_hps_importance(self) -> Dict[str, Dict[str, float]]:
-        """
-        Retrieves the hyperparameter importances.
-
-        Returns
-        -------
-        hps_importance : Dict[str, Dict[str, float]]
-            Hyperparameters importance for each task.
-        """
-        hps_importance = {}
-        for idx, task in enumerate(self._objective.dataset.tasks):
-            importances = get_param_importances(
-                study=self._study,
-                evaluator=FanovaImportanceEvaluator(seed=Tuner.HP_IMPORTANCE_SEED),
-                target=lambda t: t.values[idx]
-            )
-
-            hps_importance[task.name] = importances
-
-        return hps_importance
-
-    def tune(
-            self,
-            verbose: bool = True
-    ) -> Tuple[Dict[str, Any], Dict[str, Dict[str, float]]]:
-        """
-        Searches for the hyperparameters that optimize the objective function, using the TPE algorithm.
-
-        Parameters
-        ----------
-        verbose : bool
-            Whether we want optuna to show a progress bar.
-
-        Returns
-        -------
-        best_hps, hps_importance : Tuple[Dict[str, Any], Dict[str, Dict[str, float]]]
-            Best hyperparameters and hyperparameters' importance.
-        """
-        if self._study is None or self._objective is None:
-            raise Exception("study and objective must be defined")
-
-        # We check ray status
-        ray_already_init = self._check_ray_status()
-
-        # We perform the optimization
-        set_verbosity(FATAL)  # We remove verbosity from loading bar
-        self._study.optimize(self._objective, self.n_trials, gc_after_trial=True, show_progress_bar=verbose)
-
-        # We save the plots if it is required
-        if self.save_hps_importance:
-            self._plot_hps_importance_graph()
-
-        if self.save_parallel_coordinates:
-            self._plot_parallel_coordinates_graph()
-
-        if self.save_optimization_history:
-            self._plot_optimization_history_graph()
-
-        if self.save_pareto_front:
-            self._plot_pareto_front()
-
-        # We extract the best hyperparameters and their importance
-        best_trial = self.get_best_trial()
-        best_hps = self._objective.extract_hps(best_trial)
-        hps_importance = self.get_hps_importance()
-
-        # We shutdown ray if it has been initialized in this function
-        if not ray_already_init:
-           ray.shutdown()
-
-        return best_hps, hps_importance
-
-    def update_tuner(
-            self,
-            study_name: str,
-            objective: Objective,
-            saving_path: Optional[str] = None
-    ) -> None:
-        """
-        Sets study and objective protected attributes.
-
-        Parameters
-        ----------
-        study_name : str
-            Name of the optuna study.
-        objective : Objective
-            Objective function to optimize.
-        saving_path : Optional[str]
-            Path where the tuning details will be stored.
-        """
-        self._objective = objective
-        self._study = self._new_study(study_name)
-        self.path = saving_path if saving_path is not None else self.path
-
-    @staticmethod
-    def _check_ray_status() -> bool:
-        """
-        Checks if ray was already initialized and initialize it if it's not.
-
-        Returns
-        -------
-        Whether ray was already initialized.
-        """
-        # We initialize ray if it is not initialized yet
-        ray_was_init = True
-        if not ray.is_initialized():
-            ray_was_init = False
-            ray.init()
-
-        return ray_was_init
+        return self.study_state.study.best_trials[0]
