@@ -51,7 +51,7 @@ class IntegerHyperparameter(Hyperparameter):
         self.step = step
         self.log = log
 
-    def get_suggestion(
+    def suggest(
             self,
             trial: Trial
     ) -> int:
@@ -70,7 +70,7 @@ class IntegerHyperparameter(Hyperparameter):
         """
         return trial.suggest_int(name=self.name, low=self.low, high=self.high, step=self.step, log=self.log)
 
-    def get_fixed_value(
+    def retrieve_suggestion(
             self,
             parameters: Dict[str, Any]
     ) -> Any:

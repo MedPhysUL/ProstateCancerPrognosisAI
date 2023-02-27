@@ -51,7 +51,7 @@ class FloatHyperparameter(Hyperparameter):
         self.step = step
         self.log = log
 
-    def get_suggestion(
+    def suggest(
             self,
             trial: Trial
     ) -> float:
@@ -70,7 +70,7 @@ class FloatHyperparameter(Hyperparameter):
         """
         return trial.suggest_float(name=self.name, low=self.low, high=self.high, step=self.step, log=self.log)
 
-    def get_fixed_value(
+    def retrieve_suggestion(
             self,
             parameters: Dict[str, Any]
     ) -> Any:

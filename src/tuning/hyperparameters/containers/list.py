@@ -34,7 +34,7 @@ class HyperparameterList(HyperparameterContainer):
         """
         super().__init__(sequence=container)
 
-    def get_suggestion(
+    def suggest(
             self,
             trial: Trial
     ) -> List[Any]:
@@ -51,9 +51,9 @@ class HyperparameterList(HyperparameterContainer):
         suggestion : List[Any]
             Optuna's current suggestions for all hyperparameters in the list.
         """
-        return [hp.get_suggestion(trial) for hp in self._sequence]
+        return [hp.suggest(trial) for hp in self._sequence]
 
-    def get_fixed_value(
+    def retrieve_suggestion(
             self,
             parameters: Dict[str, Any]
     ) -> List[Any]:
@@ -71,4 +71,4 @@ class HyperparameterList(HyperparameterContainer):
             The fixed value of the hyperparameter container.
         """
         self.verify_params_keys(parameters)
-        return [hp.get_fixed_value(parameters) for hp in self._sequence]
+        return [hp.retrieve_suggestion(parameters) for hp in self._sequence]

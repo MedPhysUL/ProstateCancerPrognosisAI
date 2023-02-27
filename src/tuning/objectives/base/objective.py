@@ -82,7 +82,7 @@ class Objective(ABC):
         """
         callbacks.on_trial_start(self)
 
-        suggested_hps = self.hyperparameters.get_suggestion(trial)
+        suggested_hps = self.hyperparameters.suggest(trial)
 
         futures = []
         for idx, mask in enumerate(masks.values()):

@@ -108,7 +108,7 @@ class HyperparameterContainer(ABC):
         assert not duplicates, f"Duplicate hyperparameters names are not allowed. Found duplicates {duplicates}."
 
     @abstractmethod
-    def get_suggestion(
+    def suggest(
             self,
             trial: Trial
     ) -> Any:
@@ -128,7 +128,7 @@ class HyperparameterContainer(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_fixed_value(
+    def retrieve_suggestion(
             self,
             parameters: Dict[str, Any]
     ) -> Any:

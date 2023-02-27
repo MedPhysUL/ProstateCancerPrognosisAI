@@ -35,7 +35,7 @@ class HyperparameterDict(HyperparameterContainer):
         super().__init__(sequence=list(container.values()))
         self._container = container
 
-    def get_suggestion(
+    def suggest(
             self,
             trial: Trial
     ) -> Dict[str, Any]:
@@ -52,9 +52,9 @@ class HyperparameterDict(HyperparameterContainer):
         suggestion : Dict[Any]
             Optuna's current suggestions for all hyperparameters in the dict.
         """
-        return {name: hp.get_suggestion(trial) for name, hp in self._container.items()}
+        return {name: hp.suggest(trial) for name, hp in self._container.items()}
 
-    def get_fixed_value(
+    def retrieve_suggestion(
             self,
             parameters: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -72,4 +72,4 @@ class HyperparameterDict(HyperparameterContainer):
             The fixed value of the hyperparameter container.
         """
         self.verify_params_keys(parameters)
-        return {name: hp.get_fixed_value(parameters) for name, hp in self._container.items()}
+        return {name: hp.retrieve_suggestion(parameters) for name, hp in self._container.items()}

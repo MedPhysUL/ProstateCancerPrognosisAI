@@ -43,7 +43,7 @@ class HyperparameterObject(HyperparameterContainer):
         self._constructor = constructor
         self._parameters = parameters
 
-    def get_suggestion(
+    def suggest(
             self,
             trial: Trial
     ) -> object:
@@ -61,10 +61,10 @@ class HyperparameterObject(HyperparameterContainer):
             Optuna's current suggestion for this object hyperparameter.
         """
         self_copy = deepcopy(self)
-        params = {name: hp.get_suggestion(trial) for name, hp in self_copy._parameters.items()}
+        params = {name: hp.suggest(trial) for name, hp in self_copy._parameters.items()}
         return self_copy._constructor(**params)
 
-    def get_fixed_value(
+    def retrieve_suggestion(
             self,
             parameters: Dict[str, Any]
     ) -> object:
@@ -84,5 +84,5 @@ class HyperparameterObject(HyperparameterContainer):
         self.verify_params_keys(parameters)
 
         self_copy = deepcopy(self)
-        constructor_params = {name: hp.get_fixed_value(parameters) for name, hp in self_copy._parameters.items()}
+        constructor_params = {name: hp.retrieve_suggestion(parameters) for name, hp in self_copy._parameters.items()}
         return self_copy._constructor(**constructor_params)

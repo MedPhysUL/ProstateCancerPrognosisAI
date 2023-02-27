@@ -38,7 +38,7 @@ class FixedHyperparameter(Hyperparameter):
         super().__init__(name=name)
         self.value = value
 
-    def get_suggestion(
+    def suggest(
             self,
             trial: Trial
     ) -> Any:
@@ -57,7 +57,7 @@ class FixedHyperparameter(Hyperparameter):
         """
         return self.value
 
-    def get_fixed_value(
+    def retrieve_suggestion(
             self,
             parameters: Dict[str, Any]
     ) -> Any:
