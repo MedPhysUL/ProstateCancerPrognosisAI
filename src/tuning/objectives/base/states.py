@@ -13,7 +13,6 @@ from typing import List
 
 from optuna.trial import Trial
 
-from ...callbacks.containers import TuningCallbackList
 from .containers import HistoryContainer, ScoreContainer, StatisticsContainer
 from ....data.datasets import ProstateCancerDataset
 
