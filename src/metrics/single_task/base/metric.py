@@ -50,7 +50,7 @@ class SingleTaskMetric(ABC):
         if name:
             self.name = name
         else:
-            self.name = f"{self.__class__.__name__}('reduction'={repr(self.reduction)}, 'n_digits'={n_digits})"
+            self.name = f"{self.__class__.__name__}('reduction'='{self.reduction}', 'n_digits'={n_digits})"
 
     @abstractmethod
     def __call__(
