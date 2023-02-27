@@ -16,6 +16,7 @@ from torch.nn import Module
 from torch import cuda
 from torch import device as torch_device
 
+from ...tasks import TaskList
 from ...data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 
 
@@ -57,10 +58,13 @@ class Model(Module, ABC):
         self.device = device if device else torch_device("cuda") if cuda.is_available() else torch_device("cpu")
         self.name = name if name else self.__class__.__name__
 
-        self._dataset: Optional[ProstateCancerDataset] = None
+        self._tasks: Optional[TaskList] = None
         self._is_built: bool = False
 
-    def build(self, dataset: ProstateCancerDataset) -> None:
+    def build(
+            self,
+            dataset: ProstateCancerDataset
+    ) -> None:
         """
         Builds the model using information contained in the dataset with which the model is going to be trained.
 
@@ -69,16 +73,22 @@ class Model(Module, ABC):
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
         """
-        self._dataset = dataset
+        self._tasks = dataset.tasks
         self._is_built = True
 
     @check_if_built
     @abstractmethod
     def fix_thresholds_to_optimal_values(
-            self
+            self,
+            dataset: ProstateCancerDataset
     ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
         """
         raise NotImplementedError
 
@@ -136,6 +146,7 @@ class Model(Module, ABC):
     @abstractmethod
     def predict_on_dataset(
             self,
+            dataset: ProstateCancerDataset,
             mask: List[int],
             probability: bool = True
     ) -> TargetsType:
@@ -150,6 +161,8 @@ class Model(Module, ABC):
 
         Parameters
         ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
         mask : List[int]
             A list of dataset idx for which we want to obtain the predictions.
         probability : bool
@@ -191,6 +204,7 @@ class Model(Module, ABC):
     @abstractmethod
     def score_on_dataset(
             self,
+            dataset: ProstateCancerDataset,
             mask: List[int]
     ) -> Dict[str, Dict[str, float]]:
         """
@@ -198,6 +212,8 @@ class Model(Module, ABC):
 
         Parameters
         ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
         mask : List[int]
             A list of dataset idx for which we want to obtain the mean score.
 
