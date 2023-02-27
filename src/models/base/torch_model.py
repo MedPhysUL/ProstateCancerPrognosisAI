@@ -145,6 +145,8 @@ class TorchModel(Model, ABC):
                     else:
                         metric.threshold = thresholds[argmax(scores)]
 
+        self._tasks = dataset.tasks
+
     @check_if_built
     @evaluation_function
     def predict(
