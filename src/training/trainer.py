@@ -16,6 +16,7 @@ from typing import Generator, List, Optional, Union
 from monai.data import DataLoader
 from torch import device as torch_device
 from torch import cuda, no_grad
+from torch.nn import Identity
 from torch.utils.data import SubsetRandomSampler
 from tqdm.auto import tqdm
 
@@ -81,8 +82,8 @@ class Trainer:
         self.batch_state, self.batches_state, self.epoch_state, self.training_state = None, None, None, None
         self._initialize_states()
 
-        self.x_transform = kwargs.get("x_transform", ToTensor())
-        self.y_transform = kwargs.get("y_transform", ToTensor())
+        self.x_transform = kwargs.get("x_transform", Identity())
+        self.y_transform = kwargs.get("y_transform", Identity())
 
     @property
     def callbacks(self) -> TrainingCallbackList:
