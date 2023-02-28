@@ -532,10 +532,10 @@ class Trainer:
         """
         if training:
             scores = self.model.score_on_dataset(dataset=dataset, mask=dataset.train_mask)
-            self.epoch_state.train_single_task_metrics = scores
+            self.epoch_state.train.single_task_metrics = scores
         else:
             scores = self.model.score_on_dataset(dataset=dataset, mask=dataset.valid_mask)
-            self.epoch_state.valid_single_task_metrics = scores
+            self.epoch_state.valid.single_task_metrics = scores
 
     def _empty_cache(self):
         """
