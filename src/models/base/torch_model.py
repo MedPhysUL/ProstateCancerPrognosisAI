@@ -13,10 +13,10 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, NamedTuple, Optional
 
-from monai.data import DataLoader
 from numpy import argmin, argmax, linspace
 from torch import device as torch_device
 from torch import no_grad, round, sigmoid, stack
+from torch.utils.data import DataLoader
 
 from ...data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ...metrics.single_task.base import Direction, MetricReduction
@@ -104,6 +104,8 @@ class TorchModel(Model, ABC):
         raise NotImplementedError
 
     @check_if_built
+    @evaluation_function
+    @no_grad()
     def fix_thresholds_to_optimal_values(
             self,
             dataset: ProstateCancerDataset
@@ -124,31 +126,31 @@ class TorchModel(Model, ABC):
 
         thresholds = linspace(start=0.01, stop=0.95, num=95)
 
-        with no_grad():
-            for features, targets in data_loader:
-                features, targets = batch_to_device(features, self.device), batch_to_device(targets, self.device)
+        for features, targets in data_loader:
+            features, targets = batch_to_device(features, self.device), batch_to_device(targets, self.device)
 
-                predictions = self.predict(features)
-
-                for task in binary_classification_tasks:
-                    outputs_dict[task.name].predictions.append(predictions[task.name].item())
-                    outputs_dict[task.name].targets.append(targets[task.name].item())
+            predictions = self.predict(features)
 
             for task in binary_classification_tasks:
-                output = outputs_dict[task.name]
+                outputs_dict[task.name].predictions.append(predictions[task.name].item())
+                outputs_dict[task.name].targets.append(targets[task.name].item())
 
-                for metric in task.metrics:
-                    scores = [metric(to_numpy(output.predictions), to_numpy(output.targets), t) for t in thresholds]
+        for task in binary_classification_tasks:
+            output = outputs_dict[task.name]
 
-                    if metric.direction == Direction.MINIMIZE:
-                        metric.threshold = thresholds[argmin(scores)]
-                    else:
-                        metric.threshold = thresholds[argmax(scores)]
+            for metric in task.metrics:
+                scores = [metric(to_numpy(output.predictions), to_numpy(output.targets), t) for t in thresholds]
 
-        self._tasks = dataset.tasks
+                if metric.direction == Direction.MINIMIZE:
+                    metric.threshold = thresholds[argmin(scores)]
+                else:
+                    metric.threshold = thresholds[argmax(scores)]
+
+            self._tasks = dataset.tasks
 
     @check_if_built
     @evaluation_function
+    @no_grad()
     def predict(
             self,
             features: FeaturesType,
@@ -175,23 +177,23 @@ class TorchModel(Model, ABC):
             Predictions.
         """
         predictions = {}
-        with no_grad():
-            features = batch_to_device(features, self.device)
-            outputs = self(features)
+        features = batch_to_device(features, self.device)
+        outputs = self(features)
 
-            for task in self._tasks.binary_classification_tasks:
-                if probability:
-                    predictions[task.name] = sigmoid(outputs[task.name])
-                else:
-                    predictions[task.name] = (sigmoid(outputs[task.name]) >= task.decision_threshold_metric.threshold)
-            for task in self._tasks.regression_tasks:
-                predictions[task.name] = outputs[task.name]
-            for task in self._tasks.segmentation_tasks:
-                predictions[task.name] = round(sigmoid(outputs[task.name]))
+        for task in self._tasks.binary_classification_tasks:
+            if probability:
+                predictions[task.name] = sigmoid(outputs[task.name])
+            else:
+                predictions[task.name] = (sigmoid(outputs[task.name]) >= task.decision_threshold_metric.threshold)
+        for task in self._tasks.regression_tasks:
+            predictions[task.name] = outputs[task.name]
+        for task in self._tasks.segmentation_tasks:
+            predictions[task.name] = round(sigmoid(outputs[task.name]))
 
         return predictions
 
     @check_if_built
+    @no_grad()
     def predict_on_dataset(
             self,
             dataset: ProstateCancerDataset,
@@ -226,12 +228,11 @@ class TorchModel(Model, ABC):
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
 
         predictions = {task.name: [] for task in dataset.tasks}
-        with no_grad():
-            for features, _ in data_loader:
-                pred = self.predict(features=features, tasks=dataset.tasks, probability=probability)
+        for features, _ in data_loader:
+            pred = self.predict(features=features, tasks=dataset.tasks, probability=probability)
 
-                for task in dataset.tasks.table_tasks:
-                    predictions[task.name].append(pred[task.name])
+            for task in dataset.tasks.table_tasks:
+                predictions[task.name].append(pred[task.name])
 
         if dataset.tasks.table_tasks:
             return {task.name: stack(predictions[task.name], dim=0) for task in dataset.tasks.table_tasks}
@@ -239,6 +240,7 @@ class TorchModel(Model, ABC):
             return None
 
     @check_if_built
+    @no_grad()
     def score(
             self,
             features: FeaturesType,
@@ -259,18 +261,18 @@ class TorchModel(Model, ABC):
         scores : Dict[str, Dict[str, float]]
             Score for each tasks and each metrics.
         """
-        with no_grad():
-            pred = self.predict(features=features)
+        pred = self.predict(features=features)
 
-            scores = {}
-            for task in self._tasks:
-                scores[task.name] = {}
-                for metric in task.unique_metrics:
-                    scores[task.name][metric.name] = metric(to_numpy(pred[task.name]), to_numpy(targets[task.name]))
+        scores = {}
+        for task in self._tasks:
+            scores[task.name] = {}
+            for metric in task.unique_metrics:
+                scores[task.name][metric.name] = metric(to_numpy(pred[task.name]), to_numpy(targets[task.name]))
 
         return scores
 
     @check_if_built
+    @no_grad()
     def score_on_dataset(
             self,
             dataset: ProstateCancerDataset,
@@ -300,31 +302,30 @@ class TorchModel(Model, ABC):
         scores = {task.name: {} for task in tasks}
         segmentation_scores = {task.name: {metric.name: [] for metric in task.unique_metrics} for task in seg_tasks}
         table_outputs = {task.name: Output(predictions=[], targets=[]) for task in table_tasks}
-        with no_grad():
-            for features, targets in data_loader:
-                features, targets = batch_to_device(features, self.device), batch_to_device(targets, self.device)
+        for features, targets in data_loader:
+            features, targets = batch_to_device(features, self.device), batch_to_device(targets, self.device)
 
-                predictions = self.predict(features=features)
-
-                for task in seg_tasks:
-                    for metric in task.unique_metrics:
-                        segmentation_scores[task.name][metric.name].append(
-                            metric(predictions[task.name], targets[task.name], MetricReduction.NONE)
-                        )
-
-                for task in table_tasks:
-                    table_outputs[task.name].predictions.append(predictions[task.name].item())
-                    table_outputs[task.name].targets.append(targets[task.name].item())
+            predictions = self.predict(features=features)
 
             for task in seg_tasks:
                 for metric in task.unique_metrics:
-                    scores[task.name][metric.name] = metric.perform_reduction(
-                        segmentation_scores[task.name][metric.name].float()
+                    segmentation_scores[task.name][metric.name].append(
+                        metric(predictions[task.name], targets[task.name], MetricReduction.NONE)
                     )
 
             for task in table_tasks:
-                output = table_outputs[task.name]
-                for metric in task.unique_metrics:
-                    scores[task.name][metric.name] = metric(to_numpy(output.predictions), to_numpy(output.targets))
+                table_outputs[task.name].predictions.append(predictions[task.name].item())
+                table_outputs[task.name].targets.append(targets[task.name].item())
+
+        for task in seg_tasks:
+            for metric in task.unique_metrics:
+                scores[task.name][metric.name] = metric.perform_reduction(
+                    segmentation_scores[task.name][metric.name].float()
+                )
+
+        for task in table_tasks:
+            output = table_outputs[task.name]
+            for metric in task.unique_metrics:
+                scores[task.name][metric.name] = metric(to_numpy(output.predictions), to_numpy(output.targets))
 
         return scores
