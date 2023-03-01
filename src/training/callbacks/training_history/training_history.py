@@ -286,6 +286,7 @@ class TrainingHistory(TrainingCallback):
 
         axes_dict, lines = {}, {k: [] for k in all_tasks}
         fig, axes = plt.subplots(nrows=len(all_tasks), ncols=1, figsize=kwargs.get("figsize", (16, 12)), sharex='all')
+        fig.suptitle(f"{task_key}", fontsize=kwargs.get("title_fontsize", 20))
         axes = np.ravel(axes)
         for i, (ax, key) in enumerate(zip(axes, all_tasks)):
             if key in train_tasks:
