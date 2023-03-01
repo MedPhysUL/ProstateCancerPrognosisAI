@@ -48,7 +48,7 @@ class EarlyStopper(ABC):
         self.patience = patience
         self.tolerance = tolerance
 
-    def on_fit_start(self, learning_algorithm: LearningAlgorithm):
+    def on_fit_start(self, learning_algorithm: LearningAlgorithm, trainer):
         """
         Initializes early stopper on fit start.
 
@@ -56,7 +56,13 @@ class EarlyStopper(ABC):
         ----------
         learning_algorithm : LearningAlgorithm
             The learning algorithm.
+        trainer : Trainer
+            Trainer
         """
+        assert trainer.training_state.valid_dataloader, (
+            "Early stopping is not available if validation_set_size == 0. Update the masks of the dataset to add "
+            "samples in the validation set."
+        )
         self.learning_algorithm_name = learning_algorithm.name
 
     @abstractmethod
@@ -123,7 +129,7 @@ class MetricsEarlyStopper(EarlyStopper):
             else -np.inf for t in self._tasks
         ]
 
-    def on_fit_start(self, learning_algorithm: LearningAlgorithm):
+    def on_fit_start(self, learning_algorithm: LearningAlgorithm, trainer):
         """
         Sets learning algorithm and best validation metric scores.
 
@@ -131,8 +137,10 @@ class MetricsEarlyStopper(EarlyStopper):
         ----------
         learning_algorithm : LearningAlgorithm
             The learning algorithm.
+        trainer : Trainer
+            Trainer
         """
-        super().on_fit_start(learning_algorithm)
+        super().on_fit_start(learning_algorithm, trainer)
 
         tasks = learning_algorithm.criterion.tasks
         assert all(task.early_stopping_metric is not None for task in tasks), (
@@ -259,7 +267,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
 
         self.criterion_full_name = f"{basic_name}{suffix}"
 
-    def on_fit_start(self, learning_algorithm: LearningAlgorithm):
+    def on_fit_start(self, learning_algorithm: LearningAlgorithm, trainer):
         """
         Sets criterion tasks.
 
@@ -267,8 +275,10 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         ----------
         learning_algorithm : LearningAlgorithm
             The learning algorithm.
+        trainer : Trainer
+            Trainer
         """
-        super().on_fit_start(learning_algorithm)
+        super().on_fit_start(learning_algorithm, trainer)
         self._set_criterion_full_name(learning_algorithm)
 
     def __call__(self, epoch_state: EpochState) -> bool:
