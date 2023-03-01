@@ -315,7 +315,6 @@ class Trainer:
             The training history.
         """
         self._initialize_states()
-        model.build(dataset=dataset)
         self.model = model
         self.device = self.device if self.device else model.device
 
