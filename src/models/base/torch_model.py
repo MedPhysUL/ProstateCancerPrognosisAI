@@ -10,6 +10,7 @@
                         pytorch models.
 """
 
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Dict, List, NamedTuple, Optional
 
@@ -68,7 +69,7 @@ class TorchModel(Model, ABC):
     def build(
             self,
             dataset: ProstateCancerDataset
-    ):
+    ) -> TorchModel:
         """
         Builds the model using information contained in the dataset with which the model is going to be trained.
 
@@ -76,11 +77,17 @@ class TorchModel(Model, ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
+
+        Returns
+        -------
+        model : TorchModel
+            The current model.
         """
         assert all(task.criterion is not None for task in dataset.tasks), (
             f"'TorchModel' requires that all tasks define the 'criterion' attribute at instance initialization."
         )
         super().build(dataset=dataset)
+        return self
 
     @check_if_built
     @abstractmethod

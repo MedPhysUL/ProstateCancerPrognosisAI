@@ -9,6 +9,7 @@
                         this model to ensure consistency will all training and tuning tools.
 """
 
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
@@ -64,7 +65,7 @@ class Model(Module, ABC):
     def build(
             self,
             dataset: ProstateCancerDataset
-    ) -> None:
+    ) -> Model:
         """
         Builds the model using information contained in the dataset with which the model is going to be trained.
 
@@ -72,9 +73,16 @@ class Model(Module, ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
+
+        Returns
+        -------
+        model : Model
+            The current model.
         """
         self._tasks = dataset.tasks
         self._is_built = True
+
+        return self
 
     @check_if_built
     @abstractmethod
