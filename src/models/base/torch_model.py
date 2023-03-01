@@ -13,10 +13,10 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, NamedTuple, Optional
 
+from monai.data import DataLoader
 from numpy import argmin, argmax, linspace
 from torch import device as torch_device
 from torch import no_grad, round, sigmoid, stack
-from torch.utils.data import DataLoader
 
 from ...data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ...metrics.single_task.base import Direction, MetricReduction
