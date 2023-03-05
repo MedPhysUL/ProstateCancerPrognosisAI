@@ -11,7 +11,7 @@
                         appropriate times, and more.
 """
 
-from typing import Generator, List, Optional, Union
+from typing import Generator, List, Optional, Sequence, Union
 
 from monai.data import DataLoader
 from torch import device as torch_device
@@ -36,8 +36,8 @@ class Trainer:
 
     def __init__(
             self,
-            callbacks: Union[TrainingCallback, TrainingCallbackList, List[TrainingCallback]],
             batch_size: int = 8,
+            checkpoint: Checkpoint = None,
             device: Optional[torch_device] = None,
             exec_metrics_on_train: bool = True,
             max_epochs: int = 100,
@@ -50,11 +50,10 @@ class Trainer:
 
         Parameters
         ----------
-        callbacks : Union[TrainingCallback, TrainingCallbackList, List[TrainingCallback]]
-            Callbacks to use during training. Each callback will be called at different times during training. See the
-            documentation of `TrainingCallback` for more information.
         batch_size : int
             Size of the batches in the training loader. Default is 8.
+        checkpoint : Checkpoint
+             Checkpoint used to manage and create the checkpoints of a model during the training process.
         device : Optional[torch_device]
             Device to use for the training process. Default is the device of the model.
         exec_metrics_on_train : bool
@@ -70,14 +69,17 @@ class Trainer:
             y_transform : Module
                 Transform to apply to the target data before passing it to the model.
         """
-        self.callbacks = callbacks
-
         self.batch_size = batch_size
         self.device = device
         self.exec_metrics_on_train = exec_metrics_on_train
         self.max_epochs = max_epochs
         self.model = None
         self.verbose = verbose
+
+        self._callbacks = None
+        self._checkpoint = checkpoint
+        self._learning_algorithms = None
+        self._training_history = TrainingHistory()
 
         self.batch_state, self.batches_state, self.epoch_state, self.training_state = None, None, None, None
         self._initialize_states()
@@ -86,62 +88,32 @@ class Trainer:
         self.y_transform = kwargs.get("y_transform", Identity())
 
     @property
-    def callbacks(self) -> TrainingCallbackList:
+    def callbacks(self) -> Optional[TrainingCallbackList]:
         """
         Callbacks to use during the training process.
 
         Returns
         -------
-        callbacks : CallbackList
+        callbacks : Optional[TrainingCallbackList]
             Callback list
         """
         return self._callbacks
 
-    @callbacks.setter
-    def callbacks(self, callbacks: Union[TrainingCallback, TrainingCallbackList, List[TrainingCallback]]):
+    def _build_callbacks(self):
         """
-        Sets the callbacks attribute as a CallbackList and sorts the callbacks in this list. Also, automatically sets
-        the training_history, learning_algorithms and checkpoint trainer's attributes.
+        Builds the callbacks attribute as a `CallbackList` and sorts the callbacks in this list.
+        """
+        callbacks: List[TrainingCallback] = []
 
-        Parameters
-        ----------
-        callbacks : Union[TrainingCallback, TrainingCallbackList, List[TrainingCallback]]
-            The callbacks to set the callbacks attribute to.
-        """
-        if not isinstance(callbacks, (TrainingCallback, TrainingCallbackList, list)):
-            raise AssertionError(
-                "'callbacks must be of type 'TrainingCallback', 'TrainingCallbackList' or 'List[TrainingCallback]'."
-            )
-        if isinstance(callbacks, TrainingCallback):
-            callbacks = [callbacks]
-        if not any([isinstance(callback, TrainingHistory) for callback in callbacks]):
-            callbacks.append(TrainingHistory())
+        if self.training_history:
+            callbacks += [self.training_history]
+        if self.learning_algorithms:
+            callbacks += self.learning_algorithms
+        if self.checkpoint:
+            callbacks += [self.checkpoint]
 
         self._callbacks = TrainingCallbackList(callbacks)
-        self.sort_callbacks()
-
-        self._set_training_history()
-        self._set_learning_algorithms()
-        self._set_checkpoint()
-
-    def sort_callbacks(self):
-        """
-        Sort the callbacks by their priority. The higher the priority, the earlier the callback is called. In general,
-        the callbacks will be sorted in the following order:
-            1. TrainingHistory callback;
-            2. Others callbacks;
-            3. Checkpoint callback.
-        """
         self._callbacks.sort()
-
-    def _initialize_states(self):
-        """
-        Initializes all states.
-        """
-        self.batch_state = BatchState()
-        self.batches_state = BatchesState()
-        self.epoch_state = EpochState()
-        self.training_state = TrainingState(max_epochs=self.max_epochs)
 
     @property
     def checkpoint(self) -> Optional[Checkpoint]:
@@ -155,38 +127,51 @@ class Trainer:
         """
         return self._checkpoint
 
-    def _set_checkpoint(self):
+    @checkpoint.setter
+    def checkpoint(self, checkpoint: Optional[Checkpoint]):
         """
-        Sets checkpoint callback using the 'callbacks' attribute. There should be a single `Checkpoint` callback, if
-        there is one.
+        Sets checkpoint callback.
+
+        Parameters
+        ----------
+        checkpoint : Optional[Checkpoint]
+            The checkpoint callback.
         """
-        checkpoints = list(filter(lambda x: isinstance(x, Checkpoint), self.callbacks))
-        if checkpoints:
-            assert len(checkpoints) == 1, "There should be a single `Checkpoint` callback, if there is one."
-            self._checkpoint = checkpoints[0]
-        else:
-            self._checkpoint = None
+        self._checkpoint = checkpoint
+        self._build_callbacks()
 
     @property
-    def learning_algorithms(self) -> List[LearningAlgorithm]:
+    def learning_algorithms(self) -> Optional[Sequence[LearningAlgorithm]]:
         """
         Learning algorithm callbacks.
 
         Returns
         -------
-        learning_algorithms : Optional[LearningAlgorithm]
+        learning_algorithms : Optional[Sequence[LearningAlgorithm]]
             The learning algorithm callbacks.
         """
         return self._learning_algorithms
 
-    def _set_learning_algorithms(self):
+    @learning_algorithms.setter
+    def learning_algorithms(self, learning_algorithms: Optional[Union[LearningAlgorithm, Sequence[LearningAlgorithm]]]):
         """
-        Sets learning algorithm callbacks using the 'callbacks' attribute. There should be at least one
-        `LearningAlgorithm` callback.
+        Sets learning algorithm callbacks.
+
+        Parameters
+        ----------
+        learning_algorithms : Optional[LearningAlgorithm]
+            The learning algorithm callbacks.
         """
-        learning_algorithms = list(filter(lambda x: isinstance(x, LearningAlgorithm), self.callbacks))
-        assert learning_algorithms, "There should be at least one `LearningAlgorithm` callback."
-        self._learning_algorithms = learning_algorithms
+        if isinstance(learning_algorithms, Sequence):
+            self._learning_algorithms = learning_algorithms
+        elif isinstance(learning_algorithms, LearningAlgorithm):
+            self._learning_algorithms = [learning_algorithms]
+        else:
+            raise TypeError(
+                "'learning_algorithms' should be of type 'LearningAlgorithm' or 'Sequence[LearningAlgorithm]'"
+            )
+
+        self._build_callbacks()
 
     @property
     def training_history(self) -> TrainingHistory:
@@ -195,19 +180,32 @@ class Trainer:
 
         Returns
         -------
-        training_history : Optional[TrainingHistory]
+        training_history : TrainingHistory
             The training history callback.
         """
         return self._training_history
 
-    def _set_training_history(self):
+    @training_history.setter
+    def training_history(self, training_history: TrainingHistory):
         """
-        Sets training history callback using the 'callbacks' attribute. There should be one and only one
-        `TrainingHistory` callback.
+        Sets training history callback.
+
+        Parameters
+        ----------
+        training_history : TrainingHistory
+            The training history callback.
         """
-        training_histories = list(filter(lambda x: isinstance(x, TrainingHistory), self.callbacks))
-        assert len(training_histories) == 1, "There should be one and only one `TrainingHistory` callback."
-        self._training_history = training_histories[0]
+        self._training_history = training_history
+        self._build_callbacks()
+
+    def _initialize_states(self):
+        """
+        Initializes all states.
+        """
+        self.batch_state = BatchState()
+        self.batches_state = BatchesState()
+        self.epoch_state = EpochState()
+        self.training_state = TrainingState(max_epochs=self.max_epochs)
 
     def _check_if_training_can_be_stopped(self):
         """
@@ -289,6 +287,7 @@ class Trainer:
             self,
             model: TorchModel,
             dataset: ProstateCancerDataset,
+            learning_algorithms: Union[LearningAlgorithm, List[LearningAlgorithm]],
             p_bar_position: Optional[int] = None,
             p_bar_leave: Optional[bool] = None,
             **kwargs
@@ -302,6 +301,8 @@ class Trainer:
             Model to train.
         dataset : ProstateCancerDataset
             Prostate cancer dataset used to feed the dataloaders.
+        learning_algorithms : Union[LearningAlgorithm, List[LearningAlgorithm]]
+            The learning algorithm callbacks.
         p_bar_position : Optional[int]
             The position of the progress bar. See https://tqdm.github.io documentation for more information.
         p_bar_leave :  Optional[bool]
@@ -314,9 +315,11 @@ class Trainer:
         training_history : TrainingHistory
             The training history.
         """
-        self._initialize_states()
-        self.model = model
         self.device = self.device if self.device else model.device
+        self.learning_algorithms = learning_algorithms
+        self.model = model
+
+        self._initialize_states()
 
         train_dataloader = self._create_train_dataloader(dataset=dataset, batch_size=self.batch_size)
         valid_dataloader = self._create_valid_dataloader(dataset=dataset)
@@ -325,7 +328,7 @@ class Trainer:
         self.training_state.valid_dataloader = valid_dataloader
         self.training_state.tasks = dataset.tasks
 
-        self.sort_callbacks()
+        self.callbacks.sort()
         self.callbacks.on_fit_start(self)
 
         if self.epoch_state.idx is None:
