@@ -35,6 +35,7 @@ class ScoreContainer:
     test: Dict[str, Dict[str, float]] = field(default_factory=dict)
 
 
+@dataclass
 class HistoryContainer:
     """
     This class is used to store scores' history.
