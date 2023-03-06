@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 from copy import deepcopy
-from typing import Callable, Dict, Union
+from typing import Callable, Dict, Optional, Union
 
 from optuna.trial import FrozenTrial, Trial
 
@@ -25,7 +25,7 @@ class HyperparameterObject(HyperparameterContainer):
     def __init__(
             self,
             constructor: Callable,
-            parameters: Dict[str, Union[Hyperparameter, HyperparameterContainer]]
+            parameters: Optional[Dict[str, Union[Hyperparameter, HyperparameterContainer]]] = None
     ) -> None:
         """
         Sets attribute using parent's constructor.
@@ -35,13 +35,17 @@ class HyperparameterObject(HyperparameterContainer):
         constructor : Callable
             The class constructor (also named 'class blueprint' or 'class object'). This constructor is used to build
             an object given the hyperparameters.
-        parameters : Dict[str, Union[Hyperparameter, HyperparameterContainer]]
+        parameters : Optional[Dict[str, Union[Hyperparameter, HyperparameterContainer]]]
             A dictionary of parameters to initialize the object with. The keys are the names of the parameters used to
             build the given class constructor using its __init__ method.
         """
         super().__init__(sequence=list(parameters.values()))
         self._constructor = constructor
-        self._parameters = parameters
+
+        if parameters:
+            self._parameters = parameters
+        else:
+            self._parameters = {}
 
     def suggest(
             self,
