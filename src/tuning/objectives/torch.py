@@ -109,9 +109,9 @@ class TorchObjective(Objective):
         trainer_instance.model.fix_thresholds_to_optimal_values(dataset)
 
         # We calculate the scores on the different tasks on the different sets
-        train_set_scores = trainer_instance.model.scores_dataset(dataset, dataset.train_mask)
-        valid_set_scores = trainer_instance.model.scores_dataset(dataset, dataset.valid_mask)
-        test_set_scores = trainer_instance.model.scores_dataset(dataset, dataset.test_mask)
+        train_set_scores = trainer_instance.model.score_on_dataset(dataset, dataset.train_mask)
+        valid_set_scores = trainer_instance.model.score_on_dataset(dataset, dataset.valid_mask)
+        test_set_scores = trainer_instance.model.score_on_dataset(dataset, dataset.test_mask)
         score = ScoreContainer(train=train_set_scores, valid=valid_set_scores, test=test_set_scores)
 
         return ModelEvaluationContainer(trained_model=trainer_instance.model, score=score)
