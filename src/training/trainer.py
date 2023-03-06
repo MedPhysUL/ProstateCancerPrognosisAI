@@ -76,10 +76,10 @@ class Trainer:
         self.model = None
         self.verbose = verbose
 
-        self._callbacks = None
         self._checkpoint = checkpoint
         self._learning_algorithms = None
         self._training_history = TrainingHistory()
+        self._build_callbacks()
 
         self.batch_state, self.batches_state, self.epoch_state, self.training_state = None, None, None, None
         self._initialize_states()
