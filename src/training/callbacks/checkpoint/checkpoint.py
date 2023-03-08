@@ -317,7 +317,10 @@ class Checkpoint(TrainingCallback):
         if trainer.epoch_state.idx < trainer.training_state.max_epochs:
             self.save(trainer)
 
+        path_to_save = os.path.join(self.path_to_checkpoint_folder, self.TRAINING_HISTORY_FIGURES_FOLDER_NAME)
+        os.makedirs(path_to_save, exist_ok=True)
+
         trainer.training_history.plot(
-            path_to_save=os.path.join(self.path_to_checkpoint_folder, self.TRAINING_HISTORY_FIGURES_FOLDER_NAME),
+            path_to_save=path_to_save,
             show=False
         )
