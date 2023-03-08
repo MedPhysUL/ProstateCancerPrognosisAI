@@ -238,4 +238,4 @@ class TrainingState(State):
     def state_dict(self):
         unserializable = ["info", "tasks", "train_dataloader", "valid_dataloader"]
         state_dict = super().state_dict()
-        return {k: v for k, v in state_dict if k not in unserializable}
+        return {k: v for k, v in state_dict.items() if k not in unserializable}
