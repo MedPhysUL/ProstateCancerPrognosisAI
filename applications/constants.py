@@ -76,20 +76,20 @@ COLUMNS_TYPES = {
 MODALITIES = {"CT"}
 
 # TASKS
-TABLE_TASKS = [
-    BinaryClassificationTask(
-        target_column=PN,
-        decision_threshold_metric=BinaryBalancedAccuracy(),
-        hps_tuning_metric=BinaryBalancedAccuracy(),
-        criterion=BCEWithLogitsLoss()
-    ),
-    BinaryClassificationTask(
-        target_column=BCR,
-        decision_threshold_metric=BinaryBalancedAccuracy(),
-        hps_tuning_metric=BinaryBalancedAccuracy(),
-        criterion=BCEWithLogitsLoss()
-    )
-]
+PN_TASK = BinaryClassificationTask(
+    target_column=PN,
+    decision_threshold_metric=BinaryBalancedAccuracy(),
+    hps_tuning_metric=BinaryBalancedAccuracy(),
+    criterion=BCEWithLogitsLoss()
+)
+BCR_TASK = BinaryClassificationTask(
+    target_column=BCR,
+    decision_threshold_metric=BinaryBalancedAccuracy(),
+    hps_tuning_metric=BinaryBalancedAccuracy(),
+    criterion=BCEWithLogitsLoss()
+)
+TABLE_TASKS = [BCR_TASK, PN_TASK]
+
 IMAGE_TASKS = [
     SegmentationTask(
         criterion=DiceLoss(),
