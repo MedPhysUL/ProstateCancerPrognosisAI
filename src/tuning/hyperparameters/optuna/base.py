@@ -1,5 +1,5 @@
 """
-    @file:              hyperparameter.py
+    @file:              base.py
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     07/2022
