@@ -1,5 +1,5 @@
 """
-    @file:              sklearn.py
+    @file:              training.py
     @Author:            Maxence Larose
 
     @Creation Date:     03/2023
