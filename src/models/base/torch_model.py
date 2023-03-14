@@ -17,7 +17,7 @@ from typing import Dict, List, NamedTuple, Optional
 from monai.data import DataLoader
 from numpy import argmin, argmax, linspace
 from torch import device as torch_device
-from torch import no_grad, round, sigmoid, stack
+from torch import no_grad, random, round, sigmoid, stack
 
 from ...data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ...metrics.single_task.base import Direction, MetricReduction
@@ -126,7 +126,9 @@ class TorchModel(Model, ABC):
             A prostate cancer dataset.
         """
         subset = dataset[dataset.train_mask]
+        rng_state = random.get_rng_state()
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
+        random.set_rng_state(rng_state)
 
         tasks, binary_classification_tasks = dataset.tasks, dataset.tasks.binary_classification_tasks
         outputs_dict = {task.name: Output(predictions=[], targets=[]) for task in binary_classification_tasks}
@@ -232,7 +234,9 @@ class TorchModel(Model, ABC):
             Predictions (except segmentation map).
         """
         subset = dataset[mask]
+        rng_state = random.get_rng_state()
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
+        random.set_rng_state(rng_state)
 
         predictions = {task.name: [] for task in dataset.tasks}
         for features, _ in data_loader:
@@ -301,7 +305,9 @@ class TorchModel(Model, ABC):
             Score for each tasks and each metrics.
         """
         subset = dataset[mask]
+        rng_state = random.get_rng_state()
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
+        random.set_rng_state(rng_state)
 
         tasks = dataset.tasks
         table_tasks, seg_tasks = tasks.table_tasks, tasks.segmentation_tasks
