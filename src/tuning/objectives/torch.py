@@ -9,11 +9,15 @@
 """
 
 from os import cpu_count, path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
-from .base import ModelEvaluationContainer, Objective, ScoreContainer
+from optuna.trial import FrozenTrial, Trial
+
+from .base import ModelEvaluationContainer, Objective
+from ..callbacks.containers import TuningCallbackList
 from ...data.datasets import ProstateCancerDataset
-from ..hyperparameters import HyperparameterDict, HyperparameterObject
+from ..hyperparameters.containers import HyperparameterDict
+from ..hyperparameters.torch import TrainerHyperparameter, TrainMethodHyperparameter
 from ...training import Trainer
 
 
@@ -27,8 +31,8 @@ class TorchObjective(Objective):
 
     def __init__(
             self,
-            trainer_constructor_hps: HyperparameterObject,
-            train_method_hps: HyperparameterDict,
+            trainer_hyperparameter: TrainerHyperparameter,
+            train_method_hyperparameter: TrainMethodHyperparameter,
             num_cpus: int = cpu_count(),
             num_gpus: int = 0
     ) -> None:
@@ -37,9 +41,9 @@ class TorchObjective(Objective):
 
         Parameters
         ----------
-        trainer_constructor_hps : HyperparameterObject
+        trainer_hyperparameter : TrainerHyperparameter
             Trainer constructor hyperparameters.
-        train_method_hps : HyperparameterDict
+        train_method_hyperparameter : TrainMethodHyperparameter
             Train method hyperparameters.
         num_cpus : int
             The quantity of CPU cores to reserve for the tuning task. This parameter does not affect the device used
@@ -54,8 +58,8 @@ class TorchObjective(Objective):
 
         self._hyperparameters = HyperparameterDict(
             {
-                self.TRAINER_INSTANCE_KEY: trainer_constructor_hps,
-                self.TRAIN_METHOD_PARAMS_KEY: train_method_hps
+                self.TRAINER_INSTANCE_KEY: trainer_hyperparameter,
+                self.TRAIN_METHOD_PARAMS_KEY: train_method_hyperparameter
             }
         )
 
@@ -70,6 +74,72 @@ class TorchObjective(Objective):
             Dictionary containing hyperparameters.
         """
         return self._hyperparameters
+
+    def __call__(
+            self,
+            trial: Trial,
+            callbacks: TuningCallbackList,
+            dataset: ProstateCancerDataset,
+            masks: Dict[int, Dict[str, List[int]]],
+    ) -> List[float]:
+        """
+        Extracts hyperparameters suggested by optuna and executes the parallel inner loops.
+
+        Parameters
+        ----------
+        trial : Trial
+            Optuna trial.
+        callbacks : TuningCallbackList
+            Callbacks to use during tuning.
+        dataset : ProstateCancerDataset
+            The dataset used for the current trial.
+        masks : Dict[int, Dict[str, List[int]]]
+            Dictionary of inner loops masks, i.e a dictionary with list of idx to use as train, valid and test masks.
+
+        Returns
+        -------
+        scores : List[float]
+            List of task scores associated with the set of hyperparameters.
+        """
+        self._set_dataset(dataset)
+        return super().__call__(trial, callbacks, dataset, masks)
+
+    def exec_best_model_evaluation(
+            self,
+            best_trial: FrozenTrial,
+            dataset: ProstateCancerDataset,
+            path_to_save: str
+    ) -> ModelEvaluationContainer:
+        """
+        Evaluates the best model.
+
+        Parameters
+        ----------
+        best_trial : FrozenTrial
+            Optuna trial.
+        dataset : ProstateCancerDataset
+            The dataset used for the current trial.
+        path_to_save : str
+            Path to save.
+
+        Returns
+        -------
+        model_evaluation : ModelEvaluationContainer
+            Model evaluation.
+        """
+        self._set_dataset(dataset)
+        return super().exec_best_model_evaluation(best_trial, dataset, path_to_save)
+
+    def _set_dataset(self, dataset: ProstateCancerDataset):
+        """
+        Sets dataset instance.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            Prostate cancer dataset.
+        """
+        self.hyperparameters[self.TRAIN_METHOD_PARAMS_KEY].dataset = dataset
 
     def _test_hyperparameters(
             self,
@@ -103,18 +173,9 @@ class TorchObjective(Objective):
         train_method_params[self.DATASET_KEY] = dataset
 
         # We train the model using the suggested hyperparameters
-        trainer_instance.train(**train_method_params)
+        model_instance, _ = trainer_instance.train(**train_method_params)
 
-        # We find the optimal threshold for each classification tasks
-        trainer_instance.model.fix_thresholds_to_optimal_values(dataset)
-
-        # We calculate the scores on the different tasks on the different sets
-        train_set_scores = trainer_instance.model.score_on_dataset(dataset, dataset.train_mask)
-        valid_set_scores = trainer_instance.model.score_on_dataset(dataset, dataset.valid_mask)
-        test_set_scores = trainer_instance.model.score_on_dataset(dataset, dataset.test_mask)
-        score = ScoreContainer(train=train_set_scores, valid=valid_set_scores, test=test_set_scores)
-
-        return ModelEvaluationContainer(trained_model=trainer_instance.model, score=score)
+        return self._get_model_evaluation(model_instance, dataset)
 
     @staticmethod
     def _set_checkpoint_path(path_to_directory: str, trainer: Trainer):

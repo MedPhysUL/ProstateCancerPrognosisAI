@@ -11,9 +11,10 @@
 from os import cpu_count
 from typing import Any, Dict
 
-from .base import ModelEvaluationContainer, Objective, ScoreContainer
+from .base import ModelEvaluationContainer, Objective
 from ...data.datasets import ProstateCancerDataset
-from ..hyperparameters import HyperparameterDict, HyperparameterObject
+from ..hyperparameters.containers import HyperparameterDict
+from ..hyperparameters.sklearn import FitMethodHyperparameter, SklearnModelHyperparameter
 
 
 class SklearnObjective(Objective):
@@ -26,8 +27,8 @@ class SklearnObjective(Objective):
 
     def __init__(
             self,
-            model_constructor_hps: HyperparameterObject,
-            fit_method_hps: HyperparameterDict,
+            model_hyperparameter: SklearnModelHyperparameter,
+            fit_method_hyperparameter: FitMethodHyperparameter,
             num_cpus: int = cpu_count(),
             num_gpus: int = 0
     ) -> None:
@@ -36,9 +37,9 @@ class SklearnObjective(Objective):
 
         Parameters
         ----------
-        model_constructor_hps : HyperparameterObject
+        model_hyperparameter : SklearnModelHyperparameter
             Model constructor hyperparameters.
-        fit_method_hps : HyperparameterDict
+        fit_method_hyperparameter : FitMethodHyperparameter
             Fit method hyperparameters.
         num_cpus : int
             The quantity of CPU cores to reserve for the tuning task. This parameter does not affect the device used
@@ -53,8 +54,8 @@ class SklearnObjective(Objective):
 
         self._hyperparameters = HyperparameterDict(
             {
-                self.MODEL_INSTANCE_KEY: model_constructor_hps,
-                self.FIT_METHOD_PARAMS_KEY: fit_method_hps
+                self.MODEL_INSTANCE_KEY: model_hyperparameter,
+                self.FIT_METHOD_PARAMS_KEY: fit_method_hyperparameter
             }
         )
 
@@ -97,18 +98,10 @@ class SklearnObjective(Objective):
         model_instance = hyperparameters[self.MODEL_INSTANCE_KEY]
         fit_method_params = hyperparameters[self.FIT_METHOD_PARAMS_KEY]
         dataset = self.inner_loop_state.dataset
+        model_instance.build(dataset)
         fit_method_params[self.DATASET_KEY] = dataset
 
         # We train the model using the suggested hyperparameters
         model_instance.fit(**fit_method_params)
 
-        # We find the optimal threshold for each classification tasks
-        model_instance.fix_thresholds_to_optimal_values(dataset)
-
-        # We calculate the scores on the different tasks on the different sets
-        train_set_scores = model_instance.score_on_dataset(dataset, dataset.train_mask)
-        valid_set_scores = model_instance.score_on_dataset(dataset, dataset.valid_mask)
-        test_set_scores = model_instance.score_on_dataset(dataset, dataset.test_mask)
-        score = ScoreContainer(train=train_set_scores, valid=valid_set_scores, test=test_set_scores)
-
-        return ModelEvaluationContainer(trained_model=model_instance, score=score)
+        return self._get_model_evaluation(model_instance, dataset)
