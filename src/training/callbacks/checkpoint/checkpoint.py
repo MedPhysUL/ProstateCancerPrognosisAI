@@ -301,7 +301,7 @@ class Checkpoint(TrainingCallback):
             return
         elif self.save_freq > 0 and trainer.epoch_state.idx % self.save_freq == 0:
             self.save(trainer)
-        elif trainer.state.epoch >= trainer.training_state.max_epochs - 1:
+        elif trainer.state.epoch >= trainer.training_state.n_epochs - 1:
             self.save(trainer)
 
     def on_fit_end(self, trainer, **kwargs):
@@ -314,7 +314,7 @@ class Checkpoint(TrainingCallback):
         trainer : Trainer
             The trainer.
         """
-        if trainer.epoch_state.idx < trainer.training_state.max_epochs:
+        if trainer.epoch_state.idx < trainer.training_state.n_epochs:
             self.save(trainer)
 
         path_to_save = os.path.join(self.path_to_checkpoint_folder, self.TRAINING_HISTORY_FIGURES_FOLDER_NAME)

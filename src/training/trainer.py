@@ -11,11 +11,12 @@
                         appropriate times, and more.
 """
 
-from typing import Generator, List, Optional, Sequence, Union
+from typing import Generator, List, NamedTuple, Optional, Sequence, Union
 
 from monai.data import DataLoader
+from monai.utils import set_determinism
 from torch import device as torch_device
-from torch import cuda, no_grad
+from torch import cuda, no_grad, random
 from torch.nn import Identity
 from torch.utils.data import SubsetRandomSampler
 from tqdm.auto import tqdm
@@ -29,6 +30,21 @@ from .states import BatchState, BatchesState, EpochState, TrainingState
 from ..tools.transforms import batch_to_device, ToTensor
 
 
+class TrainingResult(NamedTuple):
+    """
+    Training result.
+
+    Elements
+    --------
+    model : TorchModel
+        Trained model.
+    training_history : TrainingHistory
+        Training history.
+    """
+    model: TorchModel
+    training_history: TrainingHistory
+
+
 class Trainer:
     """
     This class is used to train a PyTorch model to perform certain tasks given sample data.
@@ -40,7 +56,8 @@ class Trainer:
             checkpoint: Checkpoint = None,
             device: Optional[torch_device] = None,
             exec_metrics_on_train: bool = True,
-            max_epochs: int = 100,
+            n_epochs: int = 100,
+            seed: Optional[int] = None,
             verbose: bool = True,
             **kwargs
     ):
@@ -59,8 +76,10 @@ class Trainer:
         exec_metrics_on_train : bool
             Whether to compute metrics on the training set. This is useful when you want to save time by not computing
             the metrics on the training set. Default is True.
-        max_epochs : int
+        n_epochs : int
             Maximum number of epochs for training. Default is 100.
+        seed : Optional[int]
+            Random state used for reproducibility.
         verbose : bool
             Whether to print out the trace of the trainer.
         **kwargs : dict
@@ -72,8 +91,9 @@ class Trainer:
         self.batch_size = batch_size
         self.device = device
         self.exec_metrics_on_train = exec_metrics_on_train
-        self.max_epochs = max_epochs
+        self.n_epochs = n_epochs
         self.model = None
+        self.seed = seed
         self.verbose = verbose
 
         self._checkpoint = checkpoint
@@ -205,7 +225,7 @@ class Trainer:
         self.batch_state = BatchState()
         self.batches_state = BatchesState()
         self.epoch_state = EpochState()
-        self.training_state = TrainingState(max_epochs=self.max_epochs)
+        self.training_state = TrainingState(n_epochs=self.n_epochs)
 
     def _check_if_training_can_be_stopped(self):
         """
@@ -239,6 +259,7 @@ class Trainer:
         train_size = len(dataset.train_mask)
         train_batch_size = min(train_size, batch_size) if batch_size is not None else train_size
 
+        rng_state = random.get_rng_state()
         train_data = DataLoader(
             dataset=dataset,
             batch_size=train_batch_size,
@@ -246,6 +267,7 @@ class Trainer:
             drop_last=(train_size % train_batch_size) == 1,
             collate_fn=None
         )
+        random.set_rng_state(rng_state)
 
         return train_data
 
@@ -274,12 +296,14 @@ class Trainer:
         if valid_size != 0:
             valid_batch_size = min(valid_size, batch_size)
 
+            rng_state = random.get_rng_state()
             valid_data = DataLoader(
                 dataset=dataset,
                 batch_size=valid_batch_size,
                 sampler=SubsetRandomSampler(dataset.valid_mask),
                 collate_fn=None
             )
+            random.set_rng_state(rng_state)
 
         return valid_data
 
@@ -291,7 +315,7 @@ class Trainer:
             p_bar_position: Optional[int] = None,
             p_bar_leave: Optional[bool] = None,
             **kwargs
-    ) -> TrainingHistory:
+    ) -> TrainingResult:
         """
         Trains the model.
 
@@ -312,9 +336,10 @@ class Trainer:
 
         Returns
         -------
-        training_history : TrainingHistory
-            The training history.
+        training_result : TrainingResult
+            The training result.
         """
+        self._set_seed()
         self.device = self.device if self.device else model.device
         self.learning_algorithms = learning_algorithms
         self.model = model
@@ -338,7 +363,7 @@ class Trainer:
 
         progress_bar = tqdm(
             initial=self.epoch_state.idx,
-            total=self.training_state.max_epochs,
+            total=self.training_state.n_epochs,
             desc=kwargs.get("desc", "Training"),
             disable=not self.verbose,
             position=p_bar_position,
@@ -372,7 +397,7 @@ class Trainer:
         self.callbacks.on_fit_end(self)
         progress_bar.close()
 
-        return self.training_history
+        return TrainingResult(model=self.model, training_history=self.training_history)
 
     def _epochs_generator(self, progress_bar: tqdm) -> Generator:
         """
@@ -388,10 +413,10 @@ class Trainer:
         epochs_generator : Generator
             The current epoch.
         """
-        while self.epoch_state.idx < self.training_state.max_epochs:
+        while self.epoch_state.idx < self.training_state.n_epochs:
             yield self.epoch_state.idx
             self.epoch_state.idx += 1
-            progress_bar.total = self.training_state.max_epochs
+            progress_bar.total = self.training_state.n_epochs
             progress_bar.update()
 
     def _exec_epoch(
@@ -546,3 +571,10 @@ class Trainer:
         if self.device.type == "cuda":
             with no_grad():
                 cuda.empty_cache()
+
+    def _set_seed(self):
+        """
+        Sets numpy and torch seed.
+        """
+        if self.seed is not None:
+            set_determinism(self.seed)

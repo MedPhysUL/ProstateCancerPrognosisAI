@@ -35,7 +35,7 @@ class TrainerHyperparameter(HyperparameterObject):
             checkpoint: Checkpoint = None,
             device: Optional[torch_device] = None,
             exec_metrics_on_train: bool = True,
-            max_epochs: Union[int, FixedHyperparameter] = 100,
+            n_epochs: Union[int, FixedHyperparameter] = 100,
             verbose: bool = True,
             **kwargs
     ) -> None:
@@ -53,7 +53,7 @@ class TrainerHyperparameter(HyperparameterObject):
         exec_metrics_on_train : bool
             Whether to compute metrics on the training set. This is useful when you want to save time by not computing
             the metrics on the training set. Default is True.
-        max_epochs : Optional[int, FixedHyperparameter]
+        n_epochs : Optional[int, FixedHyperparameter]
             Maximum number of epochs for training. Default is 100.
         verbose : bool
             Whether to print out the trace of the trainer.
@@ -68,7 +68,7 @@ class TrainerHyperparameter(HyperparameterObject):
             checkpoint=checkpoint,
             device=device,
             exec_metrics_on_train=exec_metrics_on_train,
-            max_epochs=max_epochs,
+            n_epochs=n_epochs,
             verbose=verbose,
             **kwargs
         )

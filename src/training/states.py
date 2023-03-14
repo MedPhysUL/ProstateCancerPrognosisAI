@@ -217,7 +217,7 @@ class TrainingState(State):
     --------
     info : Dict[str, Any]
         Any additional information. This is useful to communicate between callbacks.
-    max_epochs : int
+    n_epochs : int
         Maximum number of epochs for training.
     stop_training_flag : bool
         Whether the training should be stopped.
@@ -229,7 +229,7 @@ class TrainingState(State):
         Validation set data loader.
     """
     info: Dict[str, Any] = field(default_factory=dict)
-    max_epochs: int = None
+    n_epochs: int = None
     stop_training_flag: bool = False
     tasks: TaskList = None
     train_dataloader: DataLoader = None
