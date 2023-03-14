@@ -8,7 +8,7 @@
     @Description:       This file is used to define the `HyperparameterList` object.
 """
 
-from typing import Any, List, Union
+from typing import Any, Callable, List
 
 from optuna.trial import FrozenTrial, Trial
 
@@ -22,17 +22,44 @@ class HyperparameterList(HyperparameterContainer):
 
     def __init__(
             self,
-            container: List[Union[Hyperparameter, HyperparameterContainer]]
+            container: List[Any]
     ) -> None:
         """
         Hyperparameters list constructor.
 
         Parameters
         ----------
-        container : List[Union[Hyperparameter, HyperparameterContainer]]
+        container : List[Any]
             List of hyperparameters.
         """
-        super().__init__(sequence=container)
+        self.container = container
+        super().__init__(sequence=self.container)
+
+    def _get_params(
+            self,
+            hyperparameter_value_getter: Callable
+    ) -> List[Any]:
+        """
+        Get the hyperparameters.
+
+        Parameters
+        ----------
+        hyperparameter_value_getter : Callable
+            Hyperparameter value getter.
+
+        Returns
+        -------
+        params : List[Any]
+            Parameters.
+        """
+        params = []
+        for hp in self.sequence:
+            if isinstance(hp, (Hyperparameter, HyperparameterContainer)):
+                params.append(hyperparameter_value_getter(hp))
+            else:
+                params.append(hp)
+
+        return params
 
     def suggest(
             self,
@@ -51,7 +78,7 @@ class HyperparameterList(HyperparameterContainer):
         suggestion : List[Any]
             Optuna's current suggestions for all hyperparameters in the list.
         """
-        return [hp.suggest(trial) for hp in self._sequence]
+        return self._get_params(lambda hp: hp.suggest(trial))
 
     def retrieve_suggestion(
             self,
@@ -71,4 +98,4 @@ class HyperparameterList(HyperparameterContainer):
             The fixed value of the hyperparameter.
         """
         self.verify_params_keys(trial)
-        return [hp.retrieve_suggestion(trial) for hp in self._sequence]
+        return self._get_params(lambda hp: hp.retrieve_suggestion(trial))

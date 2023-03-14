@@ -8,7 +8,7 @@
     @Description:       This file is used to define the `HyperparameterDict` object.
 """
 
-from typing import Any, Dict, Union
+from typing import Any, Callable, Dict
 
 from optuna.trial import FrozenTrial, Trial
 
@@ -22,18 +22,60 @@ class HyperparameterDict(HyperparameterContainer):
 
     def __init__(
             self,
-            container: Dict[str, Union[Hyperparameter, HyperparameterContainer]]
+            container: Dict[str, Any]
     ) -> None:
         """
         Hyperparameters dict constructor.
 
         Parameters
         ----------
-        container : Dict[str, Union[Hyperparameter, HyperparameterContainer]]
+        container : Dict[str, Any]
             Dict of hyperparameters.
         """
-        super().__init__(sequence=list(container.values()))
-        self._container = container
+        self.container = container
+        super().__init__(sequence=list(self.container.values()))
+
+    def __getitem__(self, key: str) -> Any:
+        """
+        Gets value corresponding to given key in dictionary.
+
+        Parameters
+        ----------
+        key : str
+            Key.
+
+        Returns
+        -------
+        value : Any
+            Value.
+        """
+        return self.container[key]
+
+    def _get_params(
+            self,
+            hyperparameter_value_getter: Callable
+    ) -> Dict[str, Any]:
+        """
+        Get the hyperparameters.
+
+        Parameters
+        ----------
+        hyperparameter_value_getter : Callable
+            Hyperparameter value getter.
+
+        Returns
+        -------
+        params : Dict[str, Any]
+            Parameters.
+        """
+        params = {}
+        for name, hp in self.container.items():
+            if isinstance(hp, (Hyperparameter, HyperparameterContainer)):
+                params[name] = hyperparameter_value_getter(hp)
+            else:
+                params[name] = hp
+
+        return params
 
     def suggest(
             self,
@@ -52,7 +94,7 @@ class HyperparameterDict(HyperparameterContainer):
         suggestion : Dict[Any]
             Optuna's current suggestions for all hyperparameters in the dict.
         """
-        return {name: hp.suggest(trial) for name, hp in self._container.items()}
+        return self._get_params(lambda hp: hp.suggest(trial))
 
     def retrieve_suggestion(
             self,
@@ -72,4 +114,4 @@ class HyperparameterDict(HyperparameterContainer):
             The fixed value of the hyperparameter.
         """
         self.verify_params_keys(trial)
-        return {name: hp.retrieve_suggestion(trial) for name, hp in self._container.items()}
+        return self._get_params(lambda hp: hp.retrieve_suggestion(trial))

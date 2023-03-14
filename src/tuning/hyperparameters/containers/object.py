@@ -9,15 +9,14 @@
 """
 
 from __future__ import annotations
-from copy import deepcopy
-from typing import Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional
 
 from optuna.trial import FrozenTrial, Trial
 
-from .base import Hyperparameter, HyperparameterContainer
+from .dict import HyperparameterDict
 
 
-class HyperparameterObject(HyperparameterContainer):
+class HyperparameterObject(HyperparameterDict):
     """
     An object hyperparameter.
     """
@@ -25,7 +24,7 @@ class HyperparameterObject(HyperparameterContainer):
     def __init__(
             self,
             constructor: Callable,
-            parameters: Optional[Dict[str, Union[Hyperparameter, HyperparameterContainer]]] = None
+            parameters: Optional[Dict[str, Any]] = None
     ) -> None:
         """
         Sets attribute using parent's constructor.
@@ -35,17 +34,17 @@ class HyperparameterObject(HyperparameterContainer):
         constructor : Callable
             The class constructor (also named 'class blueprint' or 'class object'). This constructor is used to build
             an object given the hyperparameters.
-        parameters : Optional[Dict[str, Union[Hyperparameter, HyperparameterContainer]]]
+        parameters : Optional[Dict[str, Any]]
             A dictionary of parameters to initialize the object with. The keys are the names of the parameters used to
             build the given class constructor using its __init__ method.
         """
-        super().__init__(sequence=list(parameters.values()))
-        self._constructor = constructor
-
         if parameters:
-            self._parameters = parameters
+            parameters = parameters
         else:
-            self._parameters = {}
+            parameters = {}
+
+        super().__init__(container=parameters)
+        self.constructor = constructor
 
     def suggest(
             self,
@@ -64,9 +63,8 @@ class HyperparameterObject(HyperparameterContainer):
         suggestion : object
             Optuna's current suggestion for this object hyperparameter.
         """
-        self_copy = deepcopy(self)
-        params = {name: hp.suggest(trial) for name, hp in self_copy._parameters.items()}
-        return self_copy._constructor(**params)
+        constructor_params = self._get_params(lambda hp: hp.suggest(trial))
+        return self.constructor(**constructor_params)
 
     def retrieve_suggestion(
             self,
@@ -86,7 +84,5 @@ class HyperparameterObject(HyperparameterContainer):
             The fixed value of the hyperparameter.
         """
         self.verify_params_keys(trial)
-
-        self_copy = deepcopy(self)
-        constructor_params = {name: hp.retrieve_suggestion(trial) for name, hp in self_copy._parameters.items()}
-        return self_copy._constructor(**constructor_params)
+        constructor_params = self._get_params(lambda hp: hp.retrieve_suggestion(trial))
+        return self.constructor(**constructor_params)

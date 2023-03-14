@@ -10,12 +10,12 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Any, List, Sequence, Union
+from typing import Any, List, Sequence
 
 from optuna.trial import FrozenTrial, Trial
 
-from ..base import Hyperparameter
-from ..fixed import FixedHyperparameter
+from ..optuna import FixedHyperparameter
+from ..optuna.base import Hyperparameter
 
 
 class HyperparameterContainer(ABC):
@@ -25,20 +25,17 @@ class HyperparameterContainer(ABC):
 
     def __init__(
             self,
-            sequence: Sequence[Union[Hyperparameter, HyperparameterContainer]]
+            sequence: Sequence[Any]
     ) -> None:
         """
         Initializes the hyperparameter container.
 
         Parameters
         ----------
-        sequence : Sequence[Union[Hyperparameter, HyperparameterContainer]]
+        sequence : Sequence[Any]
             A sequence of hyperparameters.
         """
-        assert all(isinstance(hp, (Hyperparameter, HyperparameterContainer)) for hp in sequence), (
-            "All objects in 'sequence' must be instances of 'Hyperparameter' or 'HyperparameterContainer'."
-        )
-        self._sequence = sequence
+        self.sequence = sequence
         self._set_hyperparameters()
 
     @property
@@ -85,15 +82,11 @@ class HyperparameterContainer(ABC):
         Sets list of hyperparameters and checks hyperparameters names uniqueness.
         """
         hyperparameters = []
-        for hp in self._sequence:
+        for hp in self.sequence:
             if isinstance(hp, Hyperparameter):
                 hyperparameters += [hp]
             elif isinstance(hp, HyperparameterContainer):
                 hyperparameters += hp.hyperparameters
-            else:
-                raise AssertionError(
-                    "All objects in 'sequence' must be instances of 'Hyperparameter' or 'HyperparameterContainer'."
-                )
 
         self._hyperparameters = hyperparameters
         self._check_hyperparameters_names_uniqueness()
@@ -159,6 +152,6 @@ class HyperparameterContainer(ABC):
         trial : FrozenTrial
             Optuna's hyperparameter optimization frozen trial.
         """
-        assert all(hp.name in trial.params.keys for hp in self.tunable_hyperparameters), (
+        assert all(hp.name in trial.params.keys() for hp in self.tunable_hyperparameters), (
             f"'params' must set all hyperparameter values of the current container."
         )
