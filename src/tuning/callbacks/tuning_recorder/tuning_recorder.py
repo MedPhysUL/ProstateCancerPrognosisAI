@@ -3,14 +3,14 @@
     @Author:            Maxence Larose
 
     @Creation Date:     02/2023
-    @Last modification: 02/2023
+    @Last modification: 03/2023
 
     @Description:       This file is used to define the 'TuningRecorder' callback.
 """
 
-from dataclasses import asdict
+from functools import partial
 from itertools import count
-import json
+from json import dump
 import os
 from typing import Any, Dict, Optional
 
@@ -21,6 +21,7 @@ import torch
 
 from ..base import Priority, TuningCallback
 from ....data.datasets import TableDataset
+from .json_encoder import EnhancedJSONEncoder
 from ....models.base.torch_model import TorchModel
 from ...states import TuningState
 from ....visualization import TableViewer
@@ -100,6 +101,9 @@ class TuningRecorder(TuningCallback):
         self.save_descriptive_analysis = save_descriptive_analysis
         self.verbose = verbose
 
+        self._dump = partial(dump, indent=4, sort_keys=True, cls=EnhancedJSONEncoder)
+        self._encode = EnhancedJSONEncoder().default
+
     @property
     def allow_duplicates(self) -> bool:
         """
@@ -177,14 +181,11 @@ class TuningRecorder(TuningCallback):
         tuner : Tuner
             The tuner.
         """
-        path_to_figures = os.path.join(
-            self.path_to_record_folder,
-            self.HYPERPARAMETERS_FOLDER_NAME,
-            self.FIGURES_FOLDER_NAME
-        )
+        path_to_hps = os.path.join(self.path_to_record_folder, self.HYPERPARAMETERS_FOLDER_NAME)
+        path_to_figures = os.path.join(path_to_hps, self.FIGURES_FOLDER_NAME)
         os.makedirs(path_to_figures, exist_ok=True)
 
-        for idx, task in enumerate(tuner.dataset.tasks):
+        for idx, task in enumerate(tuner.outer_loop_state.dataset.tasks):
             path_to_task_figure_folder = os.path.join(path_to_figures, task.name)
             os.makedirs(path_to_task_figure_folder, exist_ok=True)
             path_to_task_figure = os.path.join(path_to_task_figure_folder, self.HPS_IMPORTANCE_FIGURE_NAME)
@@ -195,8 +196,8 @@ class TuningRecorder(TuningCallback):
 
         summary = {
             self.SCORES_KEY: {
-                self.HISTORY_KEY: vars(tuner.tuning_state.scores_history),
-                self.STATISTICS_KEY: vars(tuner.tuning_state.scores_statistics)
+                self.HISTORY_KEY: tuner.tuning_state.scores_history,
+                self.STATISTICS_KEY: tuner.tuning_state.scores_statistics
             },
             self.HYPERPARAMETERS_KEY: {
                 self.HISTORY_KEY: tuner.tuning_state.hyperparameters_history,
@@ -207,9 +208,9 @@ class TuningRecorder(TuningCallback):
                 self.STATISTICS_KEY: tuner.tuning_state.hyperparameters_importance_statistics
             }
         }
-        path_to_summary = os.path.join(self.path_to_record_folder, self.SUMMARY_FILE_NAME)
+        path_to_summary = os.path.join(path_to_hps, self.SUMMARY_FILE_NAME)
         with open(path_to_summary, "w") as file:
-            json.dump(summary, file, indent=4, default=str, sort_keys=True)
+            self._dump(summary, file)
 
     def on_outer_loop_start(self, tuner, **kwargs):
         """
@@ -251,7 +252,7 @@ class TuningRecorder(TuningCallback):
         path_to_outer_loop_folder = os.path.join(
             self.path_to_record_folder,
             self.OUTER_LOOPS_FOLDER_NAME,
-            f"{self.SPLIT_PREFIX}_{tuner.outer_loop_state.outer_loop_idx}"
+            f"{self.SPLIT_PREFIX}_{tuner.outer_loop_state.idx}"
         )
         os.makedirs(path_to_outer_loop_folder, exist_ok=True)
         tuner.outer_loop_state.path_to_outer_loop_folder = path_to_outer_loop_folder
@@ -294,12 +295,12 @@ class TuningRecorder(TuningCallback):
         """
         path_to_scores = os.path.join(tuner.best_model_state.path_to_best_model_folder, self.SCORES_FILE_NAME)
         with open(path_to_scores, "w") as file:
-            json.dump(vars(tuner.best_model_state.score), file, indent=4, default=str, sort_keys=True)
+            self._dump(tuner.best_model_state.score, file)
 
-        if self.tuner.tuning_state.scores:
-            self.tuner.tuning_state.scores.append(tuner.best_model_state.score)
+        if tuner.tuning_state.scores:
+            tuner.tuning_state.scores.append(tuner.best_model_state.score)
         else:
-            self.tuner.tuning_state.scores = [tuner.best_model_state.score]
+            tuner.tuning_state.scores = [tuner.best_model_state.score]
 
         model = tuner.best_model_state.model
         if isinstance(model, TorchModel):
@@ -327,21 +328,30 @@ class TuningRecorder(TuningCallback):
         )
 
         hps_importance = self._get_hps_importance(tuner)
-        tuner.study_state.study.set_user_attr(self.BEST_TRIAL_KEY, tuner.study_state.best_trial)
-        tuner.study_state.study.set_user_attr(self.BEST_TRIALS_KEY, tuner.study_state.study.best_trials)
-        tuner.study_state.study.set_user_attr(self.HYPERPARAMETERS_IMPORTANCE_KEY, hps_importance)
+        tuner.study_state.study.set_user_attr(
+            self.BEST_TRIAL_KEY,
+            self._encode(tuner.study_state.best_trial)
+        )
+        tuner.study_state.study.set_user_attr(
+            self.BEST_TRIALS_KEY,
+            self._encode(tuner.study_state.study.best_trials)
+        )
+        tuner.study_state.study.set_user_attr(
+            self.HYPERPARAMETERS_IMPORTANCE_KEY,
+            hps_importance
+        )
         with open(path_to_best_hps_file, "w") as file:
-            json.dump(vars(tuner.study_state.study), file, indent=4, default=str, sort_keys=True)
+            self._dump(tuner.study_state.study, file)
 
-        if self.tuner.tuning_state.hyperparameters_importance:
-            self.tuner.tuning_state.hyperparameters_importance.append(hps_importance)
+        if tuner.tuning_state.hyperparameters_importance:
+            tuner.tuning_state.hyperparameters_importance.append(hps_importance)
         else:
-            self.tuner.tuning_state.hyperparameters_importance = [hps_importance]
+            tuner.tuning_state.hyperparameters_importance = [hps_importance]
 
-        if self.tuner.tuning_state.hyperparameters:
-            self.tuner.tuning_state.hyperparameters.append(tuner.study_state.best_trial.params)
+        if tuner.tuning_state.hyperparameters:
+            tuner.tuning_state.hyperparameters.append(tuner.study_state.best_trial.params)
         else:
-            self.tuner.tuning_state.hyperparameters = [tuner.study_state.best_trial.params]
+            tuner.tuning_state.hyperparameters = [tuner.study_state.best_trial.params]
 
     def _get_hps_importance(self, tuner):
         """
@@ -353,7 +363,7 @@ class TuningRecorder(TuningCallback):
             Hyperparameters importance for each task.
         """
         hps_importance = {}
-        for idx, task in enumerate(tuner.dataset.tasks):
+        for idx, task in enumerate(tuner.outer_loop_state.dataset.tasks):
             importances = get_param_importances(
                 study=tuner.study_state.study,
                 evaluator=FanovaImportanceEvaluator(seed=self.HP_IMPORTANCE_SEED),
@@ -407,11 +417,11 @@ class TuningRecorder(TuningCallback):
         """
         fixed_hps = {hp.name: hp.value for hp in objective.hyperparameters.fixed_hyperparameters}
         objective.trial_state.trial.set_user_attr(self.FIXED_PARAMS, fixed_hps)
-        objective.trial_state.trial.set_user_attr(self.HISTORY_KEY, asdict(objective.trial_state.history))
-        objective.trial_state.trial.set_user_attr(self.STATISTICS_KEY, asdict(objective.trial_state.statistics))
+        objective.trial_state.trial.set_user_attr(self.HISTORY_KEY, self._encode(objective.trial_state.history))
+        objective.trial_state.trial.set_user_attr(self.STATISTICS_KEY, self._encode(objective.trial_state.statistics))
         path_to_hps = os.path.join(objective.trial_state.path_to_trial_folder, self.SUMMARY_FILE_NAME)
         with open(path_to_hps, "w") as file:
-            json.dump(vars(objective.trial_state.trial), file, indent=4, default=str, sort_keys=True)
+            self._dump(objective.trial_state.trial, file)
 
     def on_inner_loop_start(self, objective, **kwargs):
         """
@@ -463,4 +473,4 @@ class TuningRecorder(TuningCallback):
         """
         path_to_scores = os.path.join(objective.inner_loop_state.path_to_inner_loop_folder, self.SCORES_FILE_NAME)
         with open(path_to_scores, "w") as file:
-            json.dump(vars(objective.inner_loop_state.score), file, indent=4, default=str, sort_keys=True)
+            self._dump(objective.inner_loop_state.score, file)
