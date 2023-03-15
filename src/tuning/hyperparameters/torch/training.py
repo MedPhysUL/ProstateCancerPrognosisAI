@@ -13,9 +13,8 @@ from typing import Any, Callable, Dict, Optional, Union
 from torch import device as torch_device
 
 from .base import Hyperparameter
-from ....training.callbacks import Checkpoint
 from ....data.datasets import ProstateCancerDataset
-from .callbacks import LearningAlgorithmHyperparameter
+from .callbacks import CheckpointHyperparameter, LearningAlgorithmHyperparameter
 from ..containers.base import HyperparameterContainer
 from ..containers import HyperparameterDict, HyperparameterList, HyperparameterObject
 from ....models.base.torch_model import TorchModel
@@ -32,7 +31,7 @@ class TrainerHyperparameter(HyperparameterObject):
     def __init__(
             self,
             batch_size: Union[int, FixedHyperparameter] = 8,
-            checkpoint: Checkpoint = None,
+            checkpoint: CheckpointHyperparameter = None,
             device: Optional[torch_device] = None,
             exec_metrics_on_train: bool = True,
             n_epochs: Union[int, FixedHyperparameter] = 100,
@@ -46,7 +45,7 @@ class TrainerHyperparameter(HyperparameterObject):
         ----------
         batch_size : Optional[int, FixedHyperparameter]
             Size of the batches in the training loader. Default is 8.
-        checkpoint : Checkpoint
+        checkpoint : CheckpointHyperparameter
              Checkpoint used to manage and create the checkpoints of a model during the training process.
         device : Optional[torch_device]
             Device to use for the training process. Default is the device of the model.
