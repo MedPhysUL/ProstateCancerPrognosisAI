@@ -31,7 +31,8 @@ class MLP(TorchModel):
             layers: List[int],
             dropout: float = 0,
             device: Optional[torch_device] = None,
-            name: Optional[str] = None
+            name: Optional[str] = None,
+            seed: Optional[int] = None
     ):
         """
         Builds the layers of the model and sets other protected attributes.
@@ -48,8 +49,10 @@ class MLP(TorchModel):
             The device of the model.
         name : Optional[str]
             The name of the model.
+        seed : Optional[int]
+            Random state used for reproducibility.
         """
-        super().__init__(device=device, name=name)
+        super().__init__(device=device, name=name, seed=seed)
 
         self.activation = activation
         self.dropout = dropout

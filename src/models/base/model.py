@@ -13,6 +13,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
+from monai.utils import set_determinism
 from torch.nn import Module
 from torch import cuda
 from torch import device as torch_device
@@ -42,7 +43,8 @@ class Model(Module, ABC):
     def __init__(
             self,
             device: Optional[torch_device] = None,
-            name: Optional[str] = None
+            name: Optional[str] = None,
+            seed: Optional[int] = None
     ):
         """
         Sets the model's device and name.
@@ -53,14 +55,17 @@ class Model(Module, ABC):
             The device of the model.
         name : Optional[str]
             The name of the model.
+        seed : Optional[int]
+            Random state used for reproducibility.
         """
         super().__init__()
 
         self.device = device if device else torch_device("cuda") if cuda.is_available() else torch_device("cpu")
         self.name = name if name else self.__class__.__name__
 
-        self._tasks: Optional[TaskList] = None
         self._is_built: bool = False
+        self._seed = seed
+        self._tasks: Optional[TaskList] = None
 
     def build(
             self,
@@ -79,6 +84,7 @@ class Model(Module, ABC):
         model : Model
             The current model.
         """
+        self._set_seed()
         self._tasks = dataset.tasks
         self._is_built = True
 
@@ -231,3 +237,10 @@ class Model(Module, ABC):
             Score for each tasks and each metrics.
         """
         raise NotImplementedError
+
+    def _set_seed(self):
+        """
+        Sets numpy and torch seed.
+        """
+        if self._seed is not None:
+            set_determinism(self._seed)

@@ -52,7 +52,8 @@ class TorchModel(Model, ABC):
     def __init__(
             self,
             device: Optional[torch_device] = None,
-            name: Optional[str] = None
+            name: Optional[str] = None,
+            seed: Optional[int] = None
     ) -> None:
         """
         Sets the protected attributes and creates an embedding block if required.
@@ -63,8 +64,10 @@ class TorchModel(Model, ABC):
             Device used for training.
         name : Optional[str]
             The name of the model.
+        seed : Optional[int]
+            Random state used for reproducibility.
         """
-        super().__init__(device=device, name=name)
+        super().__init__(device=device, name=name, seed=seed)
 
     def build(
             self,
