@@ -172,7 +172,7 @@ class TuningState:
             Hyperparameters statistics container.
         """
         statistics = {}
-        history = self.hyperparameters_history
+        history = self.hyperparameters_importance_history
         for task, hps_importance in history.items():
             statistics[task] = {}
             for hp_name, hp_values in hps_importance.items():
