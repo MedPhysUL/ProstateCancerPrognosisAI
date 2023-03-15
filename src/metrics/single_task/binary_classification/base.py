@@ -29,7 +29,7 @@ class BinaryClassificationMetric(SingleTaskMetric, ABC):
             reduction: Union[MetricReduction, str],
             threshold: float = 0.5,
             weight: float = 0.5,
-            n_digits: int = 5
+            n_digits: int = 7
     ):
         """
         Sets protected attributes using parent's constructor

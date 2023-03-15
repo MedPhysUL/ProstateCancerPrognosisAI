@@ -27,7 +27,7 @@ class SingleTaskMetric(ABC):
             direction: Union[Direction, str],
             name: str,
             reduction: Union[MetricReduction, str],
-            n_digits: int = 5
+            n_digits: int = 7
     ):
         """
         Sets protected attributes.

@@ -23,7 +23,7 @@ class BinaryBalancedAccuracy(BinaryClassificationMetric):
 
     def __init__(
             self,
-            n_digits: int = 5,
+            n_digits: int = 7,
             name: Optional[str] = None,
             reduction: Union[MetricReduction, str] = MetricReduction.MEAN
     ):
