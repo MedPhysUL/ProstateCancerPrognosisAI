@@ -238,8 +238,8 @@ class TableViewer:
             wedges,
             labels,
             title="Labels",
-            loc="center right",
-            bbox_to_anchor=(0.1, 0.5, 0, 0),
+            loc="lower center",
+            bbox_to_anchor=(0.5, -0.2),
             prop={"size": 8}
         )
 
@@ -264,7 +264,7 @@ class TableViewer:
             Whether to show figures.
         """
         for i, target_col in enumerate(self._target_cols):
-            fig, axes = plt.subplots(ncols=len(self.dataset.tasks), squeeze=False)
+            fig, axes = plt.subplots(ncols=len(self._nonempty_masks[i]), squeeze=False)
             for idx, (name, mask) in enumerate(self._nonempty_masks[i].items()):
                 if mask:
                     filtered_df = self._original_dataframes[i].loc[self._original_dataframes[i]["Sets"] == name]
@@ -313,7 +313,7 @@ class TableViewer:
                     if path_to_save:
                         plt.savefig(
                             os.path.join(*[
-                                path_to_save, task.target_col, self.FIGURES_PATH, path, f"{cont_col}.png"
+                                path_to_save, task.target_column, self.FIGURES_PATH, path, f"{cont_col}.png"
                             ]),
                             dpi=300
                         )
@@ -372,7 +372,7 @@ class TableViewer:
                     if path_to_save:
                         plt.savefig(
                             os.path.join(*[
-                                path_to_save, task.target_col, self.FIGURES_PATH, path, f"{cat_col}.png"
+                                path_to_save, task.target_column, self.FIGURES_PATH, path, f"{cat_col}.png"
                             ]),
                             dpi=300
                         )

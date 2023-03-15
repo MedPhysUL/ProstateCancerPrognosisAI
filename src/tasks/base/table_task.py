@@ -9,7 +9,10 @@
 """
 
 from abc import ABC
-from typing import Iterable, Optional, Union
+from typing import Iterable, List, Optional, Union
+
+import numpy as np
+from torch import Tensor, where
 
 from ...losses.single_task.binary_classification import BinaryClassificationLoss
 from ...losses.single_task.regression import RegressionLoss
@@ -71,7 +74,7 @@ class TableTask(Task, ABC):
             early_stopping_metric=early_stopping_metric,
             evaluation_metrics=evaluation_metrics
         )
-
+        self.get_idx_of_nonmissing_targets = hps_tuning_metric.get_idx_of_nonmissing_targets
         self._target_column = target_column
 
     @property
