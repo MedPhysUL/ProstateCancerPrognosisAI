@@ -93,8 +93,8 @@ class Trainer:
         self.exec_metrics_on_train = exec_metrics_on_train
         self.n_epochs = n_epochs
         self.model = None
-        self.seed = seed
         self.verbose = verbose
+        self._seed = seed
 
         self._checkpoint = checkpoint
         self._learning_algorithms = None
@@ -576,5 +576,5 @@ class Trainer:
         """
         Sets numpy and torch seed.
         """
-        if self.seed is not None:
-            set_determinism(self.seed)
+        if self._seed is not None:
+            set_determinism(self._seed)
