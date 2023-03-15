@@ -15,6 +15,7 @@ from typing import Dict, Iterable, Optional, Union
 
 from torch import Tensor
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 
 from ..base import Priority, TrainingCallback
 from .early_stopper import EarlyStopper
@@ -51,7 +52,7 @@ class LearningAlgorithm(TrainingCallback):
             criterion: MultiTaskLoss,
             optimizer: Optimizer,
             early_stopper: Optional[EarlyStopper] = None,
-            lr_scheduler: Optional[object] = None,
+            lr_scheduler: Optional[LRScheduler] = None,
             name: Optional[str] = None,
             regularizer: Optional[Union[Regularizer, RegularizerList, Iterable[Regularizer]]] = None,
             **kwargs
@@ -67,7 +68,7 @@ class LearningAlgorithm(TrainingCallback):
             A pytorch Optimizer.
         early_stopper : Optional[EarlyStopper]
             An early stopper.
-        lr_scheduler : Optional[object]
+        lr_scheduler : Optional[LRScheduler]
             A pytorch learning rate scheduler.
         name : Optional[str]
             The name of the callback.
