@@ -27,7 +27,7 @@ class ModelDependantHyperparameter(HyperparameterObject, ABC):
             self,
             constructor: Type[object],
             model_params_getter: Callable = lambda model: model.parameters(),
-            parameters: Optional[Dict[str, Hyperparameter]] = None
+            parameters: Optional[Dict[str, Any]] = None
     ) -> None:
         """
         Sets attribute using parent's constructor.
@@ -39,7 +39,7 @@ class ModelDependantHyperparameter(HyperparameterObject, ABC):
             the regularizer given the hyperparameters.
         model_params_getter : Callable
             Model parameters getter.
-        parameters : Optional[Dict[str, Hyperparameter]]
+        parameters : Optional[Dict[str, Any]]
             A dictionary of parameters to initialize the object with. The keys are the names of the parameters used to
             build the given class constructor using its __init__ method.
         """
@@ -101,7 +101,7 @@ class OptimizerDependantHyperparameter(HyperparameterObject, ABC):
     def __init__(
             self,
             constructor: Type[object],
-            parameters: Optional[Dict[str, Hyperparameter]] = None
+            parameters: Optional[Dict[str, Any]] = None
     ) -> None:
         """
         Sets attribute using parent's constructor.
@@ -111,7 +111,7 @@ class OptimizerDependantHyperparameter(HyperparameterObject, ABC):
         constructor : Type[object]
             The class constructor (also named 'class blueprint' or 'class object'). This constructor is used to build
             the optimizer given the hyperparameters.
-        parameters : Optional[Dict[str, Hyperparameter]]
+        parameters : Optional[Dict[str, Any]]
             A dictionary of parameters to initialize the object with. The keys are the names of the parameters used to
             build the given class constructor using its __init__ method.
         """
