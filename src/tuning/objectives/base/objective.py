@@ -18,7 +18,8 @@ import ray
 from ...callbacks.containers import TuningCallbackList
 from .containers import ModelEvaluationContainer, ScoreContainer
 from ....data.datasets import Mask, ProstateCancerDataset
-from ...hyperparameters import HyperparameterDict
+from ...hyperparameters.containers import HyperparameterDict
+from ....models.base.model import Model
 from .states import InnerLoopState, TrialState
 
 
@@ -53,6 +54,19 @@ class Objective(ABC):
         self.inner_loop_state = InnerLoopState()
         self.trial_state = TrialState()
 
+    @property
+    @abstractmethod
+    def hyperparameters(self) -> HyperparameterDict:
+        """
+        Hyperparameters.
+
+        Returns
+        -------
+        hyperparameters : HyperparameterDict
+            Dictionary containing hyperparameters.
+        """
+        raise NotImplementedError
+
     def __call__(
             self,
             trial: Trial,
@@ -79,6 +93,7 @@ class Objective(ABC):
         scores : List[float]
             List of task scores associated with the set of hyperparameters.
         """
+        self.trial_state.trial = trial
         callbacks.on_trial_start(self)
 
         suggested_hps = self.hyperparameters.suggest(trial)
@@ -91,9 +106,11 @@ class Objective(ABC):
 
             self._exec_inner_loop = self._build_inner_loop_runner()
             score = self._exec_inner_loop.remote(callbacks=callbacks, hyperparameters=suggested_hps)
+            # score = self._exec_inner_loop(callbacks=callbacks, hyperparameters=suggested_hps)
             futures.append(score)
 
         self.trial_state.scores = ray.get(futures)
+        # self.trial_state.scores = futures
 
         tuning_metric_test_scores = [
             self.trial_state.statistics.test[task.name][task.hps_tuning_metric.name].mean
@@ -104,18 +121,37 @@ class Objective(ABC):
 
         return tuning_metric_test_scores
 
-    @property
-    @abstractmethod
-    def hyperparameters(self) -> HyperparameterDict:
+    def exec_best_model_evaluation(
+            self,
+            best_trial: FrozenTrial,
+            dataset: ProstateCancerDataset,
+            path_to_save: str
+    ) -> ModelEvaluationContainer:
         """
-        Hyperparameters.
+        Evaluates the best model.
+
+        Parameters
+        ----------
+        best_trial : FrozenTrial
+            Optuna trial.
+        dataset : ProstateCancerDataset
+            The dataset used for the current trial.
+        path_to_save : str
+            Path to save.
 
         Returns
         -------
-        hyperparameters : HyperparameterDict
-            Dictionary containing hyperparameters.
+        model_evaluation : ModelEvaluationContainer
+            Model evaluation.
         """
-        raise NotImplementedError
+        best_hyperparameters = self.hyperparameters.retrieve_suggestion(best_trial)
+        model_evaluation = self._test_hyperparameters(
+            dataset=dataset,
+            hyperparameters=best_hyperparameters,
+            path_to_save=path_to_save
+        )
+
+        return model_evaluation
 
     def _build_inner_loop_runner(self) -> Callable:
         """
@@ -161,37 +197,36 @@ class Objective(ABC):
 
         return exec_inner_loop
 
-    def exec_best_model_evaluation(
-            self,
-            best_trial: FrozenTrial,
-            dataset: ProstateCancerDataset,
-            path_to_save: str
+    @staticmethod
+    def _get_model_evaluation(
+            trained_model: Model,
+            dataset: ProstateCancerDataset
     ) -> ModelEvaluationContainer:
         """
-        Evaluates the best model.
+        Gets model evaluation given a trained model and a dataset.
 
         Parameters
         ----------
-        best_trial : FrozenTrial
-            Optuna trial.
+        trained_model : Model
+            A trained model.
         dataset : ProstateCancerDataset
-            The dataset used for the current trial.
-        path_to_save : str
-            Path to save.
+            A dataset.
 
         Returns
         -------
         model_evaluation : ModelEvaluationContainer
             Model evaluation.
         """
-        best_hyperparameters = self.hyperparameters.retrieve_suggestion(best_trial)
-        model_evaluation = self._test_hyperparameters(
-            dataset=dataset,
-            hyperparameters=best_hyperparameters,
-            path_to_save=path_to_save
-        )
+        # We find the optimal threshold for each classification tasks
+        trained_model.fix_thresholds_to_optimal_values(dataset)
 
-        return model_evaluation
+        # We calculate the scores on the different tasks on the different sets
+        train_set_scores = trained_model.score_on_dataset(dataset, dataset.train_mask)
+        valid_set_scores = trained_model.score_on_dataset(dataset, dataset.valid_mask)
+        test_set_scores = trained_model.score_on_dataset(dataset, dataset.test_mask)
+        score = ScoreContainer(train=train_set_scores, valid=valid_set_scores, test=test_set_scores)
+
+        return ModelEvaluationContainer(trained_model=trained_model, score=score)
 
     @abstractmethod
     def _test_hyperparameters(
