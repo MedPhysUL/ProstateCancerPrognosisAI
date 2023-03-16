@@ -18,7 +18,7 @@ from optuna.logging import FATAL, set_verbosity
 from optuna.pruners import BasePruner, NopPruner
 from optuna.samplers import BaseSampler
 from optuna.study import Study
-import ray
+# import ray
 
 from .callbacks.containers import TuningCallbackList
 from ..data.datasets import ProstateCancerDataset
@@ -129,7 +129,7 @@ class SearchAlgorithm:
             Study object.
         """
         # We check ray status
-        ray_already_init = self._is_ray_initialized()
+        # ray_already_init = self._is_ray_initialized()
 
         study = self._create_new_study(dataset, study_name)
 
@@ -143,8 +143,8 @@ class SearchAlgorithm:
         )
 
         # We shutdown ray if it has been initialized in this function
-        if not ray_already_init:
-            ray.shutdown()
+        # if not ray_already_init:
+        #   ray.shutdown()
 
         return study
 
@@ -159,9 +159,9 @@ class SearchAlgorithm:
             Whether ray was already initialized.
         """
         # We initialize ray if it is not initialized yet
-        ray_was_init = True
-        if not ray.is_initialized():
-            ray_was_init = False
-            ray.init()
-
-        return ray_was_init
+        # ray_was_init = True
+        # if not ray.is_initialized():
+        #     ray_was_init = False
+        #     ray.init()
+        #
+        # return ray_was_init

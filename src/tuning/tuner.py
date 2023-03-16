@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Union
 
 from monai.utils import set_determinism
 from optuna.trial import FrozenTrial
-import ray
+# import ray
 
 from .callbacks import TuningRecorder
 from .callbacks.base import TuningCallback
@@ -142,7 +142,7 @@ class Tuner:
         """
         self._initialize_states()
         self._set_seed()
-        ray.init()
+        # ray.init()
 
         self.callbacks.on_tuning_start(self)
         self.outer_loop_state.scores = []
@@ -160,7 +160,7 @@ class Tuner:
             self.callbacks.on_outer_loop_end(self)
 
         # We shutdown ray
-        ray.shutdown()
+        # ray.shutdown()
         self.callbacks.on_tuning_end(self)
 
     def _exec_study(

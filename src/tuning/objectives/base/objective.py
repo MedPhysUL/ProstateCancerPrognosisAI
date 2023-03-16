@@ -13,7 +13,7 @@ from os import cpu_count
 from typing import Any, Callable, Dict, List
 
 from optuna.trial import FrozenTrial, Trial
-import ray
+# import ray
 
 from ...callbacks.containers import TuningCallbackList
 from .containers import ModelEvaluationContainer, ScoreContainer
@@ -105,12 +105,12 @@ class Objective(ABC):
             self.inner_loop_state.idx = idx
 
             self._exec_inner_loop = self._build_inner_loop_runner()
-            score = self._exec_inner_loop.remote(callbacks=callbacks, hyperparameters=suggested_hps)
-            # score = self._exec_inner_loop(callbacks=callbacks, hyperparameters=suggested_hps)
+            # score = self._exec_inner_loop.remote(callbacks=callbacks, hyperparameters=suggested_hps)
+            score = self._exec_inner_loop(callbacks=callbacks, hyperparameters=suggested_hps)
             futures.append(score)
 
-        self.trial_state.scores = ray.get(futures)
-        # self.trial_state.scores = futures
+        # self.trial_state.scores = ray.get(futures)
+        self.trial_state.scores = futures
 
         tuning_metric_test_scores = [
             self.trial_state.statistics.test[task.name][task.hps_tuning_metric.name].mean
@@ -163,7 +163,7 @@ class Objective(ABC):
             Function that train a single model using given masks and trial.
         """
 
-        @ray.remote(num_cpus=self.num_cpus, num_gpus=self.num_gpus)
+        # @ray.remote(num_cpus=self.num_cpus, num_gpus=self.num_gpus)
         def exec_inner_loop(
                 callbacks: TuningCallbackList,
                 hyperparameters: Dict[str, Any]
