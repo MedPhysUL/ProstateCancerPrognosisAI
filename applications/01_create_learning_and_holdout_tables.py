@@ -10,10 +10,9 @@
 
 import pandas as pd
 
+from constants import *
 from src.data.datasets import TableDataset
 from src.data.processing.sampling import Mask, Sampler
-
-from constants import *
 
 
 if __name__ == '__main__':

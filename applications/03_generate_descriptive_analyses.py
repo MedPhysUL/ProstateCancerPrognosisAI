@@ -10,10 +10,9 @@
 
 import pandas as pd
 
+from constants import *
 from src.data.datasets import TableDataset
 from src.visualization import TableViewer
-
-from constants import *
 
 
 if __name__ == '__main__':
