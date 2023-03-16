@@ -17,7 +17,7 @@ from constants import *
 from src.data.datasets import ProstateCancerDataset, TableDataset
 from src.data.processing.sampling import extract_masks
 from src.losses.multi_task import MeanLoss
-from src.models.base.mlp import MLP
+from src.models.prediction import MLP
 from src.training.callbacks.learning_algorithm import L2Regularizer, MultiTaskLossEarlyStopper
 from src.tuning import SearchAlgorithm, TorchObjective, Tuner
 from src.tuning.callbacks import TuningRecorder
@@ -83,7 +83,7 @@ if __name__ == '__main__':
         constructor=MLP,
         parameters={
             "activation": FixedHyperparameter(name="activation", value="PReLU"),
-            "layers": HyperparameterList(
+            "hidden_channels": HyperparameterList(
                 [
                     IntegerHyperparameter(name="layer_1", low=5, high=30),
                     IntegerHyperparameter(name="layer_2", low=5, high=30)

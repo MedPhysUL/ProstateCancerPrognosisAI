@@ -15,7 +15,7 @@ from torch.optim.lr_scheduler import ExponentialLR
 
 from constants import *
 from src.data.datasets import ProstateCancerDataset, TableDataset
-from src.models.base.mlp import MLP
+from src.models.prediction.mlp import MLP
 from src.losses.multi_task import MeanLoss
 from src.training import Trainer
 from src.training.callbacks import LearningAlgorithm, Checkpoint
@@ -48,8 +48,8 @@ if __name__ == '__main__':
     )
 
     model = MLP(
-        activation="PReLU",
-        layers=[20, 20, 20],
+        activation="PRELU",
+        hidden_channels=[20, 20, 20],
         device=torch.device("cuda"),
         seed=SEED
     ).build(dataset)
