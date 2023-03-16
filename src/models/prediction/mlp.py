@@ -9,15 +9,14 @@
 """
 
 from __future__ import annotations
-from typing import List, Optional
+from typing import Optional, Sequence, Tuple, Union
 
+from monai.networks.nets import FullyConnectedNet
 from torch import stack
 from torch import device as torch_device
-from torch.nn import Identity, Linear
 
-from ..base.blocks.encoders import MLPEncodingBlock
 from ...data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
-from .torch_model import check_if_built, TorchModel
+from ..base import check_if_built, TorchModel
 
 
 class MLP(TorchModel):
@@ -27,9 +26,11 @@ class MLP(TorchModel):
 
     def __init__(
             self,
-            activation: str,
-            layers: List[int],
-            dropout: float = 0,
+            hidden_channels: Sequence[int],
+            activation: Optional[Union[Tuple, str]] = None,
+            adn_ordering: Optional[str] = None,
+            bias: bool = True,
+            dropout: Optional[Union[Tuple, str, float]] = None,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None
@@ -39,12 +40,16 @@ class MLP(TorchModel):
 
         Parameters
         ----------
+        hidden_channels : Sequence[int]
+            List with number of units in each hidden layer.
         activation : str
-            Activation function
-        layers : List[int]
-            List with number of units in each hidden layer
+            Activation function.
+        adn_ordering : Optional[str]
+            A string representing the ordering of activation, dropout, and normalization. Defaults to "NDA".
+        bias : bool
+            If `bias` is True then linear units have a bias term.
         dropout : float
-            Probability of dropout
+            Probability of dropout.
         device : Optional[torch_device]
             The device of the model.
         name : Optional[str]
@@ -54,12 +59,13 @@ class MLP(TorchModel):
         """
         super().__init__(device=device, name=name, seed=seed)
 
+        self.hidden_channels = hidden_channels
         self.activation = activation
+        self.adn_ordering = adn_ordering
+        self.bias = bias
         self.dropout = dropout
-        self.layers = layers
 
-        self._linear_layer = None
-        self._main_encoding_block = None
+        self._net = None
 
     def build(self, dataset: ProstateCancerDataset) -> MLP:
         """
@@ -79,20 +85,15 @@ class MLP(TorchModel):
 
         table_input_size, table_output_size = len(dataset.table_dataset.features_cols), len(dataset.table_dataset.tasks)
 
-        if len(self.layers) > 0:
-            self._main_encoding_block = MLPEncodingBlock(
-                input_size=table_input_size,
-                output_size=self.layers[-1],
-                layers=self.layers[:-1],
-                activation=self.activation,
-                dropout=self.dropout
-            )
-        else:
-            self._main_encoding_block = Identity()
-            self.layers.append(table_input_size)
-
-        self._main_encoding_block = self._main_encoding_block.to(self.device)
-        self._linear_layer = Linear(self.layers[-1], table_output_size).to(self.device)
+        self._net = FullyConnectedNet(
+            in_channels=table_input_size,
+            out_channels=table_output_size,
+            hidden_channels=self.hidden_channels,
+            dropout=self.dropout,
+            act=self.activation,
+            bias=self.bias,
+            adn_ordering=self.adn_ordering
+        ).to(self.device)
 
         return self
 
@@ -118,7 +119,7 @@ class MLP(TorchModel):
         x_table = stack(list(features.table.values()), 1)
 
         # We compute the output
-        y_table = self._linear_layer(self._main_encoding_block(x_table.float()))
+        y_table = self._net(x_table.float())
 
         y = {task.name: y_table[:, i] for i, task in enumerate(self._tasks.table_tasks)}
 
