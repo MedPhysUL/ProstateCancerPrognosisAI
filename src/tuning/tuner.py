@@ -10,11 +10,11 @@
 
 from typing import Dict, List, Optional, Union
 
-from numpy.random import seed as np_seed
-import ray
+from monai.utils import set_determinism
 from optuna.trial import FrozenTrial
-from torch import manual_seed
+import ray
 
+from .callbacks import TuningRecorder
 from .callbacks.base import TuningCallback
 from .callbacks.containers import TuningCallbackList
 from ..data.datasets import Mask, ProstateCancerDataset
@@ -32,7 +32,7 @@ class Tuner:
     def __init__(
             self,
             search_algorithm: SearchAlgorithm,
-            callbacks: Optional[Union[TuningCallback, TuningCallbackList, List[TuningCallback]]] = None,
+            recorder: TuningRecorder = None,
             n_trials: int = 100,
             seed: Optional[int] = None,
             verbose: bool = False
@@ -44,8 +44,8 @@ class Tuner:
         ----------
         search_algorithm : SearchAlgorithm
             Search algorithm used to search for the optimal set of hyperparameters.
-        callbacks : Optional[Union[TuningCallback, TuningCallbackList, List[TuningCallback]]]
-            The tuning callbacks.
+        recorder : TuningRecorder
+            The tuning recorder.
         n_trials : int
             Number of sets of hyperparameters tested.
         seed : Optional[int]
@@ -53,48 +53,65 @@ class Tuner:
         verbose : bool
             Whether to print out the trace of the tuner.
         """
-        self.callbacks = callbacks
         self.n_trials = n_trials
         self.search_algorithm = search_algorithm
         self.seed = seed
         self.verbose = verbose
 
+        self._recorder = recorder
+        self._build_callbacks()
+
         self.best_model_state, self.outer_loop_state, self.study_state, self.tuning_state = None, None, None, None
         self._initialize_states()
 
     @property
-    def callbacks(self) -> TuningCallbackList:
+    def callbacks(self) -> Optional[TuningCallbackList]:
         """
         Callbacks to use during the training process.
 
         Returns
         -------
-        callbacks : TuningCallbackList
+        callbacks : Optional[TuningCallbackList]
             Callback list
         """
         return self._callbacks
 
-    @callbacks.setter
-    def callbacks(self, callbacks: Optional[Union[TuningCallback, TuningCallbackList, List[TuningCallback]]]):
+    def _build_callbacks(self):
         """
-        Sets the callbacks attribute as a CallbackList and sorts the callbacks in this list.
+        Builds the callbacks attribute as a `TuningCallbackList` and sorts the callbacks in this list.
+        """
+        callbacks: List[TuningCallback] = []
 
-        Parameters
-        ----------
-        callbacks : Optional[Union[TuningCallback, TuningCallbackList, List[TuningCallback]]]
-            The callbacks to set the callbacks attribute to.
-        """
-        if callbacks is None:
-            callbacks = []
-        if not isinstance(callbacks, (TuningCallback, TuningCallbackList, list)):
-            raise AssertionError(
-                "'callbacks must be of type 'TuningCallback', 'TuningCallbackList' or 'List[TuningCallback]'."
-            )
-        if isinstance(callbacks, TuningCallback):
-            callbacks = [callbacks]
+        if self.recorder:
+            callbacks += [self.recorder]
 
         self._callbacks = TuningCallbackList(callbacks)
         self._callbacks.sort()
+
+    @property
+    def recorder(self) -> Optional[TuningRecorder]:
+        """
+        Recorder callback.
+
+        Returns
+        -------
+        recorder : Optional[TuningRecorder]
+            The recorder callback, if there is one.
+        """
+        return self._recorder
+
+    @recorder.setter
+    def recorder(self, recorder: Optional[TuningRecorder]):
+        """
+        Sets recorder callback.
+
+        Parameters
+        ----------
+        recorder : Optional[TuningRecorder]
+            The recorder callback.
+        """
+        self._recorder = recorder
+        self._build_callbacks()
 
     def _initialize_states(self):
         """
@@ -131,7 +148,6 @@ class Tuner:
         self.outer_loop_state.scores = []
         for k, v in masks.items():
             self.outer_loop_state.idx = k
-
             train_mask, valid_mask, test_mask, inner_masks = v[Mask.TRAIN], v[Mask.VALID], v[Mask.TEST], v[Mask.INNER]
             dataset.update_masks(train_mask=train_mask, valid_mask=valid_mask, test_mask=test_mask)
             self.outer_loop_state.dataset = dataset
@@ -211,8 +227,7 @@ class Tuner:
         Sets numpy and torch seed.
         """
         if self.seed is not None:
-            np_seed(self.seed)
-            manual_seed(self.seed)
+            set_determinism(self.seed)
 
     def _get_best_trial(self) -> FrozenTrial:
         """
