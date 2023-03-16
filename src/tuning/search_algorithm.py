@@ -9,6 +9,7 @@
                         hyperparameters.
 """
 
+from copy import deepcopy
 from functools import partial
 from typing import Dict, List
 
@@ -76,16 +77,16 @@ class SearchAlgorithm:
         if len(directions) == 1:
             study = create_study(
                 direction=directions[0],
-                sampler=self.sampler,
-                pruner=self.pruner,
+                sampler=deepcopy(self.sampler),
+                pruner=deepcopy(self.pruner),
                 study_name=name,
                 storage=self.storage
             )
         else:
             study = create_study(
                 directions=directions,
-                sampler=self.sampler,
-                pruner=self.pruner,
+                sampler=deepcopy(self.sampler),
+                pruner=deepcopy(self.pruner),
                 study_name=name,
                 storage=self.storage
             )
@@ -135,7 +136,7 @@ class SearchAlgorithm:
         # We perform the optimization
         set_verbosity(FATAL)  # We remove verbosity from loading bar
         study.optimize(
-            func=partial(func=objective.__call__, masks=masks, dataset=dataset, callbacks=callbacks),
+            func=partial(objective.__call__, masks=masks, dataset=dataset, callbacks=callbacks),
             n_trials=n_trials,
             gc_after_trial=True,
             show_progress_bar=verbose
@@ -143,7 +144,7 @@ class SearchAlgorithm:
 
         # We shutdown ray if it has been initialized in this function
         if not ray_already_init:
-           ray.shutdown()
+            ray.shutdown()
 
         return study
 
