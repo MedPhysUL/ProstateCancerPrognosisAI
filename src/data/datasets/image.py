@@ -3,7 +3,7 @@
     @Author:            Raphael Brodeur, Maxence Larose
 
     @Creation Date:     05/2022
-    @Last modification: 02/2023
+    @Last modification: 03/2023
 
     @Description:       This file contains a class used to create a dataset containing multiple patient images and
                         segmentations from a given DELIA database.
@@ -30,8 +30,8 @@ class ImageDataset(Dataset):
     def __init__(
             self,
             database: PatientsDatabase,
-            tasks: Union[SegmentationTask, TaskList, List[SegmentationTask]],
-            modalities: Set[str],
+            modalities_and_organs: Dict[str, Set[str]],
+            tasks: Optional[Union[SegmentationTask, TaskList, List[SegmentationTask]]] = None,
             transforms: Optional[Union[Compose, MapTransform]] = None,
             transposition: Tuple[int, int, int] = (2, 0, 1),
             **kwargs
@@ -43,10 +43,11 @@ class ImageDataset(Dataset):
         ----------
         database : PatientsDatabase
             A DELIA database that is used to interact with the HDF5 file that contains all the patients' folders.
-        tasks : Union[SegmentationTask, TaskList, List[SegmentationTask]]
+        modalities_and_organs : Dict[str, Set[str]]
+            Dictionary of modalities and organs to include in the dataset. Keys are modality names and values are sets
+            of organs. Ex : {"CT": {"Prostate", "Bladder"}, "PT": {"Prostate"}, "MR": {"Brain"}}.
+        tasks : Optional[Union[SegmentationTask, TaskList, List[SegmentationTask]]]
             Segmentation tasks to perform.
-        modalities : Set[str]
-            Set of modalities to include in the dataset. Ex : {CT, PT, MR}.
         transforms : Optional[Union[Compose, MapTransform]]
             A single or a sequence of transforms to apply to images and segmentations (depending on transform keys).
         transposition : Tuple[int, int, int]
@@ -61,7 +62,7 @@ class ImageDataset(Dataset):
         )
 
         self._database = database
-        self._modalities = modalities
+        self._modalities_and_organs = modalities_and_organs
         self._transforms = transforms
         self._transposition = transposition
 
@@ -129,18 +130,17 @@ class ImageDataset(Dataset):
         """
         patient_group = self._database[index]
 
-        print(f"Loading {patient_group.name[1:]}.")  # TODO : Use logging instead of a print.
+        # print(f"Loading {patient_group.name[1:]}.")  # TODO : Use logging instead of a print.
         img_dict, seg_dict = {}, {}
         for series_number in patient_group.keys():
             series = patient_group[series_number]
-            for modality in self._modalities:
+            for modality, set_of_organs in self._modalities_and_organs.items():
                 if series.attrs[self._database.MODALITY] == modality:
                     img_dict[modality] = self._transpose(series[self._database.IMAGE]).astype(self._img_format)
 
-                    for task in self.tasks.segmentation_tasks:
-                        if modality == task.modality:
-                            seg_array = series[self._seg_series][task.organ]
-                            seg_dict[task.organ] = self._transpose(seg_array).astype(self._seg_format)
+                    for organ in set_of_organs:
+                        seg_array = series[self._seg_series][organ]
+                        seg_dict[f"{modality}_{organ}"] = self._transpose(seg_array).astype(self._seg_format)
 
         return dict(img_dict, **seg_dict)
 
