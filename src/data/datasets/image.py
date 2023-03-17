@@ -30,7 +30,8 @@ class ImageDataset(Dataset):
     def __init__(
             self,
             database: PatientsDatabase,
-            modalities_and_organs: Dict[str, Set[str]],
+            modalities: Set[str],
+            organs: Dict[str, Set[str]],
             tasks: Optional[Union[SegmentationTask, TaskList, List[SegmentationTask]]] = None,
             transforms: Optional[Union[Compose, MapTransform]] = None,
             transposition: Tuple[int, int, int] = (2, 0, 1),
@@ -43,9 +44,12 @@ class ImageDataset(Dataset):
         ----------
         database : PatientsDatabase
             A DELIA database that is used to interact with the HDF5 file that contains all the patients' folders.
-        modalities_and_organs : Dict[str, Set[str]]
+        modalities : Set[str]
             Dictionary of modalities and organs to include in the dataset. Keys are modality names and values are sets
             of organs. Ex : {"CT": {"Prostate", "Bladder"}, "PT": {"Prostate"}, "MR": {"Brain"}}.
+        organs : Dict[str, Set[str]]
+            Dictionary of organs to include in the dataset. Keys are modality names and values are sets of organs.
+            Ex : {"CT": {"Prostate", "Bladder"}, "PT": {"Prostate"}, "MR": {"Brain"}}.
         tasks : Optional[Union[SegmentationTask, TaskList, List[SegmentationTask]]]
             Segmentation tasks to perform.
         transforms : Optional[Union[Compose, MapTransform]]
@@ -62,7 +66,8 @@ class ImageDataset(Dataset):
         )
 
         self._database = database
-        self._modalities_and_organs = modalities_and_organs
+        self._modalities = modalities
+        self._organs = organs
         self._transforms = transforms
         self._transposition = transposition
 
@@ -134,13 +139,14 @@ class ImageDataset(Dataset):
         img_dict, seg_dict = {}, {}
         for series_number in patient_group.keys():
             series = patient_group[series_number]
-            for modality, set_of_organs in self._modalities_and_organs.items():
+            for modality in self._modalities:
                 if series.attrs[self._database.MODALITY] == modality:
                     img_dict[modality] = self._transpose(series[self._database.IMAGE]).astype(self._img_format)
 
-                    for organ in set_of_organs:
-                        seg_array = series[self._seg_series][organ]
-                        seg_dict[f"{modality}_{organ}"] = self._transpose(seg_array).astype(self._seg_format)
+                    if modality in self._organs.keys():
+                        for organ in self._organs[modality]:
+                            seg_array = series[self._seg_series][organ]
+                            seg_dict[f"{modality}_{organ}"] = self._transpose(seg_array).astype(self._seg_format)
 
         return dict(img_dict, **seg_dict)
 
