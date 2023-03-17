@@ -268,7 +268,6 @@ class LearningAlgorithm(TrainingCallback):
         batch_loss = self._compute_loss(pred_batch, y_batch, trainer)
         batch_loss.backward()
         self.optimizer.step()
-        batch_loss.detach_()
 
     @_pass_if_stopped
     def on_optimization_start(self, trainer, **kwargs):
