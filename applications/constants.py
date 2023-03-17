@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
-    @Last modification: 07/2022
+    @Last modification: 03/2023
 
     @Description:       This file stores helpful constants.
 """
@@ -51,30 +51,6 @@ CORES_NEGATIVE_PERCENTAGE = "CORES_NEGATIVE_PERCENTAGE"
 PN = "PN"
 BCR = "BCR"
 
-# DATA TYPE
-DATE_TYPE = "date"
-NUMERIC_TYPE = "numeric"
-CATEGORICAL_TYPE = "text"
-
-# TYPE DICT
-COLUMNS_TYPES = {
-    AGE: NUMERIC_TYPE,
-    PSA: NUMERIC_TYPE,
-    GLEASON_GLOBAL: CATEGORICAL_TYPE,
-    GLEASON_PRIMARY: CATEGORICAL_TYPE,
-    GLEASON_SECONDARY: CATEGORICAL_TYPE,
-    CLINICAL_STAGE: CATEGORICAL_TYPE,
-    CORES_POSITIVE: NUMERIC_TYPE,
-    CORES_NEGATIVE: NUMERIC_TYPE,
-    CORES_POSITIVE_PERCENTAGE: NUMERIC_TYPE,
-    CORES_NEGATIVE_PERCENTAGE: NUMERIC_TYPE,
-    PN: CATEGORICAL_TYPE,
-    BCR: CATEGORICAL_TYPE
-}
-
-# SET OF MODALITIES
-MODALITIES = {"CT"}
-
 # TASKS
 PN_TASK = BinaryClassificationTask(
     target_column=PN,
@@ -90,11 +66,10 @@ BCR_TASK = BinaryClassificationTask(
 )
 TABLE_TASKS = [BCR_TASK, PN_TASK]
 
-IMAGE_TASKS = [
-    SegmentationTask(
-        criterion=DiceLoss(),
-        hps_tuning_metric=DiceMetric(),
-        organ="Prostate",
-        modality="CT"
-    )
-]
+PROSTATE_SEGMENTATION_TASK = SegmentationTask(
+    criterion=DiceLoss(),
+    hps_tuning_metric=DiceMetric(),
+    organ="Prostate",
+    modality="CT"
+)
+IMAGE_TASKS = [PROSTATE_SEGMENTATION_TASK]
