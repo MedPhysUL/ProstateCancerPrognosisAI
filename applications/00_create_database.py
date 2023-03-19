@@ -38,26 +38,28 @@ if __name__ == "__main__":
     # ----------------------------------------------------------------------------------------------------------- #
     #                                               Transforms                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
-    automatic_crop = CenterSpatialCropD(keys=["CT", "PET", "Prostate"], roi_size=(1000, 160, 160))
+    automatic_crop = [
+        SpatialCropD(keys=["CT", "PET", "Prostate"], roi_slices=[slice(50, 210), slice(None), slice(None)]),
+        KeepLargestConnectedComponentD(keys=["Prostate"]),
+        CenterSpatialCropD(keys=["CT", "PET", "Prostate"], roi_size=(1000, 160, 160)),
+    ]
 
-    ideal_crop = MatchingCentroidSpatialCropD(
-        segmentation_key="Prostate",
-        matching_keys=["CT", "PET"],
-        roi_size=(96, 96, 96)
-    )
+    ideal_crop = [
+        SpatialCropD(keys=["CT", "PET", "Prostate"], roi_slices=[slice(20, 250), slice(None), slice(None)]),
+        KeepLargestConnectedComponentD(keys=["Prostate"]),
+        MatchingCentroidSpatialCropD(segmentation_key="Prostate", matching_keys=["CT", "PET"], roi_size=(96, 96, 96))
+    ]
 
     transforms = Compose(
         [
             ResampleD(keys=["CT", "PET", "Prostate"], out_spacing=(1.5, 1.5, 1.5)),
             MatchingCropForegroundD(image_key="CT", matching_keys=["PET", "Prostate"]),
-            SpatialCropD(keys=["CT", "PET", "Prostate"], roi_slices=[slice(50, 210), slice(None), slice(None)]),
-            KeepLargestConnectedComponentD(keys=["Prostate"]),
-            ideal_crop,
+            *ideal_crop,
             PETtoSUVD(keys=["PET"]),
             ThresholdIntensityD(keys=["CT"], threshold=-250, above=True, cval=-250),
             ThresholdIntensityD(keys=["CT"], threshold=500, above=False, cval=500),
             ScaleIntensityD(keys=["CT"], minv=0, maxv=1),
-            CopySegmentationsD(segmented_image_key="CT", unsegmented_image_key="PET"),
+            # CopySegmentationsD(segmented_image_key="CT", unsegmented_image_key="PET")
         ]
     )
 
