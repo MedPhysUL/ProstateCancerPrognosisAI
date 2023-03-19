@@ -14,7 +14,7 @@
 from os import makedirs
 from shutil import rmtree
 from typing import Generator, List, NamedTuple, Optional, Sequence, Union
-from uuid import uuid4
+from uuid import uuid1
 
 from monai.data import DataLoader
 from monai.utils import set_determinism
@@ -269,7 +269,7 @@ class Trainer:
         """
         if self.is_using_early_stopping:
             if path_to_temporary_folder is None:
-                path_to_temporary_folder = f"./{uuid4()}"
+                path_to_temporary_folder = f"./EarlyStopTemporaryFolder-{uuid1()}"
             makedirs(path_to_temporary_folder, exist_ok=False)
             self.training_state.path_to_temporary_folder = path_to_temporary_folder
 
