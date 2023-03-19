@@ -10,9 +10,8 @@
 
 from dataclasses import asdict
 from itertools import count
-import json
 import os
-from typing import Any, Dict, Mapping, Optional, Union
+from typing import Optional
 
 import torch
 
@@ -27,9 +26,9 @@ class Checkpoint(TrainingCallback):
 
     instance_counter = count()
 
+    BEST_MODEL_KEY: str = "best"
     CHECKPOINT_EPOCH_KEY: str = "epoch"
     CHECKPOINT_EPOCHS_KEY: str = "epochs"
-    CHECKPOINT_METADATA_KEY: str = 'metadata'
 
     TRAINING_HISTORY_FIGURES_FOLDER_NAME = "training_history_figures"
 
@@ -84,10 +83,12 @@ class Checkpoint(TrainingCallback):
         loaded_checkpoint : dict
             The loaded checkpoint.
         """
-        with open(self.path_to_checkpoints_metadata, "r+") as file:
-            info = json.load(file)
-        filename = self._get_save_name_from_checkpoints(info, epoch)
-        checkpoint = torch.load(f"{self.path_to_checkpoint_folder}/{filename}")
+        if os.path.exists(self._get_path_to_checkpoint(epoch)):
+            checkpoint = torch.load(self._get_path_to_checkpoint(epoch))
+        elif os.path.exists(self._get_path_to_checkpoint(epoch, True)):
+            checkpoint = torch.load(self._get_path_to_checkpoint(epoch, True))
+        else:
+            raise FileNotFoundError("File not found.")
 
         return checkpoint
 
@@ -102,18 +103,6 @@ class Checkpoint(TrainingCallback):
             Allow duplicates.
         """
         return False
-
-    @property
-    def path_to_checkpoints_metadata(self) -> str:
-        """
-        Gets the path to the checkpoints metadata file.
-
-        Returns
-        -------
-        metadata_path : str
-            The path to the checkpoints metadata file.
-        """
-        return os.path.join(self.path_to_checkpoint_folder, f"{self.CHECKPOINT_METADATA_KEY}.json")
 
     @property
     def priority(self) -> int:
@@ -144,23 +133,6 @@ class Checkpoint(TrainingCallback):
             callbacks_state=trainer.callbacks.state_dict()
         )
 
-    def _create_new_checkpoint_metadata(self, epoch: int) -> dict:
-        """
-        Creates a new checkpoint's metadata.
-
-        Parameters
-        ----------
-        epoch : int
-            The epoch of the checkpoint.
-
-        Returns
-        -------
-        metadata : dict
-            The new checkpoint's metadata.
-        """
-        save_name = self._get_checkpoint_filename(epoch)
-        return {self.CHECKPOINT_EPOCHS_KEY: {str(epoch): save_name}}
-
     def _get_checkpoint_filename(self, epoch: int):
         """
         Generate the filename for the checkpoint at the given epoch.
@@ -177,30 +149,42 @@ class Checkpoint(TrainingCallback):
         """
         return f"{self.CHECKPOINT_EPOCH_KEY}-{epoch}.pth"
 
-    def _get_save_name_from_checkpoints(
-            self,
-            checkpoints_meta: Dict[str, Union[str, Dict[Any, str]]],
-            epoch: int
-    ) -> str:
+    def _get_best_checkpoint_filename(self, epoch: int):
         """
-        Gets the save name from the checkpoint's metadata given the load checkpoint mode.
+        Generate the filename for the checkpoint at the given epoch.
 
         Parameters
         ----------
-        checkpoints_meta : Dict[str, Union[str, Dict[Any, str]]]
-            The checkpoint's metadata.
         epoch : int
-            The epoch to get the checkpoint at.
+            The epoch to generate the filename for.
 
         Returns
         -------
-        save_name : str
-            The save name.
+        checkpoint_filename : str
+            The filename for the checkpoint at the given epoch.
         """
-        if str(epoch) in checkpoints_meta[self.CHECKPOINT_EPOCHS_KEY].keys():
-            return checkpoints_meta[self.CHECKPOINT_EPOCHS_KEY][str(epoch)]
+        return f"{self.CHECKPOINT_EPOCH_KEY}-{epoch}({self.BEST_MODEL_KEY}).pth"
+
+    def _get_path_to_checkpoint(self, epoch: int, best: bool = False) -> str:
+        """
+        Generates the path to the file for the checkpoint at the given epoch.
+
+        Parameters
+        ----------
+        epoch : int
+            The epoch to generate the filepath for.
+        best : bool
+            Whether the current epoch is associated to the best checkpoint.
+
+        Returns
+        -------
+        checkpoint_filepath : str
+            The filepath for the checkpoint at the given epoch.
+        """
+        if best:
+            return os.path.join(self.path_to_checkpoint_folder, self._get_best_checkpoint_filename(epoch))
         else:
-            raise ValueError(f"Invalid epoch index {epoch}.")
+            return os.path.join(self.path_to_checkpoint_folder, self._get_checkpoint_filename(epoch))
 
     def _save_checkpoint(
             self,
@@ -232,8 +216,7 @@ class Checkpoint(TrainingCallback):
             The path to the saved checkpoint.
         """
         os.makedirs(self.path_to_checkpoint_folder, exist_ok=True)
-        save_name = self._get_checkpoint_filename(epoch)
-        path = os.path.join(self.path_to_checkpoint_folder, save_name)
+        path = self._get_path_to_checkpoint(epoch)
 
         state = CheckpointState(
             callbacks_state=callbacks_state,
@@ -244,49 +227,7 @@ class Checkpoint(TrainingCallback):
         )
 
         torch.save(asdict(state), path)
-        self._save_checkpoints_metadata(self._create_new_checkpoint_metadata(epoch))
         return path
-
-    def _save_checkpoints_metadata(self, new_info: dict):
-        """
-        Saves the new checkpoints' metadata.
-
-        Parameters
-        ----------
-        new_info : dict
-            The new checkpoints' metadata.
-        """
-        info = {}
-        if os.path.exists(self.path_to_checkpoints_metadata):
-            with open(self.path_to_checkpoints_metadata, "r+") as file:
-                info = json.load(file)
-        self._update_dictionary_recursively(info, new_info)
-        os.makedirs(self.path_to_checkpoint_folder, exist_ok=True)
-        with open(self.path_to_checkpoints_metadata, "w+") as file:
-            json.dump(info, file, indent=4)
-
-    def _update_dictionary_recursively(self, dict_to_update: dict, updater: Mapping) -> dict:
-        """
-        Update dict recursively.
-
-        Parameters
-        ----------
-        dict_to_update : dict
-            Mapping item that wil be updated.
-        updater : Mapping
-            Mapping item updater.
-
-        Returns
-        -------
-        updated_dict : dict
-            Updated dict.
-        """
-        for k, v in updater.items():
-            if isinstance(v, Mapping):
-                dict_to_update[k] = self._update_dictionary_recursively(dict_to_update.get(k, {}), v)
-            else:
-                dict_to_update[k] = v
-        return dict_to_update
 
     def on_epoch_end(self, trainer, **kwargs):
         """
@@ -314,8 +255,14 @@ class Checkpoint(TrainingCallback):
         trainer : Trainer
             The trainer.
         """
-        if trainer.epoch_state.idx < trainer.training_state.n_epochs:
-            self.save(trainer)
+        if trainer.training_state.stop_training_flag:
+            best_epoch_idx = trainer.training_state.best_epoch
+            path_to_best_checkpoint = self._get_path_to_checkpoint(best_epoch_idx)
+            if os.path.exists(path_to_best_checkpoint):
+                os.rename(
+                    path_to_best_checkpoint,
+                    self._get_path_to_checkpoint(best_epoch_idx, True)
+                )
 
         path_to_save = os.path.join(self.path_to_checkpoint_folder, self.TRAINING_HISTORY_FIGURES_FOLDER_NAME)
         os.makedirs(path_to_save, exist_ok=True)
