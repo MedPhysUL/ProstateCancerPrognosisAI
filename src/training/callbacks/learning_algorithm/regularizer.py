@@ -233,7 +233,7 @@ class LpRegularizer(Regularizer):
         """
         loss = tensor(0.0, requires_grad=True).to(self.params[0].device)
         for param in self.params:
-            loss += linalg.norm(param, self.power)
+            loss += linalg.norm(param.flatten(), self.power)
         return loss
 
 
