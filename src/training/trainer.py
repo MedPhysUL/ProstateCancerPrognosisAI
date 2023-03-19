@@ -11,7 +11,10 @@
                         appropriate times, and more.
 """
 
+from os import makedirs
+from shutil import rmtree
 from typing import Generator, List, NamedTuple, Optional, Sequence, Union
+from uuid import uuid4
 
 from monai.data import DataLoader
 from monai.utils import set_determinism
@@ -218,6 +221,18 @@ class Trainer:
         self._training_history = training_history
         self._build_callbacks()
 
+    @property
+    def is_using_early_stopping(self) -> bool:
+        """
+        Whether any learning algorithm is using early stopping.
+
+        Returns
+        -------
+        trainer_is_using_early_stopping : bool
+            Whether any learning algorithm is using early stopping.
+        """
+        return any(learn_algo.early_stopper for learn_algo in self.learning_algorithms)
+
     def _initialize_states(self):
         """
         Initializes all states.
@@ -229,12 +244,34 @@ class Trainer:
 
     def _check_if_training_can_be_stopped(self):
         """
-        Checks if the training process can be stopped. Training can be stopped if all learning algorithms are stopped.
+        Checks if the training process can be stopped. Training can be stopped if any learning algorithm is stopped.
         """
         if not self.training_state.stop_training_flag:
-            self.training_state.stop_training_flag = all(
+            self.training_state.stop_training_flag = any(
                 learning_algorithm.stopped for learning_algorithm in self.learning_algorithms
             )
+
+    def _delete_temporary_folder(self):
+        """
+        Deletes the temporary folder.
+        """
+        if self.is_using_early_stopping:
+            rmtree(self.training_state.path_to_temporary_folder)
+
+    def _set_temporary_folder(self, path_to_temporary_folder: Optional[str]):
+        """
+        Sets path to temporary folder and creates the directory on the computer.
+
+        Parameters
+        ----------
+        path_to_temporary_folder : Optional[str]
+            Path to temporary folder.
+        """
+        if self.is_using_early_stopping:
+            if path_to_temporary_folder is None:
+                path_to_temporary_folder = f"./{uuid4()}"
+            makedirs(path_to_temporary_folder, exist_ok=False)
+            self.training_state.path_to_temporary_folder = path_to_temporary_folder
 
     @staticmethod
     def _create_train_dataloader(
@@ -312,6 +349,7 @@ class Trainer:
             model: TorchModel,
             dataset: ProstateCancerDataset,
             learning_algorithms: Union[LearningAlgorithm, List[LearningAlgorithm]],
+            path_to_temporary_folder: Optional[str] = None,
             p_bar_position: Optional[int] = None,
             p_bar_leave: Optional[bool] = None,
             **kwargs
@@ -327,6 +365,9 @@ class Trainer:
             Prostate cancer dataset used to feed the dataloaders.
         learning_algorithms : Union[LearningAlgorithm, List[LearningAlgorithm]]
             The learning algorithm callbacks.
+        path_to_temporary_folder : Optional[str]
+            Path to temporary folder used to save the best model during run time. The folder is only created when early
+            stopping is used and the folder is deleted at the end of the training.
         p_bar_position : Optional[int]
             The position of the progress bar. See https://tqdm.github.io documentation for more information.
         p_bar_leave :  Optional[bool]
@@ -345,6 +386,7 @@ class Trainer:
         self.model = model
 
         self._initialize_states()
+        self._set_temporary_folder(path_to_temporary_folder)
 
         train_dataloader = self._create_train_dataloader(dataset=dataset, batch_size=self.batch_size)
         valid_dataloader = self._create_valid_dataloader(dataset=dataset)
@@ -394,6 +436,7 @@ class Trainer:
                 progress_bar.set_postfix(dict(**{"stop_flag": "True"}, **postfix))
                 break
 
+        self._delete_temporary_folder()
         self.callbacks.on_fit_end(self)
         progress_bar.close()
 

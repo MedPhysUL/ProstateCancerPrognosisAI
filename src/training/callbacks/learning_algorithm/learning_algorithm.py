@@ -23,18 +23,6 @@ from ....losses.multi_task.base import MultiTaskLoss
 from .regularizer import Regularizer, RegularizerList
 
 
-def _pass_if_stopped(_func):
-    def wrapper(*args, **kwargs):
-        self = args[0]
-
-        if self.stopped:
-            pass
-        else:
-            return _func(*args, **kwargs)
-
-    return wrapper
-
-
 class LearningAlgorithm(TrainingCallback):
     """
     This class is used to dictate how to update the model's parameters during the training process.
@@ -228,7 +216,6 @@ class LearningAlgorithm(TrainingCallback):
 
         return loss_with_regularization if loss_with_regularization else loss_without_regularization
 
-    @_pass_if_stopped
     def on_fit_start(self, trainer, **kwargs):
         """
         Sets criterion tasks.
@@ -269,7 +256,6 @@ class LearningAlgorithm(TrainingCallback):
         batch_loss.backward()
         self.optimizer.step()
 
-    @_pass_if_stopped
     def on_optimization_start(self, trainer, **kwargs):
         """
         Computes loss and updates 'batch_loss' value in trainer state.
@@ -285,7 +271,6 @@ class LearningAlgorithm(TrainingCallback):
         y_batch = trainer.batch_state.y
         self._optimizer_step(pred_batch, y_batch, trainer)
 
-    @_pass_if_stopped
     def on_optimization_end(self, trainer, **kwargs):
         """
         Sets the gradients of all optimized Tensors to zero.
@@ -299,7 +284,6 @@ class LearningAlgorithm(TrainingCallback):
         """
         self.optimizer.zero_grad()
 
-    @_pass_if_stopped
     def on_validation_batch_end(self, trainer, **kwargs):
         """
         Calculates validation loss and update 'batch_loss' value in trainer state.
@@ -315,7 +299,6 @@ class LearningAlgorithm(TrainingCallback):
         y_batch = trainer.batch_state.y
         self._compute_loss(pred_batch, y_batch, trainer)
 
-    @_pass_if_stopped
     def on_epoch_end(self, trainer, **kwargs):
         """
         Performs a learning rate scheduler step and checks if early stop needs to occur.
@@ -331,8 +314,5 @@ class LearningAlgorithm(TrainingCallback):
             self.lr_scheduler.step()
 
         if self.early_stopper:
-            early_stop = self.early_stopper(trainer.epoch_state)
-
-            if early_stop:
+            if self.early_stopper(trainer):
                 self.stopped = True
-                self.early_stopper.print_early_stopping_message(trainer.epoch_state)

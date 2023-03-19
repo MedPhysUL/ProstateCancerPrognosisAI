@@ -10,21 +10,25 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from os import path
 from typing import Optional, TYPE_CHECKING
 
 import numpy as np
+from torch import load, save
 
 from ....metrics.single_task.base import Direction
 
 if TYPE_CHECKING:
     from ..learning_algorithm import LearningAlgorithm
-    from ...states import EpochState
+    from ....models.base.torch_model import TorchModel
 
 
 class EarlyStopper(ABC):
     """
     Base class for early stopping.
     """
+
+    BEST_MODEL_NAME = "best_model"
 
     def __init__(
             self,
@@ -45,8 +49,26 @@ class EarlyStopper(ABC):
 
         self.counter = 0
         self.learning_algorithm_name = None
+        self.path_to_best_model = None
         self.patience = patience
         self.tolerance = tolerance
+
+    @abstractmethod
+    def __call__(self, trainer) -> bool:
+        """
+        Called when an epoch ends. Returns whether to early stop.
+
+        Parameters
+        ----------
+        trainer : Trainer
+            The current trainer.
+
+        Returns
+        -------
+        early_stop : bool
+            Whether to early stop.
+        """
+        raise NotImplementedError
 
     def on_fit_start(self, learning_algorithm: LearningAlgorithm, trainer):
         """
@@ -60,42 +82,67 @@ class EarlyStopper(ABC):
             Trainer
         """
         assert trainer.training_state.valid_dataloader, (
-            "Early stopping is not available if validation_set_size == 0. Update the masks of the dataset to add "
+            "Early stopping is not available if 'validation_set_size' == 0. Update the masks of the dataset to add "
             "samples in the validation set."
         )
         self.learning_algorithm_name = learning_algorithm.name
+        self.path_to_best_model = path.join(
+            trainer.training_state.path_to_temporary_folder,
+            f"{self.learning_algorithm_name}_{self.BEST_MODEL_NAME}"
+        )
 
-    @abstractmethod
-    def __call__(self, epoch_state: EpochState) -> bool:
+    def _load_best_model(self, model):
         """
-        Called when an epoch ends. Returns whether to early stop.
+        Loads best model.
 
         Parameters
         ----------
-        epoch_state : EpochState
-            The current epoch state.
-
-        Returns
-        -------
-        early_stop : bool
-            Whether to early stop.
+        model : TorchModel
+            Model.
         """
-        raise NotImplementedError
+        model.load_state_dict(load(self.path_to_best_model))
 
-    @abstractmethod
-    def print_early_stopping_message(
-            self,
-            epoch_state: EpochState
-    ) -> None:
+    def _set_best_epoch(self, trainer):
+        """
+        Sets best epoch.
+
+        Parameters
+        ----------
+        trainer : Trainer
+            trainer
+        """
+        trainer.training_state.best_epoch = trainer.epoch_state.idx - self.patience
+
+    def _exec_early_stopping(self, trainer):
+        """
+        Executes early stopping.
+
+        Parameters
+        ----------
+        trainer : Trainer
+            Trainer.
+        """
+        self._load_best_model(trainer.model)
+        self._set_best_epoch(trainer)
+
+        if trainer.verbose:
+            self._print_early_stopping_message(trainer)
+
+    @staticmethod
+    def _print_early_stopping_message(trainer) -> None:
         """
         Prints a message when early stopping occurs.
 
         Parameters
         ----------
-        epoch_state : EpochState
-            The current epoch state.
+        trainer : Trainer
+            The current trainer.
         """
-        raise NotImplementedError
+        # TODO : Here, use logging instead of print.
+        print(
+            f"\nEarlyStopper: Early stopping occurred at epoch {trainer.epoch_state.idx} with best_epoch = "
+            f"{trainer.training_state.best_epoch}."
+        )
 
 
 class MetricsEarlyStopper(EarlyStopper):
@@ -151,21 +198,21 @@ class MetricsEarlyStopper(EarlyStopper):
         self._tasks = tasks
         self._initialize_best_val_metric_scores()
 
-    def __call__(self, epoch_state: EpochState) -> bool:
+    def __call__(self, trainer) -> bool:
         """
         Called when an epoch ends. Returns whether to early stop.
 
         Parameters
         ----------
-        epoch_state : EpochState
-            The current epoch state.
+        trainer : Trainer
+            The current trainer.
 
         Returns
         -------
         early_stop : bool
             Whether to early stop.
         """
-        val_scores = epoch_state.valid.single_task_losses
+        val_scores = trainer.epoch_state.valid.single_task_losses
 
         new_scores_is_better = []
         for i, task, best_score in enumerate(zip(self._tasks, self._best_val_metric_scores)):
@@ -187,32 +234,13 @@ class MetricsEarlyStopper(EarlyStopper):
 
             # if the counter reach the patience we early stop
             if self.counter >= self.patience:
+                self._exec_early_stopping(trainer)
                 return True
         else:
+            save(trainer.model.state_dict(), self.path_to_best_model)
             self.counter = 0
 
         return False
-
-    # TODO : Here, use logging instead of print.
-    def print_early_stopping_message(
-            self,
-            epoch_state: EpochState
-    ) -> None:
-        """
-        Prints a message when early stopping occurs.
-
-        Parameters
-        ----------
-        epoch_state : EpochState
-            The current epoch state.
-        """
-        print(
-            f"\n{self.learning_algorithm_name}: Early stopping occurred at epoch {epoch_state.idx} with best_epoch = "
-            f"{epoch_state.idx - self.patience}"
-        )
-
-        for score, task in zip(self._best_val_metric_scores, self._tasks):
-            print(f"\nTask ({task.name}) (metric {task.early_stopping_metric.name}), Score :{round(score, 4)}")
 
 
 class MultiTaskLossEarlyStopper(EarlyStopper):
@@ -223,9 +251,9 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
 
     def __init__(
             self,
+            include_regularization: Optional[bool] = True,
             patience: int = 10,
-            tolerance: float = 1e-4,
-            include_regularization: Optional[bool] = True
+            tolerance: float = 1e-4
     ) -> None:
         """
         Sets protected attributes of early stopper and defines comparison methods according to the given tasks.
@@ -281,21 +309,21 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         super().on_fit_start(learning_algorithm, trainer)
         self._set_criterion_full_name(learning_algorithm)
 
-    def __call__(self, epoch_state: EpochState) -> bool:
+    def __call__(self, trainer) -> bool:
         """
         Called when an epoch ends. Returns whether to early stop.
 
         Parameters
         ----------
-        epoch_state : EpochState
-            The current epoch state.
+        trainer : Trainer
+            The current trainer.
 
         Returns
         -------
         early_stop : bool
             Whether to early stop.
         """
-        val_loss = epoch_state.valid.multi_task_losses[self.learning_algorithm_name][self.criterion_full_name]
+        val_loss = trainer.epoch_state.valid.multi_task_losses[self.learning_algorithm_name][self.criterion_full_name]
 
         # if the score is worst than the best score we increment the counter
         if not (self._best_val_loss - val_loss) > self.tolerance:
@@ -303,30 +331,12 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
 
             # if the counter reach the patience we early stop
             if self.counter >= self.patience:
+                self._exec_early_stopping(trainer)
                 return True
-
         # if the score is better than the best score saved we update the best model
         else:
+            save(trainer.model.state_dict(), self.path_to_best_model)
             self._best_val_loss = val_loss
             self.counter = 0
 
         return False
-
-    # TODO : Here, use logging instead of print.
-    def print_early_stopping_message(
-            self,
-            epoch_state: EpochState
-    ) -> None:
-        """
-        Prints a message when early stopping occurs.
-
-        Parameters
-        ----------
-        epoch_state : EpochState
-            The current epoch state.
-        """
-        print(
-            f"\n{self.learning_algorithm_name}: Early stopping occurred at epoch {epoch_state.idx} with best_epoch = "
-            f"{epoch_state.idx - self.patience}. \nCriterion {self.criterion_full_name}, "
-            f"Loss :{round(self._best_val_loss, 4)}"
-        )

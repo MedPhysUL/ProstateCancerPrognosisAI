@@ -217,8 +217,13 @@ class TrainingState(State):
     --------
     info : Dict[str, Any]
         Any additional information. This is useful to communicate between callbacks.
+    best_epoch : int
+        The epoch corresponding to the best model. This is only useful when early stopping is used.
     n_epochs : int
         Maximum number of epochs for training.
+    path_to_temporary_folder : str
+        Path to temporary folder used to save the best model during run time. The folder is only created when early
+        stopping is used and the folder is deleted at the end of the training.
     stop_training_flag : bool
         Whether the training should be stopped.
     tasks: TaskList
@@ -229,7 +234,9 @@ class TrainingState(State):
         Validation set data loader.
     """
     info: Dict[str, Any] = field(default_factory=dict)
+    best_epoch: int = None
     n_epochs: int = None
+    path_to_temporary_folder: str = None
     stop_training_flag: bool = False
     tasks: TaskList = None
     train_dataloader: DataLoader = None
