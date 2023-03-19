@@ -10,12 +10,14 @@
 """
 
 import collections.abc
+from itertools import chain
 from typing import Dict, List, Optional, Union, Sequence, Set, Tuple
 
 from delia.databases.patients_database import PatientsDatabase
 from monai.data import MetaTensor
-from monai.transforms import apply_transform, Compose, MapTransform
+from monai.transforms import apply_transform, Compose, EnsureChannelFirstd, MapTransform, ToTensord
 import numpy as np
+from torch import float32
 from torch.utils.data import Dataset, Subset
 
 from ...tasks import SegmentationTask, TaskList
@@ -45,13 +47,19 @@ class ImageDataset(Dataset):
         database : PatientsDatabase
             A DELIA database that is used to interact with the HDF5 file that contains all the patients' folders.
         modalities : Set[str]
-            Dictionary of modalities and organs to include in the dataset. Keys are modality names and values are sets
-            of organs. Ex : {"CT": {"Prostate", "Bladder"}, "PT": {"Prostate"}, "MR": {"Brain"}}.
+            Set of image modalities to include in the dataset. These images are added to the dataset as features.
+                    Example : {"CT", "PT", "MR"}.
         organs : Dict[str, Set[str]]
-            Dictionary of organs to include in the dataset. Keys are modality names and values are sets of organs.
-            Ex : {"CT": {"Prostate", "Bladder"}, "PT": {"Prostate"}, "MR": {"Brain"}}.
+            Dictionary of organs to include in the dataset. Keys are modality names and values are sets of organs. The
+            keys of the dictionary, i.e. modality images (CT scan for example), will NOT be added to the dataset. This
+            parameter is only used to add the organs. These label maps are added to the dataset as features.
+                    Example : {
+                        "CT": {"Prostate", "Bladder"},
+                        "PT": {"Prostate"},
+                        "MR": {"Brain"}
+                    }.
         tasks : Optional[Union[SegmentationTask, TaskList, List[SegmentationTask]]]
-            Segmentation tasks to perform.
+            Segmentation tasks to perform. These label maps are added to the dataset as targets.
         transforms : Optional[Union[Compose, MapTransform]]
             A single or a sequence of transforms to apply to images and segmentations (depending on transform keys).
         transposition : Tuple[int, int, int]
@@ -67,12 +75,12 @@ class ImageDataset(Dataset):
 
         self._database = database
         self._modalities = modalities
+        self._modalities_to_iterate_over = set(chain(modalities, organs.keys(), [t.modality for t in self._tasks]))
         self._organs = organs
         self._transforms = transforms
         self._transposition = transposition
 
-        self._img_format = kwargs.get("img_format", np.float16)
-        self._seg_format = kwargs.get("seg_format", np.int8)
+        self._organ_key_getter = kwargs.get("organ_key_getter", lambda modality, organ: f"{modality}_{organ}")
         self._seg_series = kwargs.get("seg_series", "0")
 
     def __len__(self) -> int:
@@ -139,14 +147,20 @@ class ImageDataset(Dataset):
         img_dict, seg_dict = {}, {}
         for series_number in patient_group.keys():
             series = patient_group[series_number]
-            for modality in self._modalities:
+            for modality in self._modalities_to_iterate_over:
                 if series.attrs[self._database.MODALITY] == modality:
-                    img_dict[modality] = self._transpose(series[self._database.IMAGE]).astype(self._img_format)
+                    if modality in self._modalities:
+                        img_dict[modality] = self._transpose(series[self._database.IMAGE])
 
                     if modality in self._organs.keys():
                         for organ in self._organs[modality]:
                             seg_array = series[self._seg_series][organ]
-                            seg_dict[f"{modality}_{organ}"] = self._transpose(seg_array).astype(self._seg_format)
+                            seg_dict[self._organ_key_getter(modality, organ)] = self._transpose(seg_array)
+
+                    for task in self.tasks.segmentation_tasks:
+                        if modality == task.modality:
+                            seg_array = series[self._seg_series][task.organ]
+                            seg_dict[task.name] = self._transpose(seg_array)
 
         return dict(img_dict, **seg_dict)
 
@@ -164,7 +178,16 @@ class ImageDataset(Dataset):
         transformed_data : Dict[str, Union[np.array, MetaTensor]]
             The dictionary of transformed images and segmentation maps.
         """
-        return apply_transform(self._transforms, data) if self._transforms else data
+        if self._transforms is None:
+            keys = list(data.keys())
+            transforms = Compose([
+                EnsureChannelFirstd(keys=keys),
+                ToTensord(keys=keys, dtype=float32)
+            ])
+        else:
+            transforms = self._transforms
+
+        return apply_transform(transforms, data) if transforms else data
 
     def _transpose(self, array: np.ndarray) -> np.array:
         """
