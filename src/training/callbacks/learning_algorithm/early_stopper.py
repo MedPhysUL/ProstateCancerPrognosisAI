@@ -47,7 +47,7 @@ class EarlyStopper(ABC):
         """
         super().__init__()
 
-        self.counter = 0
+        self.counter = None
         self.learning_algorithm_name = None
         self.path_to_best_model = None
         self.patience = patience
@@ -88,8 +88,9 @@ class EarlyStopper(ABC):
         self.learning_algorithm_name = learning_algorithm.name
         self.path_to_best_model = path.join(
             trainer.training_state.path_to_temporary_folder,
-            f"{self.learning_algorithm_name}_{self.BEST_MODEL_NAME}"
+            f"{self.learning_algorithm_name}_{self.BEST_MODEL_NAME}.pth"
         )
+        self.counter = 0
 
     def _load_best_model(self, model):
         """
@@ -164,8 +165,8 @@ class MetricsEarlyStopper(EarlyStopper):
         """
         super().__init__(patience=patience, tolerance=tolerance)
 
-        self._best_val_metric_scores = []
-        self._tasks = []
+        self._best_val_metric_scores = None
+        self._tasks = None
 
     def _initialize_best_val_metric_scores(self):
         """
@@ -269,10 +270,9 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         """
         super().__init__(patience=patience, tolerance=tolerance)
 
+        self.best_val_loss = None
         self.criterion_full_name = None
         self.include_regularization = include_regularization
-
-        self._best_val_loss = np.inf
 
     def _set_criterion_full_name(self, learning_algorithm: LearningAlgorithm):
         """
@@ -307,6 +307,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
             Trainer
         """
         super().on_fit_start(learning_algorithm, trainer)
+        self.best_val_loss = np.inf
         self._set_criterion_full_name(learning_algorithm)
 
     def __call__(self, trainer) -> bool:
@@ -326,7 +327,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         val_loss = trainer.epoch_state.valid.multi_task_losses[self.learning_algorithm_name][self.criterion_full_name]
 
         # if the score is worst than the best score we increment the counter
-        if not (self._best_val_loss - val_loss) > self.tolerance:
+        if not (self.best_val_loss - val_loss) > self.tolerance:
             self.counter += 1
 
             # if the counter reach the patience we early stop
@@ -336,7 +337,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
         # if the score is better than the best score saved we update the best model
         else:
             save(trainer.model.state_dict(), self.path_to_best_model)
-            self._best_val_loss = val_loss
+            self.best_val_loss = val_loss
             self.counter = 0
 
         return False
