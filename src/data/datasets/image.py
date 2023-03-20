@@ -33,7 +33,7 @@ class ImageDataset(Dataset):
             self,
             database: PatientsDatabase,
             modalities: Set[str],
-            organs: Dict[str, Set[str]],
+            organs: Optional[Dict[str, Set[str]]] = None,
             tasks: Optional[Union[SegmentationTask, TaskList, List[SegmentationTask]]] = None,
             transforms: Optional[Union[Compose, MapTransform]] = None,
             transposition: Tuple[int, int, int] = (2, 0, 1),
@@ -75,8 +75,12 @@ class ImageDataset(Dataset):
 
         self._database = database
         self._modalities = modalities
-        self._modalities_to_iterate_over = set(chain(modalities, organs.keys(), [t.modality for t in self._tasks]))
-        self._organs = organs
+        self._organs = organs if organs else {}
+        self._modalities_to_iterate_over = set(chain(
+            modalities,
+            self._organs.keys(),
+            [t.modality for t in self._tasks]
+        ))
         self._transforms = transforms
         self._transposition = transposition
 
