@@ -85,15 +85,15 @@ class LearningAlgorithmHyperparameter(ModelDependantHyperparameter):
 
     def _get_optimizer_instance(
             self,
-            hyperparameter_value_getter: Callable
+            suggestion: Dict[str, Any]
     ) -> Optimizer:
         """
         Gets the hyperparameters.
 
         Parameters
         ----------
-        hyperparameter_value_getter : Callable
-            Hyperparameter value getter.
+        suggestion : Dict[str, Any]
+            Hyperparameter suggestion.
 
         Returns
         -------
@@ -102,7 +102,8 @@ class LearningAlgorithmHyperparameter(ModelDependantHyperparameter):
         """
         optimizer_hp = self.container[self.OPTIMIZER_KEY]
         optimizer_hp.model = self.model
-        return hyperparameter_value_getter(optimizer_hp)
+        optimizer_constructor_params = suggestion[self.OPTIMIZER_KEY]
+        return optimizer_hp.build(optimizer_constructor_params)
 
     def _build_container(
             self,
@@ -125,35 +126,30 @@ class LearningAlgorithmHyperparameter(ModelDependantHyperparameter):
         if lr_scheduler:
             lr_scheduler.optimizer = optimizer
 
-    def _get_params(
+    def build(
             self,
-            hyperparameter_value_getter: Callable
-    ) -> Dict[str, Any]:
+            suggestion: Dict[str, Any]
+    ) -> object:
         """
-        Gets the hyperparameters.
+        Builds hyperparameter given a suggestion and returns the hyperparameter instance.
 
         Parameters
         ----------
-        hyperparameter_value_getter : Callable
-            Hyperparameter value getter.
+        suggestion : Dict[str, Any]
+            Hyperparameters suggestion.
 
         Returns
         -------
-        params : Dict[str, Any]
-            Parameters.
+        hyperparameter_instance : object
+            Hyperparameter instance.
         """
-        optimizer = self._get_optimizer_instance(hyperparameter_value_getter)
+        optimizer = self._get_optimizer_instance(suggestion)
         self._build_container(optimizer)
 
-        params = dict(optimizer=optimizer)
-        for key, hp in self.container.items():
-            if key not in params.keys():
-                if isinstance(hp, (Hyperparameter, HyperparameterContainer)):
-                    params[key] = hyperparameter_value_getter(hp)
-                else:
-                    params[key] = hp
+        constructor_params = self._get_params(lambda hp, name: hp.build(suggestion[name]))
+        constructor_params[self.OPTIMIZER_KEY] = optimizer
 
-        return params
+        return self.constructor(**constructor_params)
 
 
 class CheckpointHyperparameter(HyperparameterObject):

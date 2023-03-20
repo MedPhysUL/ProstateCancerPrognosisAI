@@ -57,7 +57,7 @@ class CategoricalHyperparameter(Hyperparameter):
         """
         return trial.suggest_categorical(name=self.name, choices=self.choices)
 
-    def retrieve_suggestion(
+    def retrieve_past_suggestion(
             self,
             trial: FrozenTrial
     ) -> Any:

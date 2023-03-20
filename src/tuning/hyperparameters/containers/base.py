@@ -101,6 +101,26 @@ class HyperparameterContainer(ABC):
         assert not duplicates, f"Duplicate hyperparameters names are not allowed. Found duplicates {duplicates}."
 
     @abstractmethod
+    def build(
+            self,
+            suggestion: Any
+    ) -> Any:
+        """
+        Builds hyperparameter given a suggestion and returns the hyperparameter instance.
+
+        Parameters
+        ----------
+        suggestion : Any
+            Hyperparameters suggestion.
+
+        Returns
+        -------
+        hyperparameter_instance : Any
+            Hyperparameter instance.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def suggest(
             self,
             trial: Trial
@@ -121,7 +141,7 @@ class HyperparameterContainer(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def retrieve_suggestion(
+    def retrieve_past_suggestion(
             self,
             trial: FrozenTrial
     ) -> Any:

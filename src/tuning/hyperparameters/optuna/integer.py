@@ -68,7 +68,7 @@ class IntegerHyperparameter(Hyperparameter):
         """
         return trial.suggest_int(name=self.name, low=self.low, high=self.high, step=self.step, log=self.log)
 
-    def retrieve_suggestion(
+    def retrieve_past_suggestion(
             self,
             trial: FrozenTrial
     ) -> int:

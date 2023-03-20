@@ -72,26 +72,26 @@ class ModelDependantHyperparameter(HyperparameterObject, ABC):
         """
         self._model = model
 
-    def _get_params(
+    def build(
             self,
-            hyperparameter_value_getter: Callable
-    ) -> Dict[str, Any]:
+            suggestion: Dict[str, Any]
+    ) -> object:
         """
-        Get the hyperparameters.
+        Builds hyperparameter given a suggestion and returns the hyperparameter instance.
 
         Parameters
         ----------
-        hyperparameter_value_getter : Callable
-            Hyperparameter value getter.
+        suggestion : Dict[str, Any]
+            Hyperparameters suggestion.
 
         Returns
         -------
-        params : Dict[str, Any]
-            Parameters.
+        hyperparameter_instance : object
+            Hyperparameter instance.
         """
-        params = super()._get_params(hyperparameter_value_getter)
-        params[self.PARAMS_KEY] = self._model_params_getter(self._model)
-        return params
+        constructor_params = self._get_params(lambda hp, name: hp.build(suggestion[name]))
+        constructor_params[self.PARAMS_KEY] = self._model_params_getter(self._model)
+        return self.constructor(**constructor_params)
 
 
 class OptimizerDependantHyperparameter(HyperparameterObject, ABC):
@@ -142,23 +142,23 @@ class OptimizerDependantHyperparameter(HyperparameterObject, ABC):
         """
         self._optimizer = optimizer
 
-    def _get_params(
+    def build(
             self,
-            hyperparameter_value_getter: Callable
-    ) -> Dict[str, Any]:
+            suggestion: Dict[str, Any]
+    ) -> object:
         """
-        Gets the hyperparameters.
+        Builds hyperparameter given a suggestion and returns the hyperparameter instance.
 
         Parameters
         ----------
-        hyperparameter_value_getter : Callable
-            Hyperparameter value getter.
+        suggestion : Dict[str, Any]
+            Hyperparameters suggestion.
 
         Returns
         -------
-        params : Dict[str, Any]
-            Parameters.
+        hyperparameter_instance : object
+            Hyperparameter instance.
         """
-        params = super()._get_params(hyperparameter_value_getter)
-        params[self.OPTIMIZER_KEY] = self._optimizer
-        return params
+        constructor_params = self._get_params(lambda hp, name: hp.build(suggestion[name]))
+        constructor_params[self.OPTIMIZER_KEY] = self._optimizer
+        return self.constructor(**constructor_params)

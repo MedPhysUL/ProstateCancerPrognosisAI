@@ -57,7 +57,7 @@ class FixedHyperparameter(Hyperparameter):
         """
         return self.value
 
-    def retrieve_suggestion(
+    def retrieve_past_suggestion(
             self,
             trial: FrozenTrial
     ) -> Any:

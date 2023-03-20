@@ -71,11 +71,30 @@ class HyperparameterDict(HyperparameterContainer):
         params = {}
         for name, hp in self.container.items():
             if isinstance(hp, (Hyperparameter, HyperparameterContainer)):
-                params[name] = hyperparameter_value_getter(hp)
+                params[name] = hyperparameter_value_getter(hp, name)
             else:
                 params[name] = hp
 
         return params
+
+    def build(
+            self,
+            suggestion: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Get the hyperparameters.
+
+        Parameters
+        ----------
+        suggestion : Dict[str, Any]
+            Suggestion.
+
+        Returns
+        -------
+        hyperparameters : Dict[str, Any]
+            Hyperparameters.
+        """
+        return self._get_params(lambda hp, name: hp.build(suggestion[name]))
 
     def suggest(
             self,
@@ -94,9 +113,9 @@ class HyperparameterDict(HyperparameterContainer):
         suggestion : Dict[Any]
             Optuna's current suggestions for all hyperparameters in the dict.
         """
-        return self._get_params(lambda hp: hp.suggest(trial))
+        return self._get_params(lambda hp, name: hp.suggest(trial))
 
-    def retrieve_suggestion(
+    def retrieve_past_suggestion(
             self,
             trial: FrozenTrial
     ) -> Dict[str, Any]:
@@ -114,4 +133,4 @@ class HyperparameterDict(HyperparameterContainer):
             The fixed value of the hyperparameter.
         """
         self.verify_params_keys(trial)
-        return self._get_params(lambda hp: hp.retrieve_suggestion(trial))
+        return self._get_params(lambda hp, name: hp.retrieve_past_suggestion(trial))

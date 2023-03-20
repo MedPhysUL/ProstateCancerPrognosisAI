@@ -46,43 +46,22 @@ class HyperparameterObject(HyperparameterDict):
         super().__init__(container=parameters)
         self.constructor = constructor
 
-    def suggest(
+    def build(
             self,
-            trial: Trial
+            suggestion: Dict[str, Any]
     ) -> object:
         """
-        Gets optuna's suggestion.
+        Builds hyperparameter given a suggestion and returns the hyperparameter instance.
 
         Parameters
         ----------
-        trial : Trial
-            Optuna's hyperparameter optimization trial.
+        suggestion : Dict[str, Any]
+            Hyperparameters suggestion.
 
         Returns
         -------
-        suggestion : object
-            Optuna's current suggestion for this object hyperparameter.
+        hyperparameter_instance : object
+            Hyperparameter instance.
         """
-        constructor_params = self._get_params(lambda hp: hp.suggest(trial))
-        return self.constructor(**constructor_params)
-
-    def retrieve_suggestion(
-            self,
-            trial: FrozenTrial
-    ) -> object:
-        """
-        Gets the value of the hyperparameter using the given parameters dictionary.
-
-        Parameters
-        ----------
-        trial : FrozenTrial
-            Optuna's hyperparameter optimization frozen trial.
-
-        Returns
-        -------
-        fixed_value : object
-            The fixed value of the hyperparameter.
-        """
-        self.verify_params_keys(trial)
-        constructor_params = self._get_params(lambda hp: hp.retrieve_suggestion(trial))
+        constructor_params = super().build(suggestion)
         return self.constructor(**constructor_params)

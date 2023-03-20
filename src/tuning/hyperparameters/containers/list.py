@@ -53,13 +53,32 @@ class HyperparameterList(HyperparameterContainer):
             Parameters.
         """
         params = []
-        for hp in self.sequence:
+        for idx, hp in enumerate(self.sequence):
             if isinstance(hp, (Hyperparameter, HyperparameterContainer)):
-                params.append(hyperparameter_value_getter(hp))
+                params.append(hyperparameter_value_getter(hp, idx))
             else:
                 params.append(hp)
 
         return params
+
+    def build(
+            self,
+            suggestion: List[Any]
+    ) -> List[Any]:
+        """
+        Get the hyperparameters.
+
+        Parameters
+        ----------
+        suggestion : Dict[str, Any]
+            Suggestion.
+
+        Returns
+        -------
+        hyperparameters : Dict[str, Any]
+            Hyperparameters.
+        """
+        return self._get_params(lambda hp, idx: hp.build(suggestion[idx]))
 
     def suggest(
             self,
@@ -78,9 +97,9 @@ class HyperparameterList(HyperparameterContainer):
         suggestion : List[Any]
             Optuna's current suggestions for all hyperparameters in the list.
         """
-        return self._get_params(lambda hp: hp.suggest(trial))
+        return self._get_params(lambda hp, idx: hp.suggest(trial))
 
-    def retrieve_suggestion(
+    def retrieve_past_suggestion(
             self,
             trial: FrozenTrial
     ) -> List[Any]:
@@ -98,4 +117,4 @@ class HyperparameterList(HyperparameterContainer):
             The fixed value of the hyperparameter.
         """
         self.verify_params_keys(trial)
-        return self._get_params(lambda hp: hp.retrieve_suggestion(trial))
+        return self._get_params(lambda hp, idx: hp.retrieve_past_suggestion(trial))

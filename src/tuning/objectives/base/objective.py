@@ -96,7 +96,7 @@ class Objective(ABC):
         self.trial_state.trial = trial
         callbacks.on_trial_start(self)
 
-        suggested_hps = self.hyperparameters.suggest(trial)
+        suggestion = self.hyperparameters.suggest(trial)
 
         futures = []
         for idx, mask in enumerate(masks.values()):
@@ -105,8 +105,8 @@ class Objective(ABC):
             self.inner_loop_state.idx = idx
 
             self._exec_inner_loop = self._build_inner_loop_runner()
-            # score = self._exec_inner_loop.remote(callbacks=callbacks, hyperparameters=suggested_hps)
-            score = self._exec_inner_loop(callbacks=callbacks, hyperparameters=suggested_hps)
+            # score = self._exec_inner_loop.remote(callbacks=callbacks, suggestion=suggestion)
+            score = self._exec_inner_loop(callbacks=callbacks, suggestion=suggestion)
             futures.append(score)
 
         # self.trial_state.scores = ray.get(futures)
@@ -144,10 +144,11 @@ class Objective(ABC):
         model_evaluation : ModelEvaluationContainer
             Model evaluation.
         """
-        best_hyperparameters = self.hyperparameters.retrieve_suggestion(best_trial)
+        past_suggestion = self.hyperparameters.retrieve_past_suggestion(best_trial)
+        hyperparameters = self.hyperparameters.build(past_suggestion)
         model_evaluation = self._test_hyperparameters(
             dataset=dataset,
-            hyperparameters=best_hyperparameters,
+            hyperparameters=hyperparameters,
             path_to_save=path_to_save
         )
 
@@ -166,7 +167,7 @@ class Objective(ABC):
         # @ray.remote(num_cpus=self.num_cpus, num_gpus=self.num_gpus)
         def exec_inner_loop(
                 callbacks: TuningCallbackList,
-                hyperparameters: Dict[str, Any]
+                suggestion: Dict[str, Any]
         ) -> ScoreContainer:
             """
             Trains a single model using given masks and hyperparameters.
@@ -175,7 +176,7 @@ class Objective(ABC):
             ----------
             callbacks : TuningCallbackList
                 Callbacks to use during tuning.
-            hyperparameters : Dict[str, Any]
+            suggestion : Dict[str, Any]
                 Suggested hyperparameters for this trial.
 
             Returns
@@ -184,6 +185,7 @@ class Objective(ABC):
                 Score values.
             """
             callbacks.on_inner_loop_start(self)
+            hyperparameters = self.hyperparameters.build(suggestion)
             model_evaluation = self._test_hyperparameters(
                 dataset=self.inner_loop_state.dataset,
                 hyperparameters=hyperparameters,

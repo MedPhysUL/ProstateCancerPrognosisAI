@@ -33,6 +33,25 @@ class Hyperparameter(ABC):
         """
         self.name = name
 
+    @staticmethod
+    def build(
+            suggestion: Any
+    ) -> Any:
+        """
+        Builds hyperparameter given a suggestion and returns the hyperparameter instance.
+
+        Parameters
+        ----------
+        suggestion : Any
+            Hyperparameters suggestion.
+
+        Returns
+        -------
+        hyperparameter_instance : Any
+            Hyperparameter instance.
+        """
+        return suggestion
+
     @abstractmethod
     def suggest(
             self,
@@ -54,7 +73,7 @@ class Hyperparameter(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def retrieve_suggestion(
+    def retrieve_past_suggestion(
             self,
             trial: FrozenTrial
     ) -> Any:

@@ -152,22 +152,24 @@ class TrainMethodHyperparameter(HyperparameterDict):
 
     def _get_model_instance(
             self,
-            hyperparameter_value_getter: Callable
+            suggestion: Dict[str, Any]
     ) -> TorchModel:
         """
         Gets model instance.
 
         Parameters
         ----------
-        hyperparameter_value_getter : Callable
-            Hyperparameter value getter.
+        suggestion: Dict[str, Any]
+            Hyperparameter suggestion.
 
         Returns
         -------
         model : TorchModel
             TorchModel.
         """
-        model = hyperparameter_value_getter(self.container[self.MODEL_KEY])
+        model_hp = self.container[self.MODEL_KEY]
+        model_constructor_params = suggestion[self.MODEL_KEY]
+        model = model_hp.build(model_constructor_params)
         model.build(self._dataset)
         return model
 
@@ -186,32 +188,27 @@ class TrainMethodHyperparameter(HyperparameterDict):
         for learning_algorithm in self.container[self.LEARNING_ALGORITHMS_KEY].sequence:
             learning_algorithm.model = model
 
-    def _get_params(
+    def build(
             self,
-            hyperparameter_value_getter: Callable
-    ) -> Dict[str, Any]:
+            suggestion: Dict[str, Any]
+    ) -> object:
         """
         Gets the hyperparameters.
 
         Parameters
         ----------
-        hyperparameter_value_getter : Callable
-            Hyperparameter value getter.
+        suggestion: Dict[str, Any]
+            Hyperparameter suggestion.
 
         Returns
         -------
-        params : Dict[str, Any]
-            Parameters.
+        hyperparameter_instance : object
+            Hyperparameter instance.
         """
-        model = self._get_model_instance(hyperparameter_value_getter)
+        model = self._get_model_instance(suggestion)
         self._build_container(model)
 
-        params = dict(model=model)
-        for key, hp in self.container.items():
-            if key not in params.keys():
-                if isinstance(hp, (Hyperparameter, HyperparameterContainer)):
-                    params[key] = hyperparameter_value_getter(hp)
-                else:
-                    params[key] = hp
+        params = self._get_params(lambda hp, name: hp.build(suggestion[name]))
+        params[self.MODEL_KEY] = model
 
         return params
