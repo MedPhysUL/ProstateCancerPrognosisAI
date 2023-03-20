@@ -17,7 +17,7 @@ from typing import Dict, List, NamedTuple, Optional
 from monai.data import DataLoader
 from numpy import argmin, argmax, linspace
 from torch import device as torch_device
-from torch import no_grad, random, round, sigmoid, stack
+from torch import float32, no_grad, random, round, sigmoid, stack, tensor
 
 from ...data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ...metrics.single_task.base import Direction, MetricReduction
@@ -336,7 +336,7 @@ class TorchModel(Model, ABC):
         for task in seg_tasks:
             for metric in task.unique_metrics:
                 scores[task.name][metric.name] = metric.perform_reduction(
-                    segmentation_scores[task.name][metric.name].float()
+                    tensor(segmentation_scores[task.name][metric.name], dtype=float32)
                 )
 
         for task in table_tasks:
