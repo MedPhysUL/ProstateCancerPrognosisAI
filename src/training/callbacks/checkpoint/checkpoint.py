@@ -242,7 +242,7 @@ class Checkpoint(TrainingCallback):
             return
         elif self.save_freq > 0 and trainer.epoch_state.idx % self.save_freq == 0:
             self.save(trainer)
-        elif trainer.state.epoch >= trainer.training_state.n_epochs - 1:
+        elif trainer.epoch_state.idx >= trainer.training_state.n_epochs - 1:
             self.save(trainer)
 
     def on_fit_end(self, trainer, **kwargs):
