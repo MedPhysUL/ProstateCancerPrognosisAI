@@ -152,9 +152,10 @@ class TuningState:
         history = {}
         for splits in self.hyperparameters_importance:
             for task, hps_importance in splits.items():
-                history[task] = {}
+                if task not in history.keys():
+                    history[task] = {}
                 for hp_name, hp_value in hps_importance.items():
-                    if hp_name in history.keys():
+                    if hp_name in history[task].keys():
                         history[task][hp_name].append(hp_value)
                     else:
                         history[task][hp_name] = [hp_value]
