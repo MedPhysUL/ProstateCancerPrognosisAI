@@ -47,6 +47,7 @@ class TuningRecorder(TuningCallback):
     # PREFIXES
     SPLIT_PREFIX: str = "split"
     TRIAL_PREFIX: str = "trial"
+    STUDY_PREFIX: str = "study"
 
     # FOLDERS NAME
     BEST_MODEL_FOLDER_NAME: str = "best_model"
@@ -328,20 +329,15 @@ class TuningRecorder(TuningCallback):
         )
 
         hps_importance = self._get_hps_importance(tuner)
-        tuner.study_state.study.set_user_attr(
-            self.BEST_TRIAL_KEY,
-            self._encode(tuner.study_state.best_trial)
-        )
-        tuner.study_state.study.set_user_attr(
-            self.BEST_TRIALS_KEY,
-            self._encode(tuner.study_state.study.best_trials)
-        )
-        tuner.study_state.study.set_user_attr(
-            self.HYPERPARAMETERS_IMPORTANCE_KEY,
-            hps_importance
-        )
+        best_hps_summary = {
+            self.STUDY_PREFIX: tuner.study_state.study,
+            self.BEST_TRIAL_KEY: self._encode(tuner.study_state.best_trial),
+            self.BEST_TRIALS_KEY: self._encode(tuner.study_state.study.best_trials),
+            self.HYPERPARAMETERS_IMPORTANCE_KEY: hps_importance
+        }
+
         with open(path_to_best_hps_file, "w") as file:
-            self._dump(tuner.study_state.study, file)
+            self._dump(best_hps_summary, file)
 
         if tuner.tuning_state.hyperparameters_importance:
             tuner.tuning_state.hyperparameters_importance.append(hps_importance)
@@ -417,11 +413,16 @@ class TuningRecorder(TuningCallback):
         """
         fixed_hps = {hp.name: hp.value for hp in objective.hyperparameters.fixed_hyperparameters}
         objective.trial_state.trial.set_user_attr(self.FIXED_PARAMS, fixed_hps)
-        objective.trial_state.trial.set_user_attr(self.HISTORY_KEY, self._encode(objective.trial_state.history))
-        objective.trial_state.trial.set_user_attr(self.STATISTICS_KEY, self._encode(objective.trial_state.statistics))
+
+        trial_summary = {
+            self.TRIAL_PREFIX: objective.trial_state.trial,
+            self.HISTORY_KEY: self._encode(objective.trial_state.history),
+            self.STATISTICS_KEY: self._encode(objective.trial_state.statistics)
+        }
+
         path_to_hps = os.path.join(objective.trial_state.path_to_trial_folder, self.SUMMARY_FILE_NAME)
         with open(path_to_hps, "w") as file:
-            self._dump(objective.trial_state.trial, file)
+            self._dump(trial_summary, file)
 
     def on_inner_loop_start(self, objective, **kwargs):
         """
