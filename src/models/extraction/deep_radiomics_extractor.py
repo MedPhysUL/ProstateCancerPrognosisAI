@@ -45,8 +45,12 @@ class DeepRadiomicsExtractor(TorchModel):
 
         if isinstance(channels, str):
             self.channels = literal_eval(channels)
+        else:
+            self.channels = channels
         if isinstance(in_shape, str):
             self.in_shape = literal_eval(in_shape)
+        else
+            self.in_shape = in_shape
         self.n_radiomics = n_radiomics
         self.strides = strides
         self.kernel_size = kernel_size
