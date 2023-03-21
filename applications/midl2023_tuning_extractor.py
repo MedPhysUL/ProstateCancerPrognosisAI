@@ -9,6 +9,7 @@
 """
 
 import env_apps
+
 from delia.databases import PatientsDatabase
 from optuna.samplers import TPESampler
 import pandas as pd
@@ -24,9 +25,6 @@ from src.training.callbacks.learning_algorithm import L2Regularizer, MultiTaskLo
 from src.tuning import SearchAlgorithm, TorchObjective, Tuner
 from src.tuning.callbacks import TuningRecorder
 
-from src.tuning.hyperparameters.containers import (
-    HyperparameterList
-)
 from src.tuning.hyperparameters.optuna import (
     CategoricalHyperparameter,
     FixedHyperparameter,
@@ -92,9 +90,12 @@ if __name__ == '__main__':
     model_hyperparameter = TorchModelHyperparameter(
         constructor=DeepRadiomicsExtractor,
         parameters={
-            "in_shape": FixedHyperparameter(name="in_shape", value=(2, 96, 96, 96)),
-            "n_radiomics": IntegerHyperparameter(name="n_radiomics", low=10, high=100, step=10),
-            "channels": FixedHyperparameter(name="channels", value=(2, 4, 8, 16, 32)),
+            "in_shape": CategoricalHyperparameter(name="in_shape", choices=["(1, 96, 96, 96)", "(2, 96, 96, 96)"]),
+            "n_radiomics": IntegerHyperparameter(name="n_radiomics", low=5, high=100, step=5),
+            "channels": CategoricalHyperparameter(
+                name="channels",
+                choices=["(2, 4, 4, 8, 8)", "(2, 4, 8, 16, 32)", "(4, 8, 16, 32, 64)", "(8, 16, 32, 64, 128)"]
+            ),
             "strides": FixedHyperparameter(name="strides", value=(2, 2, 2, 2)),
             "kernel_size": CategoricalHyperparameter(name="kernel_size", choices=[3, 5, 7]),
             "num_res_units": IntegerHyperparameter(name="num_res_units", low=0, high=3),
@@ -110,7 +111,7 @@ if __name__ == '__main__':
             constructor=Adam,
             parameters={
                 "lr": FloatHyperparameter(name="lr", low=0.00001, high=0.01),
-                "weight_decay": FloatHyperparameter(name="weight_decay", low=0.001, high=0.1)
+                "weight_decay": FloatHyperparameter(name="weight_decay", low=0, high=0.1)
             }
         ),
         early_stopper=EarlyStopperHyperparameter(
@@ -123,7 +124,7 @@ if __name__ == '__main__':
         ),
         regularizer=RegularizerHyperparameter(
             constructor=L2Regularizer,
-            parameters={"lambda_": FloatHyperparameter(name="alpha", low=0.001, high=0.1)}
+            parameters={"lambda_": FloatHyperparameter(name="alpha", low=0, high=0.1)}
         )
     )
 
@@ -142,7 +143,7 @@ if __name__ == '__main__':
         train_method_hyperparameter=train_methode_hyperparameter
     )
 
-    masks = extract_masks(os.path.join(MASKS_PATH, "midl2023_masks.json"), k=1, l=1)
+    masks = extract_masks(os.path.join(MASKS_PATH, "midl2023_masks.json"), k=5, l=5)
 
     tuner.tune(
         objective=objective,

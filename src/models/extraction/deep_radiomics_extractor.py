@@ -9,10 +9,11 @@
 """
 
 from __future__ import annotations
+from ast import literal_eval
 from typing import Optional, Sequence, Union
 
 from monai.networks.nets import Classifier
-from torch import cat, where, unsqueeze
+from torch import cat, where
 from torch import device as torch_device
 from torch.nn import Linear
 
@@ -27,9 +28,9 @@ class DeepRadiomicsExtractor(TorchModel):
 
     def __init__(
             self,
-            in_shape: Sequence[int],
+            in_shape: Union[str, Sequence[int]],
             n_radiomics: int,
-            channels: Sequence[int],
+            channels: Union[str, Sequence[int]],
             strides: Sequence[int],
             kernel_size: Union[Sequence[int], int] = 3,
             num_res_units: int = 2,
@@ -42,8 +43,10 @@ class DeepRadiomicsExtractor(TorchModel):
     ):
         super().__init__(device=device, name=name, seed=seed)
 
-        self.channels = channels
-        self.in_shape = in_shape
+        if isinstance(channels, str):
+            self.channels = literal_eval(channels)
+        if isinstance(in_shape, str):
+            self.in_shape = literal_eval(in_shape)
         self.n_radiomics = n_radiomics
         self.strides = strides
         self.kernel_size = kernel_size
