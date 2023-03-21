@@ -28,7 +28,7 @@ class TrainerHyperparameter(HyperparameterObject):
 
     def __init__(
             self,
-            batch_size: Union[int, FixedHyperparameter] = 8,
+            batch_size: Union[int, FixedHyperparameter] = 16,
             checkpoint: CheckpointHyperparameter = None,
             device: Optional[torch_device] = None,
             exec_metrics_on_train: bool = True,
@@ -42,7 +42,7 @@ class TrainerHyperparameter(HyperparameterObject):
         Parameters
         ----------
         batch_size : Optional[int, FixedHyperparameter]
-            Size of the batches in the training loader. Default is 8.
+            Size of the batches in the training loader. Default is 16.
         checkpoint : CheckpointHyperparameter
              Checkpoint used to manage and create the checkpoints of a model during the training process.
         device : Optional[torch_device]
