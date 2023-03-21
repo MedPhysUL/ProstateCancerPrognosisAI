@@ -8,14 +8,12 @@
     @Description:       This file is used to define all the hyperparameters related to the trainer.
 """
 
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from torch import device as torch_device
 
-from .base import Hyperparameter
 from ....data.datasets import ProstateCancerDataset
 from .callbacks import CheckpointHyperparameter, LearningAlgorithmHyperparameter
-from ..containers.base import HyperparameterContainer
 from ..containers import HyperparameterDict, HyperparameterList, HyperparameterObject
 from ....models.base.torch_model import TorchModel
 from ..optuna import FixedHyperparameter

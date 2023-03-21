@@ -16,7 +16,6 @@ from torch.optim import Optimizer
 
 from ..containers import HyperparameterObject
 from ....models.base.torch_model import TorchModel
-from ..optuna.base import Hyperparameter
 
 
 class ModelDependantHyperparameter(HyperparameterObject, ABC):
@@ -38,7 +37,7 @@ class ModelDependantHyperparameter(HyperparameterObject, ABC):
             The class constructor (also named 'class blueprint' or 'class object'). This constructor is used to build
             the regularizer given the hyperparameters.
         model_params_getter : Callable
-            Model parameters getter.
+            Model parameters' getter.
         parameters : Optional[Dict[str, Any]]
             A dictionary of parameters to initialize the object with. The keys are the names of the parameters used to
             build the given class constructor using its __init__ method.

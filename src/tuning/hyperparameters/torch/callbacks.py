@@ -8,14 +8,12 @@
     @Description:       This file is used to define all the hyperparameters related to training callbacks.
 """
 
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 from torch.optim import Optimizer
 
 from .base import ModelDependantHyperparameter, OptimizerDependantHyperparameter
-from ..containers.base import HyperparameterContainer
 from ..containers.object import HyperparameterObject
-from ..optuna.base import Hyperparameter
 from ..optuna.fixed import FixedHyperparameter
 from ....training.callbacks import Checkpoint, LearningAlgorithm
 
@@ -37,7 +35,28 @@ class OptimizerHyperparameter(ModelDependantHyperparameter):
 
 
 class RegularizerHyperparameter(ModelDependantHyperparameter):
-    """Subclass"""
+
+    def __init__(
+            self,
+            constructor: Type[object],
+            model_params_getter: Callable = lambda model: model.named_parameters(),
+            parameters: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """
+        Sets attribute using parent's constructor.
+
+        Parameters
+        ----------
+        constructor : Type[object]
+            The class constructor (also named 'class blueprint' or 'class object'). This constructor is used to build
+            the regularizer given the hyperparameters.
+        model_params_getter : Callable
+            Model parameters' getter.
+        parameters : Optional[Dict[str, Any]]
+            A dictionary of parameters to initialize the object with. The keys are the names of the parameters used to
+            build the given class constructor using its __init__ method.
+        """
+        super().__init__(constructor, model_params_getter, parameters)
 
 
 class LearningAlgorithmHyperparameter(ModelDependantHyperparameter):

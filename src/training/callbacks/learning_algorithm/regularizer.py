@@ -14,7 +14,7 @@ from typing import Any, Dict, Iterable, Iterator, Optional, Union
 
 from torch import device as torch_device
 from torch import linalg, stack, sum, tensor, Tensor
-from torch.nn import Module, Parameter, ParameterList
+from torch.nn import Module, Parameter, ParameterDict
 
 
 class Regularizer(Module):
@@ -26,7 +26,7 @@ class Regularizer(Module):
 
     def __init__(
             self,
-            params: Union[Iterable[Parameter], Dict[str, Parameter]],
+            params: Union[Iterator[tuple[str, Parameter]], ParameterDict, Dict[str, Parameter]],
             lambda_: float = 1.0,
             name: Optional[str] = None
     ):
@@ -35,7 +35,7 @@ class Regularizer(Module):
 
         Parameters
         ----------
-        params : Union[Iterable[Parameter], Dict[str, Parameter]]
+        params : Union[Iterator[tuple[str, Parameter]], ParameterDict, Dict[str, Parameter]]
             The parameters which are regularized.
         lambda_ : float
             The weight of the regularizer. In other words, the coefficient that multiplies the loss.
@@ -43,13 +43,17 @@ class Regularizer(Module):
             The name of the regularizer.
         """
         super().__init__()
-
-        if isinstance(params, dict):
-            params = list(params.values())
+        if isinstance(params, (ParameterDict, dict)):
+            params = params
+        elif isinstance(params, Iterator):
+            params = dict(params)
         else:
-            params = list(params)
+            raise TypeError(
+                f"'params' must be of type 'Iterator', 'ParameterDict' or 'dict'. Found {type(params)}. Use "
+                f"'model.named_parameters()' instead of 'model.parameters()'."
+            )
 
-        self.params = ParameterList(params)
+        self.params = params
         self.lambda_ = lambda_
         self.name = name if name else f"{self.__class__.__name__}('lambda_'={lambda_})"
 
@@ -200,7 +204,7 @@ class LpRegularizer(Regularizer):
 
     def __init__(
             self,
-            params: Union[Iterable[Parameter], Dict[str, Parameter]],
+            params: Union[Iterator[tuple[str, Parameter]], ParameterDict, Dict[str, Parameter]],
             lambda_: float = 1.0,
             power: int = 1,
             name: Optional[str] = None
@@ -210,7 +214,7 @@ class LpRegularizer(Regularizer):
 
         Parameters
         ----------
-        params : Union[Iterable[Parameter], Dict[str, Parameter]]
+        params : Union[Iterator[tuple[str, Parameter]], ParameterDict, Dict[str, Parameter]]
             The parameters which are regularized.
         lambda_ : float
             The weight of the regularization. In other words, the coefficient that multiplies the loss.
@@ -231,9 +235,11 @@ class LpRegularizer(Regularizer):
         loss : Tensor
             The regularization loss.
         """
-        loss = tensor(0.0, requires_grad=True).to(self.params[0].device)
-        for param in self.params:
-            loss += linalg.norm(param.flatten(), self.power)
+        device = list(self.params.values())[0].device
+        loss = tensor(0.0, requires_grad=True).to(device)
+        for name, param in self.params.items():
+            if "weight" in name:
+                loss += linalg.norm(param.flatten(), self.power)
         return loss
 
 
@@ -244,7 +250,7 @@ class L1Regularizer(LpRegularizer):
 
     def __init__(
             self,
-            params: Union[Iterable[Parameter], Dict[str, Parameter]],
+            params: Union[Iterator[tuple[str, Parameter]], ParameterDict, Dict[str, Parameter]],
             lambda_: float = 1.0,
             name: Optional[str] = None
     ):
@@ -253,7 +259,7 @@ class L1Regularizer(LpRegularizer):
 
         Parameters
         ----------
-        params : Union[Iterable[Parameter], Dict[str, Parameter]]
+        params : Union[Iterator[tuple[str, Parameter]], ParameterDict, Dict[str, Parameter]]
             The parameters which are regularized.
         lambda_ : float
             The weight of the regularization. In other words, the coefficient that multiplies the loss.
@@ -270,7 +276,7 @@ class L2Regularizer(LpRegularizer):
 
     def __init__(
             self,
-            params: Union[Iterable[Parameter], Dict[str, Parameter]],
+            params: Union[Iterator[tuple[str, Parameter]], ParameterDict, Dict[str, Parameter]],
             lambda_: float = 1.0,
             name: Optional[str] = None
     ):
@@ -279,7 +285,7 @@ class L2Regularizer(LpRegularizer):
 
         Parameters
         ----------
-        params : Union[Iterable[Parameter], Dict[str, Parameter]]
+        params : Union[Iterator[tuple[str, Parameter]], ParameterDict, Dict[str, Parameter]]
             The parameters which are regularized.
         lambda_ : float
             The weight of the regularization. In other words, the coefficient that multiplies the loss.
