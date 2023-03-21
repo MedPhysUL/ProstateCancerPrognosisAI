@@ -63,11 +63,11 @@ if __name__ == '__main__':
         criterion=MeanLoss(),
         optimizer=optimizer,
         lr_scheduler=ExponentialLR(optimizer=optimizer, gamma=0.999),
-        regularizer=L2Regularizer(params=model.parameters(), lambda_=0.01),
+        regularizer=L2Regularizer(params=model.named_parameters(), lambda_=0.01),
         early_stopper=MultiTaskLossEarlyStopper()
     )
     trainer = Trainer(
-        batch_size=20,
+        batch_size=16,
         checkpoint=Checkpoint(),
         exec_metrics_on_train=True,
         n_epochs=30,
