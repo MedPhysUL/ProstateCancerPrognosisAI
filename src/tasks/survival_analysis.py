@@ -89,12 +89,20 @@ class SurvivalAnalysisTask(TableTask):
         return self._criterion
 
     @property
+    def duration_column(self) -> str:
+        return self._duration_column
+
+    @property
     def early_stopping_metric(self) -> Optional[SurvivalAnalysisMetric]:
         return self._early_stopping_metric
 
     @property
     def evaluation_metrics(self) -> Optional[SingleTaskMetricList[SurvivalAnalysisMetric]]:
         return self._evaluation_metrics
+
+    @property
+    def event_column(self) -> str:
+        return self._event_column
 
     @property
     def hps_tuning_metric(self) -> Optional[SurvivalAnalysisMetric]:
