@@ -9,12 +9,13 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import numpy as np
-from torch import from_numpy, is_tensor, nan, tensor, Tensor, where
+from torch import from_numpy, is_tensor, nan, tensor, Tensor
 
 from ..base import SingleTaskLoss, LossReduction
+from ....tools.missing_targets import get_idx_of_nonmissing_classification_targets
 
 
 class BinaryClassificationLoss(SingleTaskLoss, ABC):
@@ -45,6 +46,8 @@ class BinaryClassificationLoss(SingleTaskLoss, ABC):
 
         self._weight = weight
         self._scaling_factor = None
+
+        self.get_idx_of_nonmissing_targets = get_idx_of_nonmissing_classification_targets
 
         super().__init__(name=name, reduction=reduction)
 
@@ -94,30 +97,6 @@ class BinaryClassificationLoss(SingleTaskLoss, ABC):
             pred, targets = self.convert_to_tensors(pred, targets)
 
         return self.perform_reduction(self._compute_loss(pred, targets))
-
-    @staticmethod
-    def get_idx_of_nonmissing_targets(
-            y: Union[Tensor, np.array]
-    ) -> List[int]:
-        """
-        Gets the idx of the nonmissing targets in the given array or tensor.
-
-        Parameters
-        ----------
-        y : Union[Tensor, np.array]
-            (N,) tensor or array with targets.
-
-        Returns
-        -------
-        idx : List[int]
-            Index.
-        """
-        if isinstance(y, Tensor):
-            idx = where(y >= 0)
-        else:
-            idx = np.where(y >= 0)
-
-        return idx[0].tolist()
 
     def update_scaling_factor(
             self,

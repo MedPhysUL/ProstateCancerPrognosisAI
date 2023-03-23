@@ -24,7 +24,6 @@ class SegmentationTask(Task):
     def __init__(
             self,
             criterion: SegmentationLoss,
-            hps_tuning_metric: SegmentationMetric,
             modality: str,
             organ: str,
             early_stopping_metric: Optional[SegmentationMetric] = None,
@@ -35,6 +34,7 @@ class SegmentationTask(Task):
                     SingleTaskMetricList[SegmentationMetric]
                 ]
             ] = None,
+            hps_tuning_metric: Optional[SegmentationMetric] = None,
             name: Optional[str] = None
     ):
         """
@@ -44,8 +44,6 @@ class SegmentationTask(Task):
         ----------
         criterion : SegmentationLoss
             A loss function.
-        hps_tuning_metric : SegmentationMetric
-            A metric used for Optuna hyperparameters optimization.
         modality : str
             Modality on which segmentation was performed.
         organ : str
@@ -60,6 +58,8 @@ class SegmentationTask(Task):
                 ]
             ]
             A list of metrics to evaluate the trained models.
+        hps_tuning_metric : Optional[SegmentationMetric]
+            A metric used for Optuna hyperparameters optimization.
         name : Optional[str]
             The name of the task.
         """
@@ -93,8 +93,8 @@ class SegmentationTask(Task):
         return self._evaluation_metrics
 
     @property
-    def hps_tuning_metric(self) -> SegmentationMetric:
-        return self._hps_tuning_metric  # type: ignore
+    def hps_tuning_metric(self) -> Optional[SegmentationMetric]:
+        return self._hps_tuning_metric
 
     @property
     def metrics(self) -> SingleTaskMetricList[SegmentationMetric]:

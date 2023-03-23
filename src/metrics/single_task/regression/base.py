@@ -9,12 +9,13 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Union
+from typing import Tuple, Union
 
 import numpy as np
-from torch import from_numpy, isnan, is_tensor, Tensor, where
+from torch import from_numpy, is_tensor, Tensor
 
 from ..base import Direction, SingleTaskMetric, MetricReduction
+from ....tools.missing_targets import get_idx_of_nonmissing_regression_targets
 
 
 class RegressionMetric(SingleTaskMetric, ABC):
@@ -44,6 +45,8 @@ class RegressionMetric(SingleTaskMetric, ABC):
             Number of digits kept.
         """
         super().__init__(direction=direction, name=name, reduction=reduction, n_digits=n_digits)
+
+        self.get_idx_of_nonmissing_targets = get_idx_of_nonmissing_regression_targets
 
     def __call__(
             self,
@@ -75,30 +78,6 @@ class RegressionMetric(SingleTaskMetric, ABC):
             pred, targets = self.convert_to_tensors(pred, targets)
 
         return round(self.perform_reduction(self._compute_metric(pred, targets)), self.n_digits)
-
-    @staticmethod
-    def get_idx_of_nonmissing_targets(
-            y: Union[Tensor, np.array]
-    ) -> List[int]:
-        """
-        Gets the idx of the nonmissing targets in the given array or tensor.
-
-        Parameters
-        ----------
-        y : Union[Tensor, np.array]
-            (N,) tensor or array with targets.
-
-        Returns
-        -------
-        idx : List[int]
-            Index.
-        """
-        if isinstance(y, Tensor):
-            idx = where(~isnan(y))
-        else:
-            idx = np.where(~np.isnan(y))
-
-        return idx[0].tolist()
 
     @staticmethod
     def convert_to_tensors(

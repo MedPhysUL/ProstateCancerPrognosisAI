@@ -5,7 +5,7 @@
     @Creation Date:     09/2022
     @Last modification: 02/2023
 
-    @Description:       This file is used to define the abstract `RegressionLoss` class.
+    @Description:       This file is used to define the abstract `SurvivalAnalysisLoss` class.
 """
 
 from abc import ABC, abstractmethod
@@ -14,13 +14,14 @@ from typing import Tuple, Union
 import numpy as np
 from torch import from_numpy, is_tensor, nan, tensor, Tensor
 
-from ..base import SingleTaskLoss, LossReduction
-from ....tools.missing_targets import get_idx_of_nonmissing_regression_targets
+from ..base import LossReduction
+from ..regression import RegressionLoss
+from ....tools.missing_targets import get_idx_of_nonmissing_survival_analysis_targets
 
 
-class RegressionLoss(SingleTaskLoss, ABC):
+class SurvivalAnalysisLoss(RegressionLoss, ABC):
     """
-    An abstract class that represents the skeleton of callable classes to use as regression criteria.
+    An abstract class that represents the skeleton of callable classes to use as survival analysis criteria.
     """
 
     def __init__(
@@ -40,7 +41,7 @@ class RegressionLoss(SingleTaskLoss, ABC):
         """
         super().__init__(name=name, reduction=reduction)
 
-        self.get_idx_of_nonmissing_targets = get_idx_of_nonmissing_regression_targets
+        self.get_idx_of_nonmissing_targets = get_idx_of_nonmissing_survival_analysis_targets
 
     def __call__(
             self,

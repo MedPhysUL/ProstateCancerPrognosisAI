@@ -140,6 +140,9 @@ class Tuner:
         masks : Dict[int, Dict[str, Union[List[int], Dict[int, Dict[str, List[int]]]]]]
             Dict with list of idx to use as train, valid and test masks.
         """
+        assert all(task.hps_tuning_metric is not None for task in dataset.tasks), (
+            f"Tuning requires that all tasks define the 'hps_tuning_metric' attribute at instance initialization."
+        )
         self._initialize_states()
         self._set_seed()
         # ray.init()

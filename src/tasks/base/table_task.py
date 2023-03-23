@@ -9,16 +9,15 @@
 """
 
 from abc import ABC
-from typing import Iterable, List, Optional, Union
-
-import numpy as np
-from torch import Tensor, where
+from typing import Iterable, Optional, Union
 
 from ...losses.single_task.binary_classification import BinaryClassificationLoss
 from ...losses.single_task.regression import RegressionLoss
+from ...losses.single_task.survival_analysis import SurvivalAnalysisLoss
 from ...metrics.single_task.binary_classification import BinaryClassificationMetric
 from ...metrics.single_task.containers import SingleTaskMetricList
 from ...metrics.single_task.regression import RegressionMetric
+from ...metrics.single_task.survival_analysis import SurvivalAnalysisMetric
 from .task import Task
 
 
@@ -29,43 +28,48 @@ class TableTask(Task, ABC):
 
     def __init__(
             self,
-            hps_tuning_metric: Union[BinaryClassificationMetric, RegressionMetric],
             name: str,
             target_column: str,
-            criterion: Optional[Union[BinaryClassificationLoss, RegressionLoss]] = None,
-            early_stopping_metric: Optional[Union[BinaryClassificationMetric, RegressionMetric]] = None,
-            evaluation_metrics: Optional[
-                Union[
-                    Union[BinaryClassificationMetric, RegressionMetric],
-                    Iterable[Union[BinaryClassificationMetric, RegressionMetric]],
-                    SingleTaskMetricList[Union[BinaryClassificationMetric, RegressionMetric]]
-                ]
-            ] = None,
-
+            criterion: Optional[Union[BinaryClassificationLoss, RegressionLoss, SurvivalAnalysisLoss]] = None,
+            early_stopping_metric: Optional[Union[
+                BinaryClassificationMetric,
+                RegressionMetric,
+                SurvivalAnalysisMetric
+            ]] = None,
+            evaluation_metrics: Optional[Union[
+                Union[BinaryClassificationMetric, RegressionMetric, SurvivalAnalysisMetric],
+                Iterable[Union[BinaryClassificationMetric, RegressionMetric, SurvivalAnalysisMetric]],
+                SingleTaskMetricList[Union[BinaryClassificationMetric, RegressionMetric, SurvivalAnalysisMetric]]
+            ]] = None,
+            hps_tuning_metric: Optional[Union[
+                BinaryClassificationMetric,
+                RegressionMetric,
+                SurvivalAnalysisMetric
+            ]] = None
     ):
         """
         Sets protected attributes.
 
         Parameters
         ----------
-        hps_tuning_metric : Union[BinaryClassificationMetric, RegressionMetric]
-            A metric used for Optuna hyperparameters optimization.
         name : str
             The name of the task.
         target_column : str
             Name of the column containing the targets associated to this task.
-        criterion : Optional[Union[BinaryClassificationLoss, RegressionLoss]]
+        criterion : Optional[Union[BinaryClassificationLoss, RegressionLoss, SurvivalAnalysisLoss]]
             A loss function.
-        early_stopping_metric : Optional[Union[BinaryClassificationMetric, RegressionMetric]]
+        early_stopping_metric : Optional[Union[BinaryClassificationMetric, RegressionMetric, SurvivalAnalysisMetric]]
             A metric used for early stopping.
         evaluation_metrics : Optional[
                 Union[
-                    Union[BinaryClassificationMetric, RegressionMetric],
-                    Iterable[Union[BinaryClassificationMetric, RegressionMetric]],
-                    SingleTaskMetricList[Union[BinaryClassificationMetric, RegressionMetric]]
+                    Union[BinaryClassificationMetric, RegressionMetric, SurvivalAnalysisMetric],
+                    Iterable[Union[BinaryClassificationMetric, RegressionMetric, SurvivalAnalysisMetric]],
+                    SingleTaskMetricList[Union[BinaryClassificationMetric, RegressionMetric, SurvivalAnalysisMetric]]
                 ]
             ]
             A list of metrics to evaluate the trained models.
+        hps_tuning_metric : Optional[Union[BinaryClassificationMetric, RegressionMetric, SurvivalAnalysisMetric]]
+            A metric used for Optuna hyperparameters optimization.
         """
         super().__init__(
             hps_tuning_metric=hps_tuning_metric,
@@ -74,7 +78,6 @@ class TableTask(Task, ABC):
             early_stopping_metric=early_stopping_metric,
             evaluation_metrics=evaluation_metrics
         )
-        self.get_idx_of_nonmissing_targets = hps_tuning_metric.get_idx_of_nonmissing_targets
         self._target_column = target_column
 
     @property

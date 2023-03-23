@@ -14,6 +14,7 @@ from .base import TableTask
 from ..losses.single_task.regression import RegressionLoss
 from ..metrics.single_task.containers import SingleTaskMetricList
 from ..metrics.single_task.regression import RegressionMetric
+from ..tools.missing_targets import get_idx_of_nonmissing_regression_targets
 
 
 class RegressionTask(TableTask):
@@ -23,7 +24,6 @@ class RegressionTask(TableTask):
 
     def __init__(
             self,
-            hps_tuning_metric: RegressionMetric,
             target_column: str,
             criterion: Optional[RegressionLoss] = None,
             early_stopping_metric: Optional[RegressionMetric] = None,
@@ -34,6 +34,7 @@ class RegressionTask(TableTask):
                     SingleTaskMetricList[RegressionMetric]
                 ]
             ] = None,
+            hps_tuning_metric: Optional[RegressionMetric] = None,
             name: Optional[str] = None
     ):
         """
@@ -41,8 +42,6 @@ class RegressionTask(TableTask):
 
         Parameters
         ----------
-        hps_tuning_metric : RegressionMetric
-            A metric used for Optuna hyperparameters optimization.
         target_column : str
             Name of the column containing the targets associated to this task.
         criterion : Optional[RegressionLoss]
@@ -57,6 +56,8 @@ class RegressionTask(TableTask):
                 ]
             ]
             A list of metrics to evaluate the trained models.
+        hps_tuning_metric : RegressionMetric
+            A metric used for Optuna hyperparameters optimization.
         name : Optional[str]
             The name of the task.
         """
@@ -70,6 +71,8 @@ class RegressionTask(TableTask):
             early_stopping_metric=early_stopping_metric,
             evaluation_metrics=evaluation_metrics
         )
+
+        self.get_idx_of_nonmissing_targets = get_idx_of_nonmissing_regression_targets
 
         self._validate_metrics_type(type_=RegressionMetric)
         self._validate_criterion_type(type_=RegressionLoss)
@@ -87,8 +90,8 @@ class RegressionTask(TableTask):
         return self._evaluation_metrics
 
     @property
-    def hps_tuning_metric(self) -> RegressionMetric:
-        return self._hps_tuning_metric  # type: ignore
+    def hps_tuning_metric(self) -> Optional[RegressionMetric]:
+        return self._hps_tuning_metric
 
     @property
     def metrics(self) -> SingleTaskMetricList[RegressionMetric]:

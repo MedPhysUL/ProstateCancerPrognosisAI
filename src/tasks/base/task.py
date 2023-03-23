@@ -27,12 +27,12 @@ class Task(ABC):
 
     def __init__(
             self,
-            hps_tuning_metric: SingleTaskMetric,
             criterion: Optional[SingleTaskLoss] = None,
             early_stopping_metric: Optional[SingleTaskMetric] = None,
             evaluation_metrics: Optional[
                 Union[SingleTaskMetric, Iterable[SingleTaskMetric], SingleTaskMetricList]
             ] = None,
+            hps_tuning_metric: Optional[SingleTaskMetric] = None,
             name: str = None
     ):
         """
@@ -40,14 +40,14 @@ class Task(ABC):
 
         Parameters
         ----------
-        hps_tuning_metric : SingleTaskMetric
-            A metric used for Optuna hyperparameters optimization.
         criterion : Optional[SingleTaskLoss]
             A loss function.
         early_stopping_metric : Optional[Metric]
             A metric used for early stopping.
         evaluation_metrics : Optional[Union[SingleTaskMetric, Iterable[SingleTaskMetric], SingleTaskMetricList]]
             A list of metrics to evaluate the trained models on.
+        hps_tuning_metric : Optional[SingleTaskMetric]
+            A metric used for Optuna hyperparameters optimization.
         name : str
             The name of the task.
         """
@@ -95,13 +95,13 @@ class Task(ABC):
         return self._evaluation_metrics
 
     @property
-    def hps_tuning_metric(self) -> SingleTaskMetric:
+    def hps_tuning_metric(self) -> Optional[SingleTaskMetric]:
         """
         Hyperparameters tuning metric.
 
         Returns
         -------
-        hps_tuning_metric : SingleTaskMetric
+        hps_tuning_metric : Optional[SingleTaskMetric]
             A metric used for Optuna hyperparameters optimization.
         """
         return self._hps_tuning_metric
@@ -116,7 +116,9 @@ class Task(ABC):
         metric_list : SingleTaskMetricList
             A metric list containing all metrics.
         """
-        metrics = [self.hps_tuning_metric]
+        metrics = []
+        if self.hps_tuning_metric:
+            metrics.append(self.hps_tuning_metric)
         if self.early_stopping_metric:
             metrics.append(self.early_stopping_metric)
         if self.evaluation_metrics:

@@ -9,12 +9,13 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import numpy as np
-from torch import from_numpy, is_tensor, Tensor, where, zeros
+from torch import from_numpy, is_tensor, Tensor, zeros
 
 from ..base import Direction, SingleTaskMetric, MetricReduction
+from ....tools.missing_targets import get_idx_of_nonmissing_classification_targets
 
 
 class BinaryClassificationMetric(SingleTaskMetric, ABC):
@@ -55,6 +56,8 @@ class BinaryClassificationMetric(SingleTaskMetric, ABC):
         self._scaling_factor = None
         self._threshold = threshold
         self._weight = weight
+
+        self.get_idx_of_nonmissing_targets = get_idx_of_nonmissing_classification_targets
 
         super().__init__(direction=direction, name=name, reduction=reduction, n_digits=n_digits)
 
@@ -118,30 +121,6 @@ class BinaryClassificationMetric(SingleTaskMetric, ABC):
             pred, targets = self.convert_to_tensors(pred, targets)
 
         return round(self.perform_reduction(self._compute_metric(pred, targets, thresh)), self.n_digits)
-
-    @staticmethod
-    def get_idx_of_nonmissing_targets(
-            y: Union[Tensor, np.array]
-    ) -> List[int]:
-        """
-        Gets the idx of the nonmissing targets in the given array or tensor.
-
-        Parameters
-        ----------
-        y : Union[Tensor, np.array]
-            (N,) tensor or array with targets.
-
-        Returns
-        -------
-        idx : List[int]
-            Index.
-        """
-        if isinstance(y, Tensor):
-            idx = where(y >= 0)
-        else:
-            idx = np.where(y >= 0)
-
-        return idx[0].tolist()
 
     def update_scaling_factor(
             self,
