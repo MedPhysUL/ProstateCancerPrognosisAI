@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Any, Dict, Generic, Iterable, Iterator, Optional, TypeVar, Union
 
 from ..base import TableTask, Task
-from ...tasks import BinaryClassificationTask, RegressionTask, SegmentationTask
+from ...tasks import BinaryClassificationTask, RegressionTask, SegmentationTask, SurvivalAnalysisTask
 
 _SpecifiedTaskType = TypeVar("_SpecifiedTaskType")
 
@@ -132,6 +132,18 @@ class TaskList(Generic[_SpecifiedTaskType]):
             Segmentation tasks.
         """
         return TaskList([task for task in self.tasks if isinstance(task, SegmentationTask)])
+
+    @property
+    def survival_analysis_tasks(self) -> TaskList[SurvivalAnalysisTask]:
+        """
+        Returns a 'TaskList' of all survival analysis tasks contained in the current 'TaskList'.
+
+        Returns
+        -------
+        survival_tasks : TaskList[SurvivalAnalysisTask]
+            Survival analysis tasks.
+        """
+        return TaskList([task for task in self.tasks if isinstance(task, SurvivalAnalysisTask)])
 
     @property
     def table_tasks(self) -> TaskList[TableTask]:
