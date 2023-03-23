@@ -7,6 +7,7 @@ kaleido==0.1.0
 matplotlib==3.6.3
 monai==1.0.1
 numpy==1.24.2
+openpyxl==3.1.2
 optuna==3.1.0
 optuna-dashboard==0.8.1
 pandas==1.5.3
