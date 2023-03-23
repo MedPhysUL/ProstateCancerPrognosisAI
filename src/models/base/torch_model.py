@@ -330,8 +330,9 @@ class TorchModel(Model, ABC):
                     )
 
             for task in table_tasks:
-                table_outputs[task.name].predictions.append(predictions[task.name].item())
-                table_outputs[task.name].targets.append(targets[task.name].item())
+                if task.metrics:
+                    table_outputs[task.name].predictions.append(predictions[task.name].item())
+                    table_outputs[task.name].targets.append(targets[task.name].item())
 
         for task in seg_tasks:
             for metric in task.unique_metrics:
@@ -340,8 +341,9 @@ class TorchModel(Model, ABC):
                 )
 
         for task in table_tasks:
-            output = table_outputs[task.name]
-            for metric in task.unique_metrics:
-                scores[task.name][metric.name] = metric(to_numpy(output.predictions), to_numpy(output.targets))
+            if task.metrics:
+                output = table_outputs[task.name]
+                for metric in task.unique_metrics:
+                    scores[task.name][metric.name] = metric(to_numpy(output.predictions), to_numpy(output.targets))
 
         return scores
