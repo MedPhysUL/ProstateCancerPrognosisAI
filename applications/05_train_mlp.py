@@ -27,7 +27,7 @@ if __name__ == '__main__':
     df = pd.read_csv(LEARNING_TABLE_PATH)
 
     feature_cols = [AGE, PSA, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
-    target_cols = [PN, BCR]
+    target_cols = [PN, BCR, BCR_TIME]
 
     df = df[[ID] + feature_cols + target_cols]
 
