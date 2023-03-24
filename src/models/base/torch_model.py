@@ -334,7 +334,7 @@ class TorchModel(Model, ABC):
             for task in table_tasks:
                 if task.metrics:
                     table_outputs[task.name].predictions.append(predictions[task.name].item())
-                    table_outputs[task.name].targets.append(targets[task.name].item())
+                    table_outputs[task.name].targets.append(targets[task.name].tolist()[0])
 
         for task in seg_tasks:
             for metric in task.unique_metrics:
