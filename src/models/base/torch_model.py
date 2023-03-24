@@ -199,6 +199,8 @@ class TorchModel(Model, ABC):
                 predictions[task.name] = (sigmoid(outputs[task.name]) >= task.decision_threshold_metric.threshold)
         for task in self._tasks.regression_tasks:
             predictions[task.name] = outputs[task.name]
+        for task in self._tasks.survival_analysis_tasks:
+            predictions[task.name] = outputs[task.name]
         for task in self._tasks.segmentation_tasks:
             predictions[task.name] = round(sigmoid(outputs[task.name]))
 
