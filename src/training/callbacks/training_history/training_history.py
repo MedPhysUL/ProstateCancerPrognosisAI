@@ -337,8 +337,11 @@ class TrainingHistory(TrainingCallback):
         plt.close('all')
 
         for measurement_category in list(MeasurementsContainer.__annotations__.keys()):
-            training_set_task_keys = list(asdict(self.training_set_measurements)[measurement_category].keys())
-            validation_set_task_keys = list(asdict(self.validation_set_measurements)[measurement_category].keys())
+            train_history = asdict(self.training_set_measurements)[measurement_category]
+            valid_history = asdict(self.validation_set_measurements)[measurement_category]
+
+            training_set_task_keys = list(train_history.keys())
+            validation_set_task_keys = list(valid_history.keys())
             all_task_keys = list(set(training_set_task_keys + validation_set_task_keys))
 
             if path_to_save is not None:
@@ -346,15 +349,16 @@ class TrainingHistory(TrainingCallback):
                 os.mkdir(path_to_measurement_category_directory)
 
             for task_key in all_task_keys:
-                fig, axes, lines = self._create_plot(measurement_category, task_key, **kwargs)
-                plt.tight_layout(rect=(0, 0.03, 1, 0.95))
-                if path_to_save is not None:
-                    path_to_fig = os.path.join(os.path.join(path_to_save, measurement_category), f"{task_key}.pdf")
-                    fig.savefig(path_to_fig, dpi=kwargs.get("dpi", 300))
-                if show:
-                    plt.show(block=kwargs.get("block", True))
-                if kwargs.get("close", True):
-                    plt.close(fig)
+                if set(list(train_history[task_key].keys()) + list(valid_history[task_key].keys())):
+                    fig, axes, lines = self._create_plot(measurement_category, task_key, **kwargs)
+                    plt.tight_layout(rect=(0, 0.03, 1, 0.95))
+                    if path_to_save is not None:
+                        path_to_fig = os.path.join(os.path.join(path_to_save, measurement_category), f"{task_key}.pdf")
+                        fig.savefig(path_to_fig, dpi=kwargs.get("dpi", 300))
+                    if show:
+                        plt.show(block=kwargs.get("block", True))
+                    if kwargs.get("close", True):
+                        plt.close(fig)
 
     def on_epoch_end(self, trainer, **kwargs):
         """
