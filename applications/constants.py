@@ -10,9 +10,9 @@
 
 import os
 
-from src.losses.single_task import BCEWithLogitsLoss, DiceLoss
-from src.metrics.single_task import BinaryBalancedAccuracy, DiceMetric
-from src.tasks import BinaryClassificationTask, SegmentationTask
+from src.losses.single_task import BCEWithLogitsLoss, DiceLoss, NegativePartialLogLikelihood
+from src.metrics.single_task import BinaryBalancedAccuracy, DiceMetric, ConcordanceIndexCensored
+from src.tasks import BinaryClassificationTask, SegmentationTask, SurvivalAnalysisTask
 
 # SEED
 SEED = 1010710
@@ -59,11 +59,11 @@ PN_TASK = BinaryClassificationTask(
     hps_tuning_metric=BinaryBalancedAccuracy(),
     criterion=BCEWithLogitsLoss()
 )
-BCR_TASK = BinaryClassificationTask(
-    target_column=BCR,
-    decision_threshold_metric=BinaryBalancedAccuracy(),
-    hps_tuning_metric=BinaryBalancedAccuracy(),
-    criterion=BCEWithLogitsLoss()
+BCR_TASK = SurvivalAnalysisTask(
+    event_indicator_column=BCR,
+    event_time_column=BCR_TIME,
+    criterion=NegativePartialLogLikelihood(),
+    hps_tuning_metric=ConcordanceIndexCensored()
 )
 TABLE_TASKS = [BCR_TASK, PN_TASK]
 
