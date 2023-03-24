@@ -77,7 +77,8 @@ class NegativePartialLogLikelihood(SurvivalAnalysisLoss):
     def _compute_loss(
             self,
             pred: Tensor,
-            targets: Tensor
+            events_indicators: Tensor,
+            events_times: Tensor
     ) -> Tensor:
         """
         Computes Cox partial negative log-likelihood, where 'pred' are the natural logarithm of the relative risk
@@ -99,18 +100,17 @@ class NegativePartialLogLikelihood(SurvivalAnalysisLoss):
         Parameters
         ----------
         pred : Tensor
-            (N,) tensor with predicted labels
-        targets : Tensor
-            (N, 2) tensor with event indicators and event times.
+            (N,) tensor with predicted labels.
+        events_indicators : Tensor
+            (N,) tensor with event indicators.
+        events_times : Tensor
+            (N,) tensor with event times.
 
         Returns
         -------
         loss : Tensor
             Loss value.
         """
-        events_indicators = targets[:, 0]
-        events_times = targets[:, 1]
-
         if events_indicators.count_nonzero() == 0:
             return tensor(0.0, device=pred.device)
 
