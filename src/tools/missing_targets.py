@@ -72,11 +72,14 @@ def get_idx_of_nonmissing_survival_analysis_targets(
     Parameters
     ----------
     y : Union[Tensor, np.array]
-        (N,) tensor or array with targets.
+        (N, 2) tensor or array with targets.
 
     Returns
     -------
     idx : List[int]
         Index.
     """
-    pass  # TODO
+    nonmissing_event_indicator_idx = get_idx_of_nonmissing_classification_targets(y[:, 0])
+    nonmissing_event_time_idx = get_idx_of_nonmissing_regression_targets(y[:, 1])
+
+    return list(set(nonmissing_event_indicator_idx).intersection(nonmissing_event_time_idx))
