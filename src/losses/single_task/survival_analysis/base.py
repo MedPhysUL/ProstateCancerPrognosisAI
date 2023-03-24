@@ -102,8 +102,8 @@ class SurvivalAnalysisLoss(SingleTaskLoss, ABC):
     def _compute_loss(
             self,
             pred: Tensor,
-            events_indicators: Tensor,
-            events_times: Tensor
+            event_indicator: Tensor,
+            event_time: Tensor
     ) -> Tensor:
         """
         Computes the loss value.
@@ -112,9 +112,9 @@ class SurvivalAnalysisLoss(SingleTaskLoss, ABC):
         ----------
         pred : Tensor
             (N,) tensor with predicted labels.
-        events_indicators : Tensor
+        event_indicator : Tensor
             (N,) tensor with event indicators.
-        events_times : Tensor
+        event_time : Tensor
             (N,) tensor with event times.
 
         Returns

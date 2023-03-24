@@ -44,7 +44,7 @@ class NegativePartialLogLikelihood(SurvivalAnalysisLoss):
     @staticmethod
     def _compute_sorted_partial_negative_log_likelihood(
             pred: Tensor,
-            events_indicators: Tensor,
+            event_indicator: Tensor,
             tied_events_idx: List[List[int]],
             epsilon: float = 1e-7
     ) -> Tensor:
@@ -56,7 +56,7 @@ class NegativePartialLogLikelihood(SurvivalAnalysisLoss):
         ----------
         pred : Tensor
             (N,) tensor of the natural logarithm of the relative risk function, i.e. g(x) in the original paper.
-        events_indicators : Tensor
+        event_indicator : Tensor
             (N,) binary tensor of the events' indicators.
         tied_events_idx : List[List[int]]
             List of list of tied events indexes.
@@ -70,15 +70,15 @@ class NegativePartialLogLikelihood(SurvivalAnalysisLoss):
         for idx in tied_events_idx:
             log_cumulative_sum_h[idx[:-1]] = log_cumulative_sum_h[idx[-1]].item()
 
-        loss = ((pred - log_cumulative_sum_h) * events_indicators).sum() / events_indicators.sum()
+        loss = ((pred - log_cumulative_sum_h) * event_indicator).sum() / event_indicator.sum()
 
         return - loss
 
     def _compute_loss(
             self,
             pred: Tensor,
-            events_indicators: Tensor,
-            events_times: Tensor
+            event_indicator: Tensor,
+            event_time: Tensor
     ) -> Tensor:
         """
         Computes Cox partial negative log-likelihood, where 'pred' are the natural logarithm of the relative risk
@@ -101,9 +101,9 @@ class NegativePartialLogLikelihood(SurvivalAnalysisLoss):
         ----------
         pred : Tensor
             (N,) tensor with predicted labels.
-        events_indicators : Tensor
+        event_indicator : Tensor
             (N,) tensor with event indicators.
-        events_times : Tensor
+        event_time : Tensor
             (N,) tensor with event times.
 
         Returns
@@ -111,19 +111,19 @@ class NegativePartialLogLikelihood(SurvivalAnalysisLoss):
         loss : Tensor
             Loss value.
         """
-        if events_indicators.count_nonzero() == 0:
+        if event_indicator.count_nonzero() == 0:
             return tensor(0.0, device=pred.device)
 
-        events_times, idx = events_times.sort(descending=True)
-        events_indicators = events_indicators[idx]
+        event_time, idx = event_time.sort(descending=True)
+        event_indicator = event_indicator[idx]
         pred = pred[idx]
 
-        _, inv, counts = unique(events_times, return_inverse=True, return_counts=True)
+        _, inv, counts = unique(event_time, return_inverse=True, return_counts=True)
         tied_events_idx = [where(inv == i)[0].tolist() for i, c, in enumerate(counts) if counts[i] > 1]
 
         loss = self._compute_sorted_partial_negative_log_likelihood(
             pred=pred,
-            events_indicators=events_indicators,
+            event_indicator=event_indicator,
             tied_events_idx=tied_events_idx
         ).to(device=pred.device)
 
