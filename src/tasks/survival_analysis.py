@@ -24,8 +24,8 @@ class SurvivalAnalysisTask(TableTask):
 
     def __init__(
             self,
-            duration_column: str,
-            event_column: str,
+            event_indicator_column: str,
+            event_time_column: str,
             criterion: Optional[SurvivalAnalysisLoss] = None,
             early_stopping_metric: Optional[SurvivalAnalysisMetric] = None,
             evaluation_metrics: Optional[
@@ -43,11 +43,10 @@ class SurvivalAnalysisTask(TableTask):
 
         Parameters
         ----------
-        duration_column : str
-            Name of the column containing the time of event or time of censoring. In general, this is called the
-            follow-up duration.
-        event_column : str
+        event_indicator_column : str
             Name of the column containing the binary event indicators.
+        event_time_column : str
+            Name of the column containing the time of event or time of censoring.
         criterion : Optional[SurvivalAnalysisLoss]
             A loss function.
         early_stopping_metric : Optional[SurvivalAnalysisMetric]
@@ -70,14 +69,14 @@ class SurvivalAnalysisTask(TableTask):
         super().__init__(
             hps_tuning_metric=hps_tuning_metric,
             name=name,
-            target_column=event_column,
+            target_column=event_indicator_column,
             criterion=criterion,
             early_stopping_metric=early_stopping_metric,
             evaluation_metrics=evaluation_metrics
         )
 
-        self._duration_column = duration_column
-        self._event_column = event_column
+        self._event_indicator_column = event_indicator_column
+        self._event_time_column = event_time_column
 
         self.get_idx_of_nonmissing_targets = get_idx_of_nonmissing_survival_analysis_targets
 
@@ -89,10 +88,6 @@ class SurvivalAnalysisTask(TableTask):
         return self._criterion
 
     @property
-    def duration_column(self) -> str:
-        return self._duration_column
-
-    @property
     def early_stopping_metric(self) -> Optional[SurvivalAnalysisMetric]:
         return self._early_stopping_metric
 
@@ -101,8 +96,12 @@ class SurvivalAnalysisTask(TableTask):
         return self._evaluation_metrics
 
     @property
-    def event_column(self) -> str:
-        return self._event_column
+    def event_indicator_column(self) -> str:
+        return self._event_indicator_column
+
+    @property
+    def event_time_column(self) -> str:
+        return self._event_time_column
 
     @property
     def hps_tuning_metric(self) -> Optional[SurvivalAnalysisMetric]:
