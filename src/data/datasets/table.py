@@ -22,7 +22,7 @@ from torch.utils.data import Dataset
 from .mask import Mask
 from ..processing.tools import preprocess_categoricals, preprocess_continuous
 from ..processing.transforms import CategoricalTransform as CaT
-from ...tasks import BinaryClassificationTask, TaskList
+from ...tasks import BinaryClassificationTask, TaskList, SurvivalAnalysisTask
 from ...tasks.base import TableTask
 
 
@@ -30,7 +30,9 @@ class TableDataModel(NamedTuple):
     """
     Data element named tuple. This tuple is used to separate features (x) and targets (y) where
         - x : D-dimensional dictionary containing (N, ) tensor or array where D is the number of features.
-        - y : T-dimensional dictionary containing (N, ) tensor or array where T is the number of tasks.
+        - y : T-dimensional dictionary containing (N, ) tensor or array where T is the number of tasks. Note that it can
+            also contain (N, 2) tensor or array in the case of survival analysis, where the first column corresponds to
+            events indicators and the second to events times.
     """
     x: Dict[str, Union[np.ndarray, Tensor]]
     y: Dict[str, Union[np.ndarray, Tensor]]
@@ -140,7 +142,7 @@ class TableDataset(Dataset):
             A data element.
         """
         x = dict((col, self.x[idx, i]) for i, col in enumerate(self.features_cols))
-        y = dict((task.name, self.y[idx, i]) for i, task in enumerate(self.tasks))
+        y = dict((col, y_task[idx]) for col, y_task in self.y.items())
 
         return TableDataModel(x=x, y=y)
 
@@ -231,7 +233,7 @@ class TableDataset(Dataset):
         return self._x_cont
 
     @property
-    def y(self) -> Union[np.array, Tensor]:
+    def y(self) -> Dict[str, Union[np.array, Tensor]]:
         return self._y
 
     def _categorical_setter(
@@ -554,15 +556,13 @@ class TableDataset(Dataset):
         Sets scaling factor of all binary classification tasks.
         """
         for task in self.tasks.binary_classification_tasks:
-            idx = self.target_cols.index(task.target_column)
-
             # We set the scaling factors of all classification metrics
             for metric in task.metrics:
-                metric.update_scaling_factor(y_train=self.y[self.train_mask, idx])
+                metric.update_scaling_factor(y_train=self.y[task.name][self.train_mask])
 
             # We set the scaling factor of the criterion
             if task.criterion:
-                task.criterion.update_scaling_factor(y_train=self.y[self.train_mask, idx])
+                task.criterion.update_scaling_factor(y_train=self.y[task.name][self.train_mask])
 
     def _numerical_setter(
             self,
@@ -825,25 +825,29 @@ class TableDataset(Dataset):
         targets : Union[np.array, Tensor]
             Targets in a proper format.
         """
-        targets = []
+        targets = {}
         for task in tasks:
-            # Set targets protected attribute according to task
             t = self.original_data[task.target_column].to_numpy(dtype=float)
 
             if (not isinstance(task, BinaryClassificationTask)) and target_to_tensor:
                 t = from_numpy(t).float()
-            elif isinstance(task, BinaryClassificationTask):
+            elif isinstance(task, (BinaryClassificationTask, SurvivalAnalysisTask)):
                 if target_to_tensor:
                     t = from_numpy(t).long()
                 else:
                     t = t.astype(int)
 
-            targets.append(t)
+            if isinstance(task, SurvivalAnalysisTask):
+                event_time = self.original_data[task.event_time_column].to_numpy(dtype=float)
+                if target_to_tensor:
+                    event_time = from_numpy(event_time).float()
+                    t = stack([t, event_time], dim=1)
+                else:
+                    t = np.stack([t, event_time], axis=1)
 
-        if target_to_tensor:
-            return stack(targets, dim=1)
-        else:
-            return np.stack(targets, axis=1)
+            targets[task.name] = t
+
+        return targets
 
     @staticmethod
     def _check_columns_validity(
