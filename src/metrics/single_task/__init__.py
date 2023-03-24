@@ -4,5 +4,6 @@ from .binary_classification import (
     BinaryBalancedAccuracy
 )
 from .segmentation import DiceMetric
+from .survival_analysis import ConcordanceIndexCensored
 
 from .containers import SingleTaskMetricList
