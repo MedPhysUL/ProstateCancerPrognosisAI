@@ -1,1 +1,3 @@
 from .base import SurvivalAnalysisLoss
+
+from .negative_partial_log_likelihood import NegativePartialLogLikelihood
