@@ -61,6 +61,7 @@ class Trainer:
             exec_metrics_on_train: bool = True,
             n_epochs: int = 100,
             seed: Optional[int] = None,
+            valid_batch_size: Optional[int] = None,
             verbose: bool = True,
             **kwargs
     ):
@@ -83,6 +84,8 @@ class Trainer:
             Maximum number of epochs for training. Default is 100.
         seed : Optional[int]
             Random state used for reproducibility.
+        valid_batch_size : Optional[int]
+            Size of the batches in the dataset loader. Default is equal to the training loader batch size.
         verbose : bool
             Whether to print out the trace of the trainer.
         **kwargs : dict
@@ -96,6 +99,7 @@ class Trainer:
         self.exec_metrics_on_train = exec_metrics_on_train
         self.n_epochs = n_epochs
         self.model = None
+        self.valid_batch_size = valid_batch_size if valid_batch_size else batch_size
         self.verbose = verbose
         self._seed = seed
 
@@ -301,7 +305,7 @@ class Trainer:
             dataset=dataset,
             batch_size=train_batch_size,
             sampler=SubsetRandomSampler(dataset.train_mask),
-            drop_last=(train_size % train_batch_size) == 1,
+            drop_last=(train_size % train_batch_size) < train_batch_size / 2,
             collate_fn=None
         )
         random.set_rng_state(rng_state)
@@ -311,7 +315,7 @@ class Trainer:
     @staticmethod
     def _create_valid_dataloader(
             dataset: ProstateCancerDataset,
-            batch_size: int = 1
+            batch_size: int
     ) -> Optional[DataLoader]:
         """
         Creates the dataloader needed for validation during the training process.
@@ -321,7 +325,7 @@ class Trainer:
         dataset : ProstateCancerDataset
             Prostate cancer dataset used to feed the dataloader.
         batch_size : int
-            Size of the batches in the valid loader. Default is 1.
+            Size of the batches in the valid loader.
 
         Returns
         -------
@@ -338,6 +342,7 @@ class Trainer:
                 dataset=dataset,
                 batch_size=valid_batch_size,
                 sampler=SubsetRandomSampler(dataset.valid_mask),
+                drop_last=(valid_size % valid_batch_size) < valid_batch_size / 2,
                 collate_fn=None
             )
             random.set_rng_state(rng_state)
@@ -389,7 +394,7 @@ class Trainer:
         self._set_temporary_folder(path_to_temporary_folder)
 
         train_dataloader = self._create_train_dataloader(dataset=dataset, batch_size=self.batch_size)
-        valid_dataloader = self._create_valid_dataloader(dataset=dataset)
+        valid_dataloader = self._create_valid_dataloader(dataset=dataset, batch_size=self.valid_batch_size)
 
         self.training_state.train_dataloader = train_dataloader
         self.training_state.valid_dataloader = valid_dataloader
