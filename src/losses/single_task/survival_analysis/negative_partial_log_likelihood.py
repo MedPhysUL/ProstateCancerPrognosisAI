@@ -10,7 +10,7 @@
 
 from typing import List, Optional, Union
 
-from torch import exp, log, Tensor, unique, where
+from torch import exp, log, tensor, Tensor, unique, where
 
 from ..base import LossReduction
 from ..survival_analysis import SurvivalAnalysisLoss
@@ -24,7 +24,7 @@ class NegativePartialLogLikelihood(SurvivalAnalysisLoss):
     def __init__(
             self,
             name: Optional[str] = None,
-            reduction: Union[LossReduction, str] = LossReduction.MEAN
+            reduction: Union[LossReduction, str] = LossReduction.NONE
     ):
         """
         Sets protected attributes using parent's constructor.
@@ -110,6 +110,9 @@ class NegativePartialLogLikelihood(SurvivalAnalysisLoss):
         """
         events_indicators = targets[:, 0]
         events_times = targets[:, 1]
+
+        if events_indicators.count_nonzero() == 0:
+            return tensor(0.0, device=pred.device)
 
         events_times, idx = events_times.sort(descending=True)
         events_indicators = events_indicators[idx]
