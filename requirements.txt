@@ -13,6 +13,7 @@ optuna-dashboard==0.8.1
 pandas==1.5.3
 plotly==5.13.0
 scikit-learn==1.2.1
+scikit-survival==0.20.0
 seaborn==0.12.2
 tensorboard==2.12.0
 torch==2.0.0+cu118
