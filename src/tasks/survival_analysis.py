@@ -64,7 +64,7 @@ class SurvivalAnalysisTask(TableTask):
         name : Optional[str]
             The name of the task.
         """
-        name = name if name else f"{self.__class__.__name__}('event_column'={repr(event_column)})"
+        name = name if name else f"{self.__class__.__name__}('event_indicator_column'={repr(event_indicator_column)})"
 
         super().__init__(
             hps_tuning_metric=hps_tuning_metric,
