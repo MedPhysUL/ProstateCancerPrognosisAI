@@ -13,9 +13,9 @@ import env_apps
 from delia.databases import PatientsDatabase
 from delia.extractors import PatientsDataExtractor
 from delia.transforms import (
-    CopySegmentationsD,
     MatchingCentroidSpatialCropD,
     MatchingCropForegroundD,
+    MatchingResampleD,
     PETtoSUVD,
     ResampleD
 )
@@ -52,14 +52,14 @@ if __name__ == "__main__":
 
     transforms = Compose(
         [
-            ResampleD(keys=["CT", "PET", "Prostate"], out_spacing=(1.5, 1.5, 1.5)),
-            MatchingCropForegroundD(image_key="CT", matching_keys=["PET", "Prostate"]),
+            ResampleD(keys=["CT"], out_spacing=(1.5, 1.5, 1.5)),
+            MatchingResampleD(reference_image_key="CT", matching_keys=["PET", "Prostate"]),
+            MatchingCropForegroundD(reference_image_key="CT", matching_keys=["PET", "Prostate"]),
             *ideal_crop,
             PETtoSUVD(keys=["PET"]),
             ThresholdIntensityD(keys=["CT"], threshold=-250, above=True, cval=-250),
             ThresholdIntensityD(keys=["CT"], threshold=500, above=False, cval=500),
-            ScaleIntensityD(keys=["CT"], minv=0, maxv=1),
-            # CopySegmentationsD(segmented_image_key="CT", unsegmented_image_key="PET")
+            ScaleIntensityD(keys=["CT"], minv=0, maxv=1)
         ]
     )
 
