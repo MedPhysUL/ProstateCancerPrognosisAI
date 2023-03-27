@@ -72,7 +72,7 @@ class TableViewer:
         for task_idx, task in enumerate(self.dataset.tasks):
             filtered_masks = deepcopy(available_masks)
             for i, (name, mask) in enumerate(filtered_masks):
-                nonmissing_targets_idx = task.get_idx_of_nonmissing_targets(self.dataset.y[mask, task_idx])
+                nonmissing_targets_idx = task.get_idx_of_nonmissing_targets(self.dataset.y[task.name][mask])
                 filtered_masks[i] = (name, np.array(mask)[nonmissing_targets_idx].tolist())
 
             nonempty_masks.append(
