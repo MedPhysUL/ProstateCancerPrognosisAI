@@ -11,7 +11,7 @@
 import os
 
 from src.losses.single_task import BCEWithLogitsLoss, DiceLoss, NegativePartialLogLikelihood
-from src.metrics.single_task import BinaryBalancedAccuracy, DiceMetric, ConcordanceIndexCensored
+from src.metrics.single_task import AUC, BinaryBalancedAccuracy, DiceMetric, ConcordanceIndexCensored
 from src.tasks import BinaryClassificationTask, SegmentationTask, SurvivalAnalysisTask
 
 # SEED
@@ -56,7 +56,7 @@ BCR_TIME = "BCR_TIME"
 PN_TASK = BinaryClassificationTask(
     target_column=PN,
     decision_threshold_metric=BinaryBalancedAccuracy(),
-    hps_tuning_metric=BinaryBalancedAccuracy(),
+    hps_tuning_metric=AUC(),
     criterion=BCEWithLogitsLoss()
 )
 BCR_TASK = SurvivalAnalysisTask(
