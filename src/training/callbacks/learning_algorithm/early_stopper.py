@@ -33,7 +33,7 @@ class EarlyStopper(ABC):
     def __init__(
             self,
             patience: int = 10,
-            tolerance: float = 1e-4
+            tolerance: float = 1e-2
     ) -> None:
         """
         Sets protected attributes of early stopper.
@@ -151,7 +151,7 @@ class MetricsEarlyStopper(EarlyStopper):
     def __init__(
             self,
             patience: int = 10,
-            tolerance: float = 1e-4
+            tolerance: float = 1e-2
     ) -> None:
         """
         Sets protected attributes of early stopper and defines comparison methods according to the given tasks.
@@ -254,7 +254,7 @@ class MultiTaskLossEarlyStopper(EarlyStopper):
             self,
             include_regularization: Optional[bool] = True,
             patience: int = 10,
-            tolerance: float = 1e-4
+            tolerance: float = 1e-2
     ) -> None:
         """
         Sets protected attributes of early stopper and defines comparison methods according to the given tasks.
