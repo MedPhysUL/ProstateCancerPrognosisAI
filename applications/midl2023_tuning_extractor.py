@@ -106,7 +106,7 @@ if __name__ == '__main__':
         optimizer=OptimizerHyperparameter(
             constructor=Adam,
             parameters={
-                "lr": FloatHyperparameter(name="lr", low=5e-6, high=3e-5),
+                "lr": FloatHyperparameter(name="lr", low=5e-6, high=2e-5),
                 "weight_decay": FloatHyperparameter(name="weight_decay", low=0.1, high=0.3)
             }
         ),
