@@ -92,7 +92,7 @@ class EarlyStopper(ABC):
         )
         self.counter = 0
 
-    def _load_best_model(self, model):
+    def load_best_model(self, model):
         """
         Loads best model.
 
@@ -103,7 +103,7 @@ class EarlyStopper(ABC):
         """
         model.load_state_dict(load(self.path_to_best_model))
 
-    def _set_best_epoch(self, trainer):
+    def set_best_epoch(self, trainer):
         """
         Sets best epoch.
 
@@ -123,8 +123,8 @@ class EarlyStopper(ABC):
         trainer : Trainer
             Trainer.
         """
-        self._load_best_model(trainer.model)
-        self._set_best_epoch(trainer)
+        self.load_best_model(trainer.model)
+        self.set_best_epoch(trainer)
 
         if trainer.verbose:
             self._print_early_stopping_message(trainer)

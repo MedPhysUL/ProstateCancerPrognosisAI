@@ -441,8 +441,8 @@ class Trainer:
                 progress_bar.set_postfix(dict(**{"stop_flag": "True"}, **postfix))
                 break
 
-        self._delete_temporary_folder()
         self.callbacks.on_fit_end(self)
+        self._delete_temporary_folder()
         progress_bar.close()
 
         return TrainingResult(model=self.model, training_history=self.training_history)

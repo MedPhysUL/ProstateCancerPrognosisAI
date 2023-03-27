@@ -255,7 +255,7 @@ class Checkpoint(TrainingCallback):
         trainer : Trainer
             The trainer.
         """
-        if trainer.training_state.stop_training_flag:
+        if trainer.is_using_early_stopping:
             best_epoch_idx = trainer.training_state.best_epoch
             path_to_best_checkpoint = self._get_path_to_checkpoint(best_epoch_idx)
             if os.path.exists(path_to_best_checkpoint):

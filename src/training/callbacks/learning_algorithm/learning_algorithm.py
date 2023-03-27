@@ -316,3 +316,16 @@ class LearningAlgorithm(TrainingCallback):
         if self.early_stopper:
             if self.early_stopper(trainer):
                 self.stopped = True
+
+    def on_fit_end(self, trainer, **kwargs):
+        """
+        Called when the training is finished. If the last model is not the best model, loads the best model.
+
+        Parameters
+        ----------
+        trainer : Trainer
+            The trainer.
+        """
+        if self.early_stopper:
+            self.early_stopper.load_best_model(trainer.model)
+            self.early_stopper.set_best_epoch(trainer)
