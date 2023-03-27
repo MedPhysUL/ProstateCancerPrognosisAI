@@ -8,9 +8,9 @@
     @Description:       This file is used to define the Cox `NegativePartialLogLikelihood` class.
 """
 
-from typing import List, Optional, Union
+from typing import Optional, Union
 
-from torch import exp, log, tensor, Tensor, unique, where
+from torch import exp, log, ones, sum, tensor, Tensor, unsqueeze
 
 from ..base import LossReduction
 from ..survival_analysis import SurvivalAnalysisLoss
@@ -40,39 +40,6 @@ class NegativePartialLogLikelihood(SurvivalAnalysisLoss):
 
         if self.reduction not in (LossReduction.NONE.value, LossReduction.MEAN.value):
             raise ValueError(f"Unsupported reduction: {self.reduction}, available options are ['none', 'mean'].")
-
-    @staticmethod
-    def _compute_sorted_partial_negative_log_likelihood(
-            pred: Tensor,
-            event_indicator: Tensor,
-            tied_events_idx: List[List[int]],
-            epsilon: float = 1e-7
-    ) -> Tensor:
-        """
-        Computes Cox partial negative log-likelihood. Requires the input to be sorted by descending duration time. The
-        Breslow’s method is used for handling tied event times.
-
-        Parameters
-        ----------
-        pred : Tensor
-            (N,) tensor of the natural logarithm of the relative risk function, i.e. g(x) in the original paper.
-        event_indicator : Tensor
-            (N,) binary tensor of the events' indicators.
-        tied_events_idx : List[List[int]]
-            List of list of tied events indexes.
-        epsilon : float
-            Small epsilon for computational stability, i.e. to avoid any division by 0.
-        """
-        gamma = pred.max()
-        cumulative_sum_h = exp(pred - gamma).cumsum(0)
-        log_cumulative_sum_h = log(cumulative_sum_h + epsilon) + gamma
-
-        for idx in tied_events_idx:
-            log_cumulative_sum_h[idx[:-1]] = log_cumulative_sum_h[idx[-1]].item()
-
-        loss = ((pred - log_cumulative_sum_h) * event_indicator).sum() / event_indicator.sum()
-
-        return - loss
 
     def _compute_loss(
             self,
@@ -114,17 +81,15 @@ class NegativePartialLogLikelihood(SurvivalAnalysisLoss):
         if event_indicator.count_nonzero() == 0:
             return tensor(0.0, device=pred.device)
 
-        event_time, idx = event_time.sort(descending=True)
-        event_indicator = event_indicator[idx]
-        pred = pred[idx]
+        event_time_length = event_time.shape[0]
+        mask = ones(event_time_length, event_time_length)
+        event_time_matrix = unsqueeze(event_time, 0)
+        mask[(event_time_matrix.T - event_time_matrix) > 0] = 0
 
-        _, inv, counts = unique(event_time, return_inverse=True, return_counts=True)
-        tied_events_idx = [where(inv == i)[0].tolist() for i, c, in enumerate(counts) if counts[i] > 1]
+        hazard_ratio = exp(pred) * mask
+        log_risk = log(sum(hazard_ratio, dim=1))
+        uncensored_likelihood = pred - log_risk
+        censored_likelihood = uncensored_likelihood * event_indicator
+        neg_log_loss = -sum(censored_likelihood) / sum(event_indicator)
 
-        loss = self._compute_sorted_partial_negative_log_likelihood(
-            pred=pred,
-            event_indicator=event_indicator,
-            tied_events_idx=tied_events_idx
-        ).to(device=pred.device)
-
-        return loss
+        return neg_log_loss.to(device=pred.device)
