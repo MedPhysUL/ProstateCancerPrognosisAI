@@ -31,7 +31,7 @@ class DeepRadiomicsExtractor(TorchModel):
             in_shape: Union[str, Sequence[int]],
             n_radiomics: int,
             channels: Union[str, Sequence[int]],
-            strides: Sequence[int],
+            strides: Optional[Sequence[int]] = None,
             kernel_size: Union[Sequence[int], int] = 3,
             num_res_units: int = 2,
             act: str = "PRELU",
@@ -52,7 +52,7 @@ class DeepRadiomicsExtractor(TorchModel):
         else:
             self.in_shape = in_shape
         self.n_radiomics = n_radiomics
-        self.strides = strides
+        self.strides = strides if strides else [2] * (len(self.channels) - 1)
         self.kernel_size = kernel_size
         self.num_res_units = num_res_units
         self.act = act
@@ -98,7 +98,7 @@ class DeepRadiomicsExtractor(TorchModel):
         if self.mode == "channel":
             x_image = cat(list(features.image.values()), 1)
         elif self.mode == "mask":
-            x_image = where(features.image["CT_Prostate"] == 1, features.image["PT"], 0.0)
+            x_image = features.image["PT"]*features.image["CT_Prostate"]
         else:
             raise AssertionError(f"mode is either 'mask' or 'channel'. Found {self.mode}")
 
