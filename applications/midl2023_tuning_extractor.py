@@ -49,7 +49,7 @@ if __name__ == '__main__':
     df = pd.read_csv(os.path.join(DATA_PATH, "midl2023_learning_table.csv"))
 
     feature_cols = [AGE, PSA, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
-    target_cols = [PN, BCR]
+    target_cols = [PN, BCR, BCR_TIME]
 
     df = df[[ID] + feature_cols + target_cols]
 
@@ -91,15 +91,11 @@ if __name__ == '__main__':
         constructor=DeepRadiomicsExtractor,
         parameters={
             "in_shape": CategoricalHyperparameter(name="in_shape", choices=["(1, 96, 96, 96)", "(2, 96, 96, 96)"]),
-            "n_radiomics": IntegerHyperparameter(name="n_radiomics", low=5, high=100, step=5),
-            "channels": CategoricalHyperparameter(
-                name="channels",
-                choices=["(2, 4, 4, 8, 8)", "(2, 4, 8, 16, 32)", "(4, 8, 16, 32, 64)", "(8, 16, 32, 64, 128)"]
-            ),
-            "strides": FixedHyperparameter(name="strides", value=(2, 2, 2, 2)),
-            "kernel_size": CategoricalHyperparameter(name="kernel_size", choices=[3, 5, 7]),
-            "num_res_units": IntegerHyperparameter(name="num_res_units", low=0, high=3),
-            "dropout": FloatHyperparameter(name="dropout", low=0, high=0.3)
+            "n_radiomics": FixedHyperparameter(name="n_radiomics", value=10),
+            "channels": FixedHyperparameter(name="channels", value=(4, 8, 16, 32, 64)),
+            "kernel_size": FixedHyperparameter(name="kernel_size", value=3),
+            "num_res_units": IntegerHyperparameter(name="num_res_units", low=1, high=3),
+            "dropout": FloatHyperparameter(name="dropout", low=0.1, high=0.3)
         }
     )
 
@@ -110,8 +106,8 @@ if __name__ == '__main__':
         optimizer=OptimizerHyperparameter(
             constructor=Adam,
             parameters={
-                "lr": FloatHyperparameter(name="lr", low=0.00001, high=0.01),
-                "weight_decay": FloatHyperparameter(name="weight_decay", low=0, high=0.1)
+                "lr": FloatHyperparameter(name="lr", low=5e-6, high=3e-5),
+                "weight_decay": FloatHyperparameter(name="weight_decay", low=0.1, high=0.2)
             }
         ),
         early_stopper=EarlyStopperHyperparameter(
@@ -120,7 +116,7 @@ if __name__ == '__main__':
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
-            parameters={"gamma": CategoricalHyperparameter(name="gamma", choices=[0.9, 0.99, 0.999])}
+            parameters={"gamma": CategoricalHyperparameter(name="gamma", choices=[0.9, 0.99])}
         ),
         regularizer=RegularizerHyperparameter(
             constructor=L2Regularizer,
@@ -129,7 +125,7 @@ if __name__ == '__main__':
     )
 
     trainer_hyperparameter = TrainerHyperparameter(
-        n_epochs=50,
+        n_epochs=75,
         checkpoint=CheckpointHyperparameter(save_freq=5)
     )
 
