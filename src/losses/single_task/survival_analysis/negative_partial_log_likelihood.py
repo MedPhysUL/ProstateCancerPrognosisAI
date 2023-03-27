@@ -82,7 +82,7 @@ class NegativePartialLogLikelihood(SurvivalAnalysisLoss):
             return tensor(0.0, device=pred.device)
 
         event_time_length = event_time.shape[0]
-        mask = ones(event_time_length, event_time_length)
+        mask = ones(event_time_length, event_time_length).to(device=pred.device)
         event_time_matrix = unsqueeze(event_time, 0)
         mask[(event_time_matrix.T - event_time_matrix) > 0] = 0
 
