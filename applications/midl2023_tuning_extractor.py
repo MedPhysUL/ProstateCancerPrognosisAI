@@ -116,16 +116,16 @@ if __name__ == '__main__':
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
-            parameters={"gamma": CategoricalHyperparameter(name="gamma", choices=[0.9, 0.99])}
+            parameters={"gamma": FixedHyperparameter(name="gamma", value=0.99)}
         ),
         regularizer=RegularizerHyperparameter(
             constructor=L2Regularizer,
-            parameters={"lambda_": FloatHyperparameter(name="alpha", low=0.1, high=0.3)}
+            parameters={"lambda_": FloatHyperparameter(name="alpha", low=0.01, high=0.02)}
         )
     )
 
     trainer_hyperparameter = TrainerHyperparameter(
-        n_epochs=75,
+        n_epochs=50,
         checkpoint=CheckpointHyperparameter(save_freq=5)
     )
 
