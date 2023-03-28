@@ -97,11 +97,11 @@ if __name__ == '__main__':
             "n_radiomics": FixedHyperparameter(name="n_radiomics", value=10),
             "channels": CategoricalHyperparameter(
                 name="channels",
-                choices=["(2, 4, 8, 16)", "(4, 8, 16, 32)", "(2, 4, 8, 16, 32)", "(4, 8, 16, 32, 64)"]
+                choices=["(2, 4, 8, 16, 32)", "(4, 8, 16, 32, 64)"]
             ),
             "kernel_size": FixedHyperparameter(name="kernel_size", value=3),
             "num_res_units": FixedHyperparameter(name="num_res_units", value=3),
-            "dropout": FixedHyperparameter(name="dropout", value=0.2)
+            "dropout": FloatHyperparameter(name="dropout", low=0.6, high=0.8)
         }
     )
 
@@ -112,8 +112,8 @@ if __name__ == '__main__':
         optimizer=OptimizerHyperparameter(
             constructor=Adam,
             parameters={
-                "lr": FloatHyperparameter(name="lr", low=5e-6, high=5e-4),
-                "weight_decay": FixedHyperparameter(name="weight_decay", value=0.1)
+                "lr": FloatHyperparameter(name="lr", low=1e-6, high=1e-3),
+                "weight_decay": FloatHyperparameter(name="weight_decay", low=0.05, high=0.1)
             }
         ),
         early_stopper=EarlyStopperHyperparameter(
@@ -126,7 +126,7 @@ if __name__ == '__main__':
         ),
         regularizer=RegularizerHyperparameter(
             constructor=L2Regularizer,
-            parameters={"lambda_": FixedHyperparameter(name="alpha", value=0.05)}
+            parameters={"lambda_": FloatHyperparameter(name="alpha", low=0.05, high=0.1)}
         )
     )
 
