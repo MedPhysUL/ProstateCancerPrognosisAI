@@ -9,6 +9,8 @@
                         process.
 """
 
+from __future__ import annotations
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, TypeAlias
 
@@ -130,15 +132,23 @@ class BatchesState(State):
                     for key, value in measurements.items():
                         vars(self)[k][name][key].append(to_numpy(value))
 
-    def mean(self):
+    def mean(self) -> BatchesState:
         """
         Calculates the average value of all measurements and updates the measurements' dictionaries of the current batch
-        state with these values. Be careful, the values of the measurements will become floats instead of lists.
+        state with these values.
+
+        Returns
+        -------
+        batches_state : BatchesState
+            Mean batches state.
         """
-        for k, v in vars(self).items():
+        batches_state = deepcopy(self)
+        for k, v in vars(batches_state).items():
             for name, measurements in v.items():
                 for key, value in measurements.items():
-                    vars(self)[k][name][key] = np.nanmean(value)
+                    vars(batches_state)[k][name][key] = np.nanmean(value)
+
+        return batches_state
 
 
 @dataclass
@@ -187,7 +197,7 @@ class EpochState(State):
         training : bool
             Whether the model is currently being trained.
         """
-        batches_state.mean()
+        batches_state = batches_state.mean()
 
         multi_task_losses = {}
         for algo_name, v in batches_state.multi_task_losses_without_regularization.items():
