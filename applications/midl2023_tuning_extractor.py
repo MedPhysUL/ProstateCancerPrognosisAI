@@ -121,10 +121,10 @@ if __name__ == '__main__':
             constructor=ExponentialLR,
             parameters={"gamma": FixedHyperparameter(name="gamma", value=0.99)}
         ),
-        # regularizer=RegularizerHyperparameter(
-        #    constructor=L2Regularizer,
-        #    parameters={"lambda_": FloatHyperparameter(name="alpha", low=0.01, high=0.05)}
-        # )
+        regularizer=RegularizerHyperparameter(
+           constructor=L2Regularizer,
+           parameters={"lambda_": CategoricalHyperparameter(name="alpha", choices=[0.001, 0.01])}
+        )
     )
 
     trainer_hyperparameter = TrainerHyperparameter(
