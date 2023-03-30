@@ -90,18 +90,15 @@ if __name__ == '__main__':
     model_hyperparameter = TorchModelHyperparameter(
         constructor=DeepRadiomicsExtractor,
         parameters={
-            "in_shape": CategoricalHyperparameter(
-                name="in_shape",
-                choices=["(1, 96, 96, 96)", "(2, 96, 96, 96)"]
-            ),
+            "in_shape": FixedHyperparameter(name="in_shape", value=(1, 96, 96, 96)),
             "n_radiomics": FixedHyperparameter(name="n_radiomics", value=10),
             "channels": CategoricalHyperparameter(
                 name="channels",
-                choices=["(2, 4, 8, 16, 32)", "(4, 8, 16, 32, 64)"]
+                choices=["(2, 4, 8, 16)", "(2, 4, 8, 16, 32)"]
             ),
             "kernel_size": FixedHyperparameter(name="kernel_size", value=3),
             "num_res_units": FixedHyperparameter(name="num_res_units", value=3),
-            "dropout": FloatHyperparameter(name="dropout", low=0.6, high=0.8)
+            "dropout": FixedHyperparameter(name="dropout", value=0.8)
         }
     )
 
@@ -112,22 +109,22 @@ if __name__ == '__main__':
         optimizer=OptimizerHyperparameter(
             constructor=Adam,
             parameters={
-                "lr": FloatHyperparameter(name="lr", low=1e-6, high=1e-3),
-                "weight_decay": FloatHyperparameter(name="weight_decay", low=0.05, high=0.1)
+                "lr": FloatHyperparameter(name="lr", low=1e-6, high=1e-4),
+                "weight_decay": CategoricalHyperparameter(name="weight_decay", choices=[0.001, 0.01, 0.1])
             }
         ),
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
-            parameters={"patience": 10}
+            parameters={"patience": 20}
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
             parameters={"gamma": FixedHyperparameter(name="gamma", value=0.99)}
         ),
-        regularizer=RegularizerHyperparameter(
-            constructor=L2Regularizer,
-            parameters={"lambda_": FloatHyperparameter(name="alpha", low=0.05, high=0.1)}
-        )
+        # regularizer=RegularizerHyperparameter(
+        #    constructor=L2Regularizer,
+        #    parameters={"lambda_": FloatHyperparameter(name="alpha", low=0.01, high=0.05)}
+        # )
     )
 
     trainer_hyperparameter = TrainerHyperparameter(
