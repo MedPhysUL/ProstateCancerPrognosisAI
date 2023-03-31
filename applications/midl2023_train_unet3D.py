@@ -3,11 +3,10 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 
 from delia.databases import PatientsDatabase
-import numpy as np
-from sklearn.model_selection import train_test_split
 
 from constants import *
 from src.data.datasets import ImageDataset, ProstateCancerDataset
+from src.data.processing.sampling import extract_masks, Mask
 from src.models.torch.segmentation import Unet
 from src.losses.multi_task import MeanLoss
 from src.training import Trainer
@@ -26,11 +25,11 @@ if __name__ == '__main__':
 
     dataset = ProstateCancerDataset(image_dataset=image_dataset, table_dataset=None)
 
-    train_mask, valid_mask = train_test_split(np.arange(229), test_size=0.15, random_state=SEED)
+    masks = extract_masks(os.path.join(MASKS_PATH, "midl2023_masks.json"), k=1, l=0)
 
     dataset.update_masks(
-        train_mask=train_mask.tolist(),
-        valid_mask=valid_mask.tolist(),
+        train_mask=masks[0][Mask.TRAIN],
+        valid_mask=masks[0][Mask.VALID],
         test_mask=[]
     )
 
@@ -61,7 +60,7 @@ if __name__ == '__main__':
         batch_size=8,
         checkpoint=Checkpoint(),
         exec_metrics_on_train=True,
-        n_epochs=100,
+        n_epochs=150,
         seed=SEED
     )
 
