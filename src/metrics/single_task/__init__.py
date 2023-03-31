@@ -1,7 +1,9 @@
 from .binary_classification import (
     AUC,
     BinaryAccuracy,
-    BinaryBalancedAccuracy
+    BinaryBalancedAccuracy,
+    Sensitivity,
+    Specificity
 )
 from .segmentation import DiceMetric
 from .survival_analysis import ConcordanceIndexCensored
