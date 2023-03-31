@@ -253,7 +253,7 @@ class LearningAlgorithm(TrainingCallback):
         """
         self.optimizer.zero_grad()
         batch_loss = self._compute_loss(pred_batch, y_batch, trainer)
-        batch_loss.backward()
+        batch_loss.backward(retain_graph=True)
         self.optimizer.step()
 
     def on_optimization_start(self, trainer, **kwargs):
