@@ -15,8 +15,8 @@ from monai.networks.nets import FullyConnectedNet
 from torch import stack
 from torch import device as torch_device
 
-from ...data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ..base import check_if_built, TorchModel
+from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 
 
 class MLP(TorchModel):
@@ -65,7 +65,7 @@ class MLP(TorchModel):
         self.bias = bias
         self.dropout = dropout
 
-        self._net = None
+        self.network = None
 
     def build(self, dataset: ProstateCancerDataset) -> MLP:
         """
@@ -85,7 +85,7 @@ class MLP(TorchModel):
 
         table_input_size, table_output_size = len(dataset.table_dataset.features_cols), len(dataset.table_dataset.tasks)
 
-        self._net = FullyConnectedNet(
+        self.network = FullyConnectedNet(
             in_channels=table_input_size,
             out_channels=table_output_size,
             hidden_channels=self.hidden_channels,
@@ -115,12 +115,8 @@ class MLP(TorchModel):
         predictions : TargetsType
             Predictions.
         """
-        # We retrieve the table data only and transform the input dictionary to a tensor
         x_table = stack(list(features.table.values()), 1)
-
-        # We compute the output
-        y_table = self._net(x_table.float())
-
+        y_table = self.network(x_table.float())
         y = {task.name: y_table[:, i] for i, task in enumerate(self._tasks.table_tasks)}
 
         return y

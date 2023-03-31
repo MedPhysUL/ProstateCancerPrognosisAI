@@ -28,7 +28,7 @@ from .callbacks import Checkpoint, LearningAlgorithm, TrainingHistory
 from .callbacks.base import TrainingCallback
 from .callbacks.containers import TrainingCallbackList
 from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
-from ..models.base.torch_model import TorchModel
+from ..models.torch.base.torch_model import TorchModel
 from .states import BatchState, BatchesState, EpochState, TrainingState
 from ..tools.transforms import batch_to_device, ToTensor
 

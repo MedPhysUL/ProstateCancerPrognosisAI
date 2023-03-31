@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 
 from constants import *
 from src.data.datasets import ImageDataset, ProstateCancerDataset
-from src.models.segmentation.unet3D import Unet3D
+from src.models.torch.segmentation.unet3D import Unet3D
 from src.losses.multi_task import MeanLoss
 from src.training import Trainer
 from src.training.callbacks import LearningAlgorithm, Checkpoint

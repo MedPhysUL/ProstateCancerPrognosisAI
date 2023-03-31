@@ -10,15 +10,15 @@
 
 from __future__ import annotations
 from ast import literal_eval
-from typing import Optional, Sequence, Union
+from typing import Callable, Optional, Sequence, Union
 
 from monai.networks.nets import Classifier
-from torch import cat, where
+from torch import cat
 from torch import device as torch_device
 from torch.nn import Linear
 
-from ...data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ..base import check_if_built, TorchModel
+from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 
 
 class DeepRadiomicsExtractor(TorchModel):
@@ -43,47 +43,38 @@ class DeepRadiomicsExtractor(TorchModel):
     ):
         super().__init__(device=device, name=name, seed=seed)
 
-        if isinstance(channels, str):
-            self.channels = literal_eval(channels)
-        else:
-            self.channels = channels
-        if isinstance(in_shape, str):
-            self.in_shape = literal_eval(in_shape)
-        else:
-            self.in_shape = in_shape
+        self.in_shape = literal_eval(in_shape) if isinstance(in_shape, str) else in_shape
         self.n_radiomics = n_radiomics
-        self.strides = strides if strides else [2] * (len(self.channels) - 1)
-        self.kernel_size = kernel_size
-        self.num_res_units = num_res_units
-        self.act = act
-        self.norm = norm
-        self.dropout = dropout
 
-        self._linear_layer = None
-        self._net = None
+        self.extractor = Classifier(
+            in_shape=self.in_shape,
+            classes=self.n_radiomics,
+            channels=literal_eval(channels) if isinstance(channels, str) else channels,
+            strides=strides if strides else [2] * (len(channels) - 1),
+            kernel_size=kernel_size,
+            num_res_units=num_res_units,
+            act=act,
+            norm=norm,
+            dropout=dropout
+        ).to(self.device)
 
-    @property
-    def mode(self):
-        return "mask" if self.in_shape[0] == 1 else "channel"
+        self.linear_layer = None
+        self._input_getter = self._build_input_getter()
+
+    def _build_input_getter(self) -> Callable:
+        if self.in_shape[0] == 1:
+            return lambda features: features.image["PT"]*features.image["CT_Prostate"]
+        elif self.in_shape[0] == 2:
+            return lambda features: cat(list(features.image.values()), 1)
+        else:
+            raise AssertionError(f"'in_shape' first element must be either 1 or 2. Got {self.in_shape[0]}.")
 
     def build(self, dataset: ProstateCancerDataset) -> DeepRadiomicsExtractor:
         super().build(dataset=dataset)
 
         table_output_size = len(dataset.table_dataset.tasks)
 
-        self._net = Classifier(
-            in_shape=self.in_shape,
-            classes=self.n_radiomics,
-            channels=self.channels,
-            strides=self.strides,
-            kernel_size=self.kernel_size,
-            num_res_units=self.num_res_units,
-            act=self.act,
-            norm=self.norm,
-            dropout=self.dropout
-        ).to(self.device)
-
-        self._linear_layer = Linear(
+        self.linear_layer = Linear(
             in_features=self.n_radiomics,
             out_features=table_output_size
         ).to(self.device)
@@ -95,17 +86,9 @@ class DeepRadiomicsExtractor(TorchModel):
             self,
             features: FeaturesType
     ) -> TargetsType:
-        if self.mode == "channel":
-            x_image = cat(list(features.image.values()), 1)
-        elif self.mode == "mask":
-            x_image = features.image["PT"]*features.image["CT_Prostate"]
-        else:
-            raise AssertionError(f"mode is either 'mask' or 'channel'. Found {self.mode}")
-
-        # We compute the output
-        y = self._net(x_image)
-        y = self._linear_layer(y)
-
+        x_image = self._input_getter(features)
+        radiomics = self.extractor(x_image)
+        y = self.linear_layer(radiomics)
         y = {task.name: y[:, i] for i, task in enumerate(self._tasks.table_tasks)}
 
         return y

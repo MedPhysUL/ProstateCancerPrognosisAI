@@ -1,1 +1,1 @@
-from .torch_model import check_if_built, TorchModel
+from .model import check_if_built, Model

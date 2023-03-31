@@ -22,7 +22,7 @@ import torch
 from ..base import Priority, TuningCallback
 from ....data.datasets import TableDataset
 from .json_encoder import EnhancedJSONEncoder
-from ....models.base.torch_model import TorchModel
+from ....models.torch.base import TorchModel
 from ...states import TuningState
 from ....visualization import TableViewer
 

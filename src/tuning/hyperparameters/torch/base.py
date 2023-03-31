@@ -15,7 +15,7 @@ from typing import Any, Callable, Dict, Optional, Type
 from torch.optim import Optimizer
 
 from ..containers import HyperparameterObject
-from ....models.base.torch_model import TorchModel
+from ....models.torch.base import TorchModel
 
 
 class ModelDependantHyperparameter(HyperparameterObject, ABC):

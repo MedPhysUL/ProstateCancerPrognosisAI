@@ -20,7 +20,7 @@ from ....metrics.single_task.base import Direction
 
 if TYPE_CHECKING:
     from ..learning_algorithm import LearningAlgorithm
-    from ....models.base.torch_model import TorchModel
+    from ....models.torch.base import TorchModel
 
 
 class EarlyStopper(ABC):

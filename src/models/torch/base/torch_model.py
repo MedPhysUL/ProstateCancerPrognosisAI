@@ -19,10 +19,10 @@ from numpy import argmin, argmax, linspace
 from torch import device as torch_device
 from torch import float32, no_grad, random, round, sigmoid, stack, tensor
 
-from ...data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
-from ...metrics.single_task.base import Direction, MetricReduction
-from .model import check_if_built, Model
-from ...tools.transforms import to_numpy, batch_to_device
+from ...base import check_if_built, Model
+from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
+from ....metrics.single_task.base import Direction, MetricReduction
+from ....tools.transforms import to_numpy, batch_to_device
 
 
 def evaluation_function(_func):
@@ -133,7 +133,7 @@ class TorchModel(Model, ABC):
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
         random.set_rng_state(rng_state)
 
-        tasks, binary_classification_tasks = dataset.tasks, dataset.tasks.binary_classification_tasks
+        binary_classification_tasks = dataset.tasks.binary_classification_tasks
         outputs_dict = {task.name: Output(predictions=[], targets=[]) for task in binary_classification_tasks}
 
         thresholds = linspace(start=0.01, stop=0.95, num=95)
@@ -157,8 +157,6 @@ class TorchModel(Model, ABC):
                     metric.threshold = thresholds[argmin(scores)]
                 else:
                     metric.threshold = thresholds[argmax(scores)]
-
-            self._tasks = dataset.tasks
 
     @check_if_built
     @evaluation_function

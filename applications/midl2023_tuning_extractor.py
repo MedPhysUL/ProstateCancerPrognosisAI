@@ -20,7 +20,7 @@ from constants import *
 from src.data.datasets import ImageDataset, ProstateCancerDataset, TableDataset
 from src.data.processing.sampling import extract_masks
 from src.losses.multi_task import MeanLoss
-from src.models.extraction.deep_radiomics_extractor import DeepRadiomicsExtractor
+from src.models.torch.extraction import DeepRadiomicsExtractor
 from src.training.callbacks.learning_algorithm import L2Regularizer, MultiTaskLossEarlyStopper
 from src.tuning import SearchAlgorithm, TorchObjective, Tuner
 from src.tuning.callbacks import TuningRecorder

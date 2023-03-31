@@ -15,7 +15,7 @@ from torch import device as torch_device
 from ....data.datasets import ProstateCancerDataset
 from .callbacks import CheckpointHyperparameter, LearningAlgorithmHyperparameter
 from ..containers import HyperparameterDict, HyperparameterList, HyperparameterObject
-from ....models.base.torch_model import TorchModel
+from ....models.torch.base import TorchModel
 from ..optuna import FixedHyperparameter
 from ....training import Trainer
 

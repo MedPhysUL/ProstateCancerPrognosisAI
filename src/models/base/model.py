@@ -18,8 +18,8 @@ from torch.nn import Module
 from torch import cuda
 from torch import device as torch_device
 
-from ...tasks import TaskList
 from ...data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
+from ...tasks import TaskList
 
 
 def check_if_built(_func):

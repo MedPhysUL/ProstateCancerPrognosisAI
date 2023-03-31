@@ -15,7 +15,7 @@ from torch.optim.lr_scheduler import ExponentialLR
 
 from constants import *
 from src.data.datasets import ProstateCancerDataset, TableDataset
-from src.models.prediction.mlp import MLP
+from src.models.torch.prediction.mlp import MLP
 from src.losses.multi_task import MeanLoss
 from src.training import Trainer
 from src.training.callbacks import LearningAlgorithm, Checkpoint
