@@ -18,7 +18,7 @@ from ..base import Direction, MetricReduction
 
 class Sensitivity(BinaryClassificationMetric):
     """
-    Callable class that computes the sensitivity -> TP/(TP + FN)
+    Callable class that computes the sensitivity -> TP/(TP + FN).
     """
 
     def __init__(
@@ -27,7 +27,8 @@ class Sensitivity(BinaryClassificationMetric):
             name: Optional[str] = None
     ):
         """
-        Sets protected attributes using parent's constructor.
+        Sets protected attributes using parent's constructor. Note that the direction is set to NONE instead of MAXIMUM
+        since maximizing this metric will lead to a threshold of 0.
 
         Parameters
         ----------
@@ -36,7 +37,7 @@ class Sensitivity(BinaryClassificationMetric):
         name : Optional[str]
             Name of the metric.
         """
-        super().__init__(direction=Direction.MAXIMIZE, name=name, reduction=MetricReduction.NONE, n_digits=n_digits)
+        super().__init__(direction=Direction.NONE, name=name, reduction=MetricReduction.NONE, n_digits=n_digits)
 
     def _compute_metric(
             self,

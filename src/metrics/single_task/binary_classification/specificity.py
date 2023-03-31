@@ -27,7 +27,8 @@ class Specificity(BinaryClassificationMetric):
             name: Optional[str] = None
     ):
         """
-        Sets protected attributes using parent's constructor.
+        Sets protected attributes using parent's constructor. Note that the direction is set to NONE instead of MAXIMUM
+        since maximizing this metric will lead to a threshold of 1.
 
         Parameters
         ----------
@@ -36,7 +37,7 @@ class Specificity(BinaryClassificationMetric):
         name : Optional[str]
             Name of the metric.
         """
-        super().__init__(direction=Direction.MAXIMIZE, name=name, reduction=MetricReduction.NONE, n_digits=n_digits)
+        super().__init__(direction=Direction.NONE, name=name, reduction=MetricReduction.NONE, n_digits=n_digits)
 
     def _compute_metric(
             self,

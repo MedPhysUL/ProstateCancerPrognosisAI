@@ -15,5 +15,6 @@ class Direction(StrEnum):
     """
     Custom enum for optimization directions
     """
+    NONE = auto()
     MINIMIZE = auto()
     MAXIMIZE = auto()

@@ -155,8 +155,12 @@ class TorchModel(Model, ABC):
 
                 if metric.direction == Direction.MINIMIZE:
                     metric.threshold = thresholds[argmin(scores)]
-                else:
+                elif metric.direction == Direction.MAXIMIZE:
                     metric.threshold = thresholds[argmax(scores)]
+
+            for metric in task.metrics:
+                if metric.direction == Direction.NONE:
+                    metric.threshold = task.decision_threshold_metric.threshold
 
     @check_if_built
     @evaluation_function
