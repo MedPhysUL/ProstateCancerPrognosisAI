@@ -206,8 +206,9 @@ class EpochState(State):
                 multi_task_losses[algo_name][f"{loss_name}{self.SUFFIX_WITHOUT_REGULARIZATION}"] = loss_value
 
                 if batches_state.multi_task_losses_with_regularization:
-                    loss_with_reg = batches_state.multi_task_losses_with_regularization[algo_name][loss_name]
-                    multi_task_losses[algo_name][f"{loss_name}{self.SUFFIX_WITH_REGULARIZATION}"] = loss_with_reg
+                    if algo_name in batches_state.multi_task_losses_with_regularization.keys():
+                        loss_with_reg = batches_state.multi_task_losses_with_regularization[algo_name][loss_name]
+                        multi_task_losses[algo_name][f"{loss_name}{self.SUFFIX_WITH_REGULARIZATION}"] = loss_with_reg
 
         if training:
             self.train.multi_task_losses = multi_task_losses
