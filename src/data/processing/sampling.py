@@ -78,7 +78,16 @@ class Sampler:
         else:
             self.__unique_encodings = {}
 
-        self.__targets = np.transpose(dataset.y.numpy()) if dataset.to_tensor else np.transpose(dataset.y)
+        targets = []
+        for value in dataset.y.values():
+            if dataset.to_tensor:
+                value = value.numpy()
+            if value.ndim == 1:
+                targets.append(value)
+            else:
+                targets.append(value[:, 0])
+
+        self.__targets = np.array(targets)
 
         # Public attributes
         self.alpha = alpha
