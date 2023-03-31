@@ -5,7 +5,7 @@
     @Creation Date:     09/2022
     @Last modification: 02/2023
 
-    @Description:       This file is used to define the abstract `AUC` class.
+    @Description:       This file is used to define the `AUC` class.
 """
 
 from typing import Optional

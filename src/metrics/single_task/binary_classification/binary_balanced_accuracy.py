@@ -5,7 +5,7 @@
     @Creation Date:     09/2022
     @Last modification: 02/2023
 
-    @Description:       This file is used to define the abstract `BinaryBalancedAccuracy` class.
+    @Description:       This file is used to define the `BinaryBalancedAccuracy` class.
 """
 
 from typing import Optional, Union
