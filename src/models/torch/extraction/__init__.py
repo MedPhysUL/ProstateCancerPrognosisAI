@@ -1,1 +1,1 @@
-from .deep_radiomics_extractor import DeepRadiomicsExtractor
+from .cnn import CNN

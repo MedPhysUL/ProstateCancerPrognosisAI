@@ -20,7 +20,7 @@ from constants import *
 from src.data.datasets import ImageDataset, ProstateCancerDataset, TableDataset
 from src.data.processing.sampling import extract_masks
 from src.losses.multi_task import MeanLoss
-from src.models.torch.extraction import DeepRadiomicsExtractor
+from src.models.torch.extraction import CNN
 from src.training.callbacks.learning_algorithm import L2Regularizer, MultiTaskLossEarlyStopper
 from src.tuning import SearchAlgorithm, TorchObjective, Tuner
 from src.tuning.callbacks import TuningRecorder
@@ -88,10 +88,10 @@ if __name__ == '__main__':
     )
 
     model_hyperparameter = TorchModelHyperparameter(
-        constructor=DeepRadiomicsExtractor,
+        constructor=CNN,
         parameters={
             "in_shape": FixedHyperparameter(name="in_shape", value=(1, 96, 96, 96)),
-            "n_radiomics": FixedHyperparameter(name="n_radiomics", value=10),
+            "n_features": FixedHyperparameter(name="n_features", value=10),
             "channels": CategoricalHyperparameter(
                 name="channels",
                 choices=["(2, 4, 8, 16)", "(2, 4, 8, 16, 32)"]

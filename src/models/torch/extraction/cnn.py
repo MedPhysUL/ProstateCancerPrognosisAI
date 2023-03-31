@@ -1,11 +1,11 @@
 """
-    @file:              deep_radiomics_extractor.py
+    @file:              cnn.py
     @Author:            Maxence Larose
 
     @Creation Date:     03/2022
     @Last modification: 03/2023
 
-    @Description:       This file is used to define a 'DeepRadiomicsExtractor' model.
+    @Description:       This file is used to define a 'CNN' model.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from ..base import check_if_built, TorchModel
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 
 
-class DeepRadiomicsExtractor(TorchModel):
+class CNN(TorchModel):
     """
     Deep radiomics extractor.
     """
@@ -29,7 +29,7 @@ class DeepRadiomicsExtractor(TorchModel):
     def __init__(
             self,
             in_shape: Union[str, Sequence[int]],
-            n_radiomics: int,
+            n_features: int,
             channels: Union[str, Sequence[int]],
             strides: Optional[Sequence[int]] = None,
             kernel_size: Union[Sequence[int], int] = 3,
@@ -44,11 +44,11 @@ class DeepRadiomicsExtractor(TorchModel):
         super().__init__(device=device, name=name, seed=seed)
 
         self.in_shape = literal_eval(in_shape) if isinstance(in_shape, str) else in_shape
-        self.n_radiomics = n_radiomics
+        self.n_features = n_features
 
         self.extractor = Classifier(
             in_shape=self.in_shape,
-            classes=self.n_radiomics,
+            classes=self.n_features,
             channels=literal_eval(channels) if isinstance(channels, str) else channels,
             strides=strides if strides else [2] * (len(channels) - 1),
             kernel_size=kernel_size,
@@ -69,13 +69,13 @@ class DeepRadiomicsExtractor(TorchModel):
         else:
             raise AssertionError(f"'in_shape' first element must be either 1 or 2. Got {self.in_shape[0]}.")
 
-    def build(self, dataset: ProstateCancerDataset) -> DeepRadiomicsExtractor:
+    def build(self, dataset: ProstateCancerDataset) -> CNN:
         super().build(dataset=dataset)
 
         table_output_size = len(dataset.table_dataset.tasks)
 
         self.linear_layer = Linear(
-            in_features=self.n_radiomics,
+            in_features=self.n_features,
             out_features=table_output_size
         ).to(self.device)
 
