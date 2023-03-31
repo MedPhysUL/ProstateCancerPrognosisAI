@@ -15,7 +15,7 @@ if __name__ == '__main__':
     df = pd.read_csv(os.path.join(DATA_PATH, "midl2023_learning_table.csv"))
 
     feature_cols = [AGE, PSA, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
-    target_cols = [PN, BCR]
+    target_cols = [PN, BCR, BCR_TIME]
 
     df = df[[ID] + feature_cols + target_cols]
 
@@ -32,8 +32,8 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------------------------------------------------- #
     sampler = Sampler(
         dataset=table_dataset,
-        n_out_split=5,
-        n_in_split=5,
+        n_out_split=1,
+        n_in_split=0,
         random_state=SEED
     )
 
