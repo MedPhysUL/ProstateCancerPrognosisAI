@@ -1,5 +1,5 @@
 """
-    @file:              unet3D.py
+    @file:              unet.py
     @Author:            Maxence Larose
 
     @Creation Date:     03/2022
@@ -19,7 +19,7 @@ from ..base import check_if_built, TorchModel
 from ....data.datasets.prostate_cancer import FeaturesType, TargetsType
 
 
-class Unet3D(TorchModel):
+class Unet(TorchModel):
 
     def __init__(
             self,
