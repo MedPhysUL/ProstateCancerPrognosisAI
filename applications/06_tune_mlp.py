@@ -17,7 +17,7 @@ from constants import *
 from src.data.datasets import ProstateCancerDataset, TableDataset
 from src.data.processing.sampling import extract_masks
 from src.losses.multi_task import MeanLoss
-from src.models.torch.prediction import MLP
+from src.models.torch.prediction import TabularMLP
 from src.training.callbacks.learning_algorithm import L2Regularizer, MultiTaskLossEarlyStopper
 from src.tuning import SearchAlgorithm, TorchObjective, Tuner
 from src.tuning.callbacks import TuningRecorder
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     )
 
     model_hyperparameter = TorchModelHyperparameter(
-        constructor=MLP,
+        constructor=TabularMLP,
         parameters={
             "activation": FixedHyperparameter(name="activation", value="PReLU"),
             "hidden_channels": HyperparameterList(

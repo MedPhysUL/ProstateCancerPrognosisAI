@@ -15,7 +15,7 @@ from torch.optim.lr_scheduler import ExponentialLR
 
 from constants import *
 from src.data.datasets import ProstateCancerDataset, TableDataset
-from src.models.torch.prediction.mlp import MLP
+from src.models.torch.prediction.tabular_mlp import TabularMLP
 from src.losses.multi_task import MeanLoss
 from src.training import Trainer
 from src.training.callbacks import LearningAlgorithm, Checkpoint
@@ -47,7 +47,7 @@ if __name__ == '__main__':
         valid_mask=[20, 21, 22, 23, 24]
     )
 
-    model = MLP(
+    model = TabularMLP(
         activation="PRELU",
         hidden_channels=[20, 20, 20],
         device=torch.device("cuda"),

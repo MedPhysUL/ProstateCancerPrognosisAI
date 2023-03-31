@@ -59,14 +59,7 @@ class CNN(TorchModel):
         ).to(self.device)
 
         self.linear_layer = None
-        self._input_getter = self._build_input_getter()
-        self._extraction, self._prediction = False, True
-
-    def extraction(self):
-        self._extraction, self._prediction = True, False
-
-    def prediction(self):
-        self._extraction, self._prediction = False, True
+        self.input_getter = self._build_input_getter()
 
     def _build_input_getter(self) -> Callable:
         if self.in_shape[0] == 1:
@@ -93,12 +86,8 @@ class CNN(TorchModel):
             self,
             features: FeaturesType
     ) -> TargetsType:
-        x_image = self._input_getter(features)
+        x_image = self.input_getter(features)
         radiomics = self.extractor(x_image)
-
-        if self._prediction:
-            y = self.linear_layer(radiomics)
-            y = {task.name: y[:, i] for i, task in enumerate(self._tasks.table_tasks)}
-            return y
-        elif self._extraction:
-            return radiomics
+        y = self.linear_layer(radiomics)
+        y = {task.name: y[:, i] for i, task in enumerate(self._tasks.table_tasks)}
+        return y

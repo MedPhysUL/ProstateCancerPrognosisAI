@@ -36,7 +36,6 @@ class Unet(TorchModel):
             dropout: float = 0.0,
             bias: bool = True,
             adn_ordering: str = "NDA",
-            dimensions: Optional[int] = None,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None
@@ -56,8 +55,7 @@ class Unet(TorchModel):
             norm=norm,
             dropout=dropout,
             bias=bias,
-            adn_ordering=adn_ordering,
-            dimensions=dimensions
+            adn_ordering=adn_ordering
         ).to(device=self.device)
 
     @check_if_built
