@@ -16,6 +16,7 @@ from functools import partial
 from typing import NamedTuple, Optional
 
 import matplotlib.pyplot as plt
+import torch
 from matplotlib.widgets import Slider
 import numpy as np
 
@@ -101,11 +102,11 @@ class ImageViewer:
 
         ax_slice = plt.axes(
             [0.14 + plane.value * 0.27, 0.15, 0.2, 0.02],
-            facecolor='lightgoldenrodyellow'
+            facecolor="lightgoldenrodyellow"
         )
         slice_index = Slider(
             ax_slice,
-            'Slice',
+            "Slice",
             0,
             max_slice,
             valinit=int(max_slice / 2),
@@ -251,11 +252,11 @@ class ImageViewer:
 
             ax_slice = plt.axes(
                 [0.14 + 1 * 0.27, 0.15, 0.2, 0.02],
-                facecolor='lightgoldenrodyellow'
+                facecolor="lightgoldenrodyellow"
             )
             slice_index = Slider(
                 ax_slice,
-                'Z-Slice',
+                "Z-Slice",
                 0,
                 max_slice,
                 valinit=int(max_slice / 2),
@@ -478,9 +479,15 @@ class ImageViewer:
         if show:
             plt.show()
 
-    def view_latent_image(self, img):
+    @staticmethod
+    def view_latent_image(img: torch.Tensor):
         """
-        Description.
+        Plots a model latent image with sliders to slice through channels and z slices.
+
+        Parameters
+        ----------
+        img : torch.Tensor
+            Latent image to visualize.
         """
         img = img.detach().numpy()
         max_voxel = np.max(img)
@@ -499,8 +506,8 @@ class ImageViewer:
             vmin=min_voxel
         )
 
-        ax_channel = plt.axes([0.14 + 1 * 0.27, 0.1, 0.2, 0.02], facecolor='lightgoldenrodyellow')
-        ax_zslice = plt.axes([0.14 + 1 * 0.27, 0.05, 0.2, 0.02], facecolor='lightgoldenrodyellow')
+        ax_channel = plt.axes([0.14 + 1 * 0.27, 0.1, 0.2, 0.02], facecolor="lightgoldenrodyellow")
+        ax_zslice = plt.axes([0.14 + 1 * 0.27, 0.05, 0.2, 0.02], facecolor="lightgoldenrodyellow")
 
         slider_channel = Slider(
             ax=ax_channel,
@@ -535,9 +542,15 @@ class ImageViewer:
 
         plt.show()
 
-    def view_filter(self, conv):
+    @staticmethod
+    def view_filter(conv: torch.nn.Parameter):
         """
-        Description.
+        Plots a model convolution filter with sliders to slice through filters, channels and z slices.
+
+        Parameters
+        ----------
+        conv : torch.nn.Parameter
+            Convolution filter to visualize.
         """
         conv = conv.detach().numpy()
         max_voxel = np.max(conv)
@@ -557,9 +570,9 @@ class ImageViewer:
             vmin=min_voxel
         )
 
-        ax_filter = plt.axes([0.14 + 1 * 0.27, 0.1, 0.2, 0.02], facecolor='lightgoldenrodyellow')
-        ax_channel = plt.axes([0.14 + 1 * 0.27, 0.05, 0.2, 0.02], facecolor='lightgoldenrodyellow')
-        ax_zslice = plt.axes([0.14 + 1 * 0.27, 0, 0.2, 0.02], facecolor='lightgoldenrodyellow')
+        ax_filter = plt.axes([0.14 + 1 * 0.27, 0.1, 0.2, 0.02], facecolor="lightgoldenrodyellow")
+        ax_channel = plt.axes([0.14 + 1 * 0.27, 0.05, 0.2, 0.02], facecolor="lightgoldenrodyellow")
+        ax_zslice = plt.axes([0.14 + 1 * 0.27, 0, 0.2, 0.02], facecolor="lightgoldenrodyellow")
 
         slider_filter = Slider(
             ax=ax_filter,
@@ -603,5 +616,3 @@ class ImageViewer:
         slider_zslice.on_changed(update)
 
         plt.show()
-
-

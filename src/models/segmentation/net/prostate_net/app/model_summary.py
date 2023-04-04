@@ -5,7 +5,7 @@
     @Creation Date:     12/2022
     @Last modification: 01/2023
 
-    @Description:       Description.
+    @Description:       This file prints a summary of ProstateNet
 """
 
 from torchsummary import summary
@@ -13,7 +13,7 @@ from torchsummary import summary
 from src.models.segmentation.net.prostate_net.prostate_net import ProstateNet
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     net = ProstateNet(
         channels=(32, 64, 128, 256, 512)
     )

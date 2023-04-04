@@ -5,23 +5,23 @@
     @Creation Date:     12/2022
     @Last modification: 03/2023
 
-    @Description:       This file contains the training of a prostate net.
+    @Description:       This file contains the training of a variational inference multi head (VIMH) prostate net.
 """
 
 from monai.data import DataLoader
-from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
 from monai.transforms import CenterSpatialCropd, Compose, EnsureChannelFirstd, ToTensord
 from monai.utils import set_determinism
 import numpy as np
 import torch
+import torch.nn as nn
 from torch.utils.data.dataset import random_split
 from torch.utils.tensorboard import SummaryWriter
 
+from src.data.extraction.local import LocalDatabaseManager
 from src.data.datasets.image_dataset import ImageDataset
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
-from src.data.extraction.local import LocalDatabaseManager
-from src.models.segmentation.net.prostate_net.prostate_net import ProstateNet
+from src.models.segmentation.net.vimh_prostate_net.vimh_prostate_net import VIMHProstateNet
 from src.utils.losses import DICELoss
 from src.utils.score_metrics import DICEMetric
 from src.utils.tasks import SegmentationTask
@@ -37,9 +37,9 @@ if __name__ == "__main__":
     # Parameters for Training (part 1 of 2)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     num_workers = 0
-    num_val = 2
+    num_val = 2                                                                         # TODO
     batch_size = 2
-    num_epochs = 5              # TODO
+    num_epochs = 5
 
     # Transformations
     transformations = Compose([
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     # Dataset
     image_dataset = ImageDataset(
         database_manager=LocalDatabaseManager(
-            path_to_database="C:/Users/rapha/Desktop/dummy_db.h5"                                  # TODO
+            path_to_database="C:/Users/rapha/Desktop/dummy_db.h5"               # TODO
         ),
         tasks=[task],
         modalities={"CT"},
@@ -92,15 +92,19 @@ if __name__ == "__main__":
     )
 
     # Model
-    net = ProstateNet(
-        channels=(4, 8, 16, 32, 64)            # TODO
+    num_heads = 4
+    net = VIMHProstateNet(
+        num_heads=num_heads,
+        channels=(4, 8, 16, 32, 64)                 # TODO
     ).to(device)
 
-    # Parameters for Training (part 2 of 2)
-    lr = 1e-3
+    # Parameters for Training (part 2 of 2)     # TODO -- lam, lr, temperature, dropout, weight decay, lr scheduler ?
+    lam = 0.5
+    temperature = 1e-8
+    lr = 1e-1
     opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=opt, gamma=0.99)
-    loss = DiceLoss(sigmoid=True)
+    loss = nn.BCELoss()
     metric = DiceMetric(include_background=True, reduction="mean")
 
     # Training Loop
@@ -125,10 +129,24 @@ if __name__ == "__main__":
             opt.zero_grad()
 
             # Prediction
-            y_pred = net(batch_images)
+            y_pred, kl = net(batch_images)
+
+            # Post-processing
+            y_pred = torch.sigmoid(y_pred)
+
+            # Head-wise Loss
+            head_loss = 0
+            for head in range(y_pred.size(0)):
+                head_loss += (1 - lam) * (loss(y_pred[head], batch_segs) + temperature * kl[head]) / num_heads
+
+            # Ensemble Prediction (mean)
+            ensemble_y_pred = torch.mean(y_pred, dim=0)
+
+            # Ensemble Loss
+            ensemble_loss = lam * (temperature * kl.sum() + loss(ensemble_y_pred, batch_segs))
 
             # Loss
-            loss_train = loss(y_pred, batch_segs)
+            loss_train = head_loss + ensemble_loss
 
             loss_train.backward()
             opt.step()
@@ -136,7 +154,7 @@ if __name__ == "__main__":
             batch_loss.append(loss_train.item())
 
         epoch_train_losses.append(np.average(batch_loss))
-        writer.add_scalar("Average batch training Dice loss per epoch", epoch_train_losses[-1], epoch + 1)
+        writer.add_scalar("Average batch training loss per epoch", epoch_train_losses[-1], epoch + 1)
 
         lr_scheduler.step()
 
@@ -151,18 +169,31 @@ if __name__ == "__main__":
                 batch_segs = batch.y["Prostate_segmentation"].to(device)
 
                 # Prediction
-                y_pred = net(batch_images)
-
-                # Loss
-                loss_val = loss(y_pred, batch_segs)
-                loss_val_list.append(loss_val.item())
+                y_pred, kl = net(batch_images)
 
                 # Post-processing
                 y_pred = torch.sigmoid(y_pred)
-                y_pred = torch.round(y_pred)
+
+                # Head-wise Loss
+                head_loss_val = 0
+                for head in range(y_pred.size(0)):
+                    head_loss_val += (1 - lam) * (loss(y_pred[head], batch_segs) + temperature * kl[head]) / num_heads
+
+                # Ensemble Prediction (mean)
+                ensemble_y_pred = torch.mean(y_pred, dim=0)
+
+                # Ensemble Loss
+                ensemble_loss_val = lam * (temperature * kl.sum() + loss(ensemble_y_pred, batch_segs))
+
+                # Loss
+                loss_val = head_loss_val + ensemble_loss_val
+                loss_val_list.append(loss_val.item())
+
+                # Rounding
+                ensemble_y_pred = torch.round(ensemble_y_pred)
 
                 # Metric
-                pred_metric = metric(y_pred=y_pred, y=batch_segs)
+                pred_metric = metric(y_pred=ensemble_y_pred, y=batch_segs)
                 metric_vals += [i for i in pred_metric.cpu().data.numpy().flatten().tolist()]
 
         epoch_val_losses.append(np.average(loss_val_list))

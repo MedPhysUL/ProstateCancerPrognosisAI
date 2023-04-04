@@ -2,11 +2,10 @@
     @file:              latent_images.py
     @Author:            Raphael Brodeur
 
-    @Creation Date:     12/2022
-    @Last modification: 01/2023
+    @Creation Date:     03/2022
+    @Last modification: 03/2023
 
-    @Description:       This files is used to visualize how the image input is modified throughout the model and to
-                        visualize convolution kernels.
+    @Description:       This files is used to visualize how the image input is modified throughout the model.
 """
 
 import matplotlib.pyplot as plt
@@ -21,7 +20,7 @@ from typing import NamedTuple
 from src.data.datasets.image_dataset import ImageDataset
 from src.data.datasets.prostate_cancer_dataset import ProstateCancerDataset
 from src.data.extraction.local import LocalDatabaseManager
-from src.models.segmentation.net.prostate_net.prostate_net import ProstateNet
+from src.models.segmentation.net.vi_prostate_net.vi_prostate_net import VIProstateNet
 from src.utils.losses import DICELoss
 from src.utils.score_metrics import DICEMetric
 from src.utils.tasks import SegmentationTask
@@ -41,9 +40,9 @@ class Layers(NamedTuple):
     dec1: torch.Tensor
 
 
-class LatentImages(ProstateNet):
+class LatentImages(VIProstateNet):
     """
-    A child class of ProstateNet that adds a method used to get the latent images while ProstateNet forwards.
+    A child class of VIProstateNet that adds a method used to get the latent images while VIProstateNet forwards.
     """
 
     def get_latent_images(self, x: torch.Tensor) -> Layers:
@@ -60,15 +59,15 @@ class LatentImages(ProstateNet):
         layers : Layers
             Output image at every layer of the model.
         """
-        enc1 = self.enc1(x)
-        enc2 = self.enc2(enc1)
-        enc3 = self.enc3(enc2)
-        enc4 = self.enc4(enc3)
-        bottom = self.bottom(enc4)
-        dec4 = self.dec4(torch.cat([enc4, bottom], dim=1))
-        dec3 = self.dec3(torch.cat([enc3, dec4], dim=1))
-        dec2 = self.dec2(torch.cat([enc2, dec3], dim=1))
-        dec1 = self.dec1(torch.cat([enc1, dec2], dim=1))
+        enc1, _ = self.enc1(x)
+        enc2, _ = self.enc2(enc1)
+        enc3, _ = self.enc3(enc2)
+        enc4, _ = self.enc4(enc3)
+        bottom, _ = self.bottom(enc4)
+        dec4, _ = self.dec4(torch.cat([enc4, bottom], dim=1))
+        dec3, _ = self.dec3(torch.cat([enc3, dec4], dim=1))
+        dec2, _ = self.dec2(torch.cat([enc2, dec3], dim=1))
+        dec1, _ = self.dec1(torch.cat([enc1, dec2], dim=1))
 
         layers = Layers(
             img=x,
@@ -97,7 +96,7 @@ if __name__ == "__main__":
     ).to(device)
 
     net.load_state_dict(torch.load(     # TODO
-        "C:/Users/rapha/Documents/GitHub/ProstateCancerPrognosisAI/src/models/segmentation/net/prostate_net/saved_parameters/best_parameters_avg.pt"))
+        "C:/Users/rapha/Documents/GitHub/ProstateCancerPrognosisAI/src/models/segmentation/net/vi_prostate_net/saved_parameters/best_parameters_avg.pt"))
 
     net.eval()
 
@@ -192,9 +191,5 @@ if __name__ == "__main__":
     plt.show()
 
     # View a Single Latent Image
-    patient_idx: int = 0                                # which patient to visualize
-    ImageViewer().view_latent_image(layers.enc1[patient_idx])
-
-    # View weights
-    net_children = list(net.children())                 # net_children[i], i from (0 = enc1, 1 = enc2, 2 = enc3, ...)
-    ImageViewer().view_filter(net_children[2].conv1.weight)
+    patient: int = 0                                    # which patient to visualize
+    ImageViewer().view_latent_image(layers.enc1[0])
