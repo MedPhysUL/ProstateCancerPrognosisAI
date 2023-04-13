@@ -101,7 +101,7 @@ if __name__ == "__main__":
     # Parameters for Training (part 2 of 2)     # TODO -- lam, lr, temperature, dropout, weight decay, lr scheduler ?
     lam = 0.5
     temperature = 1e-8
-    lr = 1e-1
+    lr = 1e-3
     opt = torch.optim.Adam(net.parameters(), lr, weight_decay=1e-3)
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=opt, gamma=0.99)
     loss = nn.BCELoss()
@@ -131,7 +131,7 @@ if __name__ == "__main__":
             # Prediction
             y_pred, kl = net(batch_images)
 
-            # Post-processing
+            # Sigmoid
             y_pred = torch.sigmoid(y_pred)
 
             # Head-wise Loss
@@ -171,7 +171,7 @@ if __name__ == "__main__":
                 # Prediction
                 y_pred, kl = net(batch_images)
 
-                # Post-processing
+                # Sigmoid
                 y_pred = torch.sigmoid(y_pred)
 
                 # Head-wise Loss
