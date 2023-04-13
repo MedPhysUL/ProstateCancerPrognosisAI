@@ -37,14 +37,13 @@ if __name__ == "__main__":
     # Parameters for Training (part 1 of 2)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     num_workers = 0
-    num_val = 2
-    batch_size = 2
-    num_epochs = 5              # TODO
+    num_val = 40
+    batch_size = 8
+    num_epochs = 250
 
     # Transformations
     transformations = Compose([
         EnsureChannelFirstd(keys=["CT", "Prostate_segmentation"]),
-        CenterSpatialCropd(keys=["CT", "Prostate_segmentation"], roi_size=(1000, 160, 160)),        # TODO
         ToTensord(keys=["CT", "Prostate_segmentation"], dtype=torch.float32)
     ])
 
@@ -60,7 +59,7 @@ if __name__ == "__main__":
     # Dataset
     image_dataset = ImageDataset(
         database_manager=LocalDatabaseManager(
-            path_to_database="C:/Users/rapha/Desktop/dummy_db.h5"                                  # TODO
+            path_to_database="C:/path/to/database.h5"
         ),
         tasks=[task],
         modalities={"CT"},
@@ -93,7 +92,7 @@ if __name__ == "__main__":
 
     # Model
     net = ProstateNet(
-        channels=(4, 8, 16, 32, 64)            # TODO
+        channels=(64, 128, 256, 512, 1024)
     ).to(device)
 
     # Parameters for Training (part 2 of 2)
