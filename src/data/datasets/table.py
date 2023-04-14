@@ -50,7 +50,6 @@ class TableDataset(Dataset):
             tasks: Union[TableTask, TaskList, List[TableTask]],
             cont_cols: Optional[List[str]] = None,
             cat_cols: Optional[List[str]] = None,
-            feature_selection_groups: Optional[List[List[str]]] = None,
             to_tensor: bool = False
     ):
         """
@@ -68,8 +67,6 @@ class TableDataset(Dataset):
             List of column names associated with continuous data.
         cat_cols : Optional[List[str]]
             List of column names associated with categorical data.
-        feature_selection_groups : Optional[List[List[str]]]
-            List with list of column names to consider together in group-wise feature selection.
         to_tensor : bool
             Whether we want the features and targets in tensors. False for numpy arrays.
         """
@@ -103,9 +100,6 @@ class TableDataset(Dataset):
 
         # Define protected feature "getter" method
         self._x = self._define_feature_getter(cont_cols, cat_cols, to_tensor)
-
-        # We set feature selection idx groups
-        self._feature_selection_idx_groups = self._create_feature_selection_idx_groups(feature_selection_groups)
 
         # We set a "getter" method to get modes of categorical columns and we also extract encodings
         self._get_modes, self._encodings = self._define_categorical_stats_getter(cat_cols)
@@ -181,16 +175,12 @@ class TableDataset(Dataset):
         return self.cont_cols + self.cat_cols
 
     @property
-    def feature_selection_idx_groups(self) -> Dict[int, Dict[str, List]]:
-        return self._feature_selection_idx_groups
+    def ids(self) -> List[str]:
+        return self._ids
 
     @property
     def ids_col(self) -> str:
         return self._ids_col
-
-    @property
-    def ids(self) -> List[str]:
-        return self._ids
 
     @property
     def ids_to_row_idx(self) -> Dict[str, int]:
@@ -257,57 +247,6 @@ class TableDataset(Dataset):
         )
 
         self._x_cat = x_cat.to_numpy(dtype=int)
-
-    def _create_feature_selection_idx_groups(
-            self,
-            groups: Optional[List[List[str]]]
-    ) -> Dict[int, dict[str, list | Any]]:
-        """
-        Creates a list of lists with idx of features in the different groups. All the features not included in any group
-        will be used to create an additional group.
-
-        Parameters
-        ----------
-        groups: Optional[List[List[str]]]
-            List of list with name of columns to use in group for feature selection.
-            
-        Returns
-        -------
-        feature_idx_groups : Dict[str]
-            Dictionary of the features and indexes.
-        """
-        # We create an additional group with the features that are not already in a group
-        groups = [] if (groups is None or groups[0] is None) else groups
-        cat_cols = [] if self._cat_cols is None else self._cat_cols
-        cont_cols = [] if self._cont_cols is None else self._cont_cols
-
-        last_group = []
-        for c in cat_cols + cont_cols:
-            included = False
-            for group in groups:
-                if c in group:
-                    included = True
-                    break
-            if not included:
-                last_group.append(c)
-
-        if len(last_group) > 0:
-            groups.append(last_group)
-
-        # We associate each feature to its index when data is extracted using the item getter
-        feature_idx_groups = {}
-        for i, group in enumerate(groups):
-            group_idx = []
-            for f in group:
-                if f in cat_cols:
-                    group_idx.append(self._cat_idx[cat_cols.index(f)])
-                elif f in cont_cols:
-                    group_idx.append(self._cont_idx[cont_cols.index(f)])
-                else:
-                    raise ValueError(f"{f} is not part of cont_cols or cat_cols")
-            feature_idx_groups[i] = {'features': group, 'idx': group_idx}
-
-        return feature_idx_groups
 
     def _define_categorical_data_setter(
             self,
@@ -513,44 +452,6 @@ class TableDataset(Dataset):
 
         return get_mu_and_std
 
-    def _get_augmented_dataframe(
-            self,
-            data: pd.DataFrame,
-            categorical: bool = False
-    ) -> Tuple[pd.DataFrame, Optional[List[str]], Optional[List[str]]]:
-        """
-        Returns an augmented dataframe by concatenating original df and data.
-
-        Parameters
-        ----------
-        data : pd.Dataframe
-            Dataframe with 2 columns. First column must be PATIENT ids. Second column must be the feature we want to
-            add.
-        categorical : bool
-            True if the new features are categorical.
-
-        Returns
-        -------
-        df, cont_cols, cat_cols : Tuple[pd.DataFrame, Optional[List[str]], Optional[List[str]]]
-            Pandas dataframe, list of cont cols, list of cat cols.
-        """
-        # Extraction of the original dataframe
-        df = self._retrieve_subset_from_original(self._cont_cols, self._cat_cols)
-
-        # We add the new feature
-        df = pd.merge(df, data, on=[self._ids_col], how=Mask.INNER)
-
-        # We update the columns list
-        feature_name = [f for f in data.columns if f != self._ids_col]
-        if categorical:
-            cat_cols = self._cat_cols + feature_name if self._cat_cols is not None else [feature_name]
-            cont_cols = self._cont_cols
-        else:
-            cont_cols = self._cont_cols + feature_name if self._cont_cols is not None else [feature_name]
-            cat_cols = self._cat_cols
-
-        return df, cont_cols, cat_cols
-
     def _set_scaling_factors(self):
         """
         Sets scaling factor of all binary classification tasks.
@@ -586,34 +487,6 @@ class TableDataset(Dataset):
         # We apply the basis function
         self._x_cont = x_cont.to_numpy(dtype=float)
 
-    def _retrieve_subset_from_original(
-            self,
-            cont_cols: Optional[List[str]] = None,
-            cat_cols: Optional[List[str]] = None
-    ) -> pd.DataFrame:
-        """
-        Returns a copy of a subset of the original dataframe.
-
-        Parameters
-        ----------
-        cont_cols : Optional[List[str]]
-            List of continuous columns.
-        cat_cols : Optional[List[str]]
-            List of categorical columns.
-
-        Returns
-        -------
-        subset_df : pd.DataFrame
-            Copy of a subset of the original dataframe.
-        """
-        selected_cols = []
-        if cont_cols is not None:
-            selected_cols += cont_cols
-        if cat_cols is not None:
-            selected_cols += cat_cols
-
-        return self.original_data[[self._ids_col] + self._target_cols + selected_cols].copy()
-
     def get_imputed_dataframe(
             self
     ) -> pd.DataFrame:
@@ -633,74 +506,6 @@ class TableDataset(Dataset):
             imputed_df[self._cat_cols] = np.array(self._x_cat)
 
         return imputed_df
-
-    def create_subset(
-            self,
-            cont_cols: Optional[List[str]] = None,
-            cat_cols: List[str] = None
-    ) -> TableDataset:
-        """
-        Returns a subset of the current dataset using the given cont_cols and cat_cols.
-
-        Parameters
-        ----------
-        cont_cols : Optional[List[str]]
-            List of continuous columns.
-        cat_cols : Optional[List[str]]
-            List of categorical columns.
-
-        Returns
-        -------
-        sub_dataset : TableDataset
-            Instance of the TableDataset class.
-        """
-        subset = self._retrieve_subset_from_original(cont_cols, cat_cols)
-
-        sub_dataset = TableDataset(
-            df=subset,
-            ids_col=self._ids_col,
-            tasks=self._tasks,
-            cont_cols=cont_cols,
-            cat_cols=cat_cols,
-            to_tensor=self._to_tensor
-        )
-
-        return sub_dataset
-
-    def create_superset(
-            self,
-            data: pd.DataFrame,
-            categorical: bool = False
-    ) -> TableDataset:
-        """
-        Returns a superset of the current dataset by including the given data.
-
-        Parameters
-        ----------
-        data : pd.Dataframe
-            Dataframe with 2 columns. First column must be PATIENT ids. Second column must be the feature we want to
-            add.
-        categorical : bool
-            True if the new features are categorical.
-
-        Returns
-        -------
-        sub_dataset : TableDataset
-            Instance of the TableDataset class.
-        """
-        # We build the augmented dataframe
-        df, cont_cols, cat_cols = self._get_augmented_dataframe(data, categorical)
-
-        super_dataset = TableDataset(
-            df=df,
-            ids_col=self._ids_col,
-            tasks=self._tasks,
-            cont_cols=cont_cols,
-            cat_cols=cat_cols,
-            to_tensor=self._to_tensor
-        )
-
-        return super_dataset
 
     def current_train_stats(
             self
