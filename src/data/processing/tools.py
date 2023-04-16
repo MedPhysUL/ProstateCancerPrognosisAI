@@ -45,9 +45,8 @@ def is_categorical(
 def preprocess_categoricals(
         df: pd.DataFrame,
         encoding: str = "ordinal",
-        mode: Optional[pd.Series] = None,
-        encodings: Optional[dict] = None
-) -> Tuple[pd.DataFrame, Optional[dict]]:
+        mode: Optional[pd.Series] = None
+) -> pd.DataFrame:
     """
     Applies all categorical transforms to a dataframe containing only continuous data
 
@@ -59,13 +58,11 @@ def preprocess_categoricals(
         One option in ("ordinal", "one-hot").
     mode : Optional[pd.Series]
         Pandas series with modes of columns.
-    encodings : Optional[dict]
-        Dict of dict with integers to use as encoding for each category's values
 
     Returns
     -------
-    df, encodings : Tuple[pd.DataFrame, Optional[dict]]
-        Pandas dataframe, dictionary of encodings.
+    df : pd.DataFrame
+        Pandas dataframe.
     """
     if encoding not in ["ordinal", "one-hot"]:
         raise ValueError("Encoding option not available")
@@ -74,11 +71,9 @@ def preprocess_categoricals(
     df = CaT.fill_missing(df, mode)
 
     if encoding == "ordinal":
-        df, encodings_dict = CaT.ordinal_encode(df, encodings)
-        return df, encodings_dict
-
+        return CaT.ordinal_encode(df)
     else:
-        return CaT.one_hot_encode(df), None
+        return CaT.one_hot_encode(df)
 
 
 def preprocess_continuous(
