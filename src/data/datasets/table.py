@@ -12,16 +12,14 @@
 """
 
 from __future__ import annotations
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
+from typing import Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 from torch import cat, from_numpy, stack, Tensor
 from torch.utils.data import Dataset
 
-from .mask import Mask
 from ..processing.tools import preprocess_categoricals, preprocess_continuous
-from ..processing.transforms import CategoricalTransform as CaT
 from ...tasks import BinaryClassificationTask, TaskList, SurvivalAnalysisTask
 from ...tasks.base import TableTask
 
@@ -102,7 +100,7 @@ class TableDataset(Dataset):
         self._x = self._define_feature_getter(cont_cols, cat_cols, to_tensor)
 
         # We set a "getter" method to get modes of categorical columns and we also extract encodings
-        self._get_modes, self._encodings = self._define_categorical_stats_getter(cat_cols)
+        self._get_modes = self._define_categorical_stats_getter(cat_cols)
 
         # We set a "getter" method to get mu ans std of continuous columns
         self._get_mu_and_std = self._define_numerical_stats_getter(cont_cols)
@@ -149,14 +147,8 @@ class TableDataset(Dataset):
         return self._cat_idx
 
     @property
-    def cat_sizes(self) -> Optional[List[int]]:
-        if self._encodings is not None:
-            return [len(self._encodings[c].items()) for c in self._cat_cols]
-        return None
-
-    @property
-    def tasks(self) -> TaskList:
-        return self._tasks
+    def columns(self) -> List[str]:
+        return self.features_cols + self.target_cols
 
     @property
     def cont_cols(self) -> List[str]:
@@ -165,10 +157,6 @@ class TableDataset(Dataset):
     @property
     def cont_idx(self) -> List[int]:
         return self._cont_idx
-
-    @property
-    def encodings(self) -> Dict[str, Dict[str, int]]:
-        return self._encodings
 
     @property
     def features_cols(self) -> List[str]:
@@ -193,6 +181,10 @@ class TableDataset(Dataset):
     @property
     def target_cols(self) -> List[str]:
         return self._target_cols
+
+    @property
+    def tasks(self) -> TaskList:
+        return self._tasks
 
     @property
     def test_mask(self) -> List[int]:
@@ -240,10 +232,9 @@ class TableDataset(Dataset):
             Modes in the training set.
         """
         # We apply an ordinal encoding to categorical columns
-        x_cat, _ = preprocess_categoricals(
+        x_cat = preprocess_categoricals(
             self._original_data[self._cat_cols].copy(),
-            mode=modes,
-            encodings=self._encodings
+            mode=modes
         )
 
         self._x_cat = x_cat.to_numpy(dtype=int)
@@ -290,7 +281,7 @@ class TableDataset(Dataset):
     def _define_categorical_stats_getter(
             self,
             cat_cols: Optional[List[str]] = None
-    ) -> Tuple[Callable, Dict[str, Dict[str, int]]]:
+    ) -> Callable:
         """
         Defines the function used to extract the modes of categorical columns.
 
@@ -310,19 +301,14 @@ class TableDataset(Dataset):
             def get_modes(df: Optional[pd.DataFrame]) -> None:
                 return None
 
-            encodings = None
-
         else:
             # Make sure that categorical data in the original dataframe is in the correct format
             self._original_data[cat_cols] = self._original_data[cat_cols].astype('category')
 
-            # We extract ordinal encodings
-            encodings = {c: {v: k for k, v in enumerate(self._original_data[c].cat.categories)} for c in cat_cols}
-
             def get_modes(df: pd.DataFrame) -> pd.Series:
                 return df[cat_cols].mode().iloc[0]
 
-        return get_modes, encodings
+        return get_modes
 
     def _define_feature_getter(
             self,
@@ -521,35 +507,6 @@ class TableDataset(Dataset):
         modes = self._get_modes(train_data)
 
         return mu, std, modes
-
-    def get_one_hot_encodings(
-            self,
-            cat_cols: List[str]
-    ) -> Union[np.array, Tensor]:
-        """
-        Returns one hot encodings associated to the specified categorical columns.
-
-        Parameters
-        ----------
-        cat_cols : Optional[List[str]]
-            List of categorical columns.
-
-        Returns
-        -------
-        one_hot_encodings : Union[np.array, Tensor]
-            One hot vector of categorical columns.
-        """
-        # We check if the column names specified are categorical
-        self._validate_columns_type(cat_cols, categorical=True)
-
-        # We extract one hot encodings
-        e = CaT.one_hot_encode(self.get_imputed_dataframe()[cat_cols].astype('str'))
-
-        # We return the good type of data
-        if self._to_tensor:
-            return CaT.to_tensor(e)
-        else:
-            return e.to_numpy(dtype=int)
 
     def update_masks(
             self,
