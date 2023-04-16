@@ -41,4 +41,4 @@ if __name__ == '__main__':
     )
 
     table_viewer = TableViewer(dataset=table_dataset)
-    table_viewer.visualize(path_to_save=DESCRIPTIVE_ANALYSIS_PATH)
+    table_viewer.save_descriptive_analysis(path_to_save=DESCRIPTIVE_ANALYSIS_PATH)
