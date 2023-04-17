@@ -139,12 +139,12 @@ class ImageDataset(Dataset):
         """
         Validates modalities by checking if all given modalities are found in the list of available modalities.
         """
-        available_modalities = [modality for modality in Modality]
-        unknown_modalities = list(set(self._modalities_to_iterate_over) - set(available_modalities))
+        available_modalities = [str(modality) for modality in Modality]
+        unknown_modalities = list(self._modalities_to_iterate_over - set(available_modalities))
 
         assert not unknown_modalities, (
-            f"Found {len(unknown_modalities)} unknown modalities in the given modalities. Available modalities are"
-            f" {available_modalities}."
+            f"Found {len(unknown_modalities)} unknown modalities in the given modalities, i.e. {unknown_modalities}. "
+            f"Available modalities are {available_modalities}."
         )
 
     def _get_patient_data(self, index: int) -> Dict[str, np.ndarray]:
