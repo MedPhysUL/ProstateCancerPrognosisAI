@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from sksurv.nonparametric import kaplan_meier_estimator
 
 from ..data.datasets import TableDataset
 from ..data.processing.sampling import Mask
@@ -30,10 +31,12 @@ class TableViewer:
     TARGETS_PATH = "target-specific"
 
     CORRELATIONS_PATH = "correlations"
+    FEATURES_PATH = "features"
     FIGURES_PATH = "figures"
     IMPUTED_DF_PATH = "imputed"
     ORIGINAL_DF_PATH = "original"
     TABLES_PATH = "tables"
+    TARGET_PATH = "target"
 
     def __init__(
             self,
@@ -49,8 +52,8 @@ class TableViewer:
         """
         sns.set_style("whitegrid")
         self.dataset = dataset
-
         self._target_cols = dataset.target_cols
+
         self._global_masks = self._get_global_masks()
         self._global_original_df = self.get_global_original_dataframe()
         self._global_imputed_df = self.get_global_imputed_dataframe()
@@ -59,7 +62,7 @@ class TableViewer:
         self._target_specific_original_dfs = self._get_target_specific_original_dataframes()
         self._target_specific_imputed_dfs = self._get_target_specific_imputed_dataframes()
 
-    def _get_global_masks(self) -> List[Tuple[str, List[int]]]:
+    def _get_global_masks(self) -> Dict[str, List[int]]:
         """
         Gets global masks.
 
@@ -70,7 +73,7 @@ class TableViewer:
         """
         masks = [self.dataset.train_mask, self.dataset.valid_mask, self.dataset.test_mask]
         masks_names = [Mask.TRAIN, Mask.VALID, Mask.TEST]
-        available_masks = [(name, mask) for name, mask in zip(masks_names, masks) if mask]
+        available_masks = {name: mask for name, mask in zip(masks_names, masks) if mask}
 
         return available_masks
 
@@ -85,7 +88,7 @@ class TableViewer:
         """
         df_copy = deepcopy(self.dataset.original_data)
         df_copy = pd.concat(
-            objs=[df_copy.iloc[mask].assign(Sets=name) for name, mask in self._global_masks],
+            objs=[df_copy.iloc[mask].assign(Sets=name) for name, mask in self._global_masks.items()],
             ignore_index=True
         )
         return df_copy
@@ -101,7 +104,7 @@ class TableViewer:
         """
         imputed_df = deepcopy(self.dataset.get_imputed_dataframe())
         imputed_df = pd.concat(
-            objs=[imputed_df.iloc[mask].assign(Sets=name) for name, mask in self._global_masks],
+            objs=[imputed_df.iloc[mask].assign(Sets=name) for name, mask in self._global_masks.items()],
             ignore_index=True
         )
         return imputed_df
@@ -119,11 +122,11 @@ class TableViewer:
 
         for task_idx, task in enumerate(self.dataset.tasks):
             filtered_masks = deepcopy(self._global_masks)
-            for i, (name, mask) in enumerate(filtered_masks):
+            for name, mask in filtered_masks.items():
                 nonmissing_targets_idx = task.get_idx_of_nonmissing_targets(self.dataset.y[task.name][mask])
-                filtered_masks[i] = (name, np.array(mask)[nonmissing_targets_idx].tolist())
+                filtered_masks[name] = np.array(mask)[nonmissing_targets_idx].tolist()
 
-            nonempty_masks[task.target_column] = {name: mask for name, mask in filtered_masks}
+            nonempty_masks[task.target_column] = {name: mask for name, mask in filtered_masks.items()}
 
         return nonempty_masks
 
@@ -211,11 +214,43 @@ class TableViewer:
         """
         return self._target_specific_imputed_dfs[target]
 
+    @staticmethod
+    def _terminate_figure(
+            path_to_save: Optional[str] = None,
+            show: Optional[bool] = None,
+            fig: Optional[plt.Figure] = None
+    ) -> None:
+        """
+        Terminates current figure.
+
+        Parameters
+        ----------
+        path_to_save : Optional[str]
+            Path to save.
+        show : Optional[bool]
+            Whether to show figures.
+        fig : Optional[plt.Figure]
+            Current figure.
+        """
+        if fig:
+            fig.tight_layout()
+
+        if path_to_save:
+            plt.savefig(path_to_save, dpi=300)
+        if show:
+            plt.show()
+
+        if fig:
+            plt.close(fig)
+        else:
+            plt.close()
+
     def visualize_correlations(
             self,
             columns: List[str],
+            imputed: bool = False,
             path_to_save: Optional[str] = None,
-            show: Optional[bool] = False,
+            show: Optional[bool] = True,
             method: Union[str, Callable[[np.ndarray, np.ndarray], float]] = "pearson"
     ) -> None:
         """
@@ -225,6 +260,8 @@ class TableViewer:
         ----------
         columns : List[str]
             Features or targets columns to calculate correlations between.
+        imputed : bool
+            Whether to use imputed or original data.
         path_to_save : Optional[str]
             Path to save figures.
         show : Optional[bool]
@@ -239,27 +276,30 @@ class TableViewer:
                     will have 1 along the diagonals and will be symmetric
                     regardless of the callable's behavior.
         """
-        subset = self._global_imputed_df[columns]
-        corr = subset.corr(method=method)
+        cols = columns + ["Sets"]
+        subset = self._global_imputed_df[cols] if imputed else self._global_original_df[cols]
 
-        mask = np.zeros_like(corr, dtype=bool)
-        mask[np.triu_indices_from(mask)] = True
-        corr[mask] = np.nan
+        fig, axes = plt.subplots(ncols=len(self._global_masks), squeeze=False, figsize=(18, 12))
 
-        sns.heatmap(
-            corr,
-            cmap="Greens",
-            xticklabels=corr.columns.values,
-            yticklabels=corr.columns.values,
-            annot=True
-        )
+        for idx, (name, mask) in enumerate(self._global_masks.items()):
+            filtered_subset = subset.loc[subset["Sets"] == name]
+            corr = filtered_subset.corr(method=method, numeric_only=True)
 
-        if path_to_save:
-            plt.savefig(path_to_save)
-        if show:
-            plt.show()
+            mask = np.zeros_like(corr, dtype=bool)
+            mask[np.triu_indices_from(mask)] = True
+            corr[mask] = np.nan
 
-        plt.close()
+            sns.heatmap(
+                corr,
+                ax=axes[0, idx],
+                cmap="Greens",
+                annot=True
+            )
+            axes[0, idx].set_xticklabels(corr.columns.values, rotation=45, ha='right', rotation_mode='anchor')
+            axes[0, idx].set_yticklabels(corr.columns.values, rotation=0)
+            axes[0, idx].set_title(f"{name} (n = {len(filtered_subset)})")
+
+        self._terminate_figure(path_to_save, show, fig)
 
     @staticmethod
     def _format_to_percentage(
@@ -330,11 +370,11 @@ class TableViewer:
         if title is not None:
             axes.set_title(f"{title} (n = {sum(label_counts.values())})")
 
-    def visualize_target(
+    def visualize_target_class_distribution(
             self,
             target: str,
             path_to_save: Optional[str] = None,
-            show: Optional[bool] = False
+            show: Optional[bool] = True
     ) -> None:
         """
         Visualizes targets pie charts.
@@ -360,69 +400,51 @@ class TableViewer:
                     label_names={f"{target}_0": 0, f"{target}_1": 1},
                     title=name
                 )
-        fig.tight_layout()
-        if path_to_save:
-            plt.savefig(path_to_save)
-        if show:
-            plt.show()
-        plt.close(fig)
+        self._terminate_figure(path_to_save, show, fig)
 
-    @staticmethod
-    def _build_continuous_feature_figure(
+    def _plot_continuous_feature_figure(
+            self,
             dataframe: pd.DataFrame,
-            column: str,
+            feature: str,
             path_to_save: Optional[str] = None,
             show: Optional[bool] = None
-    ) -> plt.Figure:
+    ) -> None:
         """
-        Builds a continuous feature figure.
+        Plots a continuous feature figure.
 
         Parameters
         ----------
         dataframe : pd.DataFrame
             Dataframe.
-        column : str
+        feature : str
             The name of the column containing the continuous feature data.
         path_to_save : Optional[str]
             Path to save descriptive analysis records.
         show : Optional[bool]
             Whether to show figures.
-
-        Returns
-        -------
-        figure : plt.Figure
-            A figure.
         """
         fig, axes = plt.subplots()
         sns.boxplot(
             data=dataframe,
-            y=column,
+            y=feature,
             x="Sets",
             linewidth=1,
         )
-        fig.tight_layout()
-
-        if path_to_save:
-            plt.savefig(path_to_save, dpi=300)
-        if show:
-            plt.show()
-        plt.close(fig)
-
-        return fig
+        self._terminate_figure(path_to_save, show, fig)
 
     def visualize_global_continuous_feature(
             self,
-            column: str,
-            imputed: bool,
+            feature: str,
+            imputed: bool = False,
             path_to_save: Optional[str] = None,
-            show: Optional[bool] = None
+            show: Optional[bool] = True
     ) -> None:
         """
-        Visualize a continuous feature figure from the global dataframe.
+        Visualizes a continuous feature figure from the global dataframe.
 
         Parameters
         ----------
-        column : str
+        feature : str
             The name of the column containing the continuous feature data.
         imputed : bool
             Whether to use imputed or original data.
@@ -431,25 +453,23 @@ class TableViewer:
         show : Optional[bool]
             Whether to show figures.
         """
-        if imputed:
-            self._build_continuous_feature_figure(self._global_imputed_df, column, path_to_save, show)
-        else:
-            self._build_continuous_feature_figure(self._global_original_df, column, path_to_save, show)
+        dataset = self._global_imputed_df if imputed else self._global_original_df
+        self._plot_continuous_feature_figure(dataset, feature, path_to_save, show)
 
     def visualize_target_specific_continuous_features(
             self,
-            column: str,
+            feature: str,
             target: str,
-            imputed: bool,
+            imputed: bool = False,
             path_to_save: Optional[str] = None,
-            show: Optional[bool] = None
+            show: Optional[bool] = True
     ) -> None:
         """
-        Visualize a continuous feature figure from a target-specific dataframe.
+        Visualizes a continuous feature figure from a target-specific dataframe.
 
         Parameters
         ----------
-        column : str
+        feature : str
             The name of the column containing the continuous feature data.
         target : str
             The name of the column containing the target data.
@@ -460,31 +480,173 @@ class TableViewer:
         show : Optional[bool]
             Whether to show figures.
         """
-        if imputed:
-            self._build_continuous_feature_figure(
-                self._target_specific_imputed_dfs[target], column, path_to_save, show
-            )
-        else:
-            self._build_continuous_feature_figure(
-                self._target_specific_original_dfs[target], column, path_to_save, show
-            )
+        dataset = self._target_specific_imputed_dfs[target] if imputed else self._target_specific_original_dfs[target]
+        self._plot_continuous_feature_figure(dataset, feature, path_to_save, show)
 
-    @staticmethod
-    def _build_categorical_feature_figure(
+    def _plot_categorical_feature_figure(
+            self,
             dataset: pd.DataFrame,
-            column: str,
-            path_to_save: str,
-            show: bool
-    ):
+            feature: str,
+            path_to_save: Optional[str] = None,
+            show: Optional[bool] = True,
+    ) -> None:
         """
-        Builds a categorical feature figure.
+        Plots a categorical feature figure.
 
         Parameters
         ----------
         dataset : pd.DataFrame
             Dataframe.
-        column : str
+        feature : str
             The name of the column containing the categorical feature data.
+        path_to_save : Optional[str]
+            Path to save descriptive analysis records.
+        show : Optional[bool]
+            Whether to show figures.
+        """
+        df_copy = deepcopy(dataset)
+        df_copy[feature] = df_copy[feature].astype("category")
+
+        fig, axes = plt.subplots()
+
+        unique = pd.unique(df_copy[feature])
+        if all(isinstance(x, (int, float)) for x in unique):
+            axes.set_xticks(pd.unique(df_copy[feature]))
+
+        sns.histplot(
+            data=df_copy,
+            x=feature,
+            hue='Sets',
+            multiple='dodge',
+            ax=axes,
+            stat='percent',
+            common_norm=False,
+            shrink=0.8
+        )
+
+        fig_temp, axes_temp = plt.subplots()
+        sns.histplot(data=df_copy, x=feature, hue='Sets', ax=axes_temp)
+
+        for axes_container, axes_temp_container in zip(axes.containers, axes_temp.containers):
+            labels = [f"{axes_temp_patch.get_height()}" for axes_temp_patch in axes_temp_container]
+            axes.bar_label(axes_container, labels=labels)
+
+        plt.close(fig_temp)
+        self._terminate_figure(path_to_save, show, fig)
+
+    def visualize_global_categorical_feature(
+            self,
+            feature: str,
+            imputed: bool = False,
+            path_to_save: Optional[str] = None,
+            show: Optional[bool] = True,
+    ) -> None:
+        """
+        Visualizes a categorical feature figure from the global dataframe.
+
+        Parameters
+        ----------
+        feature : str
+            The name of the column containing the categorical feature data.
+        imputed : bool
+            Whether to use imputed or original data.
+        path_to_save : Optional[str]
+            Path to save descriptive analysis records.
+        show : Optional[bool]
+            Whether to show figures.
+        """
+        dataset = self._global_imputed_df if imputed else self._global_original_df
+        self._plot_categorical_feature_figure(dataset, feature, path_to_save, show)
+
+    def visualize_target_specific_categorical_features(
+            self,
+            feature: str,
+            target: str,
+            imputed: bool = False,
+            path_to_save: Optional[str] = None,
+            show: Optional[bool] = True,
+    ) -> None:
+        """
+        Visualizes a categorical feature figure from a target-specific dataframe.
+
+        Parameters
+        ----------
+        feature : str
+            The name of the column containing the categorical feature data.
+        target : str
+            The name of the column containing the target data.
+        imputed : bool
+            Whether to use imputed or original data.
+        path_to_save : Optional[str]
+            Path to save descriptive analysis records.
+        show : Optional[bool]
+            Whether to show figures.
+        """
+        dataset = self._target_specific_imputed_dfs[target] if imputed else self._target_specific_original_dfs[target]
+        self._plot_categorical_feature_figure(dataset, feature, path_to_save, show)
+
+    def _plot_global_kaplan_meier_curve(
+            self,
+            dataset: pd.DataFrame,
+            event_indicator: str,
+            event_time: str,
+            path_to_save: Optional[str] = None,
+            show: Optional[bool] = True,
+    ) -> None:
+        """
+        Plots the global kaplan meier curve (without stratification).
+
+        Parameters
+        ----------
+        dataset : pd.DataFrame
+            Dataframe.
+        event_indicator : str
+            The name of the column containing the event indicator data.
+        event_time : str
+            The name of the column containing the event time data.
+        path_to_save : Optional[str]
+            Path to save descriptive analysis records.
+        show : Optional[bool]
+            Whether to show figures.
+        """
+        fig, axes = plt.subplots()
+
+        for idx, (name, mask) in enumerate(self._global_masks.items()):
+            filtered_dataset = dataset.loc[dataset["Sets"] == name]
+            time, survival_probability = kaplan_meier_estimator(
+                filtered_dataset[event_indicator].astype(bool),
+                filtered_dataset[event_time]
+            )
+            axes.step(time, survival_probability, where="post", label=name)
+
+        plt.ylabel(f"Estimated probability of {event_indicator} survival")
+        plt.xlabel("Time")
+        plt.legend()
+
+        self._terminate_figure(path_to_save, show, fig)
+
+    def _plot_stratified_kaplan_meier_curve(
+            self,
+            dataset: pd.DataFrame,
+            event_indicator: str,
+            event_time: str,
+            feature: str,
+            path_to_save: Optional[str] = None,
+            show: Optional[bool] = True,
+    ) -> None:
+        """
+        Plots the global kaplan meier curve (without stratification).
+
+        Parameters
+        ----------
+        dataset : pd.DataFrame
+            Dataframe.
+        event_indicator : str
+            The name of the column containing the event indicator data.
+        event_time : str
+            The name of the column containing the event time data.
+        feature : str
+            The name of the column containing the feature data used for stratification.
         path_to_save : Optional[str]
             Path to save descriptive analysis records.
         show : Optional[bool]
@@ -496,101 +658,74 @@ class TableViewer:
             A figure.
         """
         df_copy = deepcopy(dataset)
-        df_copy[column] = df_copy[column].astype("category")
+        df_copy[feature] = df_copy[feature].astype("category")
+
+        unique = pd.unique(df_copy[feature])
+        values_count = df_copy[feature].value_counts()
+        unique_categories = [category for category in unique.categories if values_count[category] >= 1]
 
         fig, axes = plt.subplots()
+        line_styles = ["solid", "dashed", "dotted"]
 
-        unique = pd.unique(df_copy[column])
-        if all(isinstance(x, (int, float)) for x in unique):
-            axes.set_xticks(pd.unique(df_copy[column]))
+        cm = plt.get_cmap('gist_rainbow')
+        axes.set_prop_cycle(color=[cm(1. * i / len(unique_categories)) for i in range(len(unique_categories))])
+        for idx, (name, mask) in enumerate(self._global_masks.items()):
+            filtered_df = df_copy.loc[dataset["Sets"] == name]
+            unique = pd.unique(filtered_df[feature])
+            values_count = filtered_df[feature].value_counts()
+            unique_categories = [category for category in unique.categories if values_count[category] >= 1]
+            for category in unique_categories:
+                mask = filtered_df[feature] == category
+                time, survival_probability = kaplan_meier_estimator(
+                    filtered_df[event_indicator][mask].astype(bool),
+                    filtered_df[event_time][mask]
+                )
+                axes.step(
+                    time, survival_probability, where="post", label=f"{name};{category}", linestyle=line_styles[idx]
+                )
 
-        sns.histplot(
-            data=df_copy,
-            x=column,
-            hue='Sets',
-            multiple='dodge',
-            ax=axes,
-            stat='percent',
-            common_norm=False,
-            shrink=0.8
-        )
+        plt.ylabel(f"Estimated probability of {event_indicator} survival")
+        plt.xlabel("Time")
+        plt.legend(loc="best")
 
-        fig_temp, axes_temp = plt.subplots()
-        sns.histplot(data=df_copy, x=column, hue='Sets', ax=axes_temp)
+        self._terminate_figure(path_to_save, show, fig)
 
-        for axes_container, axes_temp_container in zip(axes.containers, axes_temp.containers):
-            labels = [f"{axes_temp_patch.get_height()}" for axes_temp_patch in axes_temp_container]
-            axes.bar_label(axes_container, labels=labels)
-
-        plt.close(fig_temp)
-        fig.tight_layout()
-
-        if path_to_save:
-            plt.savefig(path_to_save, dpi=300)
-        if show:
-            plt.show()
-        plt.close(fig)
-
-        return fig
-
-    def visualize_global_categorical_feature(
+    def visualize_kaplan_meier_curve(
             self,
-            column: str,
-            imputed: bool,
-            path_to_save: str,
-            show: bool
+            event_indicator: str,
+            event_time: str,
+            imputed: bool = False,
+            feature: Optional[str] = None,
+            path_to_save: Optional[str] = None,
+            show: Optional[bool] = True,
     ) -> None:
         """
-        Visualize a categorical feature figure from the global dataframe.
+        Visualizes a categorical feature figure from a target-specific dataframe.
 
         Parameters
         ----------
-        column : str
-            The name of the column containing the categorical feature data.
+        event_indicator : str
+            The name of the column containing the event indicator data.
+        event_time : str
+            The name of the column containing the event time data.
         imputed : bool
             Whether to use imputed or original data.
+        feature : Optional[str]
+            The name of the column containing the categorical feature data used for stratification.
         path_to_save : Optional[str]
             Path to save descriptive analysis records.
         show : Optional[bool]
             Whether to show figures.
         """
         if imputed:
-            self._build_categorical_feature_figure(self._global_imputed_df, column, path_to_save, show)
+            dataset = self._target_specific_imputed_dfs[event_indicator]
         else:
-            self._build_categorical_feature_figure(self._global_original_df, column, path_to_save, show)
+            dataset = self._target_specific_original_dfs[event_indicator]
 
-    def visualize_target_specific_categorical_features(
-            self,
-            column: str,
-            target: str,
-            imputed: bool,
-            path_to_save: str,
-            show: bool
-    ) -> None:
-        """
-        Visualize a categorical feature figure from a target-specific dataframe.
-
-        Parameters
-        ----------
-        column : str
-            The name of the column containing the categorical feature data.
-        target : str
-            The name of the column containing the target data.
-        imputed : bool
-            Whether to use imputed or original data.
-        path_to_save : Optional[str]
-            Path to save descriptive analysis records.
-        show : Optional[bool]
-            Whether to show figures.
-        """
-        if imputed:
-            self._build_categorical_feature_figure(
-                self._target_specific_imputed_dfs[target], column, path_to_save, show
-            )
+        if feature:
+            self._plot_stratified_kaplan_meier_curve(dataset, event_indicator, event_time, feature, path_to_save, show)
         else:
-            self._build_categorical_feature_figure(
-                self._target_specific_original_dfs[target], column, path_to_save, show
-            )
+            self._plot_global_kaplan_meier_curve(dataset, event_indicator, event_time, path_to_save, show)
 
     def _create_global_directories(
             self,
@@ -606,11 +741,17 @@ class TableViewer:
         """
         global_path = os.path.join(path_to_save, self.GLOBAL_PATH)
         os.makedirs(global_path, exist_ok=True)
-        os.makedirs(os.path.join(global_path, self.CORRELATIONS_PATH), exist_ok=True)
-        for path in [self.FIGURES_PATH, self.TABLES_PATH]:
-            os.makedirs(os.path.join(global_path, path), exist_ok=True)
-            os.makedirs(os.path.join(global_path, path, self.ORIGINAL_DF_PATH), exist_ok=True)
-            os.makedirs(os.path.join(global_path, path, self.IMPUTED_DF_PATH), exist_ok=True)
+
+        figures_path = os.path.join(global_path, self.FIGURES_PATH)
+        os.makedirs(figures_path, exist_ok=True)
+
+        tables_path = os.path.join(global_path, self.TABLES_PATH)
+        correlations_path = os.path.join(figures_path, self.CORRELATIONS_PATH)
+        features_path = os.path.join(figures_path, self.FEATURES_PATH)
+        for path in [correlations_path, features_path, tables_path]:
+            os.makedirs(path, exist_ok=True)
+            os.makedirs(os.path.join(path, self.ORIGINAL_DF_PATH), exist_ok=True)
+            os.makedirs(os.path.join(path, self.IMPUTED_DF_PATH), exist_ok=True)
 
     def _create_target_specific_directories(
             self,
@@ -625,12 +766,25 @@ class TableViewer:
             Path to save descriptive analysis records.
         """
         os.makedirs(os.path.join(path_to_save, self.TARGETS_PATH), exist_ok=True)
-        for target_col in self._target_cols:
-            os.makedirs(os.path.join(path_to_save, self.TARGETS_PATH, target_col), exist_ok=True)
-            for path in [self.TABLES_PATH, self.FIGURES_PATH]:
-                os.makedirs(os.path.join(path_to_save, self.TARGETS_PATH, target_col, path), exist_ok=True)
-                for df_path in [self.ORIGINAL_DF_PATH, self.IMPUTED_DF_PATH]:
-                    os.makedirs(os.path.join(path_to_save, self.TARGETS_PATH, target_col, path, df_path), exist_ok=True)
+        for task in self.dataset.tasks:
+            target_path = os.path.join(path_to_save, self.TARGETS_PATH, task.target_column)
+            os.makedirs(target_path, exist_ok=True)
+
+            figures_path = os.path.join(target_path, self.FIGURES_PATH)
+            os.makedirs(figures_path, exist_ok=True)
+
+            tables_path = os.path.join(target_path, self.TABLES_PATH)
+            features_path = os.path.join(figures_path, self.FEATURES_PATH)
+            for path in [tables_path, features_path]:
+                os.makedirs(path, exist_ok=True)
+                os.makedirs(os.path.join(path, self.ORIGINAL_DF_PATH), exist_ok=True)
+                os.makedirs(os.path.join(path, self.IMPUTED_DF_PATH), exist_ok=True)
+
+            sub_target_path = os.path.join(figures_path, self.TARGET_PATH)
+            os.makedirs(sub_target_path, exist_ok=True)
+            if task in self.dataset.tasks.survival_analysis_tasks:
+                os.makedirs(os.path.join(sub_target_path, self.ORIGINAL_DF_PATH), exist_ok=True)
+                os.makedirs(os.path.join(sub_target_path, self.IMPUTED_DF_PATH), exist_ok=True)
 
     def _create_directories(
             self,
@@ -732,9 +886,12 @@ class TableViewer:
         """
         ds = self.dataset
         sets = [("features", ds.features_cols), ["targets", ds.target_cols], ["all", ds.columns]]
-        for name, columns in sets:
-            path = os.path.join(path_to_save, self.GLOBAL_PATH, self.CORRELATIONS_PATH, f"{name}.png")
-            self.visualize_correlations(columns, path)
+        for imputed, path in [(False, self.ORIGINAL_DF_PATH), (True, self.IMPUTED_DF_PATH)]:
+            for name, columns in sets:
+                path_to_fig = os.path.join(
+                    path_to_save, self.GLOBAL_PATH, self.FIGURES_PATH, self.CORRELATIONS_PATH, path, f"{name}.png"
+                )
+                self.visualize_correlations(columns, imputed, path_to_fig, False)
 
     def _save_targets_figures(
             self,
@@ -749,8 +906,10 @@ class TableViewer:
             Path to save targets figures.
         """
         for i, target in enumerate(self._target_cols):
-            path = os.path.join(path_to_save, self.TARGETS_PATH, target, self.FIGURES_PATH, "target.png")
-            self.visualize_target(target, path)
+            path = os.path.join(
+                path_to_save, self.TARGETS_PATH, target, self.FIGURES_PATH, self.TARGET_PATH, "class_distribution.png"
+            )
+            self.visualize_target_class_distribution(target, path, False)
 
     def _save_global_features_figures(
             self,
@@ -765,11 +924,12 @@ class TableViewer:
             Path to save global original and imputed dataframes.
         """
         for imputed, path in [(False, self.ORIGINAL_DF_PATH), (True, self.IMPUTED_DF_PATH)]:
+            directory = os.path.join(path_to_save, self.GLOBAL_PATH, self.FIGURES_PATH, self.FEATURES_PATH, path)
             for cont_col in self.dataset.cont_cols:
-                path_to_fig = os.path.join(path_to_save, self.GLOBAL_PATH, self.FIGURES_PATH, path, f"{cont_col}.png")
+                path_to_fig = os.path.join(directory, f"{cont_col}.png")
                 self.visualize_global_continuous_feature(cont_col, imputed, path_to_fig, False)
             for cat_col in self.dataset.cat_cols:
-                path_to_fig = os.path.join(path_to_save, self.GLOBAL_PATH, self.FIGURES_PATH, path, f"{cat_col}.png")
+                path_to_fig = os.path.join(directory, f"{cat_col}.png")
                 self.visualize_global_categorical_feature(cat_col, imputed, path_to_fig, False)
 
     def _save_target_specific_features_figures(
@@ -786,15 +946,14 @@ class TableViewer:
         """
         for target in self._target_cols:
             for imputed, path in [(False, self.ORIGINAL_DF_PATH), (True, self.IMPUTED_DF_PATH)]:
+                directory = os.path.join(
+                    path_to_save, self.TARGETS_PATH, target, self.FIGURES_PATH, self.FEATURES_PATH, path
+                )
                 for cont_col in self.dataset.cont_cols:
-                    path_to_fig = os.path.join(
-                        path_to_save, self.TARGETS_PATH, target, self.FIGURES_PATH, path, f"{cont_col}.png"
-                    )
+                    path_to_fig = os.path.join(directory, f"{cont_col}.png")
                     self.visualize_target_specific_continuous_features(cont_col, target, imputed, path_to_fig, False)
                 for cat_col in self.dataset.cat_cols:
-                    path_to_fig = os.path.join(
-                        path_to_save, self.TARGETS_PATH, target, self.FIGURES_PATH, path, f"{cat_col}.png"
-                    )
+                    path_to_fig = os.path.join(directory, f"{cat_col}.png")
                     self.visualize_target_specific_categorical_features(cat_col, target, imputed, path_to_fig, False)
 
     def _save_features_figures(
@@ -811,6 +970,31 @@ class TableViewer:
         """
         self._save_global_features_figures(path_to_save)
         self._save_target_specific_features_figures(path_to_save)
+
+    def _save_kaplan_meier_figures(
+            self,
+            path_to_save: str
+    ) -> None:
+        """
+        Saves kaplan meier figures for survival analysis task.
+
+        Parameters
+        ----------
+        path_to_save : str
+            Path to save kaplan meier figures.
+        """
+        for task in self.dataset.tasks.survival_analysis_tasks:
+            for imputed, path in [(False, self.ORIGINAL_DF_PATH), (True, self.IMPUTED_DF_PATH)]:
+                directory = os.path.join(
+                    path_to_save, self.TARGETS_PATH, task.target_column, self.FIGURES_PATH, self.TARGET_PATH, path
+                )
+                event, time = task.event_indicator_column, task.event_time_column
+                path_to_fig = os.path.join(directory, "survival (global).png")
+                self.visualize_kaplan_meier_curve(event, time, imputed, None, path_to_fig, False)
+
+                for cat_col in self.dataset.cat_cols:
+                    path_to_fig = os.path.join(directory, f"survival ({cat_col} stratified).png")
+                    self.visualize_kaplan_meier_curve(event, time, imputed, cat_col, path_to_fig, False)
 
     def save_descriptive_analysis(
             self,
@@ -830,3 +1014,4 @@ class TableViewer:
         self._save_correlation_figures(path_to_save)
         self._save_targets_figures(path_to_save)
         self._save_features_figures(path_to_save)
+        self._save_kaplan_meier_figures(path_to_save)
