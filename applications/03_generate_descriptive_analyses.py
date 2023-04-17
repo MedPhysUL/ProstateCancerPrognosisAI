@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
-    @Last modification: 07/2022
+    @Last modification: 04/2023
 
     @Description:       This script is used to generate a folder containing descriptive analyses of all data.
 """
