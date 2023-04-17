@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     05/2022
-    @Last modification: 02/2023
+    @Last modification: 04/2023
 
     @Description:       This file contains an abstract model named 'Model'. All other models need to inherit from
                         this model to ensure consistency will all training and tuning tools.

@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     09/2022
-    @Last modification: 02/2023
+    @Last modification: 04/2023
 
     @Description:       This file contains an abstract class named 'TorchModel' from which all custom pytorch models
                         implemented for the project must inherit. This class allows to store common function of all
