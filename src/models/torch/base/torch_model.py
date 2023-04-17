@@ -175,6 +175,7 @@ class TorchModel(Model, ABC):
             - For binary classification tasks, returns the probability of belonging to class 1 OR directly returns the
               predicted class, depending on the value of the 'probability' parameter.
             - For regression tasks, returns the predicted real-valued target.
+            - For survival analysis tasks, returns the estimated risk of experiencing an event.
             - For segmentation tasks, returns the predicted segmentation map.
 
         Parameters
@@ -183,7 +184,7 @@ class TorchModel(Model, ABC):
             Batch data items.
         probability : bool
             Whether to return probability predictions or class predictions for binary classification task predictions.
-            Doesn't affect regression and segmentation tasks predictions.
+            Doesn't affect regression, survival and segmentation tasks predictions.
 
         Returns
         -------
@@ -222,6 +223,7 @@ class TorchModel(Model, ABC):
             - For binary classification tasks, returns the probability of belonging to class 1 OR directly returns the
               predicted class, depending on the value of the 'probability' parameter.
             - For regression tasks, returns the predicted real-valued target.
+            - For survival analysis tasks, returns the estimated risk of experiencing an event.
 
         NOTE : It doesn't return segmentation map as it will bust the computer's RAM.
 
@@ -233,7 +235,7 @@ class TorchModel(Model, ABC):
             A list of dataset idx for which we want to obtain the predictions.
         probability : bool
             Whether to return probability predictions or class predictions for binary classification task predictions.
-            Doesn't affect regression and segmentation tasks predictions.
+            Doesn't affect regression, survival and segmentation tasks predictions.
 
         Returns
         -------
