@@ -3,7 +3,7 @@
     @Author:            Raphael Brodeur, Maxence Larose
 
     @Creation Date:     05/2022
-    @Last modification: 03/2023
+    @Last modification: 04/2023
 
     @Description:       This file contains a class used to create a dataset containing multiple patient images and
                         segmentations from a given DELIA database.
@@ -20,6 +20,7 @@ import numpy as np
 from torch import float32
 from torch.utils.data import Dataset, Subset
 
+from .modality import Modality
 from ...tasks import SegmentationTask, TaskList
 
 
@@ -83,6 +84,7 @@ class ImageDataset(Dataset):
                 [t.modality for t in self._tasks]
             )
         )
+        self._validate_modalities()
         self._transforms = transforms
         self._transposition = transposition
 
@@ -132,6 +134,18 @@ class ImageDataset(Dataset):
     @property
     def tasks(self) -> TaskList:
         return self._tasks
+
+    def _validate_modalities(self) -> None:
+        """
+        Validates modalities by checking if all given modalities are found in the list of available modalities.
+        """
+        available_modalities = [modality for modality in Modality]
+        unknown_modalities = list(set(self._modalities_to_iterate_over) - set(available_modalities))
+
+        assert not unknown_modalities, (
+            f"Found {len(unknown_modalities)} unknown modalities in the given modalities. Available modalities are"
+            f" {available_modalities}."
+        )
 
     def _get_patient_data(self, index: int) -> Dict[str, np.ndarray]:
         """
