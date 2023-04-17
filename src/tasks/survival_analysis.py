@@ -10,6 +10,8 @@
 
 from typing import Iterable, Optional, Union
 
+from sksurv.linear_model.coxph import BreslowEstimator
+
 from .base import TableTask
 from ..losses.single_task.survival_analysis import SurvivalAnalysisLoss
 from ..metrics.single_task.containers import SingleTaskMetricList
@@ -75,6 +77,7 @@ class SurvivalAnalysisTask(TableTask):
             evaluation_metrics=evaluation_metrics
         )
 
+        self._breslow_estimator = BreslowEstimator()
         self._event_indicator_column = event_indicator_column
         self._event_time_column = event_time_column
 
@@ -82,6 +85,10 @@ class SurvivalAnalysisTask(TableTask):
 
         self._validate_metrics_type(type_=SurvivalAnalysisMetric)
         self._validate_criterion_type(type_=SurvivalAnalysisLoss)
+
+    @property
+    def breslow_estimator(self) -> BreslowEstimator:
+        return self._breslow_estimator
 
     @property
     def criterion(self) -> Optional[SurvivalAnalysisLoss]:

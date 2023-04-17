@@ -116,6 +116,24 @@ class TorchModel(Model, ABC):
     @check_if_built
     @evaluation_function
     @no_grad()
+    def fit_breslow_estimators(
+            self,
+            dataset: ProstateCancerDataset
+    ) -> None:
+        """
+        Fit all survival analysis tasks' breslow estimators given the training dataset. It is recommended to train the
+        model before calling this method.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
+        """
+        super().fit_breslow_estimators(dataset)
+
+    @check_if_built
+    @evaluation_function
+    @no_grad()
     def fix_thresholds_to_optimal_values(
             self,
             dataset: ProstateCancerDataset
@@ -249,7 +267,7 @@ class TorchModel(Model, ABC):
 
         predictions = {task.name: [] for task in dataset.tasks}
         for features, _ in data_loader:
-            pred = self.predict(features=features, tasks=dataset.tasks, probability=probability)
+            pred = self.predict(features=features, probability=probability)
 
             for task in dataset.tasks.table_tasks:
                 predictions[task.name].append(pred[task.name])

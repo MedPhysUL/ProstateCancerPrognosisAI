@@ -14,12 +14,14 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
 from monai.utils import set_determinism
+from sksurv.linear_model.coxph import BreslowEstimator
 from torch.nn import Module
 from torch import cuda
 from torch import device as torch_device
 
 from ...data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ...tasks import TaskList
+from ...tools.transforms import to_numpy
 
 
 def check_if_built(_func):
@@ -63,9 +65,22 @@ class Model(Module, ABC):
         self.device = device if device else torch_device("cuda") if cuda.is_available() else torch_device("cpu")
         self.name = name if name else self.__class__.__name__
 
+        self._breslow_estimators = {}
         self._is_built: bool = False
         self._seed = seed
         self._tasks: Optional[TaskList] = None
+
+    @property
+    def breslow_estimators(self) -> Dict[str, BreslowEstimator]:
+        """
+        Breslow estimators for each survival analysis tasks.
+
+        Returns
+        -------
+        breslow_estimators : Dict[str, BreslowEstimator]
+            Breslow estimator functions.
+        """
+        return self._breslow_estimators
 
     def build(
             self,
@@ -89,6 +104,32 @@ class Model(Module, ABC):
         self._is_built = True
 
         return self
+
+    @check_if_built
+    def fit_breslow_estimators(
+            self,
+            dataset: ProstateCancerDataset
+    ) -> None:
+        """
+        Fit all survival analysis tasks' breslow estimators given the training dataset. It is recommended to train the
+        model before calling this method.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
+        """
+        predictions = self.predict_on_dataset(dataset, dataset.train_mask)
+        targets = dataset.table_dataset[dataset.train_mask].y
+
+        for task in dataset.tasks.survival_analysis_tasks:
+            pred, target = to_numpy(predictions[task.name]), to_numpy(targets[task.name])
+
+            nonmissing_targets_idx = task.get_idx_of_nonmissing_targets(target)
+            if len(nonmissing_targets_idx) > 0:
+                pred, target = pred[nonmissing_targets_idx], target[nonmissing_targets_idx]
+                task.breslow_estimator.fit(pred[:, 0], target[:, 0], target[:, 1])
+                self._breslow_estimators[task.name] = task.breslow_estimator
 
     @check_if_built
     @abstractmethod

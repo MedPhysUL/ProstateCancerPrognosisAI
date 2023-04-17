@@ -442,6 +442,7 @@ class Trainer:
                 break
 
         self.callbacks.on_fit_end(self)
+        self._exec_post_fit(dataset)
         self._delete_temporary_folder()
         progress_bar.close()
 
@@ -557,8 +558,7 @@ class Trainer:
     ):
         """
         Executes a batch. During training, this is one forward and backward pass through a single batch (this process
-        is usually called an 'iteration'). During validation, this is one forward pass through a single batch (usually,
-        the batch size used in validation is 1).
+        is usually called an 'iteration'). During validation, this is one forward pass through a single batch.
 
         Parameters
         ----------
@@ -611,6 +611,21 @@ class Trainer:
         else:
             scores = self.model.score_on_dataset(dataset=dataset, mask=dataset.valid_mask)
             self.epoch_state.valid.single_task_metrics = scores
+
+    def _exec_post_fit(
+            self,
+            dataset: ProstateCancerDataset
+    ):
+        """
+        Executes some post fit adjustments to the trained model.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
+        """
+        self.model.fix_thresholds_to_optimal_values(dataset)
+        self.model.fit_breslow_estimators(dataset)
 
     def _empty_cache(self):
         """
