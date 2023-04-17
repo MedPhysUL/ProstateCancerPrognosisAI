@@ -76,11 +76,13 @@ class ImageDataset(Dataset):
         self._database = database
         self._modalities = modalities
         self._organs = organs if organs else {}
-        self._modalities_to_iterate_over = set(chain(
-            modalities,
-            self._organs.keys(),
-            [t.modality for t in self._tasks]
-        ))
+        self._modalities_to_iterate_over = set(
+            chain(
+                modalities,
+                self._organs.keys(),
+                [t.modality for t in self._tasks]
+            )
+        )
         self._transforms = transforms
         self._transposition = transposition
 
