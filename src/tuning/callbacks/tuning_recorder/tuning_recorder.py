@@ -234,7 +234,7 @@ class TuningRecorder(TuningCallback):
             table_dataset = tuner.outer_loop_state.dataset.table_dataset
             if isinstance(table_dataset, TableDataset):
                 table_viewer = TableViewer(table_dataset)
-                table_viewer.visualize(
+                table_viewer.save_descriptive_analysis(
                     path_to_save=os.path.join(
                         tuner.outer_loop_state.path_to_outer_loop_folder,
                         self.DESCRIPTIVE_ANALYSIS_FOLDER_NAME
@@ -439,7 +439,7 @@ class TuningRecorder(TuningCallback):
             table_dataset = objective.inner_loop_state.dataset.table_dataset
             if isinstance(table_dataset, TableDataset):
                 table_viewer = TableViewer(table_dataset)
-                table_viewer.visualize(
+                table_viewer.save_descriptive_analysis(
                     path_to_save=os.path.join(
                         objective.inner_loop_state.path_to_inner_loop_folder,
                         self.DESCRIPTIVE_ANALYSIS_FOLDER_NAME
