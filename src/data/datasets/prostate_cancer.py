@@ -30,7 +30,7 @@ class FeaturesType(NamedTuple):
                   features.
         - table : D-dimensional dictionary containing (N, ) tensor or array where D is the number of table features.
     """
-    image: Dict[str, Union[Tensor]] = {}
+    image: Dict[str, Tensor] = {}
     table: Dict[str, Union[np.ndarray, Tensor]] = {}
 
 
@@ -77,10 +77,13 @@ class ProstateCancerDataset(Dataset):
             self._n = len(table_dataset)
         else:
             tab_n, img_n = len(table_dataset), len(image_dataset)
-            assert tab_n == img_n, f"Length of image dataset and table dataset must be equal. Image length : {img_n}" \
-                                   f". Table length : {tab_n}."
-            assert not set(table_dataset.tasks).intersection(image_dataset.tasks), f"Tasks in table and image " \
-                                                                                   f"datasets should not overlap."
+            assert tab_n == img_n, (
+                f"Length of image dataset and table dataset must be equal. Image length : {img_n}. Table length : "
+                f"{tab_n}."
+            )
+            assert not set(table_dataset.tasks).intersection(image_dataset.tasks), (
+                f"Tasks in table and image datasets should not overlap."
+            )
             self.table_dataset = table_dataset
             self.image_dataset = image_dataset
             self._n = len(image_dataset)
