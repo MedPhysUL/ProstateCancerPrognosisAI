@@ -8,6 +8,7 @@
     @Description:       This script is used to train an mlp model. Each task has its own mlp and its own optimizer.
 """
 
+import env_apps
 import matplotlib.pyplot as plt
 import pandas as pd
 import torch

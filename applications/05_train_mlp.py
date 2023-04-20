@@ -9,6 +9,7 @@
                         using a single MeanLoss on all tasks.
 """
 
+import env_apps
 import matplotlib.pyplot as plt
 import pandas as pd
 import torch

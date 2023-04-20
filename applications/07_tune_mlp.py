@@ -8,6 +8,7 @@
     @Description:       This script is used to tune an MLP model.
 """
 
+import env_apps
 from optuna.samplers import TPESampler
 import pandas as pd
 from torch.optim import Adam

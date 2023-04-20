@@ -8,6 +8,7 @@
     @Description:       This script is used to train a multi-net model.
 """
 
+import env_apps
 import pandas as pd
 import torch
 from torch.optim import Adam
