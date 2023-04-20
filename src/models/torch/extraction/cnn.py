@@ -48,7 +48,6 @@ class CNN(Extractor):
             activation: str = "PRELU",
             norm: str = "INSTANCE",
             dropout: float = 0.0,
-            table_tasks: Optional[Union[TableTask, Sequence[TableTask]]] = None,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None
@@ -96,9 +95,6 @@ class CNN(Extractor):
             Name or type defining normalization layers.
         dropout : float
             Probability of dropout.
-        table_tasks : Optional[Union[TableTask, Sequence[TableTask]]]
-            Sequence of table tasks to perform on the extracted deep radiomics. If None, will use all table tasks. This
-            parameter is only used when `mode` is set to 'prediction'.
         device : Optional[torch_device]
             The device of the model.
         name : Optional[str]
@@ -109,7 +105,6 @@ class CNN(Extractor):
         super().__init__(
             image_keys=image_keys,
             segmentation_key_or_task=segmentation_key_or_task,
-            table_tasks=table_tasks,
             merging_method=merging_method,
             model_mode=model_mode,
             multi_task_mode=multi_task_mode,
@@ -228,12 +223,14 @@ class CNN(Extractor):
             return a tensor of shape (batch_size, n_features, *spatial_shape).
         """
         if self.multi_task_mode == MultiTaskMode.SEPARATED:
-            return ModuleDict({task.name: self._build_single_extractor() for task in self.table_tasks})
+            return ModuleDict({task.name: self._build_single_extractor() for task in self._tasks.table_tasks})
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
             return self._build_single_extractor()
         elif self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
             shared_module = self._build_partly_shared_extractor()
-            separated_modules = ModuleDict({task.name: self._build_single_extractor() for task in self.table_tasks})
+            separated_modules = ModuleDict(
+                {task.name: self._build_single_extractor() for task in self._tasks.table_tasks}
+            )
 
             partly_shared_module_dict = ModuleDict()
             for name, module in separated_modules.items():

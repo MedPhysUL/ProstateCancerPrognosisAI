@@ -91,7 +91,6 @@ class Extractor(TorchModel, ABC):
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
             shape: Union[str, Sequence[int]] = (96, 96, 96),
             n_features: int = 5,
-            table_tasks: Optional[Union[TableTask, Sequence[TableTask]]] = None,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None
@@ -124,9 +123,6 @@ class Extractor(TorchModel, ABC):
         n_features : int
             Integer stating the dimension of the final output tensor, i.e. the number of deep radiomics/features to
             extract from the image.
-        table_tasks : Optional[Union[TableTask, Sequence[TableTask]]]
-            Sequence of table tasks to perform on the extracted deep radiomics. If None, will use all table tasks. This
-            parameter is only used when `mode` is set to 'prediction'.
         device : Optional[torch_device]
             The device of the model.
         name : Optional[str]
@@ -135,11 +131,6 @@ class Extractor(TorchModel, ABC):
             Random state used for reproducibility.
         """
         super().__init__(device=device, name=name, seed=seed)
-
-        if table_tasks is None or isinstance(table_tasks, Sequence):
-            self.table_tasks = table_tasks
-        else:
-            self.table_tasks = [table_tasks]
 
         if isinstance(segmentation_key_or_task, SegmentationTask):
             self.segmentation_key = segmentation_key_or_task.name
@@ -210,10 +201,10 @@ class Extractor(TorchModel, ABC):
         if self.multi_task_mode == MultiTaskMode.SEPARATED or self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
             return ModuleDict({
                 task.name: Linear(in_features=self.n_features, out_features=1).to(self.device)
-                for task in self.table_tasks
+                for task in self._tasks.table_tasks
             })
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
-            return Linear(in_features=self.n_features, out_features=len(self.table_tasks)).to(self.device)
+            return Linear(in_features=self.n_features, out_features=len(self._tasks.table_tasks)).to(self.device)
         else:
             raise ValueError(f"{self.multi_task_mode} is not a valid MultiTaskMode")
 
@@ -232,9 +223,6 @@ class Extractor(TorchModel, ABC):
             The built model.
         """
         super().build(dataset=dataset)
-
-        if self.table_tasks is None:
-            self.table_tasks = self._tasks.table_tasks
 
         self.extractor = self._build_extractor(dataset)
         self.linear_layer = self._build_linear_layer()
@@ -282,7 +270,7 @@ class Extractor(TorchModel, ABC):
         """
         if self.multi_task_mode == MultiTaskMode.SEPARATED or self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
             deep_radiomics = {}
-            for task in self.table_tasks:
+            for task in self._tasks.table_tasks:
                 deep_radiomics[task.name] = self.extractor[task.name](input_tensor)
             return deep_radiomics
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
@@ -306,12 +294,12 @@ class Extractor(TorchModel, ABC):
         """
         if self.multi_task_mode == MultiTaskMode.SEPARATED or self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
             prediction = {}
-            for task in self.table_tasks:
+            for task in self._tasks.table_tasks:
                 prediction[task.name] = self.linear_layer[task.name](radiomics[task.name])[:, 0]
             return prediction
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
             y = self.linear_layer(radiomics)
-            return {task.name: y[:, i] for i, task in enumerate(self.table_tasks)}
+            return {task.name: y[:, i] for i, task in enumerate(self._tasks.table_tasks)}
         else:
             raise ValueError(f"{self.multi_task_mode} is not a valid MultiTaskMode")
 
