@@ -37,7 +37,6 @@ class MLP(Predictor):
             dropout: Union[Tuple, str, float] = 0.0,
             bias: bool = True,
             adn_ordering: str = "NDA",
-            table_tasks: Optional[Union[TableTask, Sequence[TableTask]]] = None,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None
@@ -69,8 +68,6 @@ class MLP(Predictor):
             If `bias` is True then linear units have a bias term. Defaults to True.
         adn_ordering : str
             A string representing the ordering of activation, dropout, and normalization. Defaults to "NDA".
-        table_tasks : Optional[Union[TableTask, Sequence[TableTask]]]
-            Sequence of table tasks to perform on the extracted deep radiomics. If None, will use all table tasks.
         device : Optional[torch_device]
             The device of the model. Defaults to None.
         name : Optional[str]
@@ -83,7 +80,6 @@ class MLP(Predictor):
             input_mode=input_mode,
             multi_task_mode=multi_task_mode,
             n_radiomics=n_radiomics,
-            table_tasks=table_tasks,
             device=device,
             name=name,
             seed=seed
@@ -147,6 +143,8 @@ class MLP(Predictor):
             The current model.
         """
         if self.multi_task_mode == MultiTaskMode.SEPARATED:
-            return ModuleDict({task.name: self._build_single_predictor(out_channels=1) for task in self.table_tasks})
+            return ModuleDict(
+                {task.name: self._build_single_predictor(out_channels=1) for task in self._tasks.table_tasks}
+            )
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
-            return self._build_single_predictor(out_channels=len(self.table_tasks))
+            return self._build_single_predictor(out_channels=len(self._tasks.table_tasks))

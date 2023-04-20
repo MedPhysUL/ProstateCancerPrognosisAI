@@ -67,7 +67,6 @@ class Predictor(TorchModel, ABC):
             input_mode: Union[str, InputMode] = InputMode.TABULAR,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
             n_radiomics: int = 5,
-            table_tasks: Optional[Union[TableTask, Sequence[TableTask]]] = None,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None
@@ -89,8 +88,6 @@ class Predictor(TorchModel, ABC):
         n_radiomics : int
             Number of radiomics features. Defaults to 5. This parameter is only used when `input_mode` is set to
             'radiomics' or 'hybrid'.
-        table_tasks : Optional[Union[TableTask, Sequence[TableTask]]]
-            Sequence of table tasks to perform on the extracted deep radiomics. If None, will use all table tasks.
         device : Optional[torch_device]
             The device of the model. Defaults to None.
         name : Optional[str]
@@ -109,11 +106,6 @@ class Predictor(TorchModel, ABC):
             self.features_columns = features_columns
         else:
             self.features_columns = [features_columns]
-
-        if table_tasks is None or isinstance(table_tasks, Sequence):
-            self.table_tasks = table_tasks
-        else:
-            self.table_tasks = [table_tasks]
 
         self.input_mode = InputMode(input_mode)
         self.multi_task_mode = MultiTaskMode(multi_task_mode)
@@ -154,8 +146,6 @@ class Predictor(TorchModel, ABC):
         """
         super().build(dataset=dataset)
 
-        if self.table_tasks is None:
-            self.table_tasks = self._tasks.table_tasks
         if self.features_columns is None:
             self.features_columns = dataset.table_dataset.features_cols
 
@@ -255,14 +245,14 @@ class Predictor(TorchModel, ABC):
         """
         if self.multi_task_mode == MultiTaskMode.SEPARATED:
             prediction = {}
-            for task in self.table_tasks:
+            for task in self._tasks.table_tasks:
                 input_tensor = self._get_input_in_separated_mode(task, table_data, radiomics)
                 prediction[task.name] = self.predictor[task.name](input_tensor)[:, 0]
             return prediction
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
             input_tensor = self._get_input_in_fully_shared_mode(table_data, radiomics)
             y = self.predictor(input_tensor)
-            return {task.name: y[:, i] for i, task in enumerate(self.table_tasks)}
+            return {task.name: y[:, i] for i, task in enumerate(self._tasks.table_tasks)}
         else:
             raise ValueError(f"{self.multi_task_mode} is not a valid MultiTaskMode")
 
