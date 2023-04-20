@@ -18,7 +18,6 @@ from torch.nn import Module
 
 from .base import Segmentor
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
-from ....tasks import SegmentationTask
 
 
 class Unet(Segmentor):

@@ -20,7 +20,6 @@ from torch.nn import Module, ModuleDict, Sequential
 
 from .base import Extractor, MergingMethod, ModelMode, MultiTaskMode
 from ....tasks import SegmentationTask
-from ....tasks.base import TableTask
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
 
 

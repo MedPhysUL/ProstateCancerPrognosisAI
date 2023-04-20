@@ -21,7 +21,6 @@ from torch.nn import Linear, Module, ModuleDict
 from ..base import check_if_built, TorchModel
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ....tasks import SegmentationTask
-from ....tasks.base import TableTask
 
 
 class MergingMethod(StrEnum):
