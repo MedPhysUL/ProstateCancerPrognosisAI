@@ -64,10 +64,10 @@ class Model(Module, ABC):
 
         self.device = device if device else torch_device("cuda") if cuda.is_available() else torch_device("cpu")
         self.name = name if name else self.__class__.__name__
+        self.seed = seed
 
         self._breslow_estimators = {}
         self._is_built: bool = False
-        self._seed = seed
         self._tasks: Optional[TaskList] = None
 
     @property
@@ -285,5 +285,5 @@ class Model(Module, ABC):
         """
         Sets numpy and torch seed.
         """
-        if self._seed is not None:
-            set_determinism(self._seed)
+        if self.seed is not None:
+            set_determinism(self.seed)
