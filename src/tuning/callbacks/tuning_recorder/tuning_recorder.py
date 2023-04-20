@@ -74,7 +74,7 @@ class TuningRecorder(TuningCallback):
     def __init__(
             self,
             name: Optional[str] = None,
-            path_to_record_folder: str = "./tuning_records",
+            path_to_record_folder: str = "tuning_records",
             save_descriptive_analysis: bool = False,
             verbose: bool = False
     ):
