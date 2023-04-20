@@ -151,8 +151,8 @@ class StatisticsContainer:
                     vars(self)[k][task_name] = {}
                     for metric_name, value in metrics.items():
                         vars(self)[k][task_name][metric_name] = ScoreStatisticsContainer(
-                            mean=float(np.mean(value)),
-                            std=float(np.std(value))
+                            mean=float(np.nanmean(value)),
+                            std=float(np.nanstd(value))
                         )
 
 
