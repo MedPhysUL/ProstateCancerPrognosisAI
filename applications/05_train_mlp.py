@@ -97,6 +97,9 @@ if __name__ == '__main__':
     for task in dataset.tasks.survival_analysis_tasks:
         breslow_estimator = task.breslow_estimator
 
+        plt.plot(breslow_estimator.unique_times_)
+        plt.show()
+
         cum_baseline_hazard = breslow_estimator.cum_baseline_hazard_
         plt.plot(cum_baseline_hazard.x, cum_baseline_hazard.y)
         plt.show()
