@@ -53,6 +53,15 @@ CORES_NEGATIVE_PERCENTAGE = "CORES_NEGATIVE_PERCENTAGE"
 PN = "PN"
 BCR = "BCR"
 BCR_TIME = "BCR_TIME"
+METASTASIS = "METASTASIS"
+METASTASIS_TIME = "METASTASIS_TIME"
+EE = "EE"
+SVI = "SVI"
+CRPC = "CRPC"
+CRPC_TIME = "CRPC_TIME"
+DEATH = "DEATH"
+DEATH_TIME = "DEATH_TIME"
+
 
 # TASKS
 PN_TASK = BinaryClassificationTask(
@@ -69,34 +78,34 @@ BCR_TASK = SurvivalAnalysisTask(
     hps_tuning_metric=ConcordanceIndexCensored()
 )
 METASTASIS_TASK = SurvivalAnalysisTask(
-    event_indicator_column="METASTASIS",
-    event_time_column="METASTASIS_TIME",
+    event_indicator_column=METASTASIS,
+    event_time_column=METASTASIS_TIME,
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored()
 )
 EE_TASK = BinaryClassificationTask(
-    target_column="EE",
+    target_column=EE,
     decision_threshold_metric=BinaryBalancedAccuracy(),
     hps_tuning_metric=AUC(),
     evaluation_metrics=[Sensitivity(), Specificity()],
     criterion=BCEWithLogitsLoss()
 )
 SVI_TASK = BinaryClassificationTask(
-    target_column="SVI",
+    target_column=SVI,
     decision_threshold_metric=BinaryBalancedAccuracy(),
     hps_tuning_metric=AUC(),
     evaluation_metrics=[Sensitivity(), Specificity()],
     criterion=BCEWithLogitsLoss()
 )
 CRPC_TASK = SurvivalAnalysisTask(
-    event_indicator_column="CRPC",
-    event_time_column="CRPC_TIME",
+    event_indicator_column=CRPC,
+    event_time_column=CRPC_TIME,
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored()
 )
 DEATH_TASK = SurvivalAnalysisTask(
-    event_indicator_column="DEATH",
-    event_time_column="DEATH_TIME",
+    event_indicator_column=DEATH,
+    event_time_column=DEATH_TIME,
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored()
 )
