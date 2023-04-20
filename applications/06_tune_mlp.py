@@ -17,7 +17,7 @@ from constants import *
 from src.data.datasets import ProstateCancerDataset, TableDataset
 from src.data.processing.sampling import extract_masks
 from src.losses.multi_task import MeanLoss
-from src.models.torch.prediction import TabularMLP
+from src.models.torch.prediction import MLP
 from src.training.callbacks.learning_algorithm import L2Regularizer, MultiTaskLossEarlyStopper
 from src.tuning import SearchAlgorithm, TorchObjective, Tuner
 from src.tuning.callbacks import TuningRecorder
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     df = pd.read_csv(LEARNING_TABLE_PATH)
 
     feature_cols = [AGE, PSA, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
-    target_cols = [PN, BCR, BCR_TIME]
+    target_cols = [PN, BCR, BCR_TIME, METASTASIS, METASTASIS_TIME, EE, SVI, CRPC, CRPC_TIME, DEATH, DEATH_TIME]
 
     df = df[[ID] + feature_cols + target_cols]
 
@@ -74,19 +74,20 @@ if __name__ == '__main__':
 
     tuner = Tuner(
         search_algorithm=search_algo,
-        recorder=TuningRecorder(save_descriptive_analysis=True),
-        n_trials=2,
+        recorder=TuningRecorder(),
+        n_trials=10,
         seed=SEED
     )
 
     model_hyperparameter = TorchModelHyperparameter(
-        constructor=TabularMLP,
+        constructor=MLP,
         parameters={
             "activation": FixedHyperparameter(name="activation", value="PReLU"),
             "hidden_channels": HyperparameterList(
                 [
                     IntegerHyperparameter(name="layer_1", low=5, high=30),
-                    IntegerHyperparameter(name="layer_2", low=5, high=30)
+                    IntegerHyperparameter(name="layer_2", low=5, high=30),
+                    IntegerHyperparameter(name="layer_3", low=5, high=30)
                 ]
             ),
             "dropout": FloatHyperparameter(name="dropout", low=0, high=0.25)
@@ -116,7 +117,7 @@ if __name__ == '__main__':
     )
 
     trainer_hyperparameter = TrainerHyperparameter(
-        n_epochs=3,
+        n_epochs=20,
         checkpoint=CheckpointHyperparameter()
     )
 
@@ -130,7 +131,7 @@ if __name__ == '__main__':
         train_method_hyperparameter=train_methode_hyperparameter
     )
 
-    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=1, l=1)
+    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=2, l=2)
 
     tuner.tune(
         objective=objective,
