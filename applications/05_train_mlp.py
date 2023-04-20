@@ -53,7 +53,6 @@ if __name__ == '__main__':
 
     model = MLP(
         multi_task_mode="separated",
-        hidden_channels=[30, 30, 30],
         activation="PRELU",
         dropout=0.2,
         device=torch.device("cuda"),
@@ -78,7 +77,7 @@ if __name__ == '__main__':
         batch_size=8,
         checkpoint=Checkpoint(),
         exec_metrics_on_train=True,
-        n_epochs=1,
+        n_epochs=50,
         seed=SEED
     )
 
