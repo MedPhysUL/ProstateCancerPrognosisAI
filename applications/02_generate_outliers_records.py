@@ -18,8 +18,8 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                DataFrames                                                   #
     # ----------------------------------------------------------------------------------------------------------- #
-    learning_df = pd.read_csv(LEARNING_TABLE_PATH)
-    holdout_df = pd.read_csv(HOLDOUT_TABLE_PATH)
+    learning_df = pd.read_csv(LEARNING_TABLE_PATH)[[ID] + FEATURE_COLUMNS]
+    holdout_df = pd.read_csv(HOLDOUT_TABLE_PATH)[[ID] + FEATURE_COLUMNS]
 
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                 Cleaner                                                     #
