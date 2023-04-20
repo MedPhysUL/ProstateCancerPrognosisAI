@@ -75,7 +75,7 @@ if __name__ == '__main__':
     tuner = Tuner(
         search_algorithm=search_algo,
         recorder=TuningRecorder(),
-        n_trials=10,
+        n_trials=100,
         seed=SEED
     )
 
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     )
 
     trainer_hyperparameter = TrainerHyperparameter(
-        n_epochs=20,
+        n_epochs=50,
         checkpoint=CheckpointHyperparameter()
     )
 
