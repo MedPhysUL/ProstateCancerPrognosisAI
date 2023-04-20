@@ -10,6 +10,7 @@
 
 from typing import Optional
 
+import numpy as np
 from sksurv.metrics import concordance_index_censored
 from torch import Tensor
 
@@ -62,8 +63,13 @@ class ConcordanceIndexCensored(SurvivalAnalysisMetric):
         metric : float
             Score.
         """
+        event_indicator = event_indicator.numpy().astype(bool)
+
+        if not event_indicator.any():
+            return np.nan
+
         c_index = concordance_index_censored(
-            event_indicator=event_indicator.numpy().astype(bool),
+            event_indicator=event_indicator,
             event_time=event_time.numpy(),
             estimate=pred.numpy()
         )
