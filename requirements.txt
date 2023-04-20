@@ -1,4 +1,4 @@
-adjustText==0.8
+adjustText==0.7
 bayesian-torch==0.3.0
 dacite==1.8.0
 delia==1.0.17
