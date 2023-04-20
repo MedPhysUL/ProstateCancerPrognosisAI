@@ -1,11 +1,11 @@
 """
-    @file:              09_train_multi_net.py
+    @file:              08_train_cnn.py
     @Author:            Maxence Larose
 
     @Creation Date:     04/2023
     @Last modification: 04/2023
 
-    @Description:       This script is used to train a multi-net model.
+    @Description:       This script is used to train a cnn model.
 """
 
 import pandas as pd
@@ -18,12 +18,8 @@ from delia.databases import PatientsDatabase
 from constants import *
 from src.data.processing.sampling import extract_masks, Mask
 from src.data.datasets import ImageDataset, ProstateCancerDataset, TableDataset
-from src.models.torch.combination import ModelSetup, MultiNet
 from src.models.torch.extraction import CNN
-from src.models.torch.segmentation import Unet
-from src.models.torch.prediction import MLP
 from src.losses.multi_task import MeanLoss
-from src.losses.multi_task import WeightedMeanLoss
 from src.training import Trainer
 from src.training.callbacks import LearningAlgorithm, Checkpoint
 from src.training.callbacks.learning_algorithm import MultiTaskLossEarlyStopper
@@ -51,10 +47,11 @@ if __name__ == '__main__':
     image_dataset = ImageDataset(
         database=database,
         modalities={"PT", "CT"},
-        tasks=PROSTATE_SEGMENTATION_TASK
+        organs={"CT": {"Prostate"}}
     )
 
     dataset = ProstateCancerDataset(image_dataset=image_dataset, table_dataset=table_dataset)
+
     masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=2, l=2)
 
     dataset.update_masks(
@@ -63,74 +60,30 @@ if __name__ == '__main__':
         valid_mask=masks[0][Mask.VALID]
     )
 
-    cnn = CNN(
+    model = CNN(
         image_keys=["PT"],
-        segmentation_key_or_task=PROSTATE_SEGMENTATION_TASK,
-        model_mode="extraction",
+        segmentation_key_or_task="CT_Prostate",
+        model_mode="prediction",
         merging_method="multiplication",
         multi_task_mode="separated",
-        dropout=0.5
-    )
-
-    unet = Unet(
-        image_keys="CT",
-        spatial_dims=3,
-        num_res_units=3,
-        dropout=0.2
-    )
-
-    mlp = MLP(
-        multi_task_mode="separated",
-        dropout=0.2
-    )
-
-    multi_net = MultiNet(
-        predictor_setup=ModelSetup(mlp),
-        extractor_setup=ModelSetup(cnn),
-        segmentor_setup=ModelSetup(unet),
+        dropout=0.5,
         device=torch.device("cuda"),
         seed=SEED
     ).build(dataset)
 
-    optimizer_mlp = Adam(
-        params=mlp.parameters(),
-        lr=2e-4,
-        weight_decay=0.02
-    )
-
-    learning_algorithm_mlp = LearningAlgorithm(
-        criterion=MeanLoss(tasks=PN_TASK),
-        optimizer=optimizer_mlp,
-        lr_scheduler=ExponentialLR(optimizer=optimizer_mlp, gamma=0.99),
-        early_stopper=MultiTaskLossEarlyStopper(patience=20),
-        regularizer=L2Regularizer(mlp.named_parameters(), lambda_=0.01)
-    )
-
-    optimizer_cnn = Adam(
-        params=cnn.parameters(),
+    optimizer = Adam(
+        params=model.parameters(),
         lr=3e-5,
         weight_decay=0.1
     )
 
-    learning_algorithm_cnn = LearningAlgorithm(
-        criterion=MeanLoss(tasks=PN_TASK),
-        optimizer=optimizer_cnn,
-        lr_scheduler=ExponentialLR(optimizer=optimizer_cnn, gamma=0.99),
+    learning_algorithm = LearningAlgorithm(
+        criterion=MeanLoss(),
+        optimizer=optimizer,
+        lr_scheduler=ExponentialLR(optimizer=optimizer, gamma=0.99),
         early_stopper=MultiTaskLossEarlyStopper(patience=20),
-        regularizer=L2Regularizer(cnn.named_parameters(), lambda_=0.02)
+        regularizer=L2Regularizer(model.named_parameters(), lambda_=0.02)
     )
-
-    optimizer_unet = Adam(
-        params=unet.parameters(),
-        lr=1e-4
-    )
-
-    learning_algorithm_unet = LearningAlgorithm(
-        criterion=WeightedMeanLoss(tasks=[PROSTATE_SEGMENTATION_TASK, PN_TASK], weights=[1/2, 1/2]),
-        optimizer=optimizer_unet,
-        lr_scheduler=ExponentialLR(optimizer=optimizer_unet, gamma=0.99)
-    )
-
     trainer = Trainer(
         batch_size=8,
         checkpoint=Checkpoint(),
@@ -140,14 +93,9 @@ if __name__ == '__main__':
     )
 
     trained_model, history = trainer.train(
-        model=multi_net,
+        model=model,
         dataset=dataset,
-        learning_algorithms=[learning_algorithm_unet, learning_algorithm_cnn, learning_algorithm_mlp]
+        learning_algorithms=learning_algorithm
     )
 
     history.plot(show=True)
-
-    # The next part will be integrated in an evaluation tool in the near future.
-    multi_net.fix_thresholds_to_optimal_values(dataset)
-    score = multi_net.score_on_dataset(dataset, dataset.test_mask)
-    print(score)
