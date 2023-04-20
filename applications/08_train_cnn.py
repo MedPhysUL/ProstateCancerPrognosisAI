@@ -30,17 +30,12 @@ from src.training.callbacks.learning_algorithm.regularizer import L2Regularizer
 if __name__ == '__main__':
     df = pd.read_csv(LEARNING_TABLE_PATH)
 
-    feature_cols = [AGE, PSA, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
-    target_cols = [PN, BCR, BCR_TIME, METASTASIS, METASTASIS_TIME, EE, SVI, CRPC, CRPC_TIME, DEATH, DEATH_TIME]
-
-    df = df[[ID] + feature_cols + target_cols]
-
     table_dataset = TableDataset(
         df=df,
         ids_col=ID,
         tasks=TABLE_TASKS,
-        cont_cols=[AGE, PSA],
-        cat_cols=[GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
+        cont_cols=CONTINUOUS_FEATURE_COLUMNS,
+        cat_cols=CATEGORICAL_FEATURE_COLUMNS
     )
 
     database = PatientsDatabase(path_to_database=r"local_data/learning_set.h5")
