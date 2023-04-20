@@ -42,8 +42,8 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------------------------------------------------- #
     sampler = Sampler(
         dataset=table_dataset,
-        n_out_split=2,
-        n_in_split=2,
+        n_out_split=5,
+        n_in_split=5,
         random_state=SEED
     )
 
