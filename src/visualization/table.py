@@ -993,7 +993,7 @@ class TableViewer:
                 self.visualize_kaplan_meier_curve(event, time, imputed, None, path_to_fig, False)
 
                 for cat_col in self.dataset.cat_cols:
-                    path_to_fig = os.path.join(directory, f"survival ({cat_col} stratified).png")
+                    path_to_fig = os.path.join(directory, f"survival({cat_col}).png")
                     self.visualize_kaplan_meier_curve(event, time, imputed, cat_col, path_to_fig, False)
 
     def save_descriptive_analysis(
