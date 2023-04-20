@@ -86,7 +86,7 @@ if __name__ == '__main__':
     )
     trainer = Trainer(
         batch_size=8,
-        # checkpoint=Checkpoint(),
+        checkpoint=Checkpoint(),
         exec_metrics_on_train=True,
         n_epochs=100,
         seed=SEED
