@@ -3,16 +3,18 @@
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
-    @Last modification: 07/2022
+    @Last modification: 03/2023
 
     @Description:       This file stores helpful constants.
 """
 
 import os
 
-from src.utils.score_metrics import BinaryBalancedAccuracy, DICEMetric
-from src.utils.losses import BinaryCrossEntropyWithLogitsLoss, DICELoss
-from src.utils.tasks import ClassificationTask, SegmentationTask
+from src.losses.single_task import BCEWithLogitsLoss, DiceLoss, NegativePartialLogLikelihood
+from src.metrics.single_task import (
+    AUC, BinaryBalancedAccuracy, ConcordanceIndexCensored, DiceMetric, Sensitivity, Specificity
+)
+from src.tasks import BinaryClassificationTask, SegmentationTask, SurvivalAnalysisTask
 
 # SEED
 SEED = 1010710
@@ -36,8 +38,10 @@ DESCRIPTIVE_ANALYSIS_PATH = os.path.join(RECORDS_PATH, "descriptive_analyses")
 EXPERIMENTS_PATH = os.path.join(RECORDS_PATH, "experiments")
 CHECKPOINTS_PATH = os.path.join(EXPERIMENTS_PATH, "checkpoints")
 
-# COLUMNS
+# ID COLUMN
 ID = "ID"
+
+# FEATURE COLUMNS
 AGE = "AGE"
 PSA = "PSA"
 GLEASON_GLOBAL = "GLEASON_GLOBAL"
@@ -48,51 +52,81 @@ CORES_POSITIVE = "CORES_POSITIVE"
 CORES_NEGATIVE = "CORES_NEGATIVE"
 CORES_POSITIVE_PERCENTAGE = "CORES_POSITIVE_PERCENTAGE"
 CORES_NEGATIVE_PERCENTAGE = "CORES_NEGATIVE_PERCENTAGE"
+
+CONTINUOUS_FEATURE_COLUMNS = [AGE, PSA]
+CATEGORICAL_FEATURE_COLUMNS = [GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
+FEATURE_COLUMNS = CONTINUOUS_FEATURE_COLUMNS + CATEGORICAL_FEATURE_COLUMNS
+
+# TARGET COLUMNS
 PN = "PN"
 BCR = "BCR"
+BCR_TIME = "BCR_TIME"
+METASTASIS = "METASTASIS"
+METASTASIS_TIME = "METASTASIS_TIME"
+EE = "EE"
+SVI = "SVI"
+CRPC = "CRPC"
+CRPC_TIME = "CRPC_TIME"
+DEATH = "DEATH"
+DEATH_TIME = "DEATH_TIME"
 
-# DATA TYPE
-DATE_TYPE = "date"
-NUMERIC_TYPE = "numeric"
-CATEGORICAL_TYPE = "text"
+TARGET_COLUMNS = [PN, BCR, BCR_TIME, METASTASIS, METASTASIS_TIME, EE, SVI, CRPC, CRPC_TIME, DEATH, DEATH_TIME]
 
-# TYPE DICT
-COLUMNS_TYPES = {
-    AGE: NUMERIC_TYPE,
-    PSA: NUMERIC_TYPE,
-    GLEASON_GLOBAL: CATEGORICAL_TYPE,
-    GLEASON_PRIMARY: CATEGORICAL_TYPE,
-    GLEASON_SECONDARY: CATEGORICAL_TYPE,
-    CLINICAL_STAGE: CATEGORICAL_TYPE,
-    CORES_POSITIVE: NUMERIC_TYPE,
-    CORES_NEGATIVE: NUMERIC_TYPE,
-    CORES_POSITIVE_PERCENTAGE: NUMERIC_TYPE,
-    CORES_NEGATIVE_PERCENTAGE: NUMERIC_TYPE,
-    PN: CATEGORICAL_TYPE,
-    BCR: CATEGORICAL_TYPE
-}
+# TABLE TASKS
+PN_TASK = BinaryClassificationTask(
+    target_column=PN,
+    decision_threshold_metric=BinaryBalancedAccuracy(),
+    hps_tuning_metric=AUC(),
+    evaluation_metrics=[Sensitivity(), Specificity()],
+    criterion=BCEWithLogitsLoss()
+)
+BCR_TASK = SurvivalAnalysisTask(
+    event_indicator_column=BCR,
+    event_time_column=BCR_TIME,
+    criterion=NegativePartialLogLikelihood(),
+    hps_tuning_metric=ConcordanceIndexCensored()
+)
+METASTASIS_TASK = SurvivalAnalysisTask(
+    event_indicator_column=METASTASIS,
+    event_time_column=METASTASIS_TIME,
+    criterion=NegativePartialLogLikelihood(),
+    hps_tuning_metric=ConcordanceIndexCensored()
+)
+EE_TASK = BinaryClassificationTask(
+    target_column=EE,
+    decision_threshold_metric=BinaryBalancedAccuracy(),
+    hps_tuning_metric=AUC(),
+    evaluation_metrics=[Sensitivity(), Specificity()],
+    criterion=BCEWithLogitsLoss()
+)
+SVI_TASK = BinaryClassificationTask(
+    target_column=SVI,
+    decision_threshold_metric=BinaryBalancedAccuracy(),
+    hps_tuning_metric=AUC(),
+    evaluation_metrics=[Sensitivity(), Specificity()],
+    criterion=BCEWithLogitsLoss()
+)
+CRPC_TASK = SurvivalAnalysisTask(
+    event_indicator_column=CRPC,
+    event_time_column=CRPC_TIME,
+    criterion=NegativePartialLogLikelihood(),
+    hps_tuning_metric=ConcordanceIndexCensored()
+)
+DEATH_TASK = SurvivalAnalysisTask(
+    event_indicator_column=DEATH,
+    event_time_column=DEATH_TIME,
+    criterion=NegativePartialLogLikelihood(),
+    hps_tuning_metric=ConcordanceIndexCensored()
+)
 
-# SET OF MODALITIES
-MODALITIES = {"CT"}
+TABLE_TASKS = [BCR_TASK, PN_TASK, METASTASIS_TASK, EE_TASK, SVI_TASK, CRPC_TASK, DEATH_TASK]
 
-# TASKS
-TABLE_TASKS = [
-    ClassificationTask(
-        target_col=PN,
-        optimization_metric=BinaryBalancedAccuracy(),
-        criterion=BinaryCrossEntropyWithLogitsLoss()
-    ),
-    ClassificationTask(
-        target_col=BCR,
-        optimization_metric=BinaryBalancedAccuracy(),
-        criterion=BinaryCrossEntropyWithLogitsLoss()
-    )
-]
-IMAGE_TASKS = [
-    SegmentationTask(
-        criterion=DICELoss(),
-        optimization_metric=DICEMetric(),
-        organ="Prostate",
-        modality="CT"
-    )
-]
+# IMAGE TASKS
+PROSTATE_SEGMENTATION_TASK = SegmentationTask(
+    criterion=DiceLoss(),
+    hps_tuning_metric=DiceMetric(),
+    organ="Prostate",
+    modality="CT"
+)
+
+IMAGE_TASKS = [PROSTATE_SEGMENTATION_TASK]

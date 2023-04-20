@@ -3,17 +3,16 @@
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
-    @Last modification: 07/2022
+    @Last modification: 04/2023
 
     @Description:       This script is used to generate a folder containing descriptive analyses of all data.
 """
 
 import pandas as pd
 
-from src.data.datasets.table_dataset import TableDataset
-from src.visualization.table_viewer import TableViewer
-
 from constants import *
+from src.data.datasets import TableDataset
+from src.visualization import TableViewer
 
 
 if __name__ == '__main__':
@@ -32,8 +31,8 @@ if __name__ == '__main__':
         df=df,
         ids_col=ID,
         tasks=TABLE_TASKS,
-        cont_cols=[AGE, PSA],
-        cat_cols=[GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
+        cont_cols=CONTINUOUS_FEATURE_COLUMNS,
+        cat_cols=CATEGORICAL_FEATURE_COLUMNS
     )
 
     table_dataset.update_masks(
@@ -42,4 +41,4 @@ if __name__ == '__main__':
     )
 
     table_viewer = TableViewer(dataset=table_dataset)
-    table_viewer.visualize(path_to_save=DESCRIPTIVE_ANALYSIS_PATH)
+    table_viewer.save_descriptive_analysis(path_to_save=DESCRIPTIVE_ANALYSIS_PATH)

@@ -13,8 +13,9 @@ import env_apps
 from delia.databases import PatientsDatabase
 from delia.extractors import PatientsDataExtractor
 from delia.transforms import (
-    CopySegmentationsD,
+    MatchingCentroidSpatialCropD,
     MatchingCropForegroundD,
+    MatchingResampleD,
     PETtoSUVD,
     ResampleD
 )
@@ -35,25 +36,40 @@ if __name__ == "__main__":
     env_apps.configure_logging("logging_conf.yaml")
 
     # ----------------------------------------------------------------------------------------------------------- #
+    #                                               Transforms                                                    #
+    # ----------------------------------------------------------------------------------------------------------- #
+    automatic_crop = [
+        SpatialCropD(keys=["CT", "PET", "Prostate"], roi_slices=[slice(50, 210), slice(None), slice(None)]),
+        KeepLargestConnectedComponentD(keys=["Prostate"]),
+        CenterSpatialCropD(keys=["CT", "PET", "Prostate"], roi_size=(1000, 160, 160)),
+    ]
+
+    ideal_crop = [
+        SpatialCropD(keys=["CT", "PET", "Prostate"], roi_slices=[slice(20, 250), slice(None), slice(None)]),
+        KeepLargestConnectedComponentD(keys=["Prostate"]),
+        MatchingCentroidSpatialCropD(segmentation_key="Prostate", matching_keys=["CT", "PET"], roi_size=(96, 96, 96))
+    ]
+
+    transforms = Compose(
+        [
+            ResampleD(keys=["CT"], out_spacing=(1.5, 1.5, 1.5)),
+            MatchingResampleD(reference_image_key="CT", matching_keys=["PET", "Prostate"]),
+            MatchingCropForegroundD(reference_image_key="CT", matching_keys=["PET", "Prostate"]),
+            *ideal_crop,
+            PETtoSUVD(keys=["PET"]),
+            ThresholdIntensityD(keys=["CT"], threshold=-250, above=True, cval=-250),
+            ThresholdIntensityD(keys=["CT"], threshold=500, above=False, cval=500),
+            ScaleIntensityD(keys=["CT"], minv=0, maxv=1),
+        ]
+    )
+
+    # ----------------------------------------------------------------------------------------------------------- #
     #                                      Create patients data extractor                                         #
     # ----------------------------------------------------------------------------------------------------------- #
     patients_data_extractor = PatientsDataExtractor(
         path_to_patients_folder=r"local_data/Learning_set",
         series_descriptions=r"local_data/series_descriptions.json",
-        transforms=Compose(
-            [
-                ResampleD(keys=["CT", "PET", "Prostate"], out_spacing=(1.5, 1.5, 1.5)),
-                MatchingCropForegroundD(image_key="CT", matching_keys=["PET", "Prostate"]),
-                SpatialCropD(keys=["CT", "PET", "Prostate"], roi_slices=[slice(50, 210), slice(None), slice(None)]),
-                CenterSpatialCropD(keys=["CT", "PET", "Prostate"], roi_size=(1000, 160, 160)),
-                PETtoSUVD(keys=["PET"]),
-                ThresholdIntensityD(keys=["CT"], threshold=-250, above=True, cval=-250),
-                ThresholdIntensityD(keys=["CT"], threshold=500, above=False, cval=500),
-                ScaleIntensityD(keys=["CT"], minv=0, maxv=1),
-                KeepLargestConnectedComponentD(keys=["Prostate"]),
-                CopySegmentationsD(segmented_image_key="CT", unsegmented_image_key="PET"),
-            ]
-        )
+        transforms=transforms
     )
 
     # ----------------------------------------------------------------------------------------------------------- #

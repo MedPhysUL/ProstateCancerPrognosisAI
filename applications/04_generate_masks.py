@@ -1,11 +1,21 @@
+"""
+    @file:              04_generate_masks.py
+    @Author:            Maxence Larose
+
+    @Creation Date:     07/2022
+    @Last modification: 03/2023
+
+    @Description:       This script is used to generate masks for hyperparameters tuning.
+"""
+
 from json import dump
 from os.path import join
 
-from constants import *
 import pandas as pd
 
-from src.data.datasets.table_dataset import TableDataset
-from src.data.processing.sampling import RandomStratifiedSampler
+from constants import *
+from src.data.datasets import TableDataset
+from src.data.processing.sampling import Sampler
 
 
 if __name__ == '__main__':
@@ -14,26 +24,21 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------------------------------------------------- #
     df = pd.read_csv(LEARNING_TABLE_PATH)
 
-    feature_cols = [AGE, PSA, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
-    target_cols = [PN, BCR]
-
-    df = df[[ID] + feature_cols + target_cols]
-
     table_dataset = TableDataset(
         df=df,
         ids_col=ID,
-        tasks=TABLE_TASKS,
-        cont_cols=[AGE, PSA],
-        cat_cols=[GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
+        tasks=[BCR_TASK, PN_TASK],
+        cont_cols=CONTINUOUS_FEATURE_COLUMNS,
+        cat_cols=CATEGORICAL_FEATURE_COLUMNS
     )
 
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                 Sampling                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
-    sampler = RandomStratifiedSampler(
+    sampler = Sampler(
         dataset=table_dataset,
-        n_out_split=2,
-        n_in_split=2,
+        n_out_split=5,
+        n_in_split=5,
         random_state=SEED
     )
 

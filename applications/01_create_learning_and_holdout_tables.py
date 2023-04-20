@@ -10,10 +10,9 @@
 
 import pandas as pd
 
-from src.data.datasets.table_dataset import MaskType, TableDataset
-from src.data.processing.sampling import RandomStratifiedSampler
-
 from constants import *
+from src.data.datasets import TableDataset
+from src.data.processing.sampling import Mask, Sampler
 
 
 if __name__ == '__main__':
@@ -23,23 +22,18 @@ if __name__ == '__main__':
     df = pd.read_excel(io=CLINICAL_DATA_PATH, sheet_name="sheet1", header=1)
     # df = df[df[ID].isin(os.listdir(IMAGES_FOLDER_PATH))]
 
-    feature_cols = [AGE, PSA, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
-    target_cols = [PN, BCR]
-
-    df = df[[ID] + feature_cols + target_cols]
-
     table_dataset = TableDataset(
         df=df,
         ids_col=ID,
-        tasks=TABLE_TASKS,
-        cont_cols=[AGE, PSA],
-        cat_cols=[GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
+        tasks=[BCR_TASK, PN_TASK],
+        cont_cols=CONTINUOUS_FEATURE_COLUMNS,
+        cat_cols=CATEGORICAL_FEATURE_COLUMNS
     )
 
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                 Sampling                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
-    rss = RandomStratifiedSampler(
+    rss = Sampler(
         dataset=table_dataset,
         n_out_split=1,
         n_in_split=0,
@@ -50,7 +44,7 @@ if __name__ == '__main__':
 
     masks = rss()
     rss.visualize_splits(masks)
-    learning_idx, holdout_idx = masks[0][MaskType.TRAIN], masks[0][MaskType.TEST]
+    learning_idx, holdout_idx = masks[0][Mask.TRAIN], masks[0][Mask.TEST]
     learning_df, holdout_df = df.iloc[learning_idx, :], df.iloc[holdout_idx, :]
 
     # ----------------------------------------------------------------------------------------------------------- #

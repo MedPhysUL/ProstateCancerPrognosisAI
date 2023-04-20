@@ -3,9 +3,9 @@
     @Author:            Maxence Larose, Nicolas Raymond, Mehdi Mitiche
 
     @Creation Date:     05/2022
-    @Last modification: 05/2022
+    @Last modification: 02/2023
 
-    @Description:       This file contains the DataCleaner object used to remove invalid rows and columns from learning
+    @Description:       This file contains the 'Cleaner' object used to remove invalid rows and columns from learning
                         dataframes. This class also indicates warning about potential outliers in the dataset.
 """
 
@@ -20,11 +20,11 @@ import numpy as np
 import pandas as pd
 from scipy.stats import chi2
 
-from src.data.processing.tools import retrieve_numerical_var
-from src.data.processing.transforms import ContinuousTransform as ConT
+from .tools import retrieve_numerical_var
+from .transforms import ContinuousTransform as ConT
 
 
-class DataCleaner:
+class Cleaner:
     """
     Object used to clean up the data frames to ensure that our learning task is done correctly. It removes rows and
     columns with too many missing values (percentage above thresh) and then identifies outliers according to their

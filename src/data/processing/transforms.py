@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Nicolas Raymond
 
     @Creation Date:     05/2022
-    @Last modification: 05/2022
+    @Last modification: 02/2023
 
     @Description:       This file contains two classes, ContinuousTransform and CategoricalTransform, which simply list
                         methods that defines transformations that can be applied on data during preprocessing.
@@ -64,7 +64,7 @@ class ContinuousTransform:
         df_tensor : Tensor
             Dataframe as a tensor.
         """
-        return from_numpy(df.to_numpy(dtype=float)).float()
+        return from_numpy(df.to_numpy()).float()
 
 
 class CategoricalTransform:
@@ -83,24 +83,17 @@ class CategoricalTransform:
 
     @staticmethod
     def ordinal_encode(
-            df: pd.DataFrame,
-            encodings: Optional[dict] = None
-    ) -> Tuple[pd.DataFrame, dict]:
+            df: pd.DataFrame
+    ) -> pd.DataFrame:
         """
         Applies ordinal encoding to all columns of the dataframe
         """
-        if encodings is None:
-            encodings = {}
-            for c in df.columns:
-                encodings[c] = {v: k for k, v in enumerate(df[c].cat.categories)}
-                df[c] = df[c].cat.codes
+        encodings = {}
+        for c in df.columns:
+            encodings[c] = {v: k for k, v in enumerate(df[c].cat.categories)}
+            df[c] = df[c].cat.codes
 
-        else:
-            for c in df.columns:
-                column_encoding = encodings[c]
-                df[c] = df[c].apply(lambda x: column_encoding[x])
-
-        return df, encodings
+        return df
 
     @staticmethod
     def fill_missing(
@@ -132,4 +125,4 @@ class CategoricalTransform:
         df_tensor : Tensor
             Dataframe as a tensor.
         """
-        return from_numpy(df.to_numpy(dtype=float)).long()
+        return from_numpy(df.to_numpy()).long()

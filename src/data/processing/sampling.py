@@ -3,10 +3,10 @@
     @Author:            Maxence Larose, Nicolas Raymond, Raphael Brodeur
 
     @Creation Date:     05/2022
-    @Last modification: 06/2022
+    @Last modification: 02/2023
 
-    @Description:       This file contains the RandomStratifiedSampler class used to separate test sets and valid sets
-                        from train sets. Also contains few functions used to extract specific datasets.
+    @Description:       This file contains the 'Sampler' class used to separate test sets and valid sets from train
+                        sets. Also contains few functions used to extract specific datasets.
 """
 
 from copy import deepcopy
@@ -18,13 +18,13 @@ from sklearn.model_selection import train_test_split
 from torch import Tensor
 from tqdm import tqdm
 
-from src.data.datasets.table_dataset import MaskType, TableDataset
+from ..datasets import Mask, TableDataset
 
 
-class RandomStratifiedSampler:
+class Sampler:
     """
-    A class used to generate lists of indexes to use as train, valid and test masks for outer and inner validation
-    loops.
+    A random stratified sampler used to generate lists of indexes to use as train, valid and test masks for outer and
+    inner validation loops.
     """
 
     def __init__(
@@ -73,12 +73,18 @@ class RandomStratifiedSampler:
 
         # Private attributes
         self.__dataset = dataset
-        if self.__dataset.encodings is not None:
-            self.__unique_encodings = {k: list(v.values()) for k, v in self.__dataset.encodings.items()}
-        else:
-            self.__unique_encodings = {}
+        self.__unique_encodings = {}
 
-        self.__targets = np.transpose(dataset.y.numpy()) if dataset.to_tensor else np.transpose(dataset.y)
+        targets = []
+        for value in dataset.y.values():
+            if dataset.to_tensor:
+                value = value.numpy()
+            if value.ndim == 1:
+                targets.append(value)
+            else:
+                targets.append(value[:, 0])
+
+        self.__targets = np.array(targets)
 
         # Public attributes
         self.alpha = alpha
@@ -92,14 +98,14 @@ class RandomStratifiedSampler:
 
     def __call__(
             self
-    ) -> Dict[int, Dict[str, Union[List[int], Dict[str, List[int]]]]]:
+    ) -> Dict[int, Dict[str, Union[List[int], Dict[int, Dict[str, List[int]]]]]]:
         """
         Returns lists of indexes to use as train, valid and test masks for outer and inner validation loops.
         The proportion of each class is conserved within each split.
 
         Returns
         -------
-        masks : Dict[int, Dict[str, Union[List[int], Dict[str, List[int]]]]]
+        masks : Dict[int, Dict[str, Union[List[int], Dict[int, Dict[str, List[int]]]]]]
             Dictionary of dictionaries with list of indexes.
 
         Example
@@ -138,13 +144,13 @@ class RandomStratifiedSampler:
             for i in range(self.n_out_split):
 
                 # We create outer split masks
-                masks[i] = {**self.split(idx, targets_c), MaskType.INNER: {}}
+                masks[i] = {**self.split(idx, targets_c), Mask.INNER: {}}
                 bar.update()
 
                 for j in range(self.n_in_split):
 
                     # We create the inner split masks
-                    masks[i][MaskType.INNER][j] = self.split(masks[i][MaskType.TRAIN], targets_c)
+                    masks[i][Mask.INNER][j] = self.split(masks[i][Mask.TRAIN], targets_c)
                     bar.update()
 
         # We turn arrays of idx into lists of idx
@@ -198,7 +204,7 @@ class RandomStratifiedSampler:
                 if not mask_ok:
                     raise Exception("The sampler could not find a proper train, valid and test split.")
 
-                return {MaskType.TRAIN: train_mask, MaskType.VALID: valid_mask, MaskType.TEST: test_mask}
+                return {Mask.TRAIN: train_mask, Mask.VALID: valid_mask, Mask.TEST: test_mask}
         else:
             # Split must extract train and test masks only
             def split(idx: np.array, targets: List[np.array]) -> Dict[str, np.array]:
@@ -221,7 +227,7 @@ class RandomStratifiedSampler:
                 if not mask_ok:
                     raise Exception("The sampler could not find a proper train and test split")
 
-                return {MaskType.TRAIN: train_mask, MaskType.VALID: None, MaskType.TEST: test_mask}
+                return {Mask.TRAIN: train_mask, Mask.VALID: None, Mask.TEST: test_mask}
 
         return split
 
@@ -332,12 +338,13 @@ class RandomStratifiedSampler:
         masks : Dict[int, Dict[str, Union[np.array, Dict[str, np.array]]]]
             Dictionary of masks
         """
+        mask_keys = [Mask.TRAIN, Mask.VALID, Mask.TEST]
         for k, v in masks.items():
-            for t1 in MaskType():
+            for t1 in mask_keys:
                 masks[k][t1] = v[t1].tolist() if v[t1] is not None else None
-            for in_k, in_v in masks[k][MaskType.INNER].items():
-                for t2 in MaskType():
-                    masks[k][MaskType.INNER][in_k][t2] = in_v[t2].tolist() if in_v[t2] is not None else None
+            for in_k, in_v in masks[k][Mask.INNER].items():
+                for t2 in mask_keys:
+                    masks[k][Mask.INNER][in_k][t2] = in_v[t2].tolist() if in_v[t2] is not None else None
 
     @staticmethod
     def visualize_splits(
@@ -355,14 +362,14 @@ class RandomStratifiedSampler:
         for k, v in datasets.items():
             print(f"Split {k+1} \n")
             print(f"Outer :")
-            valid = v[MaskType.VALID] if v[MaskType.VALID] is not None else []
-            print(f"Train {len(v[MaskType.TRAIN])} - Valid {len(valid)} - Test {len(v[MaskType.TEST])}")
-            if v[MaskType.INNER]:
-                print(f"{MaskType.INNER} :")
-            for k1, v1 in v[MaskType.INNER].items():
-                valid = v1[MaskType.VALID] if v1[MaskType.VALID] is not None else []
-                print(f"{k+1}.{k1} -> Train {len(v1[MaskType.TRAIN])} - Valid {len(valid)} -"
-                      f" Test {len(v1[MaskType.TEST])}")
+            valid = v[Mask.VALID] if v[Mask.VALID] is not None else []
+            print(f"Train {len(v[Mask.TRAIN])} - Valid {len(valid)} - Test {len(v[Mask.TEST])}")
+            if v[Mask.INNER]:
+                print(f"{Mask.INNER} :")
+            for k1, v1 in v[Mask.INNER].items():
+                valid = v1[Mask.VALID] if v1[Mask.VALID] is not None else []
+                print(f"{k+1}.{k1} -> Train {len(v1[Mask.TRAIN])} - Valid {len(valid)} -"
+                      f" Test {len(v1[Mask.TEST])}")
             print("#----------------------------------#")
 
 
@@ -399,18 +406,19 @@ def extract_masks(
     all_masks = load(f)
 
     # Extraction of masks subset
+    mask_keys = [Mask.TRAIN, Mask.VALID, Mask.TEST]
     masks = {}
     for i in map(str, range(k)):
         int_i = int(i)
         masks[int_i] = {}
-        for t in MaskType():
+        for t in mask_keys:
             masks[int_i][t] = all_masks[i][t]
-        masks[int_i][MaskType.INNER] = {}
+        masks[int_i][Mask.INNER] = {}
         for j in map(str, range(l)):
             int_j = int(j)
-            masks[int_i][MaskType.INNER][int_j] = {}
-            for t in MaskType():
-                masks[int_i][MaskType.INNER][int_j][t] = all_masks[i][MaskType.INNER][j][t]
+            masks[int_i][Mask.INNER][int_j] = {}
+            for t in mask_keys:
+                masks[int_i][Mask.INNER][int_j][t] = all_masks[i][Mask.INNER][j][t]
 
     # Closing file
     f.close()
@@ -431,11 +439,11 @@ def extract_masks(
 #     Returns: same masks with valid idx added to test idx
 #     """
 #     for k, v in masks.items():
-#         masks[k][MaskType.TRAIN] += v[MaskType.VALID]
-#         masks[k][MaskType.VALID] = None
-#         for in_k, in_v in masks[k][MaskType.INNER].items():
-#             masks[k][MaskType.INNER][in_k][MaskType.TRAIN] += in_v[MaskType.VALID]
-#             masks[k][MaskType.INNER][in_k][MaskType.VALID] = None
+#         masks[k][Mask.TRAIN] += v[Mask.VALID]
+#         masks[k][Mask.VALID] = None
+#         for in_k, in_v in masks[k][Mask.INNER].items():
+#             masks[k][Mask.INNER][in_k][Mask.TRAIN] += in_v[Mask.VALID]
+#             masks[k][Mask.INNER][in_k][Mask.VALID] = None
 #
 #
 # def get_learning_one_data(data_manager: ,
