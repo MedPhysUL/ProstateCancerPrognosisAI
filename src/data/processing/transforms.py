@@ -88,10 +88,12 @@ class CategoricalTransform:
         """
         Applies ordinal encoding to all columns of the dataframe
         """
-        encodings = {}
         for c in df.columns:
-            encodings[c] = {v: k for k, v in enumerate(df[c].cat.categories)}
-            df[c] = df[c].cat.codes
+            if c == "CLINICAL_STAGE":
+                d = {"T1c": 0, "T2": 1, "T2a": 1, "T2b": 2, "T2c": 3, "T3": 4, "T3a": 4, "T3b": 5}
+                df[c] = df[c].map(d)
+            else:
+                df[c] = df[c].cat.codes
 
         return df
 
