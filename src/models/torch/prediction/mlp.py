@@ -9,6 +9,7 @@
 """
 
 from __future__ import annotations
+from ast import literal_eval
 from typing import Optional, Sequence, Tuple, Union
 
 from monai.networks.nets import FullyConnectedNet
@@ -31,7 +32,7 @@ class MLP(Predictor):
             input_mode: Union[str, InputMode] = InputMode.TABULAR,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
             n_radiomics: int = 5,
-            hidden_channels: Sequence[int] = (25, 25, 25),
+            hidden_channels: Union[str, Sequence[int]] = (25, 25, 25),
             activation: Union[Tuple, str] = "PRELU",
             dropout: Union[Tuple, str, float] = 0.0,
             bias: bool = True,
@@ -57,7 +58,7 @@ class MLP(Predictor):
         n_radiomics : int
             Number of radiomics features. Defaults to 5. This parameter is only used when `input_mode` is set to
             'radiomics' or 'hybrid'.
-        hidden_channels : Sequence[int]
+        hidden_channels : Union[str, Sequence[int]]
             List with number of units in each hidden layer. Defaults to (25, 25, 25).
         activation : Union[Tuple, str]
             Activation function. Defaults to "PRELU".
@@ -84,7 +85,7 @@ class MLP(Predictor):
             seed=seed
         )
 
-        self.hidden_channels = hidden_channels
+        self.hidden_channels = literal_eval(hidden_channels) if isinstance(hidden_channels, str) else hidden_channels
         self.activation = activation
         self.dropout = dropout
         self.bias = bias
