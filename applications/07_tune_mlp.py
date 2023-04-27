@@ -9,6 +9,7 @@
 """
 
 import env_apps
+
 from optuna.samplers import TPESampler
 import pandas as pd
 from torch.optim import Adam
@@ -27,6 +28,7 @@ from src.tuning.hyperparameters.containers import (
     HyperparameterList
 )
 from src.tuning.hyperparameters.optuna import (
+    CategoricalHyperparameter,
     FixedHyperparameter,
     FloatHyperparameter,
     IntegerHyperparameter
@@ -51,7 +53,7 @@ if __name__ == '__main__':
     table_dataset = TableDataset(
         df=df,
         ids_col=ID,
-        tasks=TABLE_TASKS,
+        tasks=PN_TASK,
         cont_features=CONTINUOUS_FEATURES,
         cat_features=CATEGORICAL_FEATURES
     )
@@ -60,18 +62,21 @@ if __name__ == '__main__':
 
     search_algo = SearchAlgorithm(
         sampler=TPESampler(
-            n_startup_trials=20,
-            n_ei_candidates=20,
+            n_startup_trials=10,
             multivariate=True,
-            constant_liar=True,
             seed=SEED
         )
     )
 
     tuner = Tuner(
         search_algorithm=search_algo,
-        recorder=TuningRecorder(),
-        n_trials=100,
+        recorder=TuningRecorder(
+            path_to_record_folder=os.path.join(
+                EXPERIMENTS_PATH,
+                f"{PN_TASK.target_column}(MLP - Clinical data only)"
+            )
+        ),
+        n_trials=50,
         seed=SEED
     )
 
@@ -79,11 +84,12 @@ if __name__ == '__main__':
         constructor=MLP,
         parameters={
             "activation": FixedHyperparameter(name="activation", value="PReLU"),
-            "hidden_channels": HyperparameterList(
-                [
-                    IntegerHyperparameter(name="layer_1", low=5, high=30),
-                    IntegerHyperparameter(name="layer_2", low=5, high=30),
-                    IntegerHyperparameter(name="layer_3", low=5, high=30)
+            "hidden_channels": CategoricalHyperparameter(
+                name="hidden_channels",
+                choices=[
+                    "(5, )", "(10, )", "(15, )",
+                    "(5, 5)", "(10, 10)", "(15, 15)",
+                    "(5, 5, 5)", "(10, 10, 10)", "(15, 15, 15)"
                 ]
             ),
             "dropout": FloatHyperparameter(name="dropout", low=0, high=0.25)
@@ -96,25 +102,25 @@ if __name__ == '__main__':
         ),
         optimizer=OptimizerHyperparameter(
             constructor=Adam,
-            parameters={"lr": FloatHyperparameter(name="lr", low=0.0001, high=0.01)}
+            parameters={"lr": FloatHyperparameter(name="lr", low=1e-5, high=1e-2)}
         ),
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
-            parameters={"patience": 20}
+            parameters={"patience": 10}
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
-            parameters={"gamma": 0.999}
+            parameters={"gamma": CategoricalHyperparameter(name="gamma", choices=[0.9, 0.99, 0.999])}
         ),
         regularizer=RegularizerHyperparameter(
             constructor=L2Regularizer,
-            parameters={"lambda_": FloatHyperparameter(name="alpha", low=0.0001, high=0.01)}
+            parameters={"lambda_": FloatHyperparameter(name="alpha", low=1e-4, high=1e-2)}
         )
     )
 
     trainer_hyperparameter = TrainerHyperparameter(
-        n_epochs=50,
-        checkpoint=CheckpointHyperparameter()
+        n_epochs=100,
+        # checkpoint=CheckpointHyperparameter(save_freq=20)
     )
 
     train_methode_hyperparameter = TrainMethodHyperparameter(
@@ -127,7 +133,7 @@ if __name__ == '__main__':
         train_method_hyperparameter=train_methode_hyperparameter
     )
 
-    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=2, l=2)
+    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=3)
 
     tuner.tune(
         objective=objective,
