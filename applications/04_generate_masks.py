@@ -8,6 +8,8 @@
     @Description:       This script is used to generate masks for hyperparameters tuning.
 """
 
+import env_apps
+
 from json import dump
 from os.path import join
 
@@ -38,7 +40,7 @@ if __name__ == '__main__':
     sampler = Sampler(
         dataset=table_dataset,
         n_out_split=5,
-        n_in_split=5,
+        n_in_split=3,
         random_state=SEED
     )
 
