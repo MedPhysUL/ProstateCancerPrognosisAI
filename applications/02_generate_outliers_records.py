@@ -8,6 +8,8 @@
     @Description:       This script is used to generate a folder containing information about outliers.
 """
 
+import env_apps
+
 import pandas as pd
 
 from constants import *
