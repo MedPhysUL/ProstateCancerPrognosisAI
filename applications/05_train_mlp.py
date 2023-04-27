@@ -34,8 +34,8 @@ if __name__ == '__main__':
         df=df,
         ids_col=ID,
         tasks=TABLE_TASKS,
-        cont_cols=CONTINUOUS_FEATURE_COLUMNS,
-        cat_cols=CATEGORICAL_FEATURE_COLUMNS
+        cont_features=CONTINUOUS_FEATURES,
+        cat_features=CATEGORICAL_FEATURES
     )
 
     dataset = ProstateCancerDataset(table_dataset=table_dataset)
@@ -112,6 +112,7 @@ if __name__ == '__main__':
         plt.show()
 
         chf_funcs = breslow_estimator.get_survival_function(prediction)
-        for fn in chf_funcs:
-            plt.step(fn.x, fn(fn.x), where="post")
+        for i, fn in enumerate(chf_funcs):
+            plt.step(fn.x, fn(fn.x), where="post", label=f"Patient {i}")
+        plt.legend()
         plt.show()

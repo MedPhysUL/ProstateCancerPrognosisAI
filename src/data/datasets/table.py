@@ -19,7 +19,8 @@ import pandas as pd
 from torch import cat, from_numpy, stack, Tensor
 from torch.utils.data import Dataset
 
-from ..processing.tools import preprocess_categoricals, preprocess_continuous
+from ..transforms.base import Identity, Transform
+from ..transforms.enums import CategoricalTransform, ContinuousTransform
 from ...tasks import BinaryClassificationTask, TaskList, SurvivalAnalysisTask
 from ...tasks.base import TableTask
 
@@ -36,9 +37,27 @@ class TableDataModel(NamedTuple):
     y: Dict[str, Union[np.ndarray, Tensor]]
 
 
+class Feature(NamedTuple):
+    """
+    Feature column named tuple. This tuple is used to store the name of a column and its associated transform.
+
+    Elements
+    --------
+    column : str
+        Name of the column.
+    transform : Optional[Transform]
+        Transform to apply to the column. If None, the identity transform is used.
+    """
+    column: str
+    transform: Optional[Transform] = None
+
+
 class TableDataset(Dataset):
     """
-    A custom dataset class used to perform experiments on tabular data.
+    A custom dataset class used to perform experiments on tabular data. It is designed to be used with a
+    torch.utils.data.DataLoader. It allows to cover the cases where some patients have a missing label for one task
+    (or should I say, for one output) while it is available for another. It also allows to perform experiments with
+    multiple tasks.
     """
 
     def __init__(
@@ -46,8 +65,8 @@ class TableDataset(Dataset):
             df: pd.DataFrame,
             ids_col: str,
             tasks: Union[TableTask, TaskList, List[TableTask]],
-            cont_cols: Optional[List[str]] = None,
-            cat_cols: Optional[List[str]] = None,
+            cont_features: Optional[List[Feature]] = None,
+            cat_features: Optional[List[Feature]] = None,
             to_tensor: bool = False
     ):
         """
@@ -61,21 +80,21 @@ class TableDataset(Dataset):
             Name of the column containing the patient ids.
         tasks : Union[TableTask, TaskList, List[TableTask]]
             List of tasks.
-        cont_cols : Optional[List[str]]
-            List of column names associated with continuous data.
-        cat_cols : Optional[List[str]]
-            List of column names associated with categorical data.
+        cont_features : Optional[List[Feature]]
+            List of column names associated with continuous feature data.
+        cat_features : Optional[List[Feature]]
+            List of column names associated with categorical feature data.
         to_tensor : bool
             Whether we want the features and targets in tensors. False for numpy arrays.
         """
         super(TableDataset).__init__()
 
         # Validation of inputs
-        if cont_cols is None and cat_cols is None:
+        if cont_features is None and cat_features is None:
             raise ValueError("At least a list of continuous columns or a list of categorical columns must be provided.")
 
-        for columns in [cont_cols, cat_cols]:
-            self._check_columns_validity(df, columns)
+        for features, cont in zip([cont_features, cat_features], [True, False]):
+            self._check_features_validity(df, features, cont)
 
         self._tasks = TaskList(tasks)
         assert all(isinstance(task, TableTask) for task in TaskList(self._tasks)), (
@@ -83,8 +102,9 @@ class TableDataset(Dataset):
         )
 
         # Set default protected attributes
-        self._cat_cols, self._cat_idx = cat_cols, []
-        self._cont_cols, self._cont_idx = cont_cols, []
+        self._cont_features, self._cat_features = cont_features, cat_features
+        self._cat_features_cols, self._cat_features_idx = [f.column for f in cat_features], []
+        self._cont_features_cols, self._cont_features_idx = [f.column for f in cont_features], []
         self._ids_col = ids_col
         self._ids = list(df[ids_col].values)
         self._ids_to_row_idx = {id_: i for i, id_ in enumerate(self._ids)}
@@ -97,17 +117,17 @@ class TableDataset(Dataset):
         self._y = self._initialize_targets(self._tasks, to_tensor)
 
         # Define protected feature "getter" method
-        self._x = self._define_feature_getter(cont_cols, cat_cols, to_tensor)
+        self._x = self._define_feature_getter()
 
         # We set a "getter" method to get modes of categorical columns and we also extract encodings
-        self._get_modes = self._define_categorical_stats_getter(cat_cols)
+        self._get_modes = self._define_categorical_stats_getter()
 
         # We set a "getter" method to get mu ans std of continuous columns
-        self._get_mu_and_std = self._define_numerical_stats_getter(cont_cols)
+        self._get_mu_and_std = self._define_numerical_stats_getter()
 
         # We set two "setter" methods to preprocess available data after masks update
-        self._set_numerical = self._define_numerical_data_setter(cont_cols, to_tensor)
-        self._set_categorical = self._define_categorical_data_setter(cat_cols, to_tensor)
+        self._set_numerical = self._define_numerical_data_setter()
+        self._set_categorical = self._define_categorical_data_setter()
 
         # We update current training mask with all the data
         self.update_masks(list(range(self._n)), [], [])
@@ -139,28 +159,36 @@ class TableDataset(Dataset):
         return TableDataModel(x=x, y=y)
 
     @property
-    def cat_cols(self) -> List[str]:
-        return self._cat_cols
+    def cat_features(self) -> List[Feature]:
+        return self._cat_features
 
     @property
-    def cat_idx(self) -> List[int]:
-        return self._cat_idx
+    def cat_features_cols(self) -> List[str]:
+        return self._cat_features_cols
+
+    @property
+    def cat_features_idx(self) -> List[int]:
+        return self._cat_features_idx
 
     @property
     def columns(self) -> List[str]:
         return self.features_cols + self.target_cols
 
     @property
-    def cont_cols(self) -> List[str]:
-        return self._cont_cols
+    def cont_features(self) -> List[Feature]:
+        return self._cont_features
 
     @property
-    def cont_idx(self) -> List[int]:
-        return self._cont_idx
+    def cont_features_cols(self) -> List[str]:
+        return self._cont_features_cols
+
+    @property
+    def cont_features_idx(self) -> List[int]:
+        return self._cont_features_idx
 
     @property
     def features_cols(self) -> List[str]:
-        return self.cont_cols + self.cat_cols
+        return self.cont_features_cols + self.cat_features_cols
 
     @property
     def ids(self) -> List[str]:
@@ -232,27 +260,50 @@ class TableDataset(Dataset):
             Modes in the training set.
         """
         # We apply an ordinal encoding to categorical columns
-        x_cat = preprocess_categoricals(
-            self._original_data[self._cat_cols].copy(),
+        x_cat = self._preprocess_categoricals(
+            df=self._original_data[self._cat_features_cols].copy(),
+            features=self._cat_features,
             mode=modes
         )
 
         self._x_cat = x_cat.to_numpy(dtype=int)
 
-    def _define_categorical_data_setter(
-            self,
-            cat_cols: Optional[List[str]] = None,
-            to_tensor: bool = False
-    ) -> Callable:
+    @staticmethod
+    def _preprocess_categoricals(
+            df: pd.DataFrame,
+            features: List[Feature],
+            mode: Optional[pd.Series] = None
+    ) -> pd.DataFrame:
         """
-        Defines the function used to set categorical data after masks update.
+        Applies all categorical transforms to a dataframe containing only continuous data
 
         Parameters
         ----------
-        cat_cols : Optional[List[str]]
-            List with names of categorical columns.
-        to_tensor : bool, default = False
-            True if we want the data to be converted into tensor.
+        df : pd.DataFrame
+            Dataframe containing all data.
+        features : List[Feature]
+            List of categorical features.
+        mode : Optional[pd.Series]
+            Pandas series with modes of columns.
+
+        Returns
+        -------
+        df : pd.DataFrame
+            Pandas dataframe.
+        """
+        if mode is not None:
+            df = df.fillna(mode)
+        else:
+            df = df.fillna(df.mode().iloc[0])
+
+        for feature in features:
+            df[feature.column] = feature.transform(df=df[feature.column])
+
+        return df
+
+    def _define_categorical_data_setter(self) -> Callable:
+        """
+        Defines the function used to set categorical data after masks update.
 
         Returns
         -------
@@ -260,7 +311,7 @@ class TableDataset(Dataset):
             The function used to set categorical data after masks update.
         """
         # If there is no categorical columns
-        if cat_cols is None:
+        if self._cat_features_cols is None:
 
             def set_categorical(modes: Optional[pd.Series]) -> None:
                 pass
@@ -268,7 +319,7 @@ class TableDataset(Dataset):
             return set_categorical
 
         else:
-            if to_tensor:
+            if self._to_tensor:
 
                 def set_categorical(modes: Optional[pd.Series]) -> None:
                     self._categorical_setter(modes)
@@ -278,17 +329,9 @@ class TableDataset(Dataset):
 
             return self._categorical_setter
 
-    def _define_categorical_stats_getter(
-            self,
-            cat_cols: Optional[List[str]] = None
-    ) -> Callable:
+    def _define_categorical_stats_getter(self) -> Callable:
         """
         Defines the function used to extract the modes of categorical columns.
-
-        Parameters
-        ----------
-        cat_cols : Optional[List[str]]
-            List of categorical column names
 
         Returns
         -------
@@ -296,56 +339,43 @@ class TableDataset(Dataset):
             The function used to extract the modes of categorical columns paired with categorical variables encodings.
         """
         # If there is not categorical column
-        if cat_cols is None:
+        if self._cat_features_cols is None:
 
             def get_modes(df: Optional[pd.DataFrame]) -> None:
                 return None
 
         else:
             # Make sure that categorical data in the original dataframe is in the correct format
-            self._original_data[cat_cols] = self._original_data[cat_cols].astype('category')
+            cols = self._cat_features_cols
+            self._original_data[cols] = self._original_data[cols].astype('category')
 
             def get_modes(df: pd.DataFrame) -> pd.Series:
-                return df[cat_cols].mode().iloc[0]
+                return df[cols].mode().iloc[0]
 
         return get_modes
 
-    def _define_feature_getter(
-            self,
-            cont_cols: Optional[List[str]] = None,
-            cat_cols: Optional[List[str]] = None,
-            to_tensor: bool = False
-    ) -> Callable:
+    def _define_feature_getter(self) -> Callable:
         """
         Defines the method used to extract the features (processed data) for training.
-
-        Parameters
-        ----------
-        cont_cols : Optional[List[str]]
-            List of continuous column names.
-        cat_cols : Optional[List[str]]
-            list of categorical column names
-        to_tensor : bool
-            True if the data must be converted to tensor
 
         Returns
         -------
         feature_getter : Callable
             Function used to extract features from data.
         """
-        if cont_cols is None:
+        if self._cont_features_cols is None:
 
             # Only categorical column idx
-            self._cat_idx = list(range(len(cat_cols)))
+            self._cat_features_idx = list(range(len(self._cat_features_cols)))
 
             # Only categorical feature extracted by the getter
             def x() -> Union[Tensor, np.array]:
                 return self.x_cat
 
-        elif cat_cols is None:
+        elif self._cat_features_cols is None:
 
             # Only continuous column idx
-            self._cont_idx = list(range(len(cont_cols)))
+            self._cont_features_idx = list(range(len(self._cont_features_cols)))
 
             # Only continuous features extracted by the getter
             def x() -> Union[Tensor, np.array]:
@@ -354,12 +384,15 @@ class TableDataset(Dataset):
         else:
 
             # Continuous and categorical column idx
-            nb_cont_cols = len(cont_cols)
-            self._cont_idx = list(range(nb_cont_cols))
-            self._cat_idx = list(range(nb_cont_cols, nb_cont_cols + len(cat_cols)))
+            nb_cont_features_cols = len(self._cont_features_cols)
+            self._cont_features_idx = list(range(nb_cont_features_cols))
+            self._cat_features_idx = list(range(
+                nb_cont_features_cols,
+                nb_cont_features_cols + len(self._cat_features_cols)
+            ))
 
             # Continuous and categorical features extracted by the getter
-            if not to_tensor:
+            if not self._to_tensor:
                 def x() -> Union[Tensor, np.array]:
                     return np.concatenate((self.x_cont, self.x_cat), axis=1)
             else:
@@ -368,20 +401,9 @@ class TableDataset(Dataset):
 
         return x
 
-    def _define_numerical_data_setter(
-            self,
-            cont_cols: Optional[List[str]] = None,
-            to_tensor: bool = False
-    ) -> Callable:
+    def _define_numerical_data_setter(self) -> Callable:
         """
         Defines the function used to set numerical continuous data after masks update.
-
-        Parameters
-        ----------
-        cont_cols : Optional[List[str]]
-            List of continuous column names.
-        to_tensor : False
-            True if data needs to be converted into tensor.
 
         Returns
         -------
@@ -389,7 +411,7 @@ class TableDataset(Dataset):
              Function used to set numerical continuous data after masks update.
         """
         # If there is no continuous column
-        if cont_cols is None:
+        if self._cont_features_cols is None:
 
             def set_numerical(mu: Optional[pd.Series], std: Optional[pd.Series]) -> None:
                 pass
@@ -397,7 +419,7 @@ class TableDataset(Dataset):
             return set_numerical
 
         else:
-            if to_tensor:
+            if self._to_tensor:
 
                 def set_numerical(mu: Optional[pd.Series], std: Optional[pd.Series]) -> None:
                     self._numerical_setter(mu, std)
@@ -407,17 +429,9 @@ class TableDataset(Dataset):
 
             return self._numerical_setter
 
-    def _define_numerical_stats_getter(
-            self,
-            cont_cols: Optional[List[str]] = None
-    ) -> Callable:
+    def _define_numerical_stats_getter(self) -> Callable:
         """
         Defines the function used to extract the mean and the standard deviations of numerical columns in a dataframe.
-
-        Parameters
-        ----------
-        cont_cols : Optional[List[str]]
-            List with names of continuous columns.
 
         Returns
         -------
@@ -425,16 +439,16 @@ class TableDataset(Dataset):
             Function used to extract the mean and the standard deviations of numerical columns in a dataframe.
         """
         # If there is no continuous column
-        if cont_cols is None:
+        if self._cont_features_cols is None:
 
             def get_mu_and_std(df: pd.DataFrame) -> Tuple[None, None]:
                 return None, None
         else:
             # Make sure that numerical data in the original dataframe is in the correct format
-            self._original_data[cont_cols] = self._original_data[cont_cols].astype(float)
+            self._original_data[self._cont_features_cols] = self._original_data[self._cont_features_cols].astype(float)
 
             def get_mu_and_std(df: pd.DataFrame) -> Tuple[pd.Series, pd.Series]:
-                return df[self._cont_cols].mean(), df[self._cont_cols].std()
+                return df[self._cont_features_cols].mean(), df[self._cont_features_cols].std()
 
         return get_mu_and_std
 
@@ -468,10 +482,52 @@ class TableDataset(Dataset):
             Standard deviations of the numerical column according to the training mask.
         """
         # We fill missing with means and normalize the data
-        x_cont = preprocess_continuous(self._original_data[self._cont_cols].copy(), mu, std)
+        x_cont = self._preprocess_continuous(
+            df=self._original_data[self._cont_features_cols].copy(),
+            features=self._cont_features,
+            mean=mu,
+            std=std
+        )
 
         # We apply the basis function
         self._x_cont = x_cont.to_numpy(dtype=float)
+
+    @staticmethod
+    def _preprocess_continuous(
+            df: pd.DataFrame,
+            features: List[Feature],
+            mean: Optional[pd.Series] = None,
+            std: Optional[pd.Series] = None
+    ) -> pd.DataFrame:
+        """
+        Applies all continuous transforms to a dataframe containing only continuous data.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Dataframe containing all data.
+        features : List[Feature]
+            List of continuous features.
+        mean : Optional[pd.Series]
+            Pandas series with mean.
+        std : Optional[pd.Series]
+            Pandas series with standard deviations
+
+        Returns
+        -------
+        preprocessed_dataframe : pd.DataFrame
+            Dataframe containing data on which all continuous transforms have been applied.
+        """
+        if mean is not None:
+            df = df.fillna(mean)
+        else:
+            df = df.fillna(df.mean())
+
+        for feature in features:
+            column = feature.column
+            df[column] = feature.transform(df=df[column], mean=mean[column], std=std[column])
+
+        return df
 
     def get_imputed_dataframe(
             self
@@ -486,10 +542,10 @@ class TableDataset(Dataset):
         """
         imputed_df = self.original_data.copy()
 
-        if self._cont_cols is not None:
-            imputed_df[self._cont_cols] = np.array(self._x_cont)
-        if self._cat_cols is not None:
-            imputed_df[self._cat_cols] = np.array(self._x_cat)
+        if self._cont_features_cols is not None:
+            imputed_df[self._cont_features_cols] = np.array(self._x_cont)
+        if self._cat_features_cols is not None:
+            imputed_df[self._cat_features_cols] = np.array(self._x_cat)
 
         return imputed_df
 
@@ -498,6 +554,17 @@ class TableDataset(Dataset):
     ) -> Tuple[Optional[pd.Series], Optional[pd.Series], Optional[pd.Series]]:
         """
         Returns the current statistics and encodings related to the training data.
+
+        Returns
+        -------
+        (mu, std, modes) : Tuple[Optional[pd.Series], Optional[pd.Series], Optional[pd.Series]]
+            Tuple containing the current statistics and encodings related to the training data :
+                mu : Optional[pd.Series]
+                    Means of the numerical columns according to the training mask.
+                std : Optional[pd.Series]
+                    Standard deviations of the numerical columns according to the training mask.
+                modes : Optional[pd.Series]
+                    Modes of the categorical columns according to the training mask.
         """
         # We extract the current training data
         train_data = self._original_data.iloc[self._train_mask]
@@ -547,7 +614,8 @@ class TableDataset(Dataset):
             categorical: bool
     ) -> None:
         """
-        Checks if all element in the column names list are either in the cat_cols list or the cont_cols list.
+        Checks if all element in the column names list are either in the cat_features_cols list or the
+        cont_features_cols list.
 
         Parameters
         ----------
@@ -557,10 +625,10 @@ class TableDataset(Dataset):
             Whether columns contain categorical variables or not.
         """
         if categorical:
-            cols = self._cat_cols if self._cat_cols is not None else []
+            cols = self._cat_features_cols if self._cat_features_cols is not None else []
             col_type = 'categorical'
         else:
-            cols = self._cont_cols if self._cont_cols is not None else []
+            cols = self._cont_features_cols if self._cont_features_cols is not None else []
             col_type = 'continuous'
 
         for c in col_list:
@@ -612,9 +680,10 @@ class TableDataset(Dataset):
         return targets
 
     @staticmethod
-    def _check_columns_validity(
+    def _check_features_validity(
             df: pd.DataFrame,
-            columns: Optional[List[str]] = None
+            features: Optional[List[Feature]] = None,
+            cont: bool = True
     ) -> None:
         """
         Checks if the columns are all in the dataframe.
@@ -623,11 +692,27 @@ class TableDataset(Dataset):
         ----------
         df : pd.DataFrame
             Pandas dataframe with original data.
-        columns : Optional[List[str]]
-            List of column names.
+        features : Optional[List[Feature]]
+            List of features.
+        cont : bool
+            Whether the features are continuous or not.
         """
-        if columns is not None:
+        if features is not None:
             dataframe_columns = list(df.columns.values)
-            for c in columns:
-                if c not in dataframe_columns:
-                    raise ValueError(f"Column {c} is not part of the given dataframe")
+            for f in features:
+                if f.column not in dataframe_columns:
+                    raise ValueError(f"Column {f.column} is not part of the given dataframe")
+
+                if f.transform:
+                    if cont:
+                        assert isinstance(f.transform, tuple(t.value for t in ContinuousTransform)), (
+                            f"Transform {f.transform} is not a continuous transform. Available transforms are: "
+                            f"{[t.name for t in ContinuousTransform]}."
+                        )
+                    else:
+                        assert isinstance(f.transform, tuple(t.value for t in CategoricalTransform)), (
+                            f"Transform {f.transform} is not a categorical transform. Available transforms are: "
+                            f"{[t.name for t in CategoricalTransform]}."
+                        )
+                else:
+                    f.transform = Identity()
