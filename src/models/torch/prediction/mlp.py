@@ -14,7 +14,7 @@ from typing import Optional, Sequence, Tuple, Union
 
 from monai.networks.nets import FullyConnectedNet
 from torch import device as torch_device
-from torch.nn import Module, ModuleDict
+from torch.nn import DataParallel, Module, ModuleDict
 
 from .base import InputMode, MultiTaskMode, Predictor
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
@@ -118,7 +118,7 @@ class MLP(Predictor):
             else:
                 raise ValueError(f"Invalid input_mode: {self.input_mode}")
 
-        return FullyConnectedNet(
+        fully_connected_net = FullyConnectedNet(
             in_channels=input_size,
             out_channels=out_channels,
             hidden_channels=self.hidden_channels,
@@ -126,7 +126,10 @@ class MLP(Predictor):
             act=self.activation,
             bias=self.bias,
             adn_ordering=self.adn_ordering
-        ).to(self.device)
+        )
+        fully_connected_net = DataParallel(fully_connected_net)
+
+        return fully_connected_net.to(self.device)
 
     def _build_predictor(self, dataset: ProstateCancerDataset) -> Union[Module, ModuleDict]:
         """

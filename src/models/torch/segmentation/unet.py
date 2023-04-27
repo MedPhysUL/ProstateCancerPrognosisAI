@@ -14,7 +14,7 @@ from typing import Optional, Sequence, Union
 
 from monai.networks.nets import UNet
 from torch import device as torch_device
-from torch.nn import Module
+from torch.nn import DataParallel, Module
 
 from .base import Segmentor
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
@@ -112,7 +112,7 @@ class Unet(Segmentor):
         segmentor : Module
             The segmentor module.
         """
-        return UNet(
+        unet = UNet(
             spatial_dims=self.spatial_dims,
             in_channels=len(self.image_keys),
             out_channels=len(self._tasks.segmentation_tasks),
@@ -126,4 +126,7 @@ class Unet(Segmentor):
             dropout=self.dropout,
             bias=self.bias,
             adn_ordering=self.adn_ordering
-        ).to(device=self.device)
+        )
+        unet = DataParallel(unet)
+
+        return unet.to(self.device)
