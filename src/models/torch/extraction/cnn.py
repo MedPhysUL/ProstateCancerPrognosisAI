@@ -16,7 +16,7 @@ from typing import List, Optional, Sequence, Union
 from monai.networks.blocks import Convolution, ResidualUnit
 from monai.networks.nets import Classifier
 from torch import device as torch_device
-from torch.nn import Module, ModuleDict, Sequential
+from torch.nn import DataParallel, Module, ModuleDict, Sequential
 
 from .base import Extractor, MergingMethod, ModelMode, MultiTaskMode
 from ....tasks import SegmentationTask
@@ -194,7 +194,7 @@ class CNN(Extractor):
             channels = self.channels
             strides = self.strides
 
-        return Classifier(
+        classifier = Classifier(
             in_shape=in_shape,
             classes=self.n_features,
             channels=channels,
@@ -204,7 +204,10 @@ class CNN(Extractor):
             act=self.activation,
             norm=self.norm,
             dropout=self.dropout
-        ).to(self.device)
+        )
+        classifier = DataParallel(classifier)
+
+        return classifier.to(self.device)
 
     def _build_extractor(self, dataset: ProstateCancerDataset) -> Union[Module, ModuleDict]:
         """
