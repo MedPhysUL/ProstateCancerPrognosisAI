@@ -8,6 +8,8 @@
     @Description:       This script is used to create the learning and holdout sets' csv tables.
 """
 
+import env_apps
+
 import pandas as pd
 
 from constants import *

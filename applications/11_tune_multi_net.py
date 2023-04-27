@@ -9,17 +9,19 @@
 """
 
 import env_apps
-
 from optuna.samplers import TPESampler
 import pandas as pd
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 
+from delia.databases import PatientsDatabase
+
 from constants import *
-from src.data.datasets import ProstateCancerDataset, TableDataset
+from src.data.datasets import ImageDataset, ProstateCancerDataset, TableDataset
 from src.data.processing.sampling import extract_masks
 from src.losses.multi_task import MeanLoss
-from src.models.torch.prediction import MLP
+from src.models.torch import CNN, MLP, MultiNet
+from src.models.torch.combination import ModelSetup
 from src.training.callbacks.learning_algorithm import L2Regularizer, MultiTaskLossEarlyStopper
 from src.tuning import SearchAlgorithm, TorchObjective, Tuner
 from src.tuning.callbacks import TuningRecorder
@@ -33,6 +35,7 @@ from src.tuning.hyperparameters.optuna import (
     FloatHyperparameter,
     IntegerHyperparameter
 )
+from src.tuning.hyperparameters.containers import HyperparameterObject
 from src.tuning.hyperparameters.torch import (
     CheckpointHyperparameter,
     CriterionHyperparameter,
@@ -58,7 +61,15 @@ if __name__ == '__main__':
         cat_features=CATEGORICAL_FEATURES
     )
 
-    dataset = ProstateCancerDataset(image_dataset=None, table_dataset=table_dataset)
+    database = PatientsDatabase(path_to_database=r"local_data/learning_set.h5")
+
+    image_dataset = ImageDataset(
+        database=database,
+        modalities={"PT", "CT"},
+        organs={"CT": {"Prostate"}}
+    )
+
+    dataset = ProstateCancerDataset(image_dataset=image_dataset, table_dataset=table_dataset)
 
     search_algo = SearchAlgorithm(
         sampler=TPESampler(
@@ -73,7 +84,7 @@ if __name__ == '__main__':
         recorder=TuningRecorder(
             path_to_record_folder=os.path.join(
                 EXPERIMENTS_PATH,
-                f"{PN_TASK.target_column}(MLP - Clinical data only)"
+                f"{PN_TASK.target_column}(MultiNet - Clinical data + Deep radiomics)"
             )
         ),
         n_trials=50,
@@ -81,18 +92,55 @@ if __name__ == '__main__':
     )
 
     model_hyperparameter = TorchModelHyperparameter(
-        constructor=MLP,
+        constructor=MultiNet,
         parameters={
-            "activation": FixedHyperparameter(name="activation", value="PReLU"),
-            "hidden_channels": CategoricalHyperparameter(
-                name="hidden_channels",
-                choices=[
-                    "(5, )", "(10, )", "(15, )",
-                    "(5, 5)", "(10, 10)", "(15, 15)",
-                    "(5, 5, 5)", "(10, 10, 10)", "(15, 15, 15)"
-                ]
+            "predictor_setup": HyperparameterObject(
+                constructor=ModelSetup,
+                parameters={
+                    "model": TorchModelHyperparameter(
+                        constructor=MLP,
+                        parameters={
+                            "activation": FixedHyperparameter(name="activation", value="PReLU"),
+                            "input_mode": "hybrid",
+                            "multi_task_mode": "separated",
+                            "hidden_channels": CategoricalHyperparameter(
+                                name="hidden_channels",
+                                choices=[
+                                    "(10, )", "(15, )", "(20, )",
+                                    "(10, 10)", "(15, 15)", "(20, 20)",
+                                    "(10, 10, 10)", "(15, 15, 15)", "(20, 20, 20)"
+                                ]
+                            ),
+                            "dropout": FloatHyperparameter(name="dropout_mlp", low=0, high=0.25)
+                        }
+                    )
+                }
             ),
-            "dropout": FloatHyperparameter(name="dropout", low=0, high=0.25)
+            "extractor_setup": HyperparameterObject(
+                constructor=ModelSetup,
+                parameters={
+                    "model": TorchModelHyperparameter(
+                        constructor=CNN,
+                        parameters={
+                            "image_keys": ["CT", "PT"],
+                            "segmentation_key_or_task": "CT_Prostate",
+                            "model_mode": "extraction",
+                            "merging_method": "multiplication",
+                            "multi_task_mode": "separated",
+                            "channels": CategoricalHyperparameter(
+                                name="channels",
+                                choices=[
+                                    "(4, 8, 16, 32)", "(8, 16, 32, 64)", "(16, 32, 64, 128)",
+                                    "(4, 8, 16, 32, 64)", "(8, 16, 32, 64, 128)", "(16, 32, 64, 128, 256)"
+                                ]
+                            ),
+                            "kernel_size": IntegerHyperparameter(name="kernel_size", low=3, high=7, step=2),
+                            "num_res_units": IntegerHyperparameter(name="num_res_units", low=0, high=3),
+                            "dropout": FloatHyperparameter(name="dropout_cnn", low=0, high=0.5)
+                        }
+                    ),
+                }
+            )
         }
     )
 
@@ -123,14 +171,14 @@ if __name__ == '__main__':
         # checkpoint=CheckpointHyperparameter(save_freq=20)
     )
 
-    train_methode_hyperparameter = TrainMethodHyperparameter(
+    train_method_hyperparameter = TrainMethodHyperparameter(
         model=model_hyperparameter,
         learning_algorithms=learning_algorithm_hyperparameter
     )
 
     objective = TorchObjective(
         trainer_hyperparameter=trainer_hyperparameter,
-        train_method_hyperparameter=train_methode_hyperparameter
+        train_method_hyperparameter=train_method_hyperparameter
     )
 
     masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=3)
