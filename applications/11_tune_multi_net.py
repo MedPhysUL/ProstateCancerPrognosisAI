@@ -151,7 +151,7 @@ if __name__ == '__main__':
         ),
         optimizer=OptimizerHyperparameter(
             constructor=Adam,
-            parameters={"lr": FloatHyperparameter(name="lr", low=1e-5, high=1e-2)}
+            parameters={"lr": FloatHyperparameter(name="lr", low=1e-5, high=1e-2, log=True)}
         ),
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
@@ -163,12 +163,13 @@ if __name__ == '__main__':
         ),
         regularizer=RegularizerHyperparameter(
             constructor=L2Regularizer,
-            parameters={"lambda_": FloatHyperparameter(name="alpha", low=1e-4, high=1e-2)}
+            parameters={"lambda_": FloatHyperparameter(name="alpha", low=1e-4, high=1e-2, log=True)}
         )
     )
 
     trainer_hyperparameter = TrainerHyperparameter(
-        n_epochs=100,
+        batch_size=8,
+        n_epochs=100
         # checkpoint=CheckpointHyperparameter(save_freq=20)
     )
 
