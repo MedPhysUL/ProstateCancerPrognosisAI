@@ -925,10 +925,10 @@ class TableViewer:
         """
         for imputed, path in [(False, self.ORIGINAL_DF_PATH), (True, self.IMPUTED_DF_PATH)]:
             directory = os.path.join(path_to_save, self.GLOBAL_PATH, self.FIGURES_PATH, self.FEATURES_PATH, path)
-            for cont_col in self.dataset.cont_cols:
+            for cont_col in self.dataset.cont_features_cols:
                 path_to_fig = os.path.join(directory, f"{cont_col}.png")
                 self.visualize_global_continuous_feature(cont_col, imputed, path_to_fig, False)
-            for cat_col in self.dataset.cat_cols:
+            for cat_col in self.dataset.cat_features_cols:
                 path_to_fig = os.path.join(directory, f"{cat_col}.png")
                 self.visualize_global_categorical_feature(cat_col, imputed, path_to_fig, False)
 
@@ -949,10 +949,10 @@ class TableViewer:
                 directory = os.path.join(
                     path_to_save, self.TARGETS_PATH, target, self.FIGURES_PATH, self.FEATURES_PATH, path
                 )
-                for cont_col in self.dataset.cont_cols:
+                for cont_col in self.dataset.cont_features_cols:
                     path_to_fig = os.path.join(directory, f"{cont_col}.png")
                     self.visualize_target_specific_continuous_features(cont_col, target, imputed, path_to_fig, False)
-                for cat_col in self.dataset.cat_cols:
+                for cat_col in self.dataset.cat_features_cols:
                     path_to_fig = os.path.join(directory, f"{cat_col}.png")
                     self.visualize_target_specific_categorical_features(cat_col, target, imputed, path_to_fig, False)
 
@@ -992,7 +992,7 @@ class TableViewer:
                 path_to_fig = os.path.join(directory, "survival (global).png")
                 self.visualize_kaplan_meier_curve(event, time, imputed, None, path_to_fig, False)
 
-                for cat_col in self.dataset.cat_cols:
+                for cat_col in self.dataset.cat_features_cols:
                     path_to_fig = os.path.join(directory, f"survival({cat_col}).png")
                     self.visualize_kaplan_meier_curve(event, time, imputed, cat_col, path_to_fig, False)
 

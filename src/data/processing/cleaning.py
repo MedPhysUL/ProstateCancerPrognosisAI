@@ -21,7 +21,7 @@ import pandas as pd
 from scipy.stats import chi2
 
 from .tools import retrieve_numerical_var
-from .transforms import ContinuousTransform as ConT
+from ..transforms import Normalization
 
 
 class Cleaner:
@@ -103,6 +103,7 @@ class Cleaner:
         self.__outlier_alpha = outlier_alpha
         self.__min_n_per_cat = min_n_per_cat
         self.__max_cat_percentage = max_cat_percentage
+        self.__normalize = Normalization()
         self.__qchi2 = qchi2_mahalanobis_cutoff
         self.__records_path = records_path
         self.__plots_path = join(records_path, "plots")
@@ -308,7 +309,7 @@ class Cleaner:
             filename = join(self.__plots_path, "boxplot")
 
             # Normalization of column values
-            updated_df[numerical_columns] = ConT.normalize(df[numerical_columns])
+            updated_df[numerical_columns] = self.__normalize(df[numerical_columns])
 
             # Creation of figure with multiple boxplots
             data_dict = updated_df[numerical_columns].to_dict('list')

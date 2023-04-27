@@ -15,6 +15,8 @@ from src.metrics.single_task import (
     AUC, BinaryBalancedAccuracy, ConcordanceIndexCensored, DiceMetric, Sensitivity, Specificity
 )
 from src.tasks import BinaryClassificationTask, SegmentationTask, SurvivalAnalysisTask
+from src.data.datasets import Feature
+from src.data.transforms import Normalization, OrdinalEncoding, MappingEncoding
 
 # SEED
 SEED = 1010710
@@ -41,23 +43,24 @@ CHECKPOINTS_PATH = os.path.join(EXPERIMENTS_PATH, "checkpoints")
 # ID COLUMN
 ID = "ID"
 
-# FEATURE COLUMNS
-AGE = "AGE"
-PSA = "PSA"
-GLEASON_GLOBAL = "GLEASON_GLOBAL"
-GLEASON_PRIMARY = "GLEASON_PRIMARY"
-GLEASON_SECONDARY = "GLEASON_SECONDARY"
-CLINICAL_STAGE = "CLINICAL_STAGE"
-CORES_POSITIVE = "CORES_POSITIVE"
-CORES_NEGATIVE = "CORES_NEGATIVE"
-CORES_POSITIVE_PERCENTAGE = "CORES_POSITIVE_PERCENTAGE"
-CORES_NEGATIVE_PERCENTAGE = "CORES_NEGATIVE_PERCENTAGE"
+# FEATURES
+AGE = Feature(column="AGE", transform=Normalization())
+PSA = Feature(column="PSA", transform=Normalization())
+GLEASON_GLOBAL = Feature(column="GLEASON_GLOBAL", transform=OrdinalEncoding())
+GLEASON_PRIMARY = Feature(column="GLEASON_PRIMARY", transform=OrdinalEncoding())
+GLEASON_SECONDARY = Feature(column="GLEASON_SECONDARY", transform=OrdinalEncoding())
+CLINICAL_STAGE = Feature(
+    column="CLINICAL_STAGE",
+    transform=MappingEncoding(
+        {"T1c": 0, "T2": 1, "T2a": 1, "T2b": 2, "T2c": 3, "T3": 4, "T3a": 4, "T3b": 5}
+    )
+)
 
-CONTINUOUS_FEATURE_COLUMNS = [AGE, PSA]
-CATEGORICAL_FEATURE_COLUMNS = [GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
-FEATURE_COLUMNS = CONTINUOUS_FEATURE_COLUMNS + CATEGORICAL_FEATURE_COLUMNS
+CONTINUOUS_FEATURES = [AGE, PSA]
+CATEGORICAL_FEATURES = [GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
+FEATURES = CONTINUOUS_FEATURES + CATEGORICAL_FEATURES
 
-# TARGET COLUMNS
+# TARGETS
 PN = "PN"
 BCR = "BCR"
 BCR_TIME = "BCR_TIME"
@@ -69,8 +72,6 @@ CRPC = "CRPC"
 CRPC_TIME = "CRPC_TIME"
 DEATH = "DEATH"
 DEATH_TIME = "DEATH_TIME"
-
-TARGET_COLUMNS = [PN, BCR, BCR_TIME, METASTASIS, METASTASIS_TIME, EE, SVI, CRPC, CRPC_TIME, DEATH, DEATH_TIME]
 
 # TABLE TASKS
 PN_TASK = BinaryClassificationTask(

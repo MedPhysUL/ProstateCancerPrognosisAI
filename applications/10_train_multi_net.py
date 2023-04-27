@@ -38,8 +38,8 @@ if __name__ == '__main__':
         df=df,
         ids_col=ID,
         tasks=TABLE_TASKS,
-        cont_cols=CONTINUOUS_FEATURE_COLUMNS,
-        cat_cols=CATEGORICAL_FEATURE_COLUMNS
+        cont_features=CONTINUOUS_FEATURES,
+        cat_features=CATEGORICAL_FEATURES
     )
 
     database = PatientsDatabase(path_to_database=r"local_data/learning_set.h5")

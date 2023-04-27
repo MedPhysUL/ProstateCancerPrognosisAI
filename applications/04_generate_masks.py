@@ -15,7 +15,7 @@ import pandas as pd
 
 from constants import *
 from src.data.datasets import TableDataset
-from src.data.processing.sampling import Sampler
+from src.data.processing import Sampler
 
 
 if __name__ == '__main__':
@@ -28,8 +28,8 @@ if __name__ == '__main__':
         df=df,
         ids_col=ID,
         tasks=[BCR_TASK, PN_TASK],
-        cont_cols=CONTINUOUS_FEATURE_COLUMNS,
-        cat_cols=CATEGORICAL_FEATURE_COLUMNS
+        cont_features=CONTINUOUS_FEATURES,
+        cat_features=CATEGORICAL_FEATURES
     )
 
     # ----------------------------------------------------------------------------------------------------------- #

@@ -11,15 +11,15 @@
 import pandas as pd
 
 from constants import *
-from src.data.processing.cleaning import Cleaner
+from src.data.processing import Cleaner
 
 
 if __name__ == '__main__':
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                DataFrames                                                   #
     # ----------------------------------------------------------------------------------------------------------- #
-    learning_df = pd.read_csv(LEARNING_TABLE_PATH)[[ID] + FEATURE_COLUMNS]
-    holdout_df = pd.read_csv(HOLDOUT_TABLE_PATH)[[ID] + FEATURE_COLUMNS]
+    learning_df = pd.read_csv(LEARNING_TABLE_PATH)[[ID] + [f.column for f in FEATURES]]
+    holdout_df = pd.read_csv(HOLDOUT_TABLE_PATH)[[ID] + [f.column for f in FEATURES]]
 
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                 Cleaner                                                     #
