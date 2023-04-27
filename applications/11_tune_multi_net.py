@@ -71,22 +71,23 @@ if __name__ == '__main__':
 
     dataset = ProstateCancerDataset(image_dataset=image_dataset, table_dataset=table_dataset)
 
+    path_to_record_folder = os.path.join(
+        EXPERIMENTS_PATH,
+        f"{PN_TASK.target_column}(MultiNet - Clinical data + Deep radiomics)"
+    )
+
     search_algo = SearchAlgorithm(
         sampler=TPESampler(
             n_startup_trials=10,
             multivariate=True,
             seed=SEED
-        )
+        ),
+        storage="sqlite:///" + os.path.join(path_to_record_folder, "tuning_history.db")
     )
 
     tuner = Tuner(
         search_algorithm=search_algo,
-        recorder=TuningRecorder(
-            path_to_record_folder=os.path.join(
-                EXPERIMENTS_PATH,
-                f"{PN_TASK.target_column}(MultiNet - Clinical data + Deep radiomics)"
-            )
-        ),
+        recorder=TuningRecorder(path_to_record_folder=path_to_record_folder),
         n_trials=50,
         seed=SEED
     )

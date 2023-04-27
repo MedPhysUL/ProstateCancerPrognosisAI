@@ -53,29 +53,30 @@ if __name__ == '__main__':
     table_dataset = TableDataset(
         df=df,
         ids_col=ID,
-        tasks=PN_TASK,
+        tasks=BCR_TASK,
         cont_features=CONTINUOUS_FEATURES,
         cat_features=CATEGORICAL_FEATURES
     )
 
     dataset = ProstateCancerDataset(image_dataset=None, table_dataset=table_dataset)
 
+    path_to_record_folder = os.path.join(
+        EXPERIMENTS_PATH,
+        f"{BCR_TASK.target_column}(MLP - Clinical data only)"
+    )
+
     search_algo = SearchAlgorithm(
         sampler=TPESampler(
             n_startup_trials=10,
             multivariate=True,
             seed=SEED
-        )
+        ),
+        storage="sqlite:///" + os.path.join(path_to_record_folder, "tuning_history.db")
     )
 
     tuner = Tuner(
         search_algorithm=search_algo,
-        recorder=TuningRecorder(
-            path_to_record_folder=os.path.join(
-                EXPERIMENTS_PATH,
-                f"{PN_TASK.target_column}(MLP - Clinical data only)"
-            )
-        ),
+        recorder=TuningRecorder(path_to_record_folder=path_to_record_folder),
         n_trials=50,
         seed=SEED
     )
