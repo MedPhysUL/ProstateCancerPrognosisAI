@@ -31,7 +31,7 @@ class MLP(Predictor):
             features_columns: Optional[Union[str, Sequence[str]]] = None,
             input_mode: Union[str, InputMode] = InputMode.TABULAR,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
-            n_radiomics: int = 5,
+            n_radiomics: int = 6,
             hidden_channels: Union[str, Sequence[int]] = (25, 25, 25),
             activation: Union[Tuple, str] = "PRELU",
             dropout: Union[Tuple, str, float] = 0.0,
