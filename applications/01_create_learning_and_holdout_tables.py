@@ -12,7 +12,7 @@ import pandas as pd
 
 from constants import *
 from src.data.datasets import TableDataset
-from src.data.processing.sampling import Mask, Sampler
+from src.data.processing import Mask, Sampler
 
 
 if __name__ == '__main__':

@@ -15,7 +15,7 @@ import pandas as pd
 
 from constants import *
 from src.data.datasets import TableDataset
-from src.data.processing.sampling import Sampler
+from src.data.processing import Sampler
 
 
 if __name__ == '__main__':

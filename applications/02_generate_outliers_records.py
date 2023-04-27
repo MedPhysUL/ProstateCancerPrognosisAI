@@ -11,7 +11,7 @@
 import pandas as pd
 
 from constants import *
-from src.data.processing.cleaning import Cleaner
+from src.data.processing import Cleaner
 
 
 if __name__ == '__main__':
