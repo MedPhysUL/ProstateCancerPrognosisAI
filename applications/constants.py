@@ -52,7 +52,7 @@ GLEASON_SECONDARY = Feature(column="GLEASON_SECONDARY", transform=OrdinalEncodin
 CLINICAL_STAGE = Feature(
     column="CLINICAL_STAGE",
     transform=MappingEncoding(
-        {"T1c": 0, "T2": 1, "T2a": 1, "T2b": 2, "T2c": 3, "T3": 4, "T3a": 4, "T3b": 5}
+        {"T1c": 0, "T2": 0.2, "T2a": 0.2, "T2b": 0.4, "T2c": 0.6, "T3": 0.8, "T3a": 0.8, "T3b": 1}
     )
 )
 
