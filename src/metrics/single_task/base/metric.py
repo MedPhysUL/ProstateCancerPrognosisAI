@@ -9,12 +9,14 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 
+import numpy as np
 from torch import any, nanmean, pow, prod, nansum, Tensor
 
 from .direction import Direction
 from .reduction import MetricReduction
+from ....tools.missing_predictions import get_idx_of_nonmissing_predictions
 
 
 class SingleTaskMetric(ABC):
@@ -105,3 +107,31 @@ class SingleTaskMetric(ABC):
         elif reduction == MetricReduction.GEOMETRIC_MEAN:
             filtered_x = x[~any(x.isnan(), dim=1)]
             return pow(prod(filtered_x), exponent=(1 / filtered_x.shape[0])).item()
+
+    @staticmethod
+    def get_finite_targets_and_preds(
+            targets: Union[Tensor, np.array],
+            pred: Union[Tensor, np.array]
+    ) -> Optional[Tuple[Union[Tensor, np.array], Union[Tensor, np.array]]]:
+        """
+        Gets non-missing targets and predictions.
+
+        Parameters
+        ----------
+        pred : Union[np.array, Tensor]
+            (N,) tensor or array with predicted labels.
+        targets : Union[np.array, Tensor]
+            (N,) tensor or array with ground truth
+
+        Returns
+        -------
+        targets : Union[np.array, Tensor]
+            (M,) tensor or array with ground truth.
+        pred : Union[np.array, Tensor]
+            (M,) tensor or array with predicted labels.
+        """
+        nonmissing_predictions_idx = get_idx_of_nonmissing_predictions(pred)
+        if len(nonmissing_predictions_idx) == 0:
+            return None
+
+        return targets[nonmissing_predictions_idx], pred[nonmissing_predictions_idx]
