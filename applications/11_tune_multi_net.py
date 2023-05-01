@@ -136,7 +136,7 @@ if __name__ == '__main__':
                             ),
                             "kernel_size": IntegerHyperparameter(name="kernel_size", low=3, high=7, step=2),
                             "num_res_units": IntegerHyperparameter(name="num_res_units", low=0, high=3),
-                            "dropout": FloatHyperparameter(name="dropout_cnn", low=0.1, high=0.5)
+                            "dropout": FloatHyperparameter(name="dropout_cnn", low=0.1, high=0.8)
                         }
                     ),
                 }
