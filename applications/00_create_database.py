@@ -23,9 +23,8 @@ from monai.transforms import (
     CenterSpatialCropD,
     Compose,
     KeepLargestConnectedComponentD,
-    ScaleIntensityD,
-    SpatialCropD,
-    ThresholdIntensityD,
+    ScaleIntensityRangeD,
+    SpatialCropD
 )
 
 
@@ -39,27 +38,26 @@ if __name__ == "__main__":
     #                                               Transforms                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
     automatic_crop = [
-        SpatialCropD(keys=["CT", "PET", "Prostate"], roi_slices=[slice(50, 210), slice(None), slice(None)]),
+        SpatialCropD(keys=["CT", "PT", "Prostate"], roi_slices=[slice(50, 210), slice(None), slice(None)]),
         KeepLargestConnectedComponentD(keys=["Prostate"]),
-        CenterSpatialCropD(keys=["CT", "PET", "Prostate"], roi_size=(1000, 160, 160)),
+        CenterSpatialCropD(keys=["CT", "PT", "Prostate"], roi_size=(1000, 160, 160)),
     ]
 
     ideal_crop = [
-        SpatialCropD(keys=["CT", "PET", "Prostate"], roi_slices=[slice(20, 250), slice(None), slice(None)]),
+        SpatialCropD(keys=["CT", "PT", "Prostate"], roi_slices=[slice(20, 250), slice(None), slice(None)]),
         KeepLargestConnectedComponentD(keys=["Prostate"]),
-        MatchingCentroidSpatialCropD(segmentation_key="Prostate", matching_keys=["CT", "PET"], roi_size=(96, 96, 96))
+        MatchingCentroidSpatialCropD(segmentation_key="Prostate", matching_keys=["CT", "PT"], roi_size=(96, 96, 96))
     ]
 
     transforms = Compose(
         [
             ResampleD(keys=["CT"], out_spacing=(1.5, 1.5, 1.5)),
-            MatchingResampleD(reference_image_key="CT", matching_keys=["PET", "Prostate"]),
-            MatchingCropForegroundD(reference_image_key="CT", matching_keys=["PET", "Prostate"]),
+            MatchingResampleD(reference_image_key="CT", matching_keys=["PT", "Prostate"]),
+            MatchingCropForegroundD(reference_image_key="CT", matching_keys=["PT", "Prostate"]),
             *ideal_crop,
-            PETtoSUVD(keys=["PET"]),
-            ThresholdIntensityD(keys=["CT"], threshold=-250, above=True, cval=-250),
-            ThresholdIntensityD(keys=["CT"], threshold=500, above=False, cval=500),
-            ScaleIntensityD(keys=["CT"], minv=0, maxv=1),
+            PETtoSUVD(keys=["PT"]),
+            ScaleIntensityRangeD(keys=["CT"], a_min=-200, a_max=200, b_min=0, b_max=1, clip=True),
+            ScaleIntensityRangeD(keys=["PT"], a_min=0, a_max=25, b_min=0, b_max=1, clip=True)
         ]
     )
 
