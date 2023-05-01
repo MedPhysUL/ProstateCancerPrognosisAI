@@ -107,12 +107,11 @@ if __name__ == '__main__':
                             "hidden_channels": CategoricalHyperparameter(
                                 name="hidden_channels",
                                 choices=[
-                                    "(10, )", "(15, )", "(20, )",
                                     "(10, 10)", "(15, 15)", "(20, 20)",
                                     "(10, 10, 10)", "(15, 15, 15)", "(20, 20, 20)"
                                 ]
                             ),
-                            "dropout": FloatHyperparameter(name="dropout_mlp", low=0, high=0.25)
+                            "dropout": FloatHyperparameter(name="dropout_mlp", low=0.05, high=0.25)
                         }
                     )
                 }
@@ -137,7 +136,7 @@ if __name__ == '__main__':
                             ),
                             "kernel_size": IntegerHyperparameter(name="kernel_size", low=3, high=7, step=2),
                             "num_res_units": IntegerHyperparameter(name="num_res_units", low=0, high=3),
-                            "dropout": FloatHyperparameter(name="dropout_cnn", low=0, high=0.5)
+                            "dropout": FloatHyperparameter(name="dropout_cnn", low=0.1, high=0.5)
                         }
                     ),
                 }
@@ -145,13 +144,14 @@ if __name__ == '__main__':
         }
     )
 
-    learning_algorithm_hyperparameter = LearningAlgorithmHyperparameter(
+    predictor_learning_algorithm_hyperparameter = LearningAlgorithmHyperparameter(
         criterion=CriterionHyperparameter(
             constructor=MeanLoss
         ),
         optimizer=OptimizerHyperparameter(
             constructor=Adam,
-            parameters={"lr": FloatHyperparameter(name="lr", low=1e-5, high=1e-2, log=True)}
+            model_params_getter=lambda model: model.predictor.parameters(),
+            parameters={"lr": FloatHyperparameter(name="lr_predictor", low=1e-4, high=1e-2, log=True)}
         ),
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
@@ -159,11 +159,36 @@ if __name__ == '__main__':
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
-            parameters={"gamma": CategoricalHyperparameter(name="gamma", choices=[0.9, 0.99, 0.999])}
+            parameters={"gamma": CategoricalHyperparameter(name="gamma_predictor", choices=[0.9, 0.99, 0.999])}
         ),
         regularizer=RegularizerHyperparameter(
             constructor=L2Regularizer,
-            parameters={"lambda_": FloatHyperparameter(name="alpha", low=1e-4, high=1e-2, log=True)}
+            model_params_getter=lambda model: model.predictor.parameters(),
+            parameters={"lambda_": FloatHyperparameter(name="alpha_predictor", low=1e-4, high=1e-2, log=True)}
+        )
+    )
+
+    extractor_learning_algorithm_hyperparameter = LearningAlgorithmHyperparameter(
+        criterion=CriterionHyperparameter(
+            constructor=MeanLoss
+        ),
+        optimizer=OptimizerHyperparameter(
+            constructor=Adam,
+            model_params_getter=lambda model: model.extractor.parameters(),
+            parameters={"lr": FloatHyperparameter(name="lr_extractor", low=1e-5, high=1e-2, log=True)}
+        ),
+        early_stopper=EarlyStopperHyperparameter(
+            constructor=MultiTaskLossEarlyStopper,
+            parameters={"patience": 20}
+        ),
+        lr_scheduler=LRSchedulerHyperparameter(
+            constructor=ExponentialLR,
+            parameters={"gamma": CategoricalHyperparameter(name="gamma_extractor", choices=[0.9, 0.99, 0.999])}
+        ),
+        regularizer=RegularizerHyperparameter(
+            constructor=L2Regularizer,
+            model_params_getter=lambda model: model.extractor.parameters(),
+            parameters={"lambda_": FloatHyperparameter(name="alpha_extractor", low=1e-5, high=1e-3, log=True)}
         )
     )
 
@@ -175,7 +200,9 @@ if __name__ == '__main__':
 
     train_method_hyperparameter = TrainMethodHyperparameter(
         model=model_hyperparameter,
-        learning_algorithms=learning_algorithm_hyperparameter
+        learning_algorithms=HyperparameterList(
+            [predictor_learning_algorithm_hyperparameter, extractor_learning_algorithm_hyperparameter]
+        )
     )
 
     objective = TorchObjective(
