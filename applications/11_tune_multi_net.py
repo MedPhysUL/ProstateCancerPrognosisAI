@@ -163,7 +163,7 @@ if __name__ == '__main__':
         ),
         regularizer=RegularizerHyperparameter(
             constructor=L2Regularizer,
-            model_params_getter=lambda model: model.predictor.parameters(),
+            model_params_getter=lambda model: model.predictor.named_parameters(),
             parameters={"lambda_": FloatHyperparameter(name="alpha_predictor", low=1e-4, high=1e-2, log=True)}
         )
     )
@@ -187,7 +187,7 @@ if __name__ == '__main__':
         ),
         regularizer=RegularizerHyperparameter(
             constructor=L2Regularizer,
-            model_params_getter=lambda model: model.extractor.parameters(),
+            model_params_getter=lambda model: model.extractor.named_parameters(),
             parameters={"lambda_": FloatHyperparameter(name="alpha_extractor", low=1e-5, high=1e-3, log=True)}
         )
     )
