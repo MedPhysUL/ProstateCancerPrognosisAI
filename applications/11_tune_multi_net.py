@@ -175,7 +175,7 @@ if __name__ == '__main__':
         optimizer=OptimizerHyperparameter(
             constructor=Adam,
             model_params_getter=lambda model: model.extractor.parameters(),
-            parameters={"lr": FloatHyperparameter(name="lr_extractor", low=1e-5, high=1e-2, log=True)}
+            parameters={"lr": FloatHyperparameter(name="lr_extractor", low=1e-5, high=1e-3, log=True)}
         ),
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
