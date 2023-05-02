@@ -71,13 +71,8 @@ class RegressionMetric(SingleTaskMetric, ABC):
         nonmissing_targets_idx = self.get_idx_of_nonmissing_targets(targets)
         if len(nonmissing_targets_idx) == 0:
             return np.nan
-        targets, pred = targets[nonmissing_targets_idx], pred[nonmissing_targets_idx]
 
-        targets_and_preds = self.get_finite_targets_and_preds(targets, pred)
-        if targets_and_preds:
-            targets, pred = targets_and_preds
-        else:
-            return np.nan
+        targets, pred = targets[nonmissing_targets_idx], pred[nonmissing_targets_idx]
 
         if not is_tensor(pred):
             pred, targets = self.convert_to_tensors(pred, targets)

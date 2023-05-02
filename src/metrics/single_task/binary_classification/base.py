@@ -114,12 +114,6 @@ class BinaryClassificationMetric(SingleTaskMetric, ABC):
             return np.nan
         targets, pred = targets[nonmissing_targets_idx], pred[nonmissing_targets_idx]
 
-        targets_and_preds = self.get_finite_targets_and_preds(targets, pred)
-        if targets_and_preds:
-            targets, pred = targets_and_preds
-        else:
-            return np.nan
-
         if thresh is None:
             thresh = self._threshold
 
