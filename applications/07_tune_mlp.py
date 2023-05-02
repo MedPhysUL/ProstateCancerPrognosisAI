@@ -115,7 +115,7 @@ if __name__ == '__main__':
             ),
             regularizer=RegularizerHyperparameter(
                 constructor=L2Regularizer,
-                parameters={"lambda_": FloatHyperparameter(name="alpha", low=1e-4, high=1e-2, log=True)}
+                parameters={"lambda_": FloatHyperparameter(name="alpha", low=1e-5, high=1e-2, log=True)}
             )
         )
 
