@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
         search_algo = SearchAlgorithm(
             sampler=TPESampler(
-                n_startup_trials=10,
+                n_startup_trials=5,
                 multivariate=True,
                 seed=SEED
             ),
@@ -78,7 +78,7 @@ if __name__ == '__main__':
         tuner = Tuner(
             search_algorithm=search_algo,
             recorder=TuningRecorder(path_to_record_folder=path_to_record_folder),
-            n_trials=50,
+            n_trials=30,
             seed=SEED
         )
 
@@ -88,10 +88,7 @@ if __name__ == '__main__':
                 "activation": FixedHyperparameter(name="activation", value="PReLU"),
                 "hidden_channels": CategoricalHyperparameter(
                     name="hidden_channels",
-                    choices=[
-                        "(5, 5)", "(10, 10)", "(15, 15)",
-                        "(5, 5, 5)", "(10, 10, 10)", "(15, 15, 15)"
-                    ]
+                    choices=["(5, 5, 5)", "(10, 10, 10)", "(15, 15, 15)"]
                 ),
                 "dropout": FloatHyperparameter(name="dropout", low=0.05, high=0.25)
             }
@@ -103,7 +100,10 @@ if __name__ == '__main__':
             ),
             optimizer=OptimizerHyperparameter(
                 constructor=Adam,
-                parameters={"lr": FloatHyperparameter(name="lr", low=1e-4, high=1e-2, log=True)}
+                parameters={
+                    "lr": FloatHyperparameter(name="lr", low=1e-4, high=1e-2, log=True),
+                    "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-4, high=1e-1, log=True)
+                }
             ),
             early_stopper=EarlyStopperHyperparameter(
                 constructor=MultiTaskLossEarlyStopper,
@@ -111,7 +111,7 @@ if __name__ == '__main__':
             ),
             lr_scheduler=LRSchedulerHyperparameter(
                 constructor=ExponentialLR,
-                parameters={"gamma": CategoricalHyperparameter(name="gamma", choices=[0.9, 0.99, 0.999])}
+                parameters={"gamma": FixedHyperparameter(name="gamma", value=0.99)}
             ),
             regularizer=RegularizerHyperparameter(
                 constructor=L2Regularizer,
