@@ -88,7 +88,7 @@ if __name__ == '__main__':
                 "activation": FixedHyperparameter(name="activation", value="PReLU"),
                 "hidden_channels": CategoricalHyperparameter(
                     name="hidden_channels",
-                    choices=["(5, 5, 5)", "(10, 10, 10)", "(15, 15, 15)"]
+                    choices=["(10, 10, 10)", "(20, 20, 20)", "(30, 30, 30)"]
                 ),
                 "dropout": FloatHyperparameter(name="dropout", low=0.05, high=0.25)
             }
@@ -101,7 +101,7 @@ if __name__ == '__main__':
             optimizer=OptimizerHyperparameter(
                 constructor=Adam,
                 parameters={
-                    "lr": FloatHyperparameter(name="lr", low=1e-4, high=1e-2, log=True),
+                    "lr": FloatHyperparameter(name="lr", low=1e-4, high=1e-1, log=True),
                     "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-4, high=1e-1, log=True)
                 }
             ),
