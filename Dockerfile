@@ -71,7 +71,7 @@ COPY applications/local_data/masks /workspace/applications/local_data/masks
 # Create launcher
 RUN echo "#!/bin/bash" >> /workspace/run_tuner.sh
 RUN echo "cd /workspace/applications" >> /workspace/run_tuner.sh
-RUN echo "python3.11 main.py" >> /workspace/run_tuner.sh
+RUN echo "python3.11 \${1}" >> /workspace/run_tuner.sh
 RUN chmod a+x /workspace/run_tuner.sh
 
 ENTRYPOINT ["/workspace/run_tuner.sh"]
