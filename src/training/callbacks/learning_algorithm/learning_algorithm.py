@@ -14,6 +14,7 @@ from itertools import count
 from typing import Dict, Iterable, Optional, Union
 
 from torch import Tensor
+from torch.nn.utils import clip_grad_norm_
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
@@ -67,6 +68,7 @@ class LearningAlgorithm(TrainingCallback):
         name = name if name else f"{self.__class__.__name__}({self.instance_id})"
         super().__init__(name=name, **kwargs)
 
+        self.clip_grad_max_norm = kwargs.get("clip_grad_max_norm", 10.0)
         self.criterion = criterion
         self.early_stopper = early_stopper
         self.lr_scheduler = lr_scheduler
@@ -254,6 +256,7 @@ class LearningAlgorithm(TrainingCallback):
         self.optimizer.zero_grad()
         batch_loss = self._compute_loss(pred_batch, y_batch, trainer)
         batch_loss.backward(retain_graph=True)
+        clip_grad_norm_(self.optimizer.param_groups[0]["params"], self.clip_grad_max_norm)
         self.optimizer.step()
 
     def on_optimization_start(self, trainer, **kwargs):
