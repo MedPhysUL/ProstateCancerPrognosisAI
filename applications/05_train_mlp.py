@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     dataset = ProstateCancerDataset(table_dataset=table_dataset)
 
-    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=2, l=2)
+    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=3)
 
     dataset.update_masks(
         train_mask=masks[0][Mask.TRAIN],
@@ -52,14 +52,15 @@ if __name__ == '__main__':
     model = MLP(
         multi_task_mode="separated",
         activation="PRELU",
-        dropout=0.2,
+        hidden_channels=(100, 100, 100),
+        dropout=0.1,
         device=torch.device("cuda"),
         seed=SEED
     ).build(dataset)
 
     optimizer = Adam(
         params=model.parameters(),
-        lr=2e-4,
+        lr=1e-3,
         weight_decay=0.02
     )
 
@@ -68,14 +69,14 @@ if __name__ == '__main__':
         optimizer=optimizer,
         lr_scheduler=ExponentialLR(optimizer=optimizer, gamma=0.99),
         early_stopper=MultiTaskLossEarlyStopper(patience=20),
-        regularizer=L2Regularizer(model.named_parameters(), lambda_=0.01)
+        regularizer=L2Regularizer(model.named_parameters(), lambda_=0.006)
     )
 
     trainer = Trainer(
-        batch_size=8,
-        checkpoint=Checkpoint(),
+        batch_size=16,
+        # checkpoint=Checkpoint(),
         exec_metrics_on_train=True,
-        n_epochs=50,
+        n_epochs=100,
         seed=SEED
     )
 

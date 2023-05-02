@@ -40,7 +40,7 @@ if __name__ == '__main__':
 
     dataset = ProstateCancerDataset(table_dataset=table_dataset)
 
-    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=2, l=2)
+    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=3)
 
     dataset.update_masks(
         train_mask=masks[0][Mask.TRAIN],
