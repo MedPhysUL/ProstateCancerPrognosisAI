@@ -106,10 +106,7 @@ if __name__ == '__main__':
                             "multi_task_mode": "separated",
                             "hidden_channels": CategoricalHyperparameter(
                                 name="hidden_channels",
-                                choices=[
-                                    "(10, 10)", "(15, 15)", "(20, 20)",
-                                    "(10, 10, 10)", "(15, 15, 15)", "(20, 20, 20)"
-                                ]
+                                choices=["(10, 10, 10)", "(15, 15, 15)", "(20, 20, 20)"]
                             ),
                             "dropout": FloatHyperparameter(name="dropout_mlp", low=0.05, high=0.25)
                         }
@@ -130,12 +127,12 @@ if __name__ == '__main__':
                             "channels": CategoricalHyperparameter(
                                 name="channels",
                                 choices=[
-                                    "(4, 8, 16, 32)", "(8, 16, 32, 64)", "(16, 32, 64, 128)",
-                                    "(4, 8, 16, 32, 64)", "(8, 16, 32, 64, 128)", "(16, 32, 64, 128, 256)"
+                                    "(4, 8, 16, 32, 64)", "(8, 16, 32, 64, 128)", "(16, 32, 64, 128, 256)",
+                                    "(32, 64, 128, 256, 512)"
                                 ]
                             ),
-                            "kernel_size": IntegerHyperparameter(name="kernel_size", low=3, high=7, step=2),
-                            "num_res_units": IntegerHyperparameter(name="num_res_units", low=0, high=3),
+                            "kernel_size": FixedHyperparameter(name="kernel_size", value=3),
+                            "num_res_units": FixedHyperparameter(name="num_res_units", value=3),
                             "dropout": FloatHyperparameter(name="dropout_cnn", low=0.1, high=0.8)
                         }
                     ),
@@ -151,7 +148,10 @@ if __name__ == '__main__':
         optimizer=OptimizerHyperparameter(
             constructor=Adam,
             model_params_getter=lambda model: model.predictor.parameters(),
-            parameters={"lr": FloatHyperparameter(name="lr_predictor", low=1e-4, high=1e-2, log=True)}
+            parameters={
+                "lr": FloatHyperparameter(name="lr_predictor", low=1e-4, high=1e-2, log=True),
+                "weight_decay": FloatHyperparameter(name="weight_decay_predictor", low=1e-4, high=1e-1, log=True)
+            }
         ),
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
@@ -159,12 +159,12 @@ if __name__ == '__main__':
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
-            parameters={"gamma": CategoricalHyperparameter(name="gamma_predictor", choices=[0.9, 0.99, 0.999])}
+            parameters={"gamma": FixedHyperparameter(name="gamma_predictor", value=0.99)}
         ),
         regularizer=RegularizerHyperparameter(
             constructor=L2Regularizer,
             model_params_getter=lambda model: model.predictor.named_parameters(),
-            parameters={"lambda_": FloatHyperparameter(name="alpha_predictor", low=1e-4, high=1e-2, log=True)}
+            parameters={"lambda_": FloatHyperparameter(name="alpha_predictor", low=1e-5, high=1e-2, log=True)}
         )
     )
 
@@ -175,7 +175,10 @@ if __name__ == '__main__':
         optimizer=OptimizerHyperparameter(
             constructor=Adam,
             model_params_getter=lambda model: model.extractor.parameters(),
-            parameters={"lr": FloatHyperparameter(name="lr_extractor", low=1e-5, high=1e-3, log=True)}
+            parameters={
+                "lr": FloatHyperparameter(name="lr_extractor", low=1e-5, high=1e-3, log=True),
+                "weight_decay": FloatHyperparameter(name="weight_decay_extractor", low=1e-4, high=1e-1, log=True)
+            }
         ),
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
@@ -183,12 +186,12 @@ if __name__ == '__main__':
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
-            parameters={"gamma": CategoricalHyperparameter(name="gamma_extractor", choices=[0.9, 0.99, 0.999])}
+            parameters={"gamma": FixedHyperparameter(name="gamma_extractor", value=0.99)}
         ),
         regularizer=RegularizerHyperparameter(
             constructor=L2Regularizer,
             model_params_getter=lambda model: model.extractor.named_parameters(),
-            parameters={"lambda_": FloatHyperparameter(name="alpha_extractor", low=1e-5, high=1e-3, log=True)}
+            parameters={"lambda_": FloatHyperparameter(name="alpha_extractor", low=1e-6, high=1e-3, log=True)}
         )
     )
 
