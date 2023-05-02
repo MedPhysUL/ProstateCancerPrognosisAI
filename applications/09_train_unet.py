@@ -66,7 +66,7 @@ if __name__ == '__main__':
         early_stopper=MultiTaskLossEarlyStopper(patience=20)
     )
     trainer = Trainer(
-        batch_size=8,
+        batch_size=16,
         checkpoint=Checkpoint(),
         exec_metrics_on_train=True,
         n_epochs=150,
