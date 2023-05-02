@@ -155,7 +155,7 @@ if __name__ == '__main__':
         ),
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
-            parameters={"patience": 20}
+            parameters={"patience": 10}
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
@@ -182,7 +182,7 @@ if __name__ == '__main__':
         ),
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
-            parameters={"patience": 20}
+            parameters={"patience": 10}
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
