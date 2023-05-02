@@ -106,7 +106,7 @@ if __name__ == '__main__':
                             "multi_task_mode": "separated",
                             "hidden_channels": CategoricalHyperparameter(
                                 name="hidden_channels",
-                                choices=["(10, 10, 10)", "(20, 20, 20)", "(30, 30, 30)"]
+                                choices=["(20, 20, 20)", "(30, 30, 30)", "(40, 40, 40)"]
                             ),
                             "dropout": FloatHyperparameter(name="dropout_mlp", low=0.05, high=0.25)
                         }
