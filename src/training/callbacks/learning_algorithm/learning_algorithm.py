@@ -68,7 +68,7 @@ class LearningAlgorithm(TrainingCallback):
         name = name if name else f"{self.__class__.__name__}({self.instance_id})"
         super().__init__(name=name, **kwargs)
 
-        self.clip_grad_max_norm = kwargs.get("clip_grad_max_norm", 5.0)
+        self.clip_grad_max_norm = kwargs.get("clip_grad_max_norm", 3.0)
         self.criterion = criterion
         self.early_stopper = early_stopper
         self.lr_scheduler = lr_scheduler
