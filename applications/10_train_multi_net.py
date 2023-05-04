@@ -99,7 +99,7 @@ if __name__ == '__main__':
         criterion=MeanLoss(tasks=PN_TASK),
         optimizer=optimizer_mlp,
         lr_scheduler=ExponentialLR(optimizer=optimizer_mlp, gamma=0.99),
-        early_stopper=MultiTaskLossEarlyStopper(patience=20),
+        early_stopper=MultiTaskLossEarlyStopper(patience=10),
         regularizer=L2Regularizer(mlp.named_parameters(), lambda_=0.01)
     )
 
@@ -113,7 +113,7 @@ if __name__ == '__main__':
         criterion=MeanLoss(tasks=PN_TASK),
         optimizer=optimizer_cnn,
         lr_scheduler=ExponentialLR(optimizer=optimizer_cnn, gamma=0.99),
-        early_stopper=MultiTaskLossEarlyStopper(patience=20),
+        early_stopper=MultiTaskLossEarlyStopper(patience=10),
         regularizer=L2Regularizer(cnn.named_parameters(), lambda_=0.02)
     )
 
@@ -129,7 +129,7 @@ if __name__ == '__main__':
     )
 
     trainer = Trainer(
-        batch_size=8,
+        batch_size=16,
         checkpoint=Checkpoint(),
         exec_metrics_on_train=True,
         n_epochs=100,

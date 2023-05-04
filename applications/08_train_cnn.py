@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
     dataset = ProstateCancerDataset(image_dataset=image_dataset, table_dataset=table_dataset)
 
-    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=2, l=2)
+    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=3)
 
     dataset.update_masks(
         train_mask=masks[0][Mask.TRAIN],
@@ -78,11 +78,11 @@ if __name__ == '__main__':
         criterion=MeanLoss(),
         optimizer=optimizer,
         lr_scheduler=ExponentialLR(optimizer=optimizer, gamma=0.99),
-        early_stopper=MultiTaskLossEarlyStopper(patience=20),
+        early_stopper=MultiTaskLossEarlyStopper(patience=10),
         regularizer=L2Regularizer(model.named_parameters(), lambda_=0.02)
     )
     trainer = Trainer(
-        batch_size=8,
+        batch_size=16,
         checkpoint=Checkpoint(),
         exec_metrics_on_train=True,
         n_epochs=100,

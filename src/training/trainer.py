@@ -55,7 +55,7 @@ class Trainer:
 
     def __init__(
             self,
-            batch_size: int = 16,
+            batch_size: int = 8,
             checkpoint: Checkpoint = None,
             device: Optional[torch_device] = None,
             exec_metrics_on_train: bool = True,
@@ -72,7 +72,7 @@ class Trainer:
         Parameters
         ----------
         batch_size : int
-            Size of the batches in the training loader. Default is 16.
+            Size of the batches in the training loader. Default is 8.
         checkpoint : Checkpoint
              Checkpoint used to manage and create the checkpoints of a model during the training process.
         device : Optional[torch_device]
