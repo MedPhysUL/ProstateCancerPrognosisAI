@@ -8,10 +8,11 @@
     @Description:       This file is used to define the abstract `Direction` class.
 """
 
-from enum import auto, StrEnum
+from enum import auto
+from strenum import LowercaseStrEnum
 
 
-class Direction(StrEnum):
+class Direction(LowercaseStrEnum):
     """
     Custom enum for optimization directions
     """
