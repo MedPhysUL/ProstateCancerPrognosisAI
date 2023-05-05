@@ -32,21 +32,17 @@ RUN python3.11 --version
 
 RUN pip3.11 --version
 
-RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117
-
-RUN python3.11 -c "import torch; print(torch.__version__)"
-
-RUN pip3 install numpy==1.24.2
-
 RUN mkdir /workspace
 
 RUN mkdir /workspace/src
 
 COPY src /workspace/src
 
-COPY requirements_docker.txt /workspace
+COPY requirements.txt /workspace
 
-RUN pip3 install -r /workspace/requirements_docker.txt
+RUN pip3 install -r /workspace/requirements.txt --extra-index-url https://download.pytorch.org/whl/cu117
+
+RUN python3.11 -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
 
 RUN mkdir /workspace/applications
 
