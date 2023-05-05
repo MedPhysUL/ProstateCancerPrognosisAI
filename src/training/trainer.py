@@ -198,6 +198,7 @@ class Trainer:
                 "'learning_algorithms' should be of type 'LearningAlgorithm' or 'Sequence[LearningAlgorithm]'"
             )
 
+        self._learning_algorithms[-1].is_last = True
         self._build_callbacks()
 
     @property

@@ -71,6 +71,7 @@ class LearningAlgorithm(TrainingCallback):
         self.clip_grad_max_norm = kwargs.get("clip_grad_max_norm", 3.0)
         self.criterion = criterion
         self.early_stopper = early_stopper
+        self.is_last = False
         self.lr_scheduler = lr_scheduler
         self.optimizer = optimizer
         self.regularizer = RegularizerList(regularizer)
@@ -255,7 +256,10 @@ class LearningAlgorithm(TrainingCallback):
         """
         self.optimizer.zero_grad()
         batch_loss = self._compute_loss(pred_batch, y_batch, trainer)
-        batch_loss.backward(retain_graph=True)
+        if self.is_last:
+            batch_loss.backward()
+        else:
+            batch_loss.backward(retain_graph=True)
         clip_grad_norm_(self.optimizer.param_groups[0]["params"], self.clip_grad_max_norm)
         self.optimizer.step()
 
