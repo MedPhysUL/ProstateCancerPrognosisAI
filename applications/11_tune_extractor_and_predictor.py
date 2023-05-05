@@ -27,14 +27,14 @@ from src.tuning import SearchAlgorithm, TorchObjective, Tuner
 from src.tuning.callbacks import TuningRecorder
 
 from src.tuning.hyperparameters.containers import (
-    HyperparameterList
+    HyperparameterList,
+    HyperparameterObject
 )
 from src.tuning.hyperparameters.optuna import (
     CategoricalHyperparameter,
     FixedHyperparameter,
     FloatHyperparameter
 )
-from src.tuning.hyperparameters.containers import HyperparameterObject
 from src.tuning.hyperparameters.torch import (
     CheckpointHyperparameter,
     CriterionHyperparameter,
