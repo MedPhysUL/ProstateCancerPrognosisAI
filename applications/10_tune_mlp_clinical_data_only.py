@@ -1,5 +1,5 @@
 """
-    @file:              07_tune_mlp.py
+    @file:              10_tune_mlp.py
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
@@ -24,14 +24,10 @@ from src.training.callbacks.learning_algorithm import L2Regularizer, MultiTaskLo
 from src.tuning import SearchAlgorithm, TorchObjective, Tuner
 from src.tuning.callbacks import TuningRecorder
 
-from src.tuning.hyperparameters.containers import (
-    HyperparameterList
-)
 from src.tuning.hyperparameters.optuna import (
     CategoricalHyperparameter,
     FixedHyperparameter,
-    FloatHyperparameter,
-    IntegerHyperparameter
+    FloatHyperparameter
 )
 from src.tuning.hyperparameters.torch import (
     CheckpointHyperparameter,
@@ -107,7 +103,7 @@ if __name__ == '__main__':
             ),
             early_stopper=EarlyStopperHyperparameter(
                 constructor=MultiTaskLossEarlyStopper,
-                parameters={"patience": 10}
+                parameters={"patience": 20}
             ),
             lr_scheduler=LRSchedulerHyperparameter(
                 constructor=ExponentialLR,

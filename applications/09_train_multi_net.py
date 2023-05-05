@@ -1,5 +1,5 @@
 """
-    @file:              10_train_multi_net.py
+    @file:              09_train_multi_net.py
     @Author:            Maxence Larose
 
     @Creation Date:     04/2023
@@ -10,12 +10,11 @@
 
 import env_apps
 
+from delia.databases import PatientsDatabase
 import pandas as pd
 import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
-
-from delia.databases import PatientsDatabase
 
 from constants import *
 from src.data.processing.sampling import extract_masks, Mask

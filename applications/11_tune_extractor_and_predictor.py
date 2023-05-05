@@ -1,20 +1,20 @@
 """
-    @file:              07_tune_mlp.py
+    @file:              11_tune_extractor_and_predictor.py
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
-    @Last modification: 03/2023
+    @Last modification: 05/2023
 
-    @Description:       This script is used to tune an MLP model.
+    @Description:       This script is used to tune a multi-net model.
 """
 
 import env_apps
+
+from delia.databases import PatientsDatabase
 from optuna.samplers import TPESampler
 import pandas as pd
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
-
-from delia.databases import PatientsDatabase
 
 from constants import *
 from src.data.datasets import ImageDataset, ProstateCancerDataset, TableDataset
@@ -27,15 +27,14 @@ from src.tuning import SearchAlgorithm, TorchObjective, Tuner
 from src.tuning.callbacks import TuningRecorder
 
 from src.tuning.hyperparameters.containers import (
-    HyperparameterList
+    HyperparameterList,
+    HyperparameterObject
 )
 from src.tuning.hyperparameters.optuna import (
     CategoricalHyperparameter,
     FixedHyperparameter,
-    FloatHyperparameter,
-    IntegerHyperparameter
+    FloatHyperparameter
 )
-from src.tuning.hyperparameters.containers import HyperparameterObject
 from src.tuning.hyperparameters.torch import (
     CheckpointHyperparameter,
     CriterionHyperparameter,
@@ -155,7 +154,7 @@ if __name__ == '__main__':
         ),
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
-            parameters={"patience": 10}
+            parameters={"patience": 20}
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
@@ -182,7 +181,7 @@ if __name__ == '__main__':
         ),
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
-            parameters={"patience": 10}
+            parameters={"patience": 20}
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
@@ -197,7 +196,8 @@ if __name__ == '__main__':
 
     trainer_hyperparameter = TrainerHyperparameter(
         batch_size=16,
-        n_epochs=100
+        n_epochs=100,
+        verbose=False
         # checkpoint=CheckpointHyperparameter(save_freq=20)
     )
 
