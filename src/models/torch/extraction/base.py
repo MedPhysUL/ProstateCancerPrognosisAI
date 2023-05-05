@@ -11,10 +11,9 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from ast import literal_eval
-from enum import auto
+from enum import auto, StrEnum
 from typing import Dict, List, Optional, Sequence, Union
 
-from strenum import LowercaseStrEnum
 from torch import cat, Tensor
 from torch import device as torch_device
 from torch.nn import Linear, Module, ModuleDict
@@ -24,7 +23,7 @@ from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDatase
 from ....tasks import SegmentationTask
 
 
-class MergingMethod(LowercaseStrEnum):
+class MergingMethod(StrEnum):
     """
     This class is used to define the merging method used to merge the extracted radiomics. It can be either
     concatenation or multiplication.
@@ -40,7 +39,7 @@ class MergingMethod(LowercaseStrEnum):
     MULTIPLICATION = auto()
 
 
-class ModelMode(LowercaseStrEnum):
+class ModelMode(StrEnum):
     """
     This class is used to define the mode of the model. It can be either extraction or prediction. If 'extraction', the
     model will extract deep radiomics from the images. If 'prediction', the model will perform predictions using the
@@ -57,7 +56,7 @@ class ModelMode(LowercaseStrEnum):
     PREDICTION = auto()
 
 
-class MultiTaskMode(LowercaseStrEnum):
+class MultiTaskMode(StrEnum):
     """
     This class is used to define the multi-task mode of the model. It can be either separated, partly shared or fully
     shared.

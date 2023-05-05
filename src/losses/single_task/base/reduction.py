@@ -8,11 +8,10 @@
     @Description:       This file is used to define the abstract `LossReduction` class.
 """
 
-from enum import auto
-from strenum import LowercaseStrEnum
+from enum import auto, StrEnum
 
 
-class LossReduction(LowercaseStrEnum):
+class LossReduction(StrEnum):
     """
     Custom enum for reduction methods used to reduce the losses of multiple samples to a common loss.
     """

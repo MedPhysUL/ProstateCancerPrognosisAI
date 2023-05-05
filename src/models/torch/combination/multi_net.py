@@ -9,10 +9,9 @@
 """
 
 from __future__ import annotations
-from enum import auto
+from enum import auto, StrEnum
 from typing import Any, Callable, Dict, Mapping, NamedTuple, Optional, Union
 
-from strenum import LowercaseStrEnum
 from torch import device as torch_device
 from torch import sigmoid, Tensor
 
@@ -23,7 +22,7 @@ from ..prediction.base import InputMode, Predictor
 from ..segmentation.base import Segmentor
 
 
-class SegmentationMap(LowercaseStrEnum):
+class SegmentationMap(StrEnum):
     """
     Enum for the segmentation map type.
 

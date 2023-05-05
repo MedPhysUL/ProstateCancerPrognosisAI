@@ -8,11 +8,10 @@
     @Description:       This file is used to define the abstract `MetricReduction` class.
 """
 
-from enum import auto
-from strenum import LowercaseStrEnum
+from enum import auto, StrEnum
 
 
-class MetricReduction(LowercaseStrEnum):
+class MetricReduction(StrEnum):
     """
     Custom enum for reduction methods used to reduce the scores of multiple samples to a common score.
     """

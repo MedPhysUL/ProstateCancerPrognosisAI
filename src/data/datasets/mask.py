@@ -8,11 +8,10 @@
     @Description:       This file contains the 'Mask' enum class.
 """
 
-from enum import auto
-from strenum import LowercaseStrEnum
+from enum import auto, StrEnum
 
 
-class Mask(LowercaseStrEnum):
+class Mask(StrEnum):
     """
     Stores the constant related to mask categories.
     """

@@ -10,10 +10,9 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from enum import auto
+from enum import auto, StrEnum
 from typing import Dict, Optional, Sequence, Union
 
-from strenum import LowercaseStrEnum
 from torch import cat, stack, Tensor
 from torch import device as torch_device
 from torch.nn import Module, ModuleDict
@@ -23,7 +22,7 @@ from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDatase
 from ....tasks.base import TableTask
 
 
-class InputMode(LowercaseStrEnum):
+class InputMode(StrEnum):
     """
     The input mode of the model. Available modes are 'tabular', 'radiomics' and 'hybrid'. Defaults to 'tabular'.
 
@@ -41,7 +40,7 @@ class InputMode(LowercaseStrEnum):
     TABULAR = auto()
 
 
-class MultiTaskMode(LowercaseStrEnum):
+class MultiTaskMode(StrEnum):
     """
     This class is used to define the multi-task mode of the model. It can be either 'separated' or 'fully_shared'.
 
