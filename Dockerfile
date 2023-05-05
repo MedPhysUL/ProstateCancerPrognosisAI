@@ -52,7 +52,19 @@ COPY applications/env_apps.py /workspace/applications
 
 COPY applications/logging_conf.yaml /workspace/applications
 
-COPY applications/main.py /workspace/applications
+COPY applications/main_BCR.py /workspace/applications
+
+COPY applications/main_PN.py /workspace/applications
+
+COPY applications/main_METASTASIS.py /workspace/applications
+
+COPY applications/main_CRPC.py /workspace/applications
+
+COPY applications/main_SVI.py /workspace/applications
+
+COPY applications/main_EE.py /workspace/applications
+
+COPY applications/main_DEATH.py /workspace/applications
 
 RUN mkdir /workspace/applications/local_data
 
