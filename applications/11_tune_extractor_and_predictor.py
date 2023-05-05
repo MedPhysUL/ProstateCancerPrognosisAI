@@ -1,11 +1,11 @@
 """
-    @file:              07_tune_mlp.py
+    @file:              11_tune_extractor_and_predictor.py
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
-    @Last modification: 03/2023
+    @Last modification: 05/2023
 
-    @Description:       This script is used to tune an MLP model.
+    @Description:       This script is used to tune a multi-net model.
 """
 
 import env_apps
