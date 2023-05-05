@@ -9,12 +9,12 @@
 """
 
 import env_apps
+
+from delia.databases import PatientsDatabase
 from optuna.samplers import TPESampler
 import pandas as pd
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
-
-from delia.databases import PatientsDatabase
 
 from constants import *
 from src.data.datasets import ImageDataset, ProstateCancerDataset, TableDataset
@@ -32,8 +32,7 @@ from src.tuning.hyperparameters.containers import (
 from src.tuning.hyperparameters.optuna import (
     CategoricalHyperparameter,
     FixedHyperparameter,
-    FloatHyperparameter,
-    IntegerHyperparameter
+    FloatHyperparameter
 )
 from src.tuning.hyperparameters.containers import HyperparameterObject
 from src.tuning.hyperparameters.torch import (

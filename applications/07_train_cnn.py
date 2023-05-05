@@ -10,12 +10,12 @@
 
 import env_apps
 
+from delia.databases import PatientsDatabase
 import pandas as pd
 import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 
-from delia.databases import PatientsDatabase
 
 from constants import *
 from src.data.processing.sampling import extract_masks, Mask

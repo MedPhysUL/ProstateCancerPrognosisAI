@@ -24,14 +24,10 @@ from src.training.callbacks.learning_algorithm import L2Regularizer, MultiTaskLo
 from src.tuning import SearchAlgorithm, TorchObjective, Tuner
 from src.tuning.callbacks import TuningRecorder
 
-from src.tuning.hyperparameters.containers import (
-    HyperparameterList
-)
 from src.tuning.hyperparameters.optuna import (
     CategoricalHyperparameter,
     FixedHyperparameter,
-    FloatHyperparameter,
-    IntegerHyperparameter
+    FloatHyperparameter
 )
 from src.tuning.hyperparameters.torch import (
     CheckpointHyperparameter,
