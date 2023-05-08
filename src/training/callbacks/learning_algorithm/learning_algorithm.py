@@ -222,23 +222,6 @@ class LearningAlgorithm(TrainingCallback):
 
         return loss_with_regularization if loss_with_regularization else loss_without_regularization
 
-    def on_fit_start(self, trainer, **kwargs):
-        """
-        Sets criterion tasks.
-
-        Parameters
-        ----------
-        trainer : Trainer
-            The trainer.
-        kwargs : dict
-            Keyword arguments.
-        """
-        if not self.criterion.tasks:
-            self.criterion.tasks = trainer.training_state.tasks
-
-        if self.early_stopper:
-            self.early_stopper.on_fit_start(self, trainer)
-
     def _compute_grad(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor], trainer):
         """
         Computes gradients.
@@ -259,13 +242,42 @@ class LearningAlgorithm(TrainingCallback):
             batch_loss.backward(retain_graph=True)
 
         clip_grad_norm_(self._params, self.clip_grad_max_norm)
+        self._set_current_grads()
 
+    def _set_current_grads(self):
+        """
+        Sets current gradients.
+        """
         self._current_grads = []
         for param in self._params:
             if param.grad is not None:
                 self._current_grads.append(param.grad.detach().clone())
             else:
                 self._current_grads.append(None)
+
+    def _set_params_grads(self):
+        """
+        Sets parameter gradients.
+        """
+        for i, param in enumerate(self._params):
+            param.grad = self._current_grads[i]
+
+    def on_fit_start(self, trainer, **kwargs):
+        """
+        Sets criterion tasks.
+
+        Parameters
+        ----------
+        trainer : Trainer
+            The trainer.
+        kwargs : dict
+            Keyword arguments.
+        """
+        if not self.criterion.tasks:
+            self.criterion.tasks = trainer.training_state.tasks
+
+        if self.early_stopper:
+            self.early_stopper.on_fit_start(self, trainer)
 
     def on_optimization_start(self, trainer, **kwargs):
         """
@@ -296,8 +308,7 @@ class LearningAlgorithm(TrainingCallback):
             Keyword arguments.
         """
         self.optimizer.zero_grad()
-        for i, param in enumerate(self._params):
-            param.grad = self._current_grads[i]
+        self._set_params_grads()
         self.optimizer.step()
         self.optimizer.zero_grad()
 
