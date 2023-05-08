@@ -77,6 +77,9 @@ class LearningAlgorithm(TrainingCallback):
         self.regularizer = RegularizerList(regularizer)
         self.stopped = False
 
+        self._current_grads = []
+        self._params = [param_group['params'] for param_group in optimizer.param_groups]
+
     @property
     def priority(self) -> int:
         """
@@ -236,9 +239,9 @@ class LearningAlgorithm(TrainingCallback):
         if self.early_stopper:
             self.early_stopper.on_fit_start(self, trainer)
 
-    def _optimizer_step(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor], trainer):
+    def _compute_grad(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor], trainer):
         """
-        Performs an optimizer step, i.e computes loss and performs backward pass.
+        Computes gradients.
 
         Parameters
         ----------
@@ -248,20 +251,21 @@ class LearningAlgorithm(TrainingCallback):
             Targets.
         trainer : Trainer
             The trainer.
-
-        Returns
-        -------
-        batch_loss : Tensor
-            Tensor with loss value.
         """
-        self.optimizer.zero_grad()
         batch_loss = self._compute_loss(pred_batch, y_batch, trainer)
         if self.is_last:
             batch_loss.backward()
         else:
             batch_loss.backward(retain_graph=True)
-        clip_grad_norm_(self.optimizer.param_groups[0]["params"], self.clip_grad_max_norm)
-        self.optimizer.step()
+
+        clip_grad_norm_(self._params, self.clip_grad_max_norm)
+
+        self._current_grads = []
+        for param in self._params:
+            if param.grad is not None:
+                self._current_grads.append(param.grad.detach().clone())
+            else:
+                self._current_grads.append(None)
 
     def on_optimization_start(self, trainer, **kwargs):
         """
@@ -274,9 +278,11 @@ class LearningAlgorithm(TrainingCallback):
         kwargs : dict
             Keyword arguments.
         """
+        trainer.model.zero_grad()
         pred_batch = trainer.batch_state.pred
         y_batch = trainer.batch_state.y
-        self._optimizer_step(pred_batch, y_batch, trainer)
+        self._compute_grad(pred_batch, y_batch, trainer)
+        trainer.model.zero_grad()
 
     def on_optimization_end(self, trainer, **kwargs):
         """
@@ -289,6 +295,10 @@ class LearningAlgorithm(TrainingCallback):
         kwargs : dict
             Keyword arguments.
         """
+        self.optimizer.zero_grad()
+        for i, param in enumerate(self._params):
+            param.grad = self._current_grads[i]
+        self.optimizer.step()
         self.optimizer.zero_grad()
 
     def on_validation_batch_end(self, trainer, **kwargs):
