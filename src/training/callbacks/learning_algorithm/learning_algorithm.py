@@ -78,7 +78,7 @@ class LearningAlgorithm(TrainingCallback):
         self.stopped = False
 
         self._current_grads = []
-        self._params = [param_group['params'] for param_group in optimizer.param_groups]
+        self._params = [param for group in optimizer.param_groups for param in group['params']]
 
     @property
     def priority(self) -> int:
