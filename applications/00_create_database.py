@@ -37,29 +37,17 @@ if __name__ == "__main__":
     # ----------------------------------------------------------------------------------------------------------- #
     #                                               Transforms                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
-    automatic_crop = [
-        SpatialCropD(keys=["CT", "PT", "Prostate"], roi_slices=[slice(50, 210), slice(None), slice(None)]),
+    transforms = Compose([
+        ResampleD(keys=["CT"], out_spacing=(1.0, 1.0, 1.0)),
+        MatchingResampleD(reference_image_key="CT", matching_keys=["PT", "Prostate"]),
+        MatchingCropForegroundD(reference_image_key="CT", matching_keys=["PT", "Prostate"]),
+        SpatialCropD(keys=["CT", "PT", "Prostate"], roi_slices=[slice(30, 740), slice(None), slice(None)]),
         KeepLargestConnectedComponentD(keys=["Prostate"]),
-        CenterSpatialCropD(keys=["CT", "PT", "Prostate"], roi_size=(1000, 160, 160)),
-    ]
-
-    ideal_crop = [
-        SpatialCropD(keys=["CT", "PT", "Prostate"], roi_slices=[slice(20, 250), slice(None), slice(None)]),
-        KeepLargestConnectedComponentD(keys=["Prostate"]),
-        MatchingCentroidSpatialCropD(segmentation_key="Prostate", matching_keys=["CT", "PT"], roi_size=(96, 96, 96))
-    ]
-
-    transforms = Compose(
-        [
-            ResampleD(keys=["CT"], out_spacing=(1.5, 1.5, 1.5)),
-            MatchingResampleD(reference_image_key="CT", matching_keys=["PT", "Prostate"]),
-            MatchingCropForegroundD(reference_image_key="CT", matching_keys=["PT", "Prostate"]),
-            *ideal_crop,
-            PETtoSUVD(keys=["PT"]),
-            ScaleIntensityRangeD(keys=["CT"], a_min=-200, a_max=200, b_min=0, b_max=1, clip=True),
-            ScaleIntensityRangeD(keys=["PT"], a_min=0, a_max=25, b_min=0, b_max=1, clip=True)
-        ]
-    )
+        MatchingCentroidSpatialCropD(segmentation_key="Prostate", matching_keys=["CT", "PT"], roi_size=(128, 128, 128)),
+        PETtoSUVD(keys=["PT"]),
+        ScaleIntensityRangeD(keys=["CT"], a_min=-200, a_max=200, b_min=0, b_max=1, clip=True),
+        ScaleIntensityRangeD(keys=["PT"], a_min=0, a_max=25, b_min=0, b_max=1, clip=True)
+    ])
 
     # ----------------------------------------------------------------------------------------------------------- #
     #                                      Create patients data extractor                                         #
