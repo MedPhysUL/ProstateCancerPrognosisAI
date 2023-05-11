@@ -9,6 +9,7 @@
 """
 
 from copy import deepcopy
+import logging
 import os
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
@@ -504,6 +505,10 @@ class TableViewer:
         show : Optional[bool]
             Whether to show figures.
         """
+        logger = logging.getLogger('matplotlib')
+        initial_logger_level = logger.getEffectiveLevel()
+        logger.setLevel(logging.WARNING)
+
         df_copy = deepcopy(dataset)
         feature_series = df_copy[feature]
 
@@ -565,6 +570,7 @@ class TableViewer:
 
         plt.close(fig_temp)
         self._terminate_figure(path_to_save, show, fig)
+        logger.setLevel(initial_logger_level)
 
     def visualize_global_categorical_feature(
             self,
