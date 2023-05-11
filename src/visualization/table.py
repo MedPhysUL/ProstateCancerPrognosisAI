@@ -505,27 +505,59 @@ class TableViewer:
             Whether to show figures.
         """
         df_copy = deepcopy(dataset)
-        df_copy[feature] = df_copy[feature].astype("category")
+        feature_series = df_copy[feature]
 
         fig, axes = plt.subplots()
 
-        unique = pd.unique(df_copy[feature])
+        feature_series_copy = deepcopy(feature_series.astype("category"))
+        unique = pd.unique(feature_series_copy)
         if all(isinstance(x, (int, float)) for x in unique):
-            axes.set_xticks(pd.unique(df_copy[feature]))
+            axes.set_xticks(unique)
 
-        sns.histplot(
-            data=df_copy,
-            x=feature,
-            hue='Sets',
-            multiple='dodge',
-            ax=axes,
-            stat='percent',
-            common_norm=False,
-            shrink=0.8
-        )
+        if feature_series.dtype == "float":
+            a, b, c = feature_series.min(), feature_series.max(), len(unique)
+            bins = np.linspace(a - (b - a) / (2 * (c - 1)), b + (b - a) / (2 * (c - 1)), c + 1)
 
-        fig_temp, axes_temp = plt.subplots()
-        sns.histplot(data=df_copy, x=feature, hue='Sets', ax=axes_temp)
+            sns.histplot(
+                data=df_copy,
+                x=feature,
+                hue='Sets',
+                bins=bins,
+                multiple='dodge',
+                ax=axes,
+                stat='percent',
+                common_norm=False,
+                shrink=0.8
+            )
+
+            fig_temp, axes_temp = plt.subplots()
+            sns.histplot(
+                data=df_copy,
+                x=feature,
+                bins=bins,
+                hue='Sets',
+                ax=axes_temp
+            )
+
+        else:
+            sns.histplot(
+                data=df_copy,
+                x=feature,
+                hue='Sets',
+                multiple='dodge',
+                ax=axes,
+                stat='percent',
+                common_norm=False,
+                shrink=0.8
+            )
+
+            fig_temp, axes_temp = plt.subplots()
+            sns.histplot(
+                data=df_copy,
+                x=feature,
+                hue='Sets',
+                ax=axes_temp
+            )
 
         for axes_container, axes_temp_container in zip(axes.containers, axes_temp.containers):
             labels = [f"{axes_temp_patch.get_height()}" for axes_temp_patch in axes_temp_container]
