@@ -1,4 +1,4 @@
-from typing import Mapping
+from typing import Hashable, Mapping, Union
 
 import pandas as pd
 
@@ -19,7 +19,7 @@ class OrdinalEncoding(Transform):
 
 class MappingEncoding(Transform):
 
-    def __init__(self, mapping: Mapping[str, int]):
+    def __init__(self, mapping: Mapping[Hashable, Union[float, int]]):
         self.mapping = mapping
 
     def __call__(self, df: pd.Series, **kwargs):
