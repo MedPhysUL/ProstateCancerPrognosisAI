@@ -265,8 +265,7 @@ class TableDataset(Dataset):
             features=self._cat_features,
             mode=modes
         )
-
-        self._x_cat = x_cat.to_numpy(dtype=int)
+        self._x_cat = x_cat.to_numpy(dtype=float)
 
     @staticmethod
     def _preprocess_categoricals(
