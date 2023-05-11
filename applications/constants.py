@@ -46,15 +46,10 @@ ID = "ID"
 # FEATURES
 AGE = Feature(column="AGE", transform=Normalization())
 PSA = Feature(column="PSA", transform=Normalization())
-GLEASON_GLOBAL = Feature(column="GLEASON_GLOBAL", transform=OrdinalEncoding())
-GLEASON_PRIMARY = Feature(column="GLEASON_PRIMARY", transform=OrdinalEncoding())
-GLEASON_SECONDARY = Feature(column="GLEASON_SECONDARY", transform=OrdinalEncoding())
-CLINICAL_STAGE = Feature(
-    column="CLINICAL_STAGE",
-    transform=MappingEncoding(
-        {"T1c": 0, "T2": 0.2, "T2a": 0.2, "T2b": 0.4, "T2c": 0.6, "T3": 0.8, "T3a": 0.8, "T3b": 1}
-    )
-)
+GLEASON_GLOBAL = Feature(column="GLEASON_GLOBAL", transform=MappingEncoding({8: 0, 9: 0.5, 10: 1}))
+GLEASON_PRIMARY = Feature(column="GLEASON_PRIMARY", transform=MappingEncoding({3: 0, 4: 0.5, 5: 1}))
+GLEASON_SECONDARY = Feature(column="GLEASON_SECONDARY", transform=MappingEncoding({3: 0, 4: 0.5, 5: 1}))
+CLINICAL_STAGE = Feature(column="CLINICAL_STAGE", transform=MappingEncoding({"T1-T2": 0, "T3a": 1}))
 
 CONTINUOUS_FEATURES = [AGE, PSA]
 CATEGORICAL_FEATURES = [GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY, CLINICAL_STAGE]
