@@ -88,20 +88,6 @@ METASTASIS_TASK = SurvivalAnalysisTask(
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored()
 )
-EE_TASK = BinaryClassificationTask(
-    target_column=EE,
-    decision_threshold_metric=BinaryBalancedAccuracy(),
-    hps_tuning_metric=AUC(),
-    evaluation_metrics=[Sensitivity(), Specificity()],
-    criterion=BCEWithLogitsLoss()
-)
-SVI_TASK = BinaryClassificationTask(
-    target_column=SVI,
-    decision_threshold_metric=BinaryBalancedAccuracy(),
-    hps_tuning_metric=AUC(),
-    evaluation_metrics=[Sensitivity(), Specificity()],
-    criterion=BCEWithLogitsLoss()
-)
 CRPC_TASK = SurvivalAnalysisTask(
     event_indicator_column=CRPC,
     event_time_column=CRPC_TIME,
@@ -115,7 +101,7 @@ DEATH_TASK = SurvivalAnalysisTask(
     hps_tuning_metric=ConcordanceIndexCensored()
 )
 
-TABLE_TASKS = [BCR_TASK, PN_TASK, METASTASIS_TASK, EE_TASK, SVI_TASK, CRPC_TASK, DEATH_TASK]
+TABLE_TASKS = [BCR_TASK, PN_TASK, METASTASIS_TASK, CRPC_TASK, DEATH_TASK]
 
 # IMAGE TASKS
 PROSTATE_SEGMENTATION_TASK = SegmentationTask(
