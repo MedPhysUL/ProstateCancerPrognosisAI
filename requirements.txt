@@ -1,7 +1,7 @@
 adjustText==0.7
 bayesian-torch==0.3.0
 dacite==1.8.0
-delia==1.1.0
+delia==1.1.1
 einops==0.6.0
 h5py==3.8.0
 kaleido==0.1.0
