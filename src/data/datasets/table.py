@@ -607,33 +607,6 @@ class TableDataset(Dataset):
         # We set the classification tasks scaling factors
         self._set_scaling_factors()
 
-    def _validate_columns_type(
-            self,
-            col_list: List[str],
-            categorical: bool
-    ) -> None:
-        """
-        Checks if all element in the column names list are either in the cat_features_cols list or the
-        cont_features_cols list.
-
-        Parameters
-        ----------
-        col_list : List[str]
-            List of column names.
-        categorical : bool
-            Whether columns contain categorical variables or not.
-        """
-        if categorical:
-            cols = self._cat_features_cols if self._cat_features_cols is not None else []
-            col_type = 'categorical'
-        else:
-            cols = self._cont_features_cols if self._cont_features_cols is not None else []
-            col_type = 'continuous'
-
-        for c in col_list:
-            if c not in cols:
-                raise ValueError(f"Column name {c} is not part of the {col_type} columns")
-
     def _initialize_targets(
             self,
             tasks: TaskList,
