@@ -1,3 +1,13 @@
+"""
+    @file:              continuous.py
+    @Author:            Maxence Larose
+
+    @Creation Date:     04/2023
+    @Last modification: 05/2023
+
+    @Description:       This file is used to define the `Normalization` class.
+"""
+
 from typing import Optional
 
 import pandas as pd

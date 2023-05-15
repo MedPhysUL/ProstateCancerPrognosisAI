@@ -1,3 +1,13 @@
+"""
+    @file:              enums.py
+    @Author:            Maxence Larose
+
+    @Creation Date:     04/2023
+    @Last modification: 05/2023
+
+    @Description:       This file is used to define the `ContinuousTransform` and `CategoricalTransform` enum classes.
+"""
+
 from enum import Enum
 
 from .base import Identity
