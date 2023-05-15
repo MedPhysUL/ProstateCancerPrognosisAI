@@ -93,7 +93,8 @@ class TableDataset(Dataset):
         super(TableDataset).__init__()
 
         # Validate features and set original data
-        self._original_data = df
+        self._imputed_df = None
+        self._original_df = df
         self._cont_features, self._cat_features = cont_features, cat_features
         self._validate_features()
 
@@ -110,7 +111,9 @@ class TableDataset(Dataset):
         self._to_tensor = to_tensor
         self._train_mask, self._valid_mask, self._test_mask = [], [], []
         self._x_cat, self._x_cont = None, None
-        self._y = self._initialize_targets(self._tasks)
+
+        self._initialize_features()
+        self._initialize_targets()
 
         # Update masks
         self.update_masks(list(range(len(self))), [], [])
@@ -124,7 +127,7 @@ class TableDataset(Dataset):
         n : int
             Number of data elements in the dataset.
         """
-        return self._original_data.shape[0]
+        return self._original_df.shape[0]
 
     def __getitem__(
             self,
@@ -260,7 +263,7 @@ class TableDataset(Dataset):
         ids : List[str]
             List of ids associated with the data.
         """
-        return list(self._original_data[self._ids_col].values)
+        return list(self._original_df[self._ids_col].values)
 
     @property
     def ids_col(self) -> str:
@@ -287,16 +290,28 @@ class TableDataset(Dataset):
         return {id_: i for i, id_ in enumerate(self.ids)}
 
     @property
-    def original_data(self) -> pd.DataFrame:
+    def imputed_df(self) -> pd.DataFrame:
+        """
+        Returns the imputed data.
+
+        Returns
+        -------
+        imputed_df : pd.DataFrame
+            Imputed data.
+        """
+        return self._imputed_df
+
+    @property
+    def original_df(self) -> pd.DataFrame:
         """
         Returns the original data.
 
         Returns
         -------
-        original_data : pd.DataFrame
+        original_df : pd.DataFrame
             Original data.
         """
-        return self._original_data
+        return self._original_df
 
     @property
     def target_cols(self) -> List[str]:
@@ -418,227 +433,6 @@ class TableDataset(Dataset):
         """
         return self._y
 
-    def _preprocess_cat_features(self):
-        if self._cat_features_cols:
-            df = self._original_data[self._cat_features_cols].copy()
-
-            for feature in self._cat_features:
-                df[feature.column] = feature.transform(df=df[feature.column])
-
-            self._x_cat = df.to_numpy(dtype=float)
-
-            if self._to_tensor:
-                self._x_cat = from_numpy(self._x_cat)
-
-    def _preprocess_cont_features(self, mean: pd.Series, std: pd.Series):
-        if self._cont_features_cols:
-            df = self._original_data[self._cont_features_cols].copy()
-
-            for feature in self._cont_features:
-                column = feature.column
-                df[column] = feature.transform(df=df[column], mean=mean[column], std=std[column])
-
-            self._x_cont = df.to_numpy(dtype=float)
-
-            if self._to_tensor:
-                self._x_cont = from_numpy(self._x_cont)
-
-    def _get_features(self) -> Union[Tensor, np.array]:
-        if self._cont_features_cols is None:
-            self._cat_features_idx = list(range(len(self._cat_features_cols)))
-            return self.x_cat
-        elif self._cat_features_cols is None:
-            self._cont_features_idx = list(range(len(self._cont_features_cols)))
-            return self.x_cont
-        else:
-            n_cont_features = len(self._cont_features_cols)
-            self._cont_features_idx = list(range(n_cont_features))
-            self._cat_features_idx = list(range(n_cont_features, n_cont_features + len(self._cat_features_cols)))
-
-            if not self._to_tensor:
-                return np.concatenate((self.x_cont, self.x_cat), axis=1)
-            else:
-                return cat((self.x_cont, self.x_cat), dim=1)
-
-    def _get_mean_and_std(self, df: pd.DataFrame) -> Tuple[Optional[pd.Series], Optional[pd.Series]]:
-        if self._cont_features_cols is None:
-            return None, None
-        else:
-            df[self._cont_features_cols] = df[self._cont_features_cols].astype(float)
-            return df[self._cont_features_cols].mean(), df[self._cont_features_cols].std()
-
-    def _get_current_train_stats(self) -> Tuple[Optional[pd.Series], Optional[pd.Series]]:
-        """
-        Returns the current statistics and encodings related to the training data.
-
-        Returns
-        -------
-        stats : Tuple[Optional[pd.Series], Optional[pd.Series]]
-            Tuple containing the current statistics and encodings related to the training data :
-                mean : Optional[pd.Series]
-                    Means of the numerical columns according to the training mask.
-                std : Optional[pd.Series]
-                    Standard deviations of the numerical columns according to the training mask.
-        """
-        train_data = self._original_data.iloc[self._train_mask]
-        mean, std = self._get_mean_and_std(train_data)
-
-        return mean, std
-
-    @staticmethod
-    def _convert_categories_to_bins(categories: np.ndarray) -> np.ndarray:
-        """
-        Converts a list of categories to bins. The bins are defined as the midpoints between each category.
-
-        Parameters
-        ----------
-        categories : np.ndarray
-            List of categories.
-
-        Returns
-        -------
-        bins : np.ndarray
-            List of bins.
-        """
-        min_value, max_value = np.min(categories), np.max(categories)
-        mid_values = np.linspace(min_value, max_value, num=len(categories) + 1)[1:-1]
-        bins = np.concatenate(([-np.inf], mid_values, [np.inf]))
-        return bins
-
-    def _impute_features(self):
-        df = self._original_data.copy()
-        df = df[self._cont_features_cols]
-        df[self._cat_features_cols] = self._x_cat
-        training_df = df.iloc[self._train_mask]
-
-        self._iterative_imputer.fit(training_df)
-
-        features = self._cont_features_cols + self._cat_features_cols
-        df = self._original_data.copy()[features]
-        data = self._iterative_imputer.transform(df)
-        full_df = pd.DataFrame(data, columns=features)
-        for column in self._cat_features_cols:
-            array = np.array(full_df[column])
-            categories = np.unique(array)
-            bins = self._convert_categories_to_bins(categories)
-            indices = np.digitize(array, bins)
-            close = np.any(np.isclose(array[:, np.newaxis], bins), axis=1)
-            indices[close] = indices[close] + 1
-            result = categories[indices - 1]
-            full_df[column] = result
-
-        print(full_df)
-        exit(0)
-
-    def _set_scaling_factors(self):
-        """
-        Sets scaling factor of all binary classification tasks.
-        """
-        for task in self.tasks.binary_classification_tasks:
-            # We set the scaling factors of all classification metrics
-            for metric in task.metrics:
-                metric.update_scaling_factor(y_train=self.y[task.name][self.train_mask])
-
-            # We set the scaling factor of the criterion
-            if task.criterion:
-                task.criterion.update_scaling_factor(y_train=self.y[task.name][self.train_mask])
-
-    def update_masks(
-            self,
-            train_mask: List[int],
-            valid_mask: Optional[List[int]] = None,
-            test_mask: Optional[List[int]] = None
-    ) -> None:
-        """
-        Updates the train, valid and test masks and then preprocesses the data available according to the current
-        statistics of the training data.
-
-        Parameters
-        ----------
-        train_mask : List[int]
-            List of idx in the training set.
-        valid_mask : Optional[List[int]]
-            List of idx in the valid set.
-        test_mask : Optional[List[int]]
-            List of idx in the test set.
-        """
-        # We set the new masks values
-        self._train_mask = train_mask
-        self._valid_mask = valid_mask if valid_mask is not None else []
-        self._test_mask = test_mask if test_mask is not None else []
-
-        # We compute the current values of mean, std
-        mean, std = self._get_current_train_stats()
-
-        # We update the data that will be available via __get_item__
-        self._preprocess_cat_features()
-        self._impute_features()
-        self._preprocess_cont_features(mean, std)
-
-        # We set the classification tasks scaling factors
-        self._set_scaling_factors()
-
-    def get_imputed_dataframe(
-            self
-    ) -> pd.DataFrame:
-        """
-        Returns a copy of the original pandas dataframe where missing values are imputed according to the training mask.
-
-        Returns
-        -------
-        imputed_df : pd.DataFrame
-            Copy of the original pandas dataframe where missing values are imputed according to the training mask.
-        """
-        imputed_df = self.original_data.copy()
-
-        if self._cont_features_cols is not None:
-            imputed_df[self._cont_features_cols] = np.array(self._x_cont)
-        if self._cat_features_cols is not None:
-            imputed_df[self._cat_features_cols] = np.array(self._x_cat)
-
-        return imputed_df
-
-    def _initialize_targets(
-            self,
-            tasks: TaskList
-    ) -> Union[np.array, Tensor]:
-        """
-        Sets the targets according to the task and the choice of container.
-
-        Parameters
-        ----------
-        tasks : TaskList
-            List of tasks.
-
-        Returns
-        -------
-        targets : Union[np.array, Tensor]
-            Targets in a proper format.
-        """
-        targets = {}
-        for task in tasks:
-            t = self.original_data[task.target_column].to_numpy(dtype=float)
-
-            if (not isinstance(task, BinaryClassificationTask)) and self._to_tensor:
-                t = from_numpy(t).float()
-            elif isinstance(task, (BinaryClassificationTask, SurvivalAnalysisTask)):
-                if self._to_tensor:
-                    t = from_numpy(t).long()
-                else:
-                    t = t.astype(int)
-
-            if isinstance(task, SurvivalAnalysisTask):
-                event_time = self.original_data[task.event_time_column].to_numpy(dtype=float)
-                if self._to_tensor:
-                    event_time = from_numpy(event_time).float()
-                    t = stack([t, event_time], dim=1)
-                else:
-                    t = np.stack([t, event_time], axis=1)
-
-            targets[task.name] = t
-
-        return targets
-
     def _validate_features(self):
         """
         Validates the features provided by the user. Raises an error if the features are not valid. If no features are
@@ -667,7 +461,7 @@ class TableDataset(Dataset):
             True if the features are continuous, false if they are categorical.
         """
         if features is not None:
-            dataframe_columns = list(self._original_data.columns.values)
+            dataframe_columns = list(self._original_df.columns.values)
             for f in features:
                 if f.column not in dataframe_columns:
                     raise ValueError(f"Column {f.column} is not part of the given dataframe")
@@ -694,3 +488,222 @@ class TableDataset(Dataset):
         assert all(isinstance(task, TableTask) for task in TaskList(self._tasks)), (
             f"All tasks must be instances of 'TableTask'."
         )
+
+    def _initialize_features(self):
+        """
+        Initializes the features in a proper format.
+        """
+        if self._cat_features_cols:
+            self._original_df[self._cat_features_cols] = self._original_df[self._cat_features_cols].astype('category')
+        if self._cont_features_cols:
+            self._original_df[self._cont_features_cols] = self._original_df[self._cont_features_cols].astype('float')
+
+    def _initialize_targets(self):
+        """
+        Initializes the targets in a proper format.
+        """
+        targets = {}
+        for task in self._tasks:
+            t = self._original_df[task.target_column].to_numpy(dtype=float)
+
+            if (not isinstance(task, BinaryClassificationTask)) and self._to_tensor:
+                t = from_numpy(t).float()
+            elif isinstance(task, (BinaryClassificationTask, SurvivalAnalysisTask)):
+                if self._to_tensor:
+                    t = from_numpy(t).long()
+                else:
+                    t = t.astype(int)
+
+            if isinstance(task, SurvivalAnalysisTask):
+                event_time = self._original_df[task.event_time_column].to_numpy(dtype=float)
+                if self._to_tensor:
+                    event_time = from_numpy(event_time).float()
+                    t = stack([t, event_time], dim=1)
+                else:
+                    t = np.stack([t, event_time], axis=1)
+
+            targets[task.name] = t
+
+        self._y = targets
+
+    def _get_features(self) -> Union[Tensor, np.array]:
+        """
+        Returns the feature data. If both continuous and categorical features are provided, concatenates them.
+
+        Returns
+        -------
+        x : Union[Tensor, np.array]
+            Feature data.
+        """
+        if self._cont_features_cols is None:
+            self._cat_features_idx = list(range(len(self._cat_features_cols)))
+            return self.x_cat
+        elif self._cat_features_cols is None:
+            self._cont_features_idx = list(range(len(self._cont_features_cols)))
+            return self.x_cont
+        else:
+            n_cont_features = len(self._cont_features_cols)
+            self._cont_features_idx = list(range(n_cont_features))
+            self._cat_features_idx = list(range(n_cont_features, n_cont_features + len(self._cat_features_cols)))
+
+            if not self._to_tensor:
+                return np.concatenate((self.x_cont, self.x_cat), axis=1)
+            else:
+                return cat((self.x_cont, self.x_cat), dim=1)
+
+    def update_masks(
+            self,
+            train_mask: List[int],
+            valid_mask: Optional[List[int]] = None,
+            test_mask: Optional[List[int]] = None
+    ) -> None:
+        """
+        Updates the train, valid and test masks and then preprocesses the data available according to the current
+        statistics of the training data.
+
+        Parameters
+        ----------
+        train_mask : List[int]
+            List of idx in the training set.
+        valid_mask : Optional[List[int]]
+            List of idx in the valid set.
+        test_mask : Optional[List[int]]
+            List of idx in the test set.
+        """
+        # Create imputed dataframe
+        self._imputed_df = self._original_df.copy()
+
+        # We set the new masks values
+        self._train_mask = train_mask
+        self._valid_mask = valid_mask if valid_mask is not None else []
+        self._test_mask = test_mask if test_mask is not None else []
+
+        # We compute the current values of mean, std
+        mean, std = self._get_current_train_stats()
+
+        # We update the data that will be available via __get_item__
+        self._preprocess_cat_features()
+        self._impute_missing_features()
+        self._preprocess_cont_features(mean, std)
+        self._set_features()
+
+        # We set the classification tasks scaling factors
+        self._set_scaling_factors()
+
+    def _get_current_train_stats(self) -> Tuple[Optional[pd.Series], Optional[pd.Series]]:
+        """
+        Returns the current statistics and encodings related to the training data.
+
+        Returns
+        -------
+        stats : Tuple[Optional[pd.Series], Optional[pd.Series]]
+            Tuple containing the current statistics and encodings related to the training data :
+                mean : Optional[pd.Series]
+                    Means of the numerical columns according to the training mask.
+                std : Optional[pd.Series]
+                    Standard deviations of the numerical columns according to the training mask.
+        """
+        train_data = self._original_df.iloc[self._train_mask]
+
+        if self._cont_features_cols is None:
+            return None, None
+        else:
+            train_data[self._cont_features_cols] = train_data[self._cont_features_cols].astype(float)
+            return train_data[self._cont_features_cols].mean(), train_data[self._cont_features_cols].std()
+
+    def _preprocess_cat_features(self):
+        """
+        Preprocesses the categorical features according to the transforms provided by the user. If no transforms are
+        provided, does nothing.
+        """
+        if self._cat_features_cols:
+            for feature in self._cat_features:
+                self._imputed_df[feature.column] = feature.transform(df=self._imputed_df[feature.column])
+
+            self._imputed_df[self._cat_features_cols] = self._imputed_df[self._cat_features_cols].astype('float')
+
+    def _impute_missing_features(self):
+        """
+        Imputes the missing values of the features using an iterative imputer. For categorical features, we need an
+        additional step to map the imputed values to the closest category, as an iterative imputer only works with
+        float values.
+        """
+        df = self._imputed_df[self.features_cols]
+
+        self._iterative_imputer.fit(df.iloc[self._train_mask])
+        data = self._iterative_imputer.transform(df)
+        temp_df = pd.DataFrame(data, columns=self.features_cols)
+
+        for column in self._cat_features_cols:
+            original_array = np.array(df[column].dropna())
+            categories = np.unique(original_array)
+            bins = self._convert_categories_to_bins(categories)
+
+            imputed_array = np.array(temp_df[column])
+            indices = np.digitize(imputed_array, bins)
+            result = categories[indices - 1]
+            temp_df[column] = result
+
+        self._imputed_df[self.features_cols] = temp_df
+
+    @staticmethod
+    def _convert_categories_to_bins(categories: np.ndarray) -> np.ndarray:
+        """
+        Converts a list of categories to bins. The bins are defined as the midpoints between each category.
+
+        Parameters
+        ----------
+        categories : np.ndarray
+            List of categories.
+
+        Returns
+        -------
+        bins : np.ndarray
+            List of bins.
+        """
+        min_value, max_value = np.min(categories), np.max(categories)
+        mid_values = np.linspace(min_value, max_value, num=len(categories) + 1)[1:-1]
+        bins = np.concatenate(([-np.inf], mid_values, [np.inf]))
+        return bins
+
+    def _preprocess_cont_features(self, mean: pd.Series, std: pd.Series):
+        """
+        Preprocesses the continuous features according to the transforms provided by the user. If no transforms are
+        provided, does nothing.
+
+        Parameters
+        ----------
+        mean : pd.Series
+            Means of the numerical columns according to the training mask.
+        std : pd.Series
+            Standard deviations of the numerical columns according to the training mask.
+        """
+        if self._cont_features_cols:
+            for feature in self._cont_features:
+                col = feature.column
+                self._imputed_df[col] = feature.transform(df=self._imputed_df[col], mean=mean[col], std=std[col])
+
+    def _set_features(self):
+        """
+        Sets the features of the dataset. If the dataset is to be converted to tensors, converts the features to
+        tensors.
+        """
+        self._x_cat = self._imputed_df[self._cat_features_cols].to_numpy(dtype=float)
+        self._x_cont = self._imputed_df[self._cont_features_cols].to_numpy(dtype=float)
+
+        if self._to_tensor:
+            self._x_cat = from_numpy(self._x_cat)
+            self._x_cont = from_numpy(self._x_cont)
+
+    def _set_scaling_factors(self):
+        """
+        Sets scaling factor of all binary classification tasks.
+        """
+        for task in self.tasks.binary_classification_tasks:
+            # We set the scaling factors of all classification metrics
+            for metric in task.metrics:
+                metric.update_scaling_factor(y_train=self.y[task.name][self.train_mask])
+
+            # We set the scaling factor of the criterion
+            if task.criterion:
+                task.criterion.update_scaling_factor(y_train=self.y[task.name][self.train_mask])
