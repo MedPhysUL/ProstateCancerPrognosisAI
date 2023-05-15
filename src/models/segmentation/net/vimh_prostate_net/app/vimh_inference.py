@@ -110,10 +110,11 @@ if __name__ == "__main__":
 
                 y_pred, _ = net(patient_img)  # Prediction
 
+                y_pred = torch.sigmoid(y_pred)  # Sigmoid
+
                 ensemble_y_pred = torch.mean(y_pred, dim=0)  # Ensemble Prediction (mean)
 
-                ensemble_y_pred = torch.sigmoid(ensemble_y_pred)  # Post-processing
-                ensemble_y_pred = torch.round(ensemble_y_pred)
+                ensemble_y_pred = torch.round(ensemble_y_pred)  # Rounding
 
                 seg_pred = np.array(ensemble_y_pred[0][0].cpu())
                 ImageViewer().compare(img=img, seg_truth=seg_truth, seg_pred=seg_pred, alpha=0.1)
@@ -123,6 +124,11 @@ if __name__ == "__main__":
 
                 # Variance
                 variance = np.var(y_pred, axis=0)
+
+
+                print(torch.nn.BCELoss()(y_pred[2], patient_seg))
+                print(np.max(mean))
+                print(np.max(variance))
 
 
 
