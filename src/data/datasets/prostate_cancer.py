@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
-    @Last modification: 02/2023
+    @Last modification: 05/2023
 
     @Description:       This file contains a custom torch dataset named 'ProstateCancerDataset'.
 """

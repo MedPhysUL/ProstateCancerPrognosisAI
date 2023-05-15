@@ -3,7 +3,7 @@
     @Author:            Raphael Brodeur, Maxence Larose
 
     @Creation Date:     05/2022
-    @Last modification: 04/2023
+    @Last modification: 05/2023
 
     @Description:       This file contains a class used to create a dataset containing multiple patient images and
                         segmentations from a given DELIA database.
