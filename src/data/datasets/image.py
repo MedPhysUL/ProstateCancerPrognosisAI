@@ -131,6 +131,14 @@ class ImageDataset(Dataset):
 
     @property
     def tasks(self) -> TaskList:
+        """
+        Gets the tasks of the dataset.
+
+        Returns
+        -------
+        tasks : TaskList
+            The tasks of the dataset.
+        """
         return self._tasks
 
     def _get_patient_data(self, index: int) -> Dict[str, np.ndarray]:
