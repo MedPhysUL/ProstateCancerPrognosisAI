@@ -258,7 +258,7 @@ class Sampler:
         self.__dataset.update_masks(train_mask, test_mask, valid_mask)
 
         # We extract train dataframe
-        imputed_df = self.__dataset.get_imputed_dataframe()
+        imputed_df = self.__dataset.imputed_df
         train_df = imputed_df.iloc[train_mask]
 
         # We check if all categories of categorical columns are in the training set

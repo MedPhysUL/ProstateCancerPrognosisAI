@@ -87,7 +87,7 @@ class TableViewer:
         dataframe : pd.DataFrame
             Original dataframe.
         """
-        df_copy = deepcopy(self.dataset.original_data)
+        df_copy = deepcopy(self.dataset.original_df)
         df_copy = pd.concat(
             objs=[df_copy.iloc[mask].assign(Sets=name) for name, mask in self._global_masks.items()],
             ignore_index=True
@@ -103,7 +103,7 @@ class TableViewer:
         dataframe : pd.DataFrame
             Imputed dataframe.
         """
-        imputed_df = deepcopy(self.dataset.get_imputed_dataframe())
+        imputed_df = deepcopy(self.dataset.imputed_df)
         imputed_df = pd.concat(
             objs=[imputed_df.iloc[mask].assign(Sets=name) for name, mask in self._global_masks.items()],
             ignore_index=True
@@ -145,7 +145,7 @@ class TableViewer:
         for task in self.dataset.tasks:
             original_dataframes[task.target_column] = pd.concat(
                 objs=[
-                    self.dataset.original_data.iloc[mask].assign(Sets=name) for name, mask in
+                    self.dataset.imputed_df.iloc[mask].assign(Sets=name) for name, mask in
                     self._target_specific_masks[task.target_column].items()
                 ],
                 ignore_index=True
@@ -167,7 +167,7 @@ class TableViewer:
         for task in self.dataset.tasks:
             imputed_dataframes[task.target_column] = pd.concat(
                 objs=[
-                    self.dataset.get_imputed_dataframe().iloc[mask].assign(Sets=name) for name, mask in
+                    self.dataset.imputed_df.iloc[mask].assign(Sets=name) for name, mask in
                     self._target_specific_masks[task.target_column].items()
                 ],
                 ignore_index=True
@@ -328,7 +328,7 @@ class TableViewer:
     def _update_axes_of_class_distribution_figure(
             self,
             axes: plt.axes,
-            targets: np.array,
+            targets: np.ndarray,
             label_names: dict,
             title: Optional[str] = None
     ) -> None:
@@ -339,7 +339,7 @@ class TableViewer:
         ----------
         axes : plt.axes
             Axes.
-        targets : np.array
+        targets : np.ndarray
             Array of class targets.
         label_names : dict
             Dictionary with names associated to target values.
