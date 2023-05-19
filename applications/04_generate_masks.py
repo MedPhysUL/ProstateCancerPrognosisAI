@@ -29,7 +29,7 @@ if __name__ == '__main__':
     table_dataset = TableDataset(
         df=df,
         ids_col=ID,
-        tasks=[BCR_TASK, PN_TASK],
+        tasks=PN_TASK,
         cont_features=CONTINUOUS_FEATURES,
         cat_features=CATEGORICAL_FEATURES
     )
