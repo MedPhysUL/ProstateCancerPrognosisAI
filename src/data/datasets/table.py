@@ -608,7 +608,6 @@ class TableDataset(Dataset):
         if self._cont_features_cols is None:
             return None, None
         else:
-            train_data[self._cont_features_cols] = train_data[self._cont_features_cols].astype(float)
             return train_data[self._cont_features_cols].mean(), train_data[self._cont_features_cols].std()
 
     def _preprocess_cat_features(self):
