@@ -106,7 +106,7 @@ class TableDataset(Dataset):
         self._cat_features_cols, self._cat_features_idx = [f.column for f in cat_features], []
         self._cont_features_cols, self._cont_features_idx = [f.column for f in cont_features], []
         self._ids_col = ids_col
-        self._iterative_imputer = IterativeImputer(estimator=RandomForestRegressor())
+        self._iterative_imputer = IterativeImputer(estimator=RandomForestRegressor(), tol=1e-2)
         self._target_cols = [task.target_column for task in self._tasks.table_tasks]
         self._to_tensor = to_tensor
         self._train_mask, self._valid_mask, self._test_mask = [], [], []
