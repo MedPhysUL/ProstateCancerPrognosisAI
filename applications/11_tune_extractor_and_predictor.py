@@ -87,7 +87,7 @@ if __name__ == '__main__':
     tuner = Tuner(
         search_algorithm=search_algo,
         recorder=TuningRecorder(path_to_record_folder=path_to_record_folder),
-        n_trials=25,
+        n_trials=30,
         seed=SEED
     )
 
@@ -154,7 +154,7 @@ if __name__ == '__main__':
         ),
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
-            parameters={"patience": 15}
+            parameters={"patience": 10}
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
@@ -181,7 +181,7 @@ if __name__ == '__main__':
         ),
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
-            parameters={"patience": 15}
+            parameters={"patience": 10}
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
