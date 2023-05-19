@@ -44,7 +44,7 @@ from src.tuning.hyperparameters.torch import (
 
 
 if __name__ == '__main__':
-    for task in [PN_TASK, BCR_TASK, METASTASIS_TASK, CRPC_TASK, DEATH_TASK, SVI_TASK, EE_TASK]:
+    for task in TABLE_TASKS:
         df = pd.read_csv(LEARNING_TABLE_PATH)
 
         table_dataset = TableDataset(
@@ -74,7 +74,7 @@ if __name__ == '__main__':
         tuner = Tuner(
             search_algorithm=search_algo,
             recorder=TuningRecorder(path_to_record_folder=path_to_record_folder),
-            n_trials=30,
+            n_trials=25,
             seed=SEED
         )
 

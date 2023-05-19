@@ -87,7 +87,7 @@ if __name__ == '__main__':
     tuner = Tuner(
         search_algorithm=search_algo,
         recorder=TuningRecorder(path_to_record_folder=path_to_record_folder),
-        n_trials=30,
+        n_trials=25,
         seed=SEED
     )
 
