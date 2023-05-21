@@ -154,7 +154,7 @@ if __name__ == '__main__':
         ),
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
-            parameters={"patience": 20}
+            parameters={"patience": 10}
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
@@ -181,7 +181,7 @@ if __name__ == '__main__':
         ),
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
-            parameters={"patience": 20}
+            parameters={"patience": 10}
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
@@ -213,7 +213,7 @@ if __name__ == '__main__':
         train_method_hyperparameter=train_method_hyperparameter
     )
 
-    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=3)
+    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=5)
 
     tuner.tune(
         objective=objective,
