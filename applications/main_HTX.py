@@ -41,7 +41,7 @@ from src.tuning.hyperparameters.torch import (
 
 if __name__ == '__main__':
     DOCKER_EXPERIMENTS_PATH = "experiments"
-    TASK = CRPC_TASK
+    TASK = HTX_TASK
 
     df = pd.read_csv(LEARNING_TABLE_PATH)
 
