@@ -60,9 +60,7 @@ COPY applications/main_METASTASIS.py /workspace/applications
 
 COPY applications/main_CRPC.py /workspace/applications
 
-COPY applications/main_SVI.py /workspace/applications
-
-COPY applications/main_EE.py /workspace/applications
+COPY applications/main_HTX.py /workspace/applications
 
 COPY applications/main_DEATH.py /workspace/applications
 
