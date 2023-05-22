@@ -52,7 +52,7 @@ class Feature(NamedTuple):
         Transform to apply to the column. If None, the identity transform is used.
     """
     column: str
-    transform: Optional[Transform] = None
+    transform: Optional[Transform] = Identity()
 
 
 class TableDataset(Dataset):
@@ -477,8 +477,6 @@ class TableDataset(Dataset):
                             f"Transform {f.transform} is not a categorical transform. Available transforms are: "
                             f"{[t.name for t in CategoricalTransform]}."
                         )
-                else:
-                    f.transform = Identity()
 
     def _validate_tasks(self):
         """
