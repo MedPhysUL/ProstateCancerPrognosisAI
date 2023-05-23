@@ -44,7 +44,7 @@ if __name__ == "__main__":
         KeepLargestConnectedComponentD(keys=["Prostate"]),
         MatchingCentroidSpatialCropD(segmentation_key="Prostate", matching_keys=["CT", "PT"], roi_size=(128, 128, 128)),
         PETtoSUVD(keys=["PT"]),
-        ScaleIntensityRangeD(keys=["CT"], a_min=-250, a_max=300, b_min=0, b_max=1, clip=True),
+        ScaleIntensityRangeD(keys=["CT"], a_min=-200, a_max=250, b_min=0, b_max=1, clip=True),
         ScaleIntensityRangeD(keys=["PT"], a_min=0, a_max=25, b_min=0, b_max=1, clip=True)
     ])
 
