@@ -507,6 +507,7 @@ class TableDataset(Dataset):
             if (not isinstance(task, BinaryClassificationTask)) and self._to_tensor:
                 t = from_numpy(t).float()
             elif isinstance(task, (BinaryClassificationTask, SurvivalAnalysisTask)):
+                t = np.nan_to_num(t, nan=-1e9)
                 if self._to_tensor:
                     t = from_numpy(t).long()
                 else:
