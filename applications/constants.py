@@ -19,7 +19,7 @@ from src.data.datasets import Feature
 from src.data.transforms import Normalization, MappingEncoding
 
 # SEED
-SEED = 1010710
+SEED = 100
 
 # SIZE
 HOLDOUT_SIZE = 0.15
@@ -106,6 +106,8 @@ PN_TASK = BinaryClassificationTask(
     evaluation_metrics=[Sensitivity(), Specificity()],
     criterion=BCEWithLogitsLoss()
 )
+
+CLIP_GRAD_MAX_NORM_DICT = {BCR: 3.0, CRPC: 2.0, DEATH: 1.0, HTX: 3.0, METASTASIS: 2.0, PN: 3.0}
 
 TABLE_TASKS = [BCR_TASK, CRPC_TASK, DEATH_TASK, HTX_TASK, METASTASIS_TASK, PN_TASK]
 
