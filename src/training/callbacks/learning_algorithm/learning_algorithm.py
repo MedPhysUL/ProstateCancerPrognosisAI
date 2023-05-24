@@ -40,6 +40,7 @@ class LearningAlgorithm(TrainingCallback):
             self,
             criterion: MultiTaskLoss,
             optimizer: Optimizer,
+            clip_grad_max_norm: Optional[float] = None,
             early_stopper: Optional[EarlyStopper] = None,
             lr_scheduler: Optional[LRScheduler] = None,
             name: Optional[str] = None,
@@ -55,6 +56,8 @@ class LearningAlgorithm(TrainingCallback):
             Multi-task loss.
         optimizer : Optimizer
             A pytorch Optimizer.
+        clip_grad_max_norm : Optional[float]
+            Maximum norm of the gradients. If the norm of the gradients exceeds this value, the gradients are clipped.
         early_stopper : Optional[EarlyStopper]
             An early stopper.
         lr_scheduler : Optional[LRScheduler]
@@ -68,7 +71,7 @@ class LearningAlgorithm(TrainingCallback):
         name = name if name else f"{self.__class__.__name__}({self.instance_id})"
         super().__init__(name=name, **kwargs)
 
-        self.clip_grad_max_norm = kwargs.get("clip_grad_max_norm", 2.0)
+        self.clip_grad_max_norm = clip_grad_max_norm
         self.criterion = criterion
         self.early_stopper = early_stopper
         self.is_last = False
@@ -241,7 +244,9 @@ class LearningAlgorithm(TrainingCallback):
         else:
             batch_loss.backward(retain_graph=True)
 
-        clip_grad_norm_(self._params, self.clip_grad_max_norm)
+        if self.clip_grad_max_norm:
+            clip_grad_norm_(self._params, self.clip_grad_max_norm)
+
         self._set_current_grads()
 
     def _set_current_grads(self):

@@ -101,6 +101,7 @@ if __name__ == '__main__':
                     "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-4, high=1e-2, log=True)
                 }
             ),
+            clip_grad_max_norm=CLIP_GRAD_MAX_NORM_DICT[task.target_column],
             early_stopper=EarlyStopperHyperparameter(
                 constructor=MultiTaskLossEarlyStopper,
                 parameters={"patience": 20}
