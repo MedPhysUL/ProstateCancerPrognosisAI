@@ -38,7 +38,7 @@ class CNN(Extractor):
             merging_method: Union[str, MergingMethod] = MergingMethod.CONCATENATION,
             model_mode: Union[str, ModelMode] = ModelMode.PREDICTION,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
-            shape: Union[str, Sequence[int]] = (96, 96, 96),
+            shape: Union[str, Sequence[int]] = (128, 128, 128),
             n_features: int = 6,
             channels: Union[str, Sequence[int]] = (4, 8, 16, 32, 64),
             strides: Optional[Sequence[int]] = None,
