@@ -41,14 +41,14 @@ from src.tuning.hyperparameters.torch import (
 
 if __name__ == '__main__':
     DOCKER_EXPERIMENTS_PATH = "experiments"
-    TASK = CRPC_TASK
+    task = CRPC_TASK
 
     df = pd.read_csv(LEARNING_TABLE_PATH)
 
     table_dataset = TableDataset(
         df=df,
         ids_col=ID,
-        tasks=TASK,
+        tasks=task,
         cont_features=CONTINUOUS_FEATURES,
         cat_features=CATEGORICAL_FEATURES
     )
@@ -66,7 +66,7 @@ if __name__ == '__main__':
     path_to_record_folder = os.path.join(
         os.getcwd(),
         DOCKER_EXPERIMENTS_PATH,
-        f"{TASK.target_column}(MultiNet - Clinical data + Deep radiomics)"
+        f"{task.target_column}(MultiNet - Clinical data + Deep radiomics)"
     )
 
     search_algo = SearchAlgorithm(
@@ -143,9 +143,10 @@ if __name__ == '__main__':
             model_params_getter=lambda model: model.predictor.parameters(),
             parameters={
                 "lr": FloatHyperparameter(name="lr_predictor", low=1e-4, high=1e-2, log=True),
-                "weight_decay": FloatHyperparameter(name="weight_decay_predictor", low=1e-4, high=1e-1, log=True)
+                "weight_decay": FloatHyperparameter(name="weight_decay_predictor", low=1e-4, high=1e-2, log=True)
             }
         ),
+        clip_grad_max_norm=CLIP_GRAD_MAX_NORM_DICT[task.target_column],
         early_stopper=EarlyStopperHyperparameter(
             constructor=MultiTaskLossEarlyStopper,
             parameters={"patience": 20}
@@ -169,8 +170,8 @@ if __name__ == '__main__':
             constructor=Adam,
             model_params_getter=lambda model: model.extractor.parameters(),
             parameters={
-                "lr": FloatHyperparameter(name="lr_extractor", low=1e-5, high=1e-3, log=True),
-                "weight_decay": FloatHyperparameter(name="weight_decay_extractor", low=1e-4, high=1e-1, log=True)
+                "lr": FloatHyperparameter(name="lr_extractor", low=1e-5, high=1e-2, log=True),
+                "weight_decay": FloatHyperparameter(name="weight_decay_extractor", low=1e-4, high=1e-2, log=True)
             }
         ),
         early_stopper=EarlyStopperHyperparameter(
