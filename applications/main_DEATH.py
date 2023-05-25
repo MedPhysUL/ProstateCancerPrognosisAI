@@ -120,8 +120,8 @@ if __name__ == '__main__':
                             "channels": CategoricalHyperparameter(
                                 name="channels",
                                 choices=[
-                                    "(4, 8, 16, 32, 64)", "(8, 16, 32, 64, 128)", "(16, 32, 64, 128, 256)",
-                                    "(32, 64, 128, 256, 512)"
+                                    "(8, 16, 32, 64, 128)", "(16, 32, 64, 128, 256)",
+                                    "(32, 64, 128, 256, 512)", "(64, 128, 256, 512, 1024)"
                                 ]
                             ),
                             "kernel_size": FixedHyperparameter(name="kernel_size", value=3),
