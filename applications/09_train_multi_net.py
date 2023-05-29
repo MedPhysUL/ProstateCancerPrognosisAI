@@ -65,7 +65,8 @@ if __name__ == '__main__':
         model_mode="extraction",
         merging_method="multiplication",
         multi_task_mode="separated",
-        dropout=0.5
+        dropout_cnn=0.3,
+        dropout_fnn=0.5
     )
 
     unet = Unet(

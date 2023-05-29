@@ -108,7 +108,7 @@ if __name__ == '__main__':
                                 name="hidden_channels",
                                 choices=["(20, 20, 20)", "(30, 30, 30)", "(40, 40, 40)"]
                             ),
-                            "dropout": FloatHyperparameter(name="dropout_mlp", low=0.05, high=0.25)
+                            "dropout": FloatHyperparameter(name="dropout_predictor", low=0.05, high=0.25)
                         }
                     )
                 }
@@ -133,7 +133,8 @@ if __name__ == '__main__':
                             ),
                             "kernel_size": FixedHyperparameter(name="kernel_size", value=3),
                             "num_res_units": FixedHyperparameter(name="num_res_units", value=3),
-                            "dropout": FloatHyperparameter(name="dropout_cnn", low=0.1, high=0.8)
+                            "dropout_cnn": FloatHyperparameter(name="dropout_extractor_cnn", low=0.1, high=0.7),
+                            "dropout_fnn": FloatHyperparameter(name="dropout_extractor_fnn", low=0.1, high=0.7)
                         }
                     ),
                 }

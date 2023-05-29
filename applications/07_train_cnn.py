@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
     dataset = ProstateCancerDataset(image_dataset=image_dataset, table_dataset=table_dataset)
 
-    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=3)
+    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=5)
 
     dataset.update_masks(
         train_mask=masks[0][Mask.TRAIN],
@@ -63,7 +63,8 @@ if __name__ == '__main__':
         model_mode="prediction",
         merging_method="multiplication",
         multi_task_mode="separated",
-        dropout=0.5,
+        dropout_cnn=0.1,
+        dropout_fnn=0.1,
         device=torch.device("cuda"),
         seed=SEED
     ).build(dataset)
@@ -71,7 +72,7 @@ if __name__ == '__main__':
     optimizer = Adam(
         params=model.parameters(),
         lr=3e-5,
-        weight_decay=0.1
+        weight_decay=0.01
     )
 
     learning_algorithm = LearningAlgorithm(
