@@ -89,7 +89,7 @@ class Extractor(TorchModel, ABC):
             model_mode: Union[str, ModelMode] = ModelMode.PREDICTION,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
             shape: Union[str, Sequence[int]] = (128, 128, 128),
-            n_features: int = 5,
+            n_features: int = 6,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None
@@ -120,8 +120,8 @@ class Extractor(TorchModel, ABC):
             Sequence of integers stating the dimension of the input tensor (minus batch and channel dimensions). Can
             also be given as a string containing the sequence. Exemple: (96, 96, 96).
         n_features : int
-            Integer stating the dimension of the final output tensor, i.e. the number of deep radiomics/features to
-            extract from the image.
+            Integer stating the dimension of the final output tensor, i.e. the number of deep features to extract from
+            the image.
         device : Optional[torch_device]
             The device of the model.
         name : Optional[str]
@@ -144,7 +144,7 @@ class Extractor(TorchModel, ABC):
         self.n_features = n_features
 
         self.extractor = None
-        self.linear_layer = None
+        self.prediction_layer = None
 
     @abstractmethod
     def _build_extractor(self, dataset: ProstateCancerDataset) -> Union[Module, ModuleDict]:
@@ -187,15 +187,15 @@ class Extractor(TorchModel, ABC):
 
         return in_channel, *self.shape
 
-    def _build_linear_layer(self) -> Union[Module, ModuleDict]:
+    def _build_prediction_layer(self) -> Union[Module, ModuleDict]:
         """
         Returns the linear layer module.
 
         Returns
         -------
-        linear_layer : Union[Module, ModuleDict]
-            The linear layer module. It should take as input a tensor of shape (batch_size, n_features, *spatial_shape)
-            and return a tensor of shape (batch_size, n_features).
+        prediction_layer : Union[Module, ModuleDict]
+            The prediction layer module. It should take as input a tensor of shape (batch_size, n_features) and return a
+            tensor of shape (batch_size, n_tasks).
         """
         if self.multi_task_mode == MultiTaskMode.SEPARATED or self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
             return ModuleDict({
@@ -224,7 +224,9 @@ class Extractor(TorchModel, ABC):
         super().build(dataset=dataset)
 
         self.extractor = self._build_extractor(dataset)
-        self.linear_layer = self._build_linear_layer()
+
+        if self.model_mode == ModelMode.PREDICTION:
+            self.prediction_layer = self._build_prediction_layer()
 
         return self
 
@@ -294,10 +296,10 @@ class Extractor(TorchModel, ABC):
         if self.multi_task_mode == MultiTaskMode.SEPARATED or self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
             prediction = {}
             for task in self._tasks.table_tasks:
-                prediction[task.name] = self.linear_layer[task.name](radiomics[task.name])[:, 0]
+                prediction[task.name] = self.prediction_layer[task.name](radiomics[task.name])[:, 0]
             return prediction
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
-            y = self.linear_layer(radiomics)
+            y = self.prediction_layer(radiomics)
             return {task.name: y[:, i] for i, task in enumerate(self._tasks.table_tasks)}
         else:
             raise ValueError(f"{self.multi_task_mode} is not a valid MultiTaskMode")
