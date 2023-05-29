@@ -14,7 +14,8 @@ from copy import copy
 from typing import List, Optional, Sequence, Union
 
 from monai.networks.blocks import Convolution, ResidualUnit
-from monai.networks.nets import Classifier
+from monai.networks.nets import FullyConnectedNet
+from torch import cat, mean, Tensor
 from torch import device as torch_device
 from torch.nn import DataParallel, Module, ModuleDict, Sequential
 
@@ -23,13 +24,56 @@ from ....tasks import SegmentationTask
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
 
 
+class _Encoder(Module):
+
+    def __init__(self, conv_sequence: Sequential, linear_module: Module):
+        """
+        Initializes the model.
+
+        Parameters
+        ----------
+        conv_sequence : Sequential
+            The convolutional sequence.
+        linear_module : Module
+            The linear module.
+        """
+        super().__init__()
+        self.conv_sequence = conv_sequence
+        self.linear_module = linear_module
+
+    def forward(self, input_tensor: Tensor) -> Tensor:
+        """
+        Forward pass.
+
+        Parameters
+        ----------
+        input_tensor : Tensor
+            The input tensor.
+
+        Returns
+        -------
+        Tensor
+            The output tensor.
+        """
+        dim = tuple(range(2, len(input_tensor.shape)))
+        x = input_tensor
+        features = []
+        for i, conv in enumerate(self.conv_sequence):
+            x = conv(x)
+            global_average_pool = mean(x, dim=dim)
+            features.append(global_average_pool)
+
+        features = cat(features, dim=1)
+        y = self.linear_module(features)
+
+        return y
+
+
 class CNN(Extractor):
     """
     A convolutional neural network used to extract deep radiomics from 3D medical images. It can also be used to perform
     predictions using extracted radiomics. The model is based on the 'Classifier' model from MONAI.
     """
-
-    PARTLY_SHARED_CONVOLUTIONS = 2
 
     def __init__(
             self,
@@ -46,7 +90,9 @@ class CNN(Extractor):
             num_res_units: int = 2,
             activation: str = "PRELU",
             norm: str = "INSTANCE",
-            dropout: float = 0.0,
+            dropout_cnn: float = 0.0,
+            dropout_fnn: float = 0.0,
+            partly_shared_convolutions: int = 2,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None
@@ -77,8 +123,8 @@ class CNN(Extractor):
             Sequence of integers stating the dimension of the input tensor (minus batch and channel dimensions). Can
             also be given as a string containing the sequence. Exemple: (96, 96, 96).
         n_features : int
-            Integer stating the dimension of the final output tensor, i.e. the number of deep radiomics/features to
-            extract from the image.
+            Integer stating the dimension of the final output tensor, i.e. the number of deep features to extract from
+            the image.
         channels : Union[str, Sequence[int]]
             Sequence of integers stating the output channels of each convolutional layer. Can also be given as a string
             containing the sequence.
@@ -92,8 +138,10 @@ class CNN(Extractor):
              Name defining activation layers.
         norm : str
             Name or type defining normalization layers.
-        dropout : float
-            Probability of dropout.
+        dropout_cnn : float
+            Dropout rate after each convolutional layer.
+        dropout_fnn : float
+            Dropout rate after each fully connected layer.
         device : Optional[torch_device]
             The device of the model.
         name : Optional[str]
@@ -120,8 +168,59 @@ class CNN(Extractor):
         self.num_res_units = num_res_units
         self.activation = activation
         self.norm = norm
-        self.dropout = dropout
+        self.dropout_cnn = dropout_cnn
+        self.dropout_fnn = dropout_fnn
+        self.partly_shared_convolutions = partly_shared_convolutions
+
         self.partly_shared_conv_final_shape = None
+
+    def _get_layer(
+            self,
+            in_channels: int,
+            out_channels: int,
+            strides: int,
+            is_last: bool = False
+    ) -> Union[ResidualUnit, Convolution]:
+        """
+        Returns a convolutional layer. If the number of residual units is greater than 0, a residual unit is returned.
+        Otherwise, a convolutional layer is returned. If the layer is the last one, the activation is not applied.
+
+        Parameters
+        ----------
+        in_channels : int
+            Number of input channels.
+        out_channels : int
+            Number of output channels.
+        strides : int
+            Stride of the convolution.
+        is_last : bool
+            Whether the layer is the last one.
+        """
+        if self.num_res_units > 0:
+            return ResidualUnit(
+                subunits=self.num_res_units,
+                last_conv_only=is_last,
+                spatial_dims=len(self.shape),
+                in_channels=in_channels,
+                out_channels=out_channels,
+                strides=strides,
+                kernel_size=self.kernel_size,
+                act=self.activation,
+                norm=self.norm,
+                dropout=self.dropout_cnn
+            )
+        else:
+            return Convolution(
+                conv_only=is_last,
+                spatial_dims=len(self.shape),
+                in_channels=in_channels,
+                out_channels=out_channels,
+                strides=strides,
+                kernel_size=self.kernel_size,
+                act=self.activation,
+                norm=self.norm,
+                dropout=self.dropout_cnn
+            )
 
     def _build_partly_shared_extractor(self) -> Sequential:
         """
@@ -136,44 +235,76 @@ class CNN(Extractor):
         """
         conv_sequence = Sequential()
         partly_shared_final_shape = copy(self.shape)
-        for i in range(self.PARTLY_SHARED_CONVOLUTIONS):
-            if self.num_res_units > 0:
-                module = ResidualUnit(
-                    subunits=self.num_res_units,
-                    spatial_dims=len(self.shape),
-                    in_channels=self.in_shape[0] if i == 0 else self.channels[i - 1],
-                    out_channels=self.channels[i],
-                    strides=self.strides[i],
-                    kernel_size=self.kernel_size,
-                    act=self.activation,
-                    norm=self.norm,
-                    dropout=self.dropout
-                ).to(self.device)
-            else:
-                module = Convolution(
-                    spatial_dims=len(self.shape),
-                    in_channels=self.in_shape[0] if i == 0 else self.channels[i - 1],
-                    out_channels=self.channels[i],
-                    strides=self.strides[i],
-                    kernel_size=self.kernel_size,
-                    act=self.activation,
-                    norm=self.norm,
-                    dropout=self.dropout
-                ).to(self.device)
-
+        for i in range(self.partly_shared_convolutions):
+            layer = self._get_layer(
+                in_channels=self.in_shape[0] if i == 0 else self.channels[i - 1],
+                out_channels=self.channels[i],
+                strides=self.strides[i]
+            )
             conv_sequence.add_module(
                 name="shared_conv_%i" % i,
-                module=module
+                module=DataParallel(layer).to(self.device)
             )
-
             partly_shared_final_shape = tuple(int(t/self.strides[i]) for t in partly_shared_final_shape)
 
         self.partly_shared_final_shape = (
-            int(self.channels[self.PARTLY_SHARED_CONVOLUTIONS - 1]),
+            int(self.channels[self.partly_shared_convolutions - 1]),
             *partly_shared_final_shape
         )
 
         return conv_sequence
+
+    def __get_single_conv_sequence(self):
+        """
+        Returns a single convolutional sequence.
+
+        Returns
+        -------
+        conv_sequence : Sequential
+            The convolutional sequence.
+        """
+        if self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
+            in_shape = self.partly_shared_final_shape
+            channels = self.channels[self.partly_shared_convolutions:]
+            strides = self.strides[self.partly_shared_convolutions:]
+        else:
+            in_shape = self.in_shape
+            channels = self.channels
+            strides = self.strides
+
+        conv_sequence = Sequential()
+        for i, c in enumerate(channels):
+            layer = self._get_layer(
+                in_channels=in_shape[0] if i == 0 else channels[i - 1],
+                out_channels=c,
+                strides=1 if i == len(channels) - 1 else strides[i],
+                is_last=i == len(channels) - 1
+            )
+            conv_sequence.add_module(
+                name="conv_%i" % i,
+                module=DataParallel(layer).to(self.device)
+            )
+
+        return conv_sequence
+
+    def __get_single_linear_module(self):
+        """
+        Returns a single linear module.
+
+        Returns
+        -------
+        linear_module : Module
+            The linear module.
+        """
+        in_channels = sum(self.channels)
+        linear_module = FullyConnectedNet(
+            in_channels=in_channels,
+            out_channels=self.n_features,
+            hidden_channels=(int(in_channels/2), int(in_channels/4)),
+            dropout=self.dropout_fnn,
+            act=self.activation
+        )
+        return DataParallel(linear_module).to(self.device)
 
     def _build_single_extractor(self) -> Module:
         """
@@ -185,29 +316,10 @@ class CNN(Extractor):
             The extractor module. It should take as input a tensor of shape (batch_size, channels, *spatial_shape) and
             return a tensor of shape (batch_size, n_features, *spatial_shape).
         """
-        if self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
-            in_shape = self.partly_shared_final_shape
-            channels = self.channels[self.PARTLY_SHARED_CONVOLUTIONS:]
-            strides = self.strides[self.PARTLY_SHARED_CONVOLUTIONS:]
-        else:
-            in_shape = self.in_shape
-            channels = self.channels
-            strides = self.strides
+        conv_sequence = self.__get_single_conv_sequence()
+        linear_module = self.__get_single_linear_module()
 
-        classifier = Classifier(
-            in_shape=in_shape,
-            classes=self.n_features,
-            channels=channels,
-            strides=strides,
-            kernel_size=self.kernel_size,
-            num_res_units=self.num_res_units,
-            act=self.activation,
-            norm=self.norm,
-            dropout=self.dropout
-        )
-        classifier = DataParallel(classifier)
-
-        return classifier.to(self.device)
+        return _Encoder(conv_sequence=conv_sequence, linear_module=linear_module)
 
     def _build_extractor(self, dataset: ProstateCancerDataset) -> Union[Module, ModuleDict]:
         """
