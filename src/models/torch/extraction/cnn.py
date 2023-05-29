@@ -92,6 +92,7 @@ class CNN(Extractor):
             norm: str = "INSTANCE",
             dropout_cnn: float = 0.0,
             dropout_fnn: float = 0.0,
+            hidden_channels_fnn: Optional[Sequence[int]] = None,
             partly_shared_convolutions: int = 2,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
@@ -142,6 +143,12 @@ class CNN(Extractor):
             Dropout rate after each convolutional layer.
         dropout_fnn : float
             Dropout rate after each fully connected layer.
+        hidden_channels_fnn : Optional[Sequence[int]]
+            Sequence of integers stating the number of hidden units in each fully connected layer.
+        partly_shared_convolutions : int
+            Integer stating the number of convolutional layers that are shared between the tasks when using a partly
+            shared extractor model. The first layers are shared, the last layers are not shared. Only used when
+            multi_task_mode is 'partly_shared'. Default to 2.
         device : Optional[torch_device]
             The device of the model.
         name : Optional[str]
@@ -171,6 +178,11 @@ class CNN(Extractor):
         self.dropout_cnn = dropout_cnn
         self.dropout_fnn = dropout_fnn
         self.partly_shared_convolutions = partly_shared_convolutions
+
+        if hidden_channels_fnn:
+            self.hidden_channels_fnn = hidden_channels_fnn
+        else:
+            self.hidden_channels_fnn = (int(sum(self.channels)/2), int(sum(self.channels)/4))
 
         self.partly_shared_conv_final_shape = None
 
@@ -296,11 +308,10 @@ class CNN(Extractor):
         linear_module : Module
             The linear module.
         """
-        in_channels = sum(self.channels)
         linear_module = FullyConnectedNet(
-            in_channels=in_channels,
+            in_channels=sum(self.channels),
             out_channels=self.n_features,
-            hidden_channels=(int(in_channels/2), int(in_channels/4)),
+            hidden_channels=self.hidden_channels_fnn,
             dropout=self.dropout_fnn,
             act=self.activation
         )
