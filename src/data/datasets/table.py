@@ -70,7 +70,8 @@ class TableDataset(Dataset):
             tasks: Union[TableTask, TaskList, List[TableTask]],
             cont_features: Optional[List[Feature]] = None,
             cat_features: Optional[List[Feature]] = None,
-            to_tensor: bool = False
+            to_tensor: bool = False,
+            random_state: int = 0
     ):
         """
         Sets protected and public attributes of our custom dataset class.
@@ -89,6 +90,8 @@ class TableDataset(Dataset):
             List of column names associated with categorical feature data.
         to_tensor : bool
             Whether we want the features and targets in tensors. False for numpy arrays.
+        random_state : int
+            Random state for the iterative imputer.
         """
         super(TableDataset).__init__()
 
@@ -106,7 +109,11 @@ class TableDataset(Dataset):
         self._cat_features_cols, self._cat_features_idx = [f.column for f in cat_features], []
         self._cont_features_cols, self._cont_features_idx = [f.column for f in cont_features], []
         self._ids_col = ids_col
-        self._iterative_imputer = IterativeImputer(estimator=RandomForestRegressor(), tol=1e-2)
+        self._iterative_imputer = IterativeImputer(
+            estimator=RandomForestRegressor(random_state=random_state),
+            tol=1e-2,
+            random_state=random_state
+        )
         self._target_cols = [task.target_column for task in self._tasks.table_tasks]
         self._to_tensor = to_tensor
         self._train_mask, self._valid_mask, self._test_mask = [], [], []
