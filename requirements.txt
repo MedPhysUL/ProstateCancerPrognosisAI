@@ -22,3 +22,4 @@ torch==2.0.0
 torchaudio==2.0.1
 torchvision==0.15.1
 tqdm==4.64.1
+torch-summary==1.4.5
