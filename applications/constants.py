@@ -19,7 +19,7 @@ from src.data.datasets import Feature
 from src.data.transforms import Normalization, MappingEncoding
 
 # SEED
-SEED = 10
+SEED = 100
 
 # SIZE
 HOLDOUT_SIZE = 0.15
