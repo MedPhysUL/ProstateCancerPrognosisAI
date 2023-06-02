@@ -199,7 +199,7 @@ if __name__ == '__main__':
     )
 
     trainer_hyperparameter = TrainerHyperparameter(
-        batch_size=8,
+        batch_size=16,
         n_epochs=100,
         verbose=False
         # checkpoint=CheckpointHyperparameter(save_freq=20)

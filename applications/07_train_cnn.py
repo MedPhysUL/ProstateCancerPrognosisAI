@@ -83,7 +83,7 @@ if __name__ == '__main__':
         regularizer=L2Regularizer(model.named_parameters(), lambda_=0.02)
     )
     trainer = Trainer(
-        batch_size=8,
+        batch_size=16,
         checkpoint=Checkpoint(),
         exec_metrics_on_train=True,
         n_epochs=100,
