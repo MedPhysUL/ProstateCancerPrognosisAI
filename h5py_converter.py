@@ -77,23 +77,23 @@ graph_scans = False
 if need_transform is None:
     pass
 elif need_transform:
-    # transform_list = [
-    #             ResampleD(keys=keys, out_spacing=(1.5, 1.5, 1.5)),
-    #             MatchingResampleD(reference_image_key="CT", matching_keys=["Heart", "Segmentation", "Tissue"]),
-    #             CenterSpatialCropD(keys=["CT", "Heart", "Segmentation", "Tissue"], roi_size=(192, 192, 192)),
-    #             ScaleIntensityD(keys=keys, minv=-1, maxv=1)]
-    # patients_data_extractor = PatientsDataExtractor(
-    #     path_to_patients_folder=
-    #     "/Users/felixdesroches/Desktop/Stages et notes/Stage -E23/brain_segmentation_E23/lung_data/manifest-1685649685383/patients",
-    #     series_descriptions=series,
-    #     transforms=Compose(transform_list))
-    # database = PatientsDatabase(path_to_database="patients_database_lung.h5")
-    # database.create(
-    #     patients_data_extractor=patients_data_extractor,
-    #     overwrite_database=True,
-    #     tags_to_use_as_attributes=[(0x0008, 0x103E), (0x0020, 0x000E), (0x0008, 0x0060)]
-    # )
-    # database.close()
+    transform_list = [
+                ResampleD(keys=keys, out_spacing=(1.5, 1.5, 1.5)),
+                MatchingResampleD(reference_image_key="CT", matching_keys=["Heart", "Segmentation", "Tissue"]),
+                CenterSpatialCropD(keys=["CT", "Heart", "Segmentation", "Tissue"], roi_size=(192, 192, 192)),
+                ScaleIntensityD(keys=keys, minv=-1, maxv=1)]
+    patients_data_extractor = PatientsDataExtractor(
+        path_to_patients_folder=
+        "/Users/felixdesroches/Desktop/Stages et notes/Stage -E23/brain_segmentation_E23/lung_data/manifest-1685649685383/patients",
+        series_descriptions=series,
+        transforms=Compose(transform_list))
+    database = PatientsDatabase(path_to_database="patients_database_lung.h5")
+    database.create(
+        patients_data_extractor=patients_data_extractor,
+        overwrite_database=True,
+        tags_to_use_as_attributes=[(0x0008, 0x103E), (0x0020, 0x000E), (0x0008, 0x0060)]
+    )
+    database.close()
     with h5py.File("patients_database_lung.h5", "r+") as f:
         for key in list(f.keys()):
             group = f[key]["0"]["0"]

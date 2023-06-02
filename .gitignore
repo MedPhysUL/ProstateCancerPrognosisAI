@@ -133,3 +133,5 @@ dmypy.json
 
 # Local Data
 */local_data
+patients_database_2.h5
+patients_database_lung.h5
