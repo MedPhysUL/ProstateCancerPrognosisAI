@@ -10,7 +10,7 @@
 
 import env_apps
 
-from optuna.samplers import TPESampler
+from optuna.integration.botorch import BoTorchSampler
 import pandas as pd
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
@@ -63,9 +63,8 @@ if __name__ == '__main__':
         )
 
         search_algo = SearchAlgorithm(
-            sampler=TPESampler(
+            sampler=BoTorchSampler(
                 n_startup_trials=5,
-                multivariate=True,
                 seed=SEED
             ),
             storage="sqlite:///" + os.path.join(path_to_record_folder, "tuning_history.db")
@@ -117,7 +116,7 @@ if __name__ == '__main__':
         )
 
         trainer_hyperparameter = TrainerHyperparameter(
-            batch_size=8,
+            batch_size=16,
             n_epochs=100
             # checkpoint=CheckpointHyperparameter(save_freq=20)
         )
