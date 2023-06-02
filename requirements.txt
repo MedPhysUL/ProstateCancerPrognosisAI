@@ -1,5 +1,6 @@
 adjustText==0.7
 bayesian-torch==0.3.0
+botorch==0.8.5
 dacite==1.8.0
 delia==1.1.1
 einops==0.6.0
@@ -10,7 +11,7 @@ monai==1.0.1
 numpy==1.24.2
 opencv-python==4.7.0.68
 openpyxl==3.1.2
-optuna==3.1.0
+optuna==3.2.0
 optuna-dashboard==0.8.1
 pandas==1.5.3
 plotly==5.13.0
