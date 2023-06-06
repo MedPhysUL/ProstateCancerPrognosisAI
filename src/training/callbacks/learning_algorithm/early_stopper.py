@@ -213,10 +213,10 @@ class MetricsEarlyStopper(EarlyStopper):
         early_stop : bool
             Whether to early stop.
         """
-        val_scores = trainer.epoch_state.valid.single_task_losses
+        val_scores = trainer.epoch_state.valid.single_task_metrics
 
         new_scores_is_better = []
-        for i, task, best_score in enumerate(zip(self._tasks, self._best_val_metric_scores)):
+        for i, (task, best_score) in enumerate(zip(self._tasks, self._best_val_metric_scores)):
             val_score = val_scores[task.name][task.early_stopping_metric.name]
 
             if task.early_stopping_metric.direction == Direction.MINIMIZE:
