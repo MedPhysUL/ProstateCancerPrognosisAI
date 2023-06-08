@@ -16,6 +16,7 @@ from shutil import rmtree
 from typing import Generator, List, NamedTuple, Optional, Sequence, Union
 from uuid import uuid1
 
+import numpy as np
 from monai.data import DataLoader
 from monai.utils import set_determinism
 from torch import device as torch_device
@@ -433,7 +434,7 @@ class Trainer:
 
             self.callbacks.on_epoch_end(self)
 
-            postfix = self.epoch_state.state_dict()
+            postfix = self._get_progress_postfix()
             postfix.update(self.callbacks.on_progress_bar_update(self))
             progress_bar.set_postfix(postfix)
 
@@ -448,6 +449,27 @@ class Trainer:
         progress_bar.close()
 
         return TrainingResult(model=self.model, training_history=self.training_history)
+
+    def _get_progress_postfix(self) -> dict:
+        """
+        Gives the cleaned postfix for the progress bar created from epoch_state.state_dict().
+
+        Returns
+        -------
+        postfix : dict
+            {train_loss: {algorithm: loss}, valid_loss: {algorithm: loss}}.
+        """
+        postfix = {}
+        state_dict = self.epoch_state.state_dict()
+
+        for state_key in state_dict.keys():
+            if isinstance(state_dict[state_key], dict):
+                postfix_key = state_key + "_loss"
+                postfix[postfix_key] = {}
+                for algorithm_key in state_dict[state_key]["multi_task_losses"].keys():
+                    for loss in state_dict[state_key]["multi_task_losses"][algorithm_key].values():
+                        postfix[postfix_key][algorithm_key] = np.round_(loss, 3)
+        return postfix
 
     def _epochs_generator(self, progress_bar: tqdm) -> Generator:
         """

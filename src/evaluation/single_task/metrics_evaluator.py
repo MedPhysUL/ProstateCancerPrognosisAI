@@ -40,9 +40,7 @@ class Evaluator:
         self.mask = mask
 
     def _dataset_to_predictions(self):
-
-        for features, truth in data_loader:
-            prediction = self.model.predict(features=features)
+        prediction = self.model.predict_on_dataset(features=features)
 
 
     def show_auc(self, save = False):
