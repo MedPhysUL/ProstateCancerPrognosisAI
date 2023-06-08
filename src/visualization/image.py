@@ -1,6 +1,6 @@
 """
     @file:              image.py
-    @Author:            Maxence Larose, Raphael Brodeur
+    @Author:            Raphael Brodeur, Maxence Larose
 
     @Creation Date:     06/2022
     @Last modification: 07/2022
