@@ -182,7 +182,7 @@ class CNN(Extractor):
         if hidden_channels_fnn:
             self.hidden_channels_fnn = hidden_channels_fnn
         else:
-            self.hidden_channels_fnn = (int(sum(self.channels)/2), int(sum(self.channels)/4))
+            self.hidden_channels_fnn = (int(sum(self.channels)/4), int(sum(self.channels)/16))
 
         self.partly_shared_conv_final_shape = None
 
