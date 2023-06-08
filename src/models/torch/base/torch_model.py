@@ -329,7 +329,7 @@ class TorchModel(Model, ABC):
         Returns
         -------
         scores : Dict[str, Dict[str, float]]
-            Score for each tasks and each metrics.
+            Score for each task and each metric.
         """
         subset = dataset[mask]
         rng_state = random.get_rng_state()

@@ -1,11 +1,11 @@
 """
-    @file:              training_app.py
-    @Author:            Raphael Brodeur
+    @file:
+    @Author:
 
-    @Creation Date:     12/2022
-    @Last modification: 03/2023
+    @Creation Date:
+    @Last modification:
 
-    @Description:       This file contains the training of a prostate net.
+    @Description:
 """
 
 from delia.databases import PatientsDatabase

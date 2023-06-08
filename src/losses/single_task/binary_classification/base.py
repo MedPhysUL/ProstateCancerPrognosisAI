@@ -41,7 +41,7 @@ class BinaryClassificationLoss(SingleTaskLoss, ABC):
         weight : float
             The weight attributed to class 1 (in [0, 1]).
         """
-        if not (0 < weight < 1):
+        if not (0 <= weight <= 1):
             raise ValueError("The weight parameter must be included in range [0, 1]")
 
         self._weight = weight
@@ -83,9 +83,10 @@ class BinaryClassificationLoss(SingleTaskLoss, ABC):
         loss : Tensor
             Rounded loss score.
         """
-        assert self.scaling_factor, f"Scaling factor must be set before computing the {self.__class__.__name__}. Use " \
-                                    f"the method 'update_scaling_factor' or directly set the 'scaling_factor " \
-                                    f"attribute'."
+        assert isinstance(self.scaling_factor, np.float64), f"Scaling factor must be set before computing the" \
+                                                            f" {self.__class__.__name__}. Use the method " \
+                                                            f"'update_scaling_factor' or directly set the " \
+                                                            f"'scaling_factor attribute'."
 
         nonmissing_targets_idx = self.get_idx_of_nonmissing_targets(targets)
         if len(nonmissing_targets_idx) == 0:
