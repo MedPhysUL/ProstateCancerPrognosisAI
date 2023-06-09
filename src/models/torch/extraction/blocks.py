@@ -2,7 +2,7 @@
     @file:              blocks.py
     @Author:            Raphael Brodeur
 
-    @Creation Date:     12/2022
+    @Creation Date:     06/2022
     @Last modification: 06/2023
 
     @Description:       This file contains blocks to build image processing models.
@@ -13,7 +13,7 @@ from typing import Sequence, Union
 from monai.networks.blocks import ADN
 from monai.networks.layers.convutils import same_padding
 import numpy as np
-import torch
+from torch import Tensor
 import torch.nn as nn
 
 
@@ -81,7 +81,7 @@ class EncoderBlock(nn.Module):
         if num_res_units > 0:
             self.residual = nn.Identity()
 
-            for su in range(num_res_units - 1):
+            for subunit in range(num_res_units - 1):
                 i += 1
 
                 self.conv.add_module(
@@ -124,18 +124,18 @@ class EncoderBlock(nn.Module):
                 padding=res_padding
             )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         """
         Defines the forward method of the encoder block.
 
         Parameters
         ----------
-        x : torch.Tensor
+        x : Tensor
             Input tensor.
 
         Returns
         -------
-        output : torch.Tensor
+        output : Tensor
             Output tensor.
         """
         y = self.conv(x)

@@ -14,13 +14,12 @@ from copy import copy
 from typing import List, Optional, Sequence, Union
 
 from monai.networks.nets import FullyConnectedNet
-
-from .blocks import EncoderBlock
 from torch import cat, mean, Tensor
 from torch import device as torch_device
 from torch.nn import DataParallel, Module, ModuleDict, Sequential
 
 from .base import Extractor, MergingMethod, ModelMode, MultiTaskMode
+from .blocks import EncoderBlock
 from ....tasks import SegmentationTask
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
 
