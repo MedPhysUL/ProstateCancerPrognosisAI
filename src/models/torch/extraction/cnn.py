@@ -1,11 +1,11 @@
 """
     @file:              cnn.py
-    @Author:            Maxence Larose
+    @Author:            Maxence Larose, Raphael Brodeur
 
     @Creation Date:     03/2022
-    @Last modification: 04/2023
+    @Last modification: 06/2023
 
-    @Description:       This file is used to define a 'CNN' model.
+    @Description:       This file is used to define a CNN model.
 """
 
 from __future__ import annotations
@@ -13,13 +13,13 @@ from ast import literal_eval
 from copy import copy
 from typing import List, Optional, Sequence, Union
 
-from monai.networks.blocks import Convolution, ResidualUnit
 from monai.networks.nets import FullyConnectedNet
 from torch import cat, mean, Tensor
 from torch import device as torch_device
 from torch.nn import DataParallel, Module, ModuleDict, Sequential
 
 from .base import Extractor, MergingMethod, ModelMode, MultiTaskMode
+from .blocks import EncoderBlock
 from ....tasks import SegmentationTask
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
 
@@ -87,7 +87,7 @@ class CNN(Extractor):
             channels: Union[str, Sequence[int]] = (4, 8, 16, 32, 64),
             strides: Optional[Sequence[int]] = None,
             kernel_size: Union[Sequence[int], int] = 3,
-            num_res_units: int = 2,
+            num_res_units: int = 3,
             activation: str = "PRELU",
             norm: str = "INSTANCE",
             dropout_cnn: float = 0.0,
@@ -190,12 +190,10 @@ class CNN(Extractor):
             self,
             in_channels: int,
             out_channels: int,
-            strides: int,
-            is_last: bool = False
-    ) -> Union[ResidualUnit, Convolution]:
+            strides: int
+    ) -> EncoderBlock:
         """
-        Returns a convolutional layer. If the number of residual units is greater than 0, a residual unit is returned.
-        Otherwise, a convolutional layer is returned. If the layer is the last one, the activation is not applied.
+        Returns an encoder block.
 
         Parameters
         ----------
@@ -205,34 +203,22 @@ class CNN(Extractor):
             Number of output channels.
         strides : int
             Stride of the convolution.
-        is_last : bool
-            Whether the layer is the last one.
+
+        Returns
+        -------
+        encoder : EncoderBlock
+            An encoder block.
         """
-        if self.num_res_units > 0:
-            return ResidualUnit(
-                subunits=self.num_res_units,
-                last_conv_only=is_last,
-                spatial_dims=len(self.shape),
-                in_channels=in_channels,
-                out_channels=out_channels,
-                strides=strides,
-                kernel_size=self.kernel_size,
-                act=self.activation,
-                norm=self.norm,
-                dropout=self.dropout_cnn
-            )
-        else:
-            return Convolution(
-                conv_only=is_last,
-                spatial_dims=len(self.shape),
-                in_channels=in_channels,
-                out_channels=out_channels,
-                strides=strides,
-                kernel_size=self.kernel_size,
-                act=self.activation,
-                norm=self.norm,
-                dropout=self.dropout_cnn
-            )
+        return EncoderBlock(
+            input_channels=in_channels,
+            output_channels=out_channels,
+            num_res_units=self.num_res_units,
+            kernel_size=self.kernel_size,
+            stride=strides,
+            act=self.activation,
+            norm=self.norm,
+            dropout=self.dropout_cnn
+        )
 
     def _build_partly_shared_extractor(self) -> Sequential:
         """
@@ -289,8 +275,7 @@ class CNN(Extractor):
             layer = self._get_layer(
                 in_channels=in_shape[0] if i == 0 else channels[i - 1],
                 out_channels=c,
-                strides=1 if i == len(channels) - 1 else strides[i],
-                is_last=i == len(channels) - 1
+                strides=1 if i == len(channels) - 1 else strides[i]
             )
             conv_sequence.add_module(
                 name="conv_%i" % i,
