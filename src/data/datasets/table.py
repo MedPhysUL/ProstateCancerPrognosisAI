@@ -98,7 +98,9 @@ class TableDataset(Dataset):
         # Validate features and set original data
         self._imputed_df = None
         self._original_df = df
-        self._cont_features, self._cat_features = cont_features, cat_features
+
+        self._cat_features = cat_features if cat_features else []
+        self._cont_features = cont_features if cont_features else []
         self._validate_features()
 
         # Validate tasks and set task list
@@ -106,8 +108,8 @@ class TableDataset(Dataset):
         self._validate_tasks()
 
         # Set default protected attributes
-        self._cat_features_cols, self._cat_features_idx = [f.column for f in cat_features], []
-        self._cont_features_cols, self._cont_features_idx = [f.column for f in cont_features], []
+        self._cat_features_cols, self._cat_features_idx = [f.column for f in self._cat_features], []
+        self._cont_features_cols, self._cont_features_idx = [f.column for f in self._cont_features], []
         self._ids_col = ids_col
         self._iterative_imputer = IterativeImputer(
             estimator=RandomForestRegressor(random_state=random_state),
@@ -446,9 +448,6 @@ class TableDataset(Dataset):
         provided, raises an error. If both continuous and categorical features are provided, raises an error. If the
         features are valid, does nothing.
         """
-        if self._cont_features is None and self._cat_features is None:
-            raise ValueError("At least a list of continuous columns or a list of categorical columns must be provided.")
-
         for features, cont in zip([self._cont_features, self._cat_features], [True, False]):
             self._check_features_validity(features, cont)
 
@@ -588,9 +587,10 @@ class TableDataset(Dataset):
         mean, std = self._get_current_train_stats()
 
         # We update the data that will be available via __get_item__
-        self._preprocess_cat_features()
-        self._impute_missing_features()
-        self._preprocess_cont_features(mean, std)
+        if self._cat_features or self._cont_features:
+            self._preprocess_cat_features()
+            self._impute_missing_features()
+            self._preprocess_cont_features(mean, std)
         self._set_features()
 
         # We set the classification tasks scaling factors
