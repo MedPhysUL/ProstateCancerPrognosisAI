@@ -14,7 +14,7 @@ from ast import literal_eval
 from enum import auto, StrEnum
 from typing import Dict, List, Optional, Sequence, Union
 
-from torch import cat, Tensor
+from torch import Tensor
 from torch import device as torch_device
 from torch.nn import Linear, Module, ModuleDict
 
@@ -230,6 +230,7 @@ class Extractor(TorchModel, ABC):
 
         return self
 
+    @abstractmethod
     def _get_input_tensor(self, features: FeaturesType) -> Tensor:
         """
         Returns the input tensor to the extractor.
@@ -244,16 +245,7 @@ class Extractor(TorchModel, ABC):
         input: Tensor
             The input tensor to the extractor.
         """
-        if self.segmentation_key:
-            if self.merging_method == MergingMethod.CONCATENATION:
-                image_and_seg_keys = self.image_keys + [self.segmentation_key]
-                return cat([features.image[k] for k in image_and_seg_keys], 1)
-            elif self.merging_method == MergingMethod.MULTIPLICATION:
-                return cat([features.image[k]*features.image[self.segmentation_key] for k in self.image_keys], 1)
-            else:
-                raise ValueError(f"{self.merging_method} is not a valid MergingMethod")
-        else:
-            return cat([features.image[k] for k in self.image_keys], 1)
+        raise NotImplementedError
 
     def _get_radiomics(self, input_tensor: Tensor) -> Union[Tensor, Dict[str, Tensor]]:
         """

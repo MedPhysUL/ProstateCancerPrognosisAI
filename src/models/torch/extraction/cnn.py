@@ -21,11 +21,13 @@ from torch.nn import DataParallel, Module, ModuleDict, Sequential
 from .base import Extractor, MergingMethod, ModelMode, MultiTaskMode
 from .blocks import EncoderBlock
 from ....tasks import SegmentationTask
-from ....data.datasets.prostate_cancer import ProstateCancerDataset
+from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset
 
 
 class _Encoder(Module):
-
+    """
+    Description.
+    """
     def __init__(self, conv_sequence: Sequential, linear_module: Module):
         """
         Initializes the model.
@@ -347,3 +349,28 @@ class CNN(Extractor):
                 partly_shared_module_dict[name] = Sequential(shared_module, module)
 
             return partly_shared_module_dict
+
+    def _get_input_tensor(self, features: FeaturesType) -> Tensor:
+        """
+        Returns the input tensor to the extractor.
+
+        Parameters
+        ----------
+        features : FeaturesType
+            The features to use as input to the extractor.
+
+        Returns
+        -------
+        input: Tensor
+            The input tensor to the extractor.
+        """
+        if self.segmentation_key:
+            if self.merging_method == MergingMethod.CONCATENATION:
+                image_and_seg_keys = self.image_keys + [self.segmentation_key]
+                return cat([features.image[k] for k in image_and_seg_keys], 1)
+            elif self.merging_method == MergingMethod.MULTIPLICATION:
+                return cat([features.image[k]*features.image[self.segmentation_key] for k in self.image_keys], 1)
+            else:
+                raise ValueError(f"{self.merging_method} is not a valid MergingMethod")
+        else:
+            return cat([features.image[k] for k in self.image_keys], 1)
