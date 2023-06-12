@@ -462,12 +462,12 @@ class Trainer:
         postfix = {}
         state_dict = self.epoch_state.state_dict()
 
-        for state_key in state_dict.keys():
-            if isinstance(state_dict[state_key], dict):
+        for state_key, state in state_dict.items():
+            if isinstance(state, dict):
                 postfix_key = state_key + "_loss"
                 postfix[postfix_key] = {}
-                for algorithm_key in state_dict[state_key]["multi_task_losses"].keys():
-                    for loss in state_dict[state_key]["multi_task_losses"][algorithm_key].values():
+                for algorithm_key, algorithm in state["multi_task_losses"].items():
+                    for loss in algorithm.values():
                         postfix[postfix_key][algorithm_key] = np.round_(loss, 3)
         return postfix
 
