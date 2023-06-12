@@ -1,5 +1,5 @@
 """
-    @file:              metrics_evaluator.py
+    @file:              prediction_evaluator.py
     @Author:            Felix Desroches
 
     @Creation Date:     06/2023
@@ -12,111 +12,83 @@ import json
 import matplotlib.pyplot as plt
 import torch
 
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
+from typing import Any, Dict, List, NamedTuple, Optional, Union
 
-from src.data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset
+from sklearn.calibration import calibration_curve
+
+from src.data.datasets.prostate_cancer import FeaturesType
 from src.tasks.containers.list import TaskList
 from src.models.torch.base.torch_model import Output
 from src.metrics.single_task.base import MetricReduction
 from src.tools.transforms import to_numpy
 
-from monai.data import DataLoader
-from torch import float32, random, tensor, Tensor
+from torch import float32, tensor, Tensor
+from sklearn.metrics import confusion_matrix
 
 
-class BreslowInput(NamedTuple):
+class GraphConfig(NamedTuple):
     """
-        Inputs for breslow graphs.
+    Inputs for breslow graphs.
 
-        Elements
-        --------
-        task_name : str
-            Name of the current task, used to create an unambiguous file name.
-        show : bool
-            Whether to show the graph.
-        save : Union[bool, str]
-            Whether to save the graph, if so, then this value is the path to the save folder.
-        kwargs: Dict[str, Any]
-            Dict of positional arguments to pass on to matplotlib.pyplot.savefig()
-        """
+    Elements
+    --------
+    show : bool
+        Whether to show the graph.
+    save : Union[bool, str]
+        Whether to save the graph, if so, then this value is the path to the save folder.
+    kwargs : Dict[str, Any]
+        Dict of positional arguments to pass on to matplotlib.pyplot.savefig(), use {} if there are none.
+    """
+    show: bool
+    save: Union[bool, str]
+    kwargs: Dict[str, Any]
+
+
+class TaskInput(NamedTuple):
+    """
+    Inputs for breslow graphs.
+
+    Elements
+    --------
+    task_name : str
+        Name of the current task, used to create an unambiguous file name.
+    show : bool
+        Whether to show the graph.
+    save : Union[bool, str]
+        Whether to save the graph, if so, then this value is the path to the save folder.
+    kwargs : Dict[str, Any]
+        Dict of positional arguments to pass on to matplotlib.pyplot.savefig(), use {} if there are none.
+    """
     task_name: str
     show: bool
     save: Union[bool, str]
     kwargs: Dict[str, Any]
 
 
-class Evaluator:
-    def __init__(
-            self,
-            model,
-            results,
-            ground_truth: Optional[List[Union[dict, FeaturesType, Tensor]]] = None,
-            mask: Optional[List[int]] = None,
-            tasks: Optional[TaskList] = None
-            ):
+class PredictionEvaluator:
+    def __init__(self,
+                 predictions,
+                 ground_truth: List[Union[dict, FeaturesType, Tensor]],
+                 tasks: TaskList
+                 ):
         """
         Sets the required values for the computation of the different metrics.
 
         Parameters
         ----------
-        model
-            Neural network model to evaluate.
-        results
+        predictions
             Either the dataset with which the evaluation is desired or the predictions of the model from a dataset.
         ground_truth : Optional[List[Union[dict, FeaturesType, Tensor]]]
             Ground truths to be used as a reference for the computation of the different metrics. This argument is
             required if predictions are used.
-        mask : Optional[List[int]]
-            Mask of the dataset to specify with which data to use in the evaluation. This argument is required if a
-            dataset is used.
         tasks : Optional[Tasklist]
             Object of the class TaskList that specifies for which tasks the model should be evaluated. This argument
             is required if predictions are used.
         """
 
-        self.model = model
+        self.predictions = predictions
         self.ground_truth = ground_truth
-        self.mask = mask
         self.tasks = tasks
-
-        if isinstance(results, ProstateCancerDataset):
-            self.dataset = results
-            self.predictions = self._dataset_to_predictions()
-        else:
-            self.predictions = results
-            self.dataset = None
-
-        if self.dataset is not None:
-            assert self.mask is not None, "If a dataset is used, then a mask needs to be provided."
-            if self.tasks is None:
-                self.tasks = self.dataset.tasks
-            if self.ground_truth is None:
-                self.ground_truth = []
-                subset = self.dataset[self.mask]
-                for _, targets in DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None):
-                    self.ground_truth.append(targets)
-
-        if self.dataset is None:
-            assert self.tasks is not None, "When using predictions, then a list of the tasks is required."
-            assert self.ground_truth is not None, "When using predictions, then ground truths are required."
-
-    def _dataset_to_predictions(self):
-        """
-        Generates predictions using a dataset, model and mask.
-
-        Returns
-        -------
-        predictions : List[TargetsType]
-            The predictions of the model.
-        """
-        subset = self.dataset[self.mask]
-        rng_state = random.get_rng_state()
-        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
-        random.set_rng_state(rng_state)
-        predictions = []
-        for features, _ in data_loader:
-            predictions.append(self.model.predict(features=features))
-        return predictions
 
     def _score_on_predictions(self) -> Dict[str, Dict[str, float]]:
         """
@@ -160,20 +132,20 @@ class Evaluator:
 
     def scalar_metrics(self,
                        metrics: Optional[Union[str, List[str]]] = None,
-                       show: bool = True,
+                       return_metrics: bool = True,
                        save: Union[bool, str] = False
-                       ):
+                       ) -> Dict[str, Dict[str, float]]:
         """
         Computes the metrics associated with each task.
 
         Parameters
         ----------
         metrics : Optional[Union[str, List[str]]]
-            Either the metric to compute, a list of the metric or "all" which will compute all metrics. Defaults to None
-            which computes no metric.
-        show : bool
-            Whether to print the computed metrics. False means that the metric are computed but not shown. Default to
-            True which print the metrics as a dictionary.
+            Either the metric to compute, a list of the metrics or "all" which will compute all metrics. Defaults to
+            None which computes no metric.
+        return_metrics : bool
+            Whether to return the computed metrics. False means that the metric are computed but not returned. Defaults
+            to True which returns the metrics as a dictionary.
         save : Union[bool, str]
             Whether to save the computed metrics. If saving the metrics is desired, then this is the path of the folder
             where they will be saved as a json file. Defaults to False which does not save the metrics.
@@ -191,7 +163,7 @@ class Evaluator:
                        'AUC',
                        'Dice'
                        ]
-        elif isinstance(metrics, int):
+        elif isinstance(metrics, str):
             metrics = [metrics]
 
         scores = self._score_on_predictions()
@@ -205,61 +177,67 @@ class Evaluator:
             if not metric_present:
                 scalar_metrics[task] = "N/A"
 
-        if show:
-            print(scalar_metrics)
         if save:
             path = save + '/scalar_metrics.json'
             with open(path, 'w') as file_path:
                 json.dump(scalar_metrics, file_path)
+        if return_metrics:
+            return scalar_metrics
 
-    def breslow_graphs(self,
-                       graph_unique_times: Tuple[bool, Union[bool, str], Dict[str, Any]],
-                       graph_cum_baseline_hazard: Tuple[bool, Union[bool, str], Dict[str, Any]],
-                       graph_baseline_survival: Tuple[bool, Union[bool, str], Dict[str, Any]],
-                       graph_cum_hazard_function: Tuple[bool, Union[bool, str], Dict[str, Any]],
-                       graph_survival_function: Tuple[bool, Union[bool, str], Dict[str, Any]]
-                       ):
+    def visual_metrics(self,
+                       graph_unique_times: GraphConfig,
+                       graph_cum_baseline_hazard: GraphConfig,
+                       graph_baseline_survival: GraphConfig,
+                       graph_cum_hazard_function: GraphConfig,
+                       graph_survival_function: GraphConfig,
+                       # graph_confusion_matrix: GraphConfig,
+                       # graph_calibration_curve: GraphConfig,
+                       # confusion_matrix_parameters: dict = {},
+                       # calibration_curve_parameters: dict = {}
+                       ):  # ROC curve, precision-recall curve de sklearn
         """
         Creates the different graphs for the breslow estimator.
 
         Parameters
         ----------
-        graph_unique_times: Tuple[bool, Union[bool, str], Dict[str, Any]]
-            A tuple used for the unique times graph with: a bool to decide whether to show the graph, either the path
-            to the folder where the graph should be saved of False, kwargs for matplotlib.pyplot.savefig().
-        graph_cum_baseline_hazard: Tuple[bool, Union[bool, str], Dict[str, Any]]
-            A tuple used for the cumulative baseline hazard graph with: a bool to decide whether to show the graph,
-            either the path to the folder where the graph should be saved of False, kwargs for
-            matplotlib.pyplot.savefig().
-        graph_baseline_survival: Tuple[bool, Union[bool, str], Dict[str, Any]]
-            A tuple used for the baseline survival graph with: a bool to decide whether to show the graph, either the
-            path to the folder where the graph should be saved of False, kwargs for matplotlib.pyplot.savefig().
-        graph_cum_hazard_function: Tuple[bool, Union[bool, str], Dict[str, Any]]
-            A tuple used for the cumulative hazard function graph with: a bool to decide whether to show the graph,
-            either the path to the folder where the graph should be saved of False, kwargs for
-            matplotlib.pyplot.savefig().
-        graph_survival_function: Tuple[bool, Union[bool, str], Dict[str, Any]]
-            A tuple used for the survival function graph with: a bool to decide whether to show the graph, either the
-            path to the folder where the graph should be saved of False, kwargs for matplotlib.pyplot.savefig().
+        graph_unique_times : GraphConfig
+            A tuple used for the unique times graph.
+        graph_cum_baseline_hazard : GraphConfig
+            A tuple used for the cumulative baseline hazard graph.
+        graph_baseline_survival : GraphConfig
+            A tuple used for the baseline survival graph.
+        graph_cum_hazard_function : GraphConfig
+            A tuple used for the cumulative hazard function graph.
+        graph_survival_function : GraphConfig
+            A tuple used for the survival function graph.
+        graph_confusion_matrix : GraphConfig
+            A tuple used for the confusion matrix graph.
+        graph_calibration_curve : GraphConfig
+            A tuple used for the calibration curve graph.
+        confusion_matrix_parameters : dict
+            Dictionary of optional parameters for sklearn.metrics.confusion_matrix
+        calibration_curve_parameters : dict
+            Dictionary of optional parameters for sklearn.calibration.calibration_curve.
         """
         for task in self.tasks.survival_analysis_tasks:
             self.breslow_estimator = task.breslow_estimator
-            self._breslow_unique_times(BreslowInput(task.name, *graph_unique_times))
-            self._breslow_cum_baseline_hazard(BreslowInput(task.name, *graph_cum_baseline_hazard))
-            self._breslow_baseline_survival(BreslowInput(task.name, *graph_baseline_survival))
-            self._breslow_cum_hazard_function(task, BreslowInput(task.name, *graph_cum_hazard_function))
-            self._breslow_survival_function(task, BreslowInput(task.name, *graph_survival_function))
+            self._breslow_unique_times(TaskInput(task.name, *graph_unique_times))
+            self._breslow_cum_baseline_hazard(TaskInput(task.name, *graph_cum_baseline_hazard))
+            self._breslow_baseline_survival(TaskInput(task.name, *graph_baseline_survival))
+            self._breslow_cum_hazard_function(task, TaskInput(task.name, *graph_cum_hazard_function))
+            self._breslow_survival_function(task, TaskInput(task.name, *graph_survival_function))
+        # for task in self.tasks.binary_classification_tasks:
+        #     self._confusion_matrix(TaskInput(task.name, *graph_confusion_matrix), confusion_matrix_parameters)
+        #     self._calibration_curve(TaskInput(task.name, *graph_calibration_curve), calibration_curve_parameters)
 
-    def _breslow_unique_times(self, graph: BreslowInput):
+    def _breslow_unique_times(self, graph: TaskInput):
         """
         Creates the breslow unique times graph.
 
         Parameters
         ----------
-        graph: BreslowInput
-            A NamedTuple used for the unique times graph with: the name of the task, a bool to decide whether to show
-            the graph, either the path to the folder where the graph should be saved of False, kwargs for
-            matplotlib.pyplot.savefig().
+        graph : TaskInput
+            A NamedTuple used for the unique times graph.
         """
         plt.plot(self.breslow_estimator.unique_times_)
         if graph.save:
@@ -270,16 +248,14 @@ class Evaluator:
         if not graph.show:
             plt.close()
 
-    def _breslow_cum_baseline_hazard(self, graph: BreslowInput):
+    def _breslow_cum_baseline_hazard(self, graph: TaskInput):
         """
         Creates the breslow cumulative baseline hazard graph
 
         Parameters
         ----------
-        graph: BreslowInput
-            A NamedTuple used for the cumulative baseline hazard graph with: the name of the task, a bool to decide
-            whether to show the graph, either the path to the folder where the graph should be saved of False, kwargs
-            for matplotlib.pyplot.savefig().
+        graph : TaskInput
+            A NamedTuple used for the cumulative baseline hazard graph.
         """
         cum_baseline_hazard = self.breslow_estimator.cum_baseline_hazard_
         plt.plot(cum_baseline_hazard.x, cum_baseline_hazard.y)
@@ -291,16 +267,14 @@ class Evaluator:
         if not graph.show:
             plt.close()
 
-    def _breslow_baseline_survival(self, graph: BreslowInput):
+    def _breslow_baseline_survival(self, graph: TaskInput):
         """
         Creates the breslow baseline survival graph.
 
         Parameters
         ----------
-        graph: BreslowInput
-            A NamedTuple used for the baseline survival graph with: the name of the task, a bool to decide whether to
-            show the graph, either the path to the folder where the graph should be saved of False, kwargs for
-            matplotlib.pyplot.savefig().
+        graph : TaskInput
+            A NamedTuple used for the baseline survival graph.
         """
         baseline_survival = self.breslow_estimator.baseline_survival_
         plt.plot(baseline_survival.x, baseline_survival.y)
@@ -312,7 +286,7 @@ class Evaluator:
         if not graph.show:
             plt.close()
 
-    def _breslow_cum_hazard_function(self, task, graph: BreslowInput):
+    def _breslow_cum_hazard_function(self, task, graph: TaskInput):
         """
         Creates the breslow cumulative hazard function graph.
 
@@ -320,10 +294,8 @@ class Evaluator:
         ----------
         task
             The task for which to compute the cumulative hazard function.
-        graph: BreslowInput
-            A NamedTuple used for the cumulative hazard function graph with: the name of the task, a bool to decide
-            whether to show the graph, either the path to the folder where the graph should be saved of False, kwargs
-            for matplotlib.pyplot.savefig().
+        graph : TaskInput
+            A NamedTuple used for the cumulative hazard function graph.
         """
         prediction = {}
         for prediction_element in self.predictions:
@@ -342,7 +314,7 @@ class Evaluator:
         if not graph.show:
             plt.close()
 
-    def _breslow_survival_function(self, task, graph: BreslowInput):
+    def _breslow_survival_function(self, task, graph: TaskInput):
         """
         Creates the breslow survival function graph.
 
@@ -350,10 +322,8 @@ class Evaluator:
         ----------
         task
             The task for which to compute the survival function.
-        graph: BreslowInput
-            A NamedTuple used for the survival function graph with: the name of the task, a bool to decide whether to
-            show the graph, either the path to the folder where the graph should be saved of False, kwargs for
-            matplotlib.pyplot.savefig().
+        graph : TaskInput
+            A NamedTuple used for the survival function graph.
         """
         prediction = {}
         for prediction_element in self.predictions:
@@ -366,6 +336,53 @@ class Evaluator:
             plt.step(fn.x, fn(fn.x), where="post")
         if graph.save:
             path = graph.save + f'/{graph.task_name}_breslow_survival_function.pdf'
+            plt.savefig(path, **graph.kwargs)
+        if graph.show:
+            plt.show()
+        if not graph.show:
+            plt.close()
+
+    def _confusion_matrix(self, graph: TaskInput, confusion_matrix_parameters: dict):
+        """
+        Creates the confusion matrix graph.
+
+        Parameters
+        ----------
+        graph : TaskInput
+            A NamedTuple used for the confusion matrix graph.
+        confusion_matrix_parameters : dict
+            Dictionary of optional parameters for sklearn.metrics.confusion_matrix.
+
+        """
+        confusion = confusion_matrix(self.ground_truth, self.predictions, **confusion_matrix_parameters)
+        plt.imshow(confusion)
+        if graph.save:
+            path = graph.save + f'/{graph.task_name}_confusion_matrix.pdf'
+            plt.savefig(path, **graph.kwargs)
+        if graph.show:
+            plt.show()
+        if not graph.show:
+            plt.close()
+
+    def _calibration_curve(self, graph: TaskInput, calibration_curve_parameters: dict):
+        """
+        Creates the confusion matrix graph.
+
+        Parameters
+        ----------
+        graph : TaskInput
+            A NamedTuple used for the calibration_curve graph.
+        calibration_curve_parameters : dict
+            Dictionary of optional parameters for sklearn.calibration.calibration_curve.
+
+        """
+        prob_true, prob_pred = calibration_curve(self.ground_truth, self.predictions, **calibration_curve_parameters)
+        subplot_x, subplot_y = 2, 1
+        fig, arr = plt.subplots(subplot_y, subplot_x)
+        arr[0, 0].imshow(prob_pred)
+        arr[1, 0].imshow(prob_true)
+        if graph.save:
+            path = graph.save + f'/{graph.task_name}_calibration_curve.pdf'
             plt.savefig(path, **graph.kwargs)
         if graph.show:
             plt.show()

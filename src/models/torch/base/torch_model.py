@@ -315,7 +315,7 @@ class TorchModel(Model, ABC):
             self,
             dataset: ProstateCancerDataset,
             mask: List[int]
-    ) -> Dict[str, Dict[str, float]]:
+    ) -> Dict[str, Dict[str, float]]:  # Est-ce que je peux le retirer d'ici puisqu'il existe déjà une méthode statique?
         """
         Returns the score of all samples in a particular subset of the dataset, determined using a mask parameter.
 
