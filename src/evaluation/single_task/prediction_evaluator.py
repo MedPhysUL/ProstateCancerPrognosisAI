@@ -16,19 +16,19 @@ from typing import Any, Dict, List, NamedTuple, Optional, Union
 
 from sklearn.calibration import calibration_curve
 
-from src.data.datasets.prostate_cancer import FeaturesType
+from src.data.datasets.prostate_cancer import FeaturesType, TargetsType
 from src.tasks.containers.list import TaskList
 from src.models.torch.base.torch_model import Output
 from src.metrics.single_task.base import MetricReduction
 from src.tools.transforms import to_numpy
 
 from torch import float32, tensor, Tensor
-from sklearn.metrics import confusion_matrix, roc_curve, precision_recall_curve
+from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_curve
 
 
 class GraphConfig(NamedTuple):
     """
-    Inputs for breslow graphs.
+    Inputs for metric graphs.
 
     Elements
     --------
@@ -45,24 +45,23 @@ class GraphConfig(NamedTuple):
 
 
 class PredictionEvaluator:
-    def __init__(self,
-                 predictions,
-                 ground_truth: List[Union[dict, FeaturesType, Tensor]],
-                 tasks: TaskList
-                 ):
+    def __init__(
+            self,
+            predictions: List[TargetsType],
+            ground_truth: List[Union[dict, FeaturesType, Tensor]],
+            tasks: TaskList
+    ):
         """
         Sets the required values for the computation of the different metrics.
 
         Parameters
         ----------
-        predictions
-            Either the dataset with which the evaluation is desired or the predictions of the model from a dataset.
-        ground_truth : Optional[List[Union[dict, FeaturesType, Tensor]]]
-            Ground truths to be used as a reference for the computation of the different metrics. This argument is
-            required if predictions are used.
-        tasks : Optional[Tasklist]
-            Object of the class TaskList that specifies for which tasks the model should be evaluated. This argument
-            is required if predictions are used.
+        predictions : List[TargetsType]
+            The predictions of the model from a dataset.
+        ground_truth : List[Union[dict, FeaturesType, Tensor]]
+            Ground truths to be used as a reference for the computation of the different metrics.
+        tasks : Tasklist
+            Object of the class TaskList that specifies for which tasks the model should be evaluated.
         """
 
         self.breslow_estimator = None
@@ -110,11 +109,12 @@ class PredictionEvaluator:
 
         return scores
 
-    def scalar_metrics(self,
-                       metrics: Optional[Union[str, List[str]]] = None,
-                       return_metrics: bool = True,
-                       save: Union[bool, str] = False
-                       ) -> Dict[str, Dict[str, float]]:
+    def scalar_metrics(
+            self,
+            metrics: Optional[Union[str, List[str]]] = None,
+            return_metrics: bool = True,
+            save: Optional[str] = None
+    ) -> Dict[str, Dict[str, float]]:
         """
         Computes the metrics associated with each task.
 
@@ -131,6 +131,8 @@ class PredictionEvaluator:
             where they will be saved as a json file. Defaults to False which does not save the metrics.
         """
         scalar_metrics = {}
+        scores = self._score_on_predictions()
+
         if metrics is None:
             metrics = []
         elif metrics == "all":
@@ -146,7 +148,6 @@ class PredictionEvaluator:
         elif isinstance(metrics, str):
             metrics = [metrics]
 
-        scores = self._score_on_predictions()
         for task, metric_dict in scores.items():
             scalar_metrics[task] = {}
             metric_present = False
@@ -157,19 +158,20 @@ class PredictionEvaluator:
             if not metric_present:
                 scalar_metrics[task] = "N/A"
 
-        if save:
+        if save is not None:
             path = save + '/scalar_metrics.json'
             with open(path, 'w') as file_path:
                 json.dump(scalar_metrics, file_path)
         if return_metrics:
             return scalar_metrics
 
-    def visual_metrics(self,
-                       graph_configurations: GraphConfig,
-                       threshold: float = 0.5
-                       ):
+    def visual_metrics(
+            self,
+            graph_configurations: GraphConfig,
+            threshold: float = 0.5
+    ):
         """
-        Creates the different graphs for the breslow estimator.
+        Creates the different graphs for metrics that can be visualised in a 2D graph.
 
         Parameters
         ----------
@@ -189,139 +191,161 @@ class PredictionEvaluator:
         self.graph_roc_curve(graph_configurations, {})
         self.graph_precision_recall_curve(graph_configurations, {})
 
-    def graph_breslow_unique_times(self, graph: GraphConfig):
+    def graph_breslow_unique_times(
+            self,
+            graph: GraphConfig
+    ):
         """
         Creates the breslow unique times graph.
 
         Parameters
         ----------
         graph : GraphConfig
-            A NamedTuple used for the unique times graph.
+            A NamedTuple used to configure the unique times graph.
         """
         for task in self.tasks.survival_analysis_tasks:
             self.breslow_estimator = task.breslow_estimator
             plt.plot(self.breslow_estimator.unique_times_)
+
             if graph.save:
                 path = graph.save + f'/{task.name}_breslow_unique_times.pdf'
                 plt.savefig(path, **graph.kwargs)
             if graph.show:
                 plt.show()
-            if not graph.show:
+            else:
                 plt.close()
 
-    def graph_breslow_cum_baseline_hazard(self, graph: GraphConfig):
+    def graph_breslow_cum_baseline_hazard(
+            self,
+            graph: GraphConfig
+    ):
         """
-        Creates the breslow cumulative baseline hazard graph
+        Creates the breslow cumulative baseline hazard graph.
 
         Parameters
         ----------
         graph : GraphConfig
-            A NamedTuple used for the cumulative baseline hazard graph.
+            A NamedTuple used to configure the cumulative baseline hazard graph.
         """
         for task in self.tasks.survival_analysis_tasks:
             self.breslow_estimator = task.breslow_estimator
             cum_baseline_hazard = self.breslow_estimator.cum_baseline_hazard_
             plt.plot(cum_baseline_hazard.x, cum_baseline_hazard.y)
+
             if graph.save:
                 path = graph.save + f'/{task.name}_breslow_cum_baseline_hazard.pdf'
                 plt.savefig(path, **graph.kwargs)
             if graph.show:
                 plt.show()
-            if not graph.show:
+            else:
                 plt.close()
 
-    def graph_breslow_baseline_survival(self, graph: GraphConfig):
+    def graph_breslow_baseline_survival(
+            self,
+            graph: GraphConfig
+    ):
         """
         Creates the breslow baseline survival graph.
 
         Parameters
         ----------
         graph : GraphConfig
-            A NamedTuple used for the baseline survival graph.
+            A NamedTuple used to configure the baseline survival graph.
         """
         for task in self.tasks.survival_analysis_tasks:
             self.breslow_estimator = task.breslow_estimator
             baseline_survival = self.breslow_estimator.baseline_survival_
             plt.plot(baseline_survival.x, baseline_survival.y)
+
             if graph.save:
                 path = graph.save + f'/{task.name}_breslow_baseline_survival.pdf'
                 plt.savefig(path, **graph.kwargs)
             if graph.show:
                 plt.show()
-            if not graph.show:
+            else:
                 plt.close()
 
-    def graph_breslow_cum_hazard_function(self, graph: GraphConfig):
+    def graph_breslow_cum_hazard_function(
+            self,
+            graph: GraphConfig
+    ):
         """
         Creates the breslow cumulative hazard function graph.
 
         Parameters
         ----------
         graph : GraphConfig
-            A NamedTuple used for the cumulative hazard function graph.
+            A NamedTuple used to configure the cumulative hazard function graph.
         """
         for task in self.tasks.survival_analysis_tasks:
             self.breslow_estimator = task.breslow_estimator
             prediction = {}
             for prediction_element in self.predictions:
-                if prediction.get(task.name, None) is not None:
-                    prediction[task.name] = torch.cat((prediction.get(task.name),
-                                                       prediction_element[task.name]),
-                                                      dim=-1
-                                                      )
+                if prediction.get(task.name, False):
+                    prediction[task.name] = torch.cat(
+                        (prediction.get(task.name), prediction_element[task.name]),
+                        dim=-1
+                    )
                 else:
                     prediction[task.name] = (prediction_element[task.name])
-            chf_funcs = self.breslow_estimator.get_cumulative_hazard_function(prediction[task.name])
-            for fn in chf_funcs:
-                plt.step(fn.x, fn(fn.x), where="post")
+            for chf_func in self.breslow_estimator.get_cumulative_hazard_function(prediction[task.name]):
+                plt.step(chf_func.x, chf_func(chf_func.x), where="post")
+
             if graph.save:
                 path = graph.save + f'/{task.name}_breslow_cum_hazard_function.pdf'
                 plt.savefig(path, **graph.kwargs)
             if graph.show:
                 plt.show()
-            if not graph.show:
+            else:
                 plt.close()
 
-    def graph_breslow_survival_function(self, graph: GraphConfig):
+    def graph_breslow_survival_function(
+            self,
+            graph: GraphConfig
+    ):
         """
         Creates the breslow survival function graph.
 
         Parameters
         ----------
-
         graph : GraphConfig
-            A NamedTuple used for the survival function graph.
+            A NamedTuple used to configure the survival function graph.
         """
         for task in self.tasks.survival_analysis_tasks:
             self.breslow_estimator = task.breslow_estimator
             prediction = {}
             for prediction_element in self.predictions:
-                if prediction.get(task.name, None) is not None:
-                    prediction[task.name] = torch.cat((prediction.get(task.name),
-                                                       prediction_element[task.name]),
-                                                      dim=-1
-                                                      )
+                if prediction.get(task.name, False):
+                    prediction[task.name] = torch.cat(
+                        (prediction.get(task.name), prediction_element[task.name]),
+                        dim=-1
+                    )
                 else:
                     prediction[task.name] = (prediction_element[task.name])
-            survival_funcs = self.breslow_estimator.get_survival_function(prediction[task.name])
-            for fn in survival_funcs:
-                plt.step(fn.x, fn(fn.x), where="post")
+            for survival_func in self.breslow_estimator.get_survival_function(prediction[task.name]):
+                plt.step(survival_func.x, survival_func(survival_func.x), where="post")
+
             if graph.save:
                 path = graph.save + f'/{task.name}_breslow_survival_function.pdf'
                 plt.savefig(path, **graph.kwargs)
             if graph.show:
                 plt.show()
-            if not graph.show:
+            else:
                 plt.close()
 
-    def graph_confusion_matrix(self, graph: GraphConfig, threshold: float, confusion_matrix_parameters: dict):
+    def graph_confusion_matrix(
+            self,
+            graph: GraphConfig,
+            threshold: float,
+            confusion_matrix_parameters: dict
+    ):
         """
         Creates the confusion matrix graph.
 
         Parameters
         ----------
         graph : GraphConfig
-            A NamedTuple used for the confusion matrix graph.
+            A NamedTuple used to configure the confusion matrix graph.
         threshold : float
             Threshold to consider while transforming continuous predictions to binary results
         confusion_matrix_parameters : dict
@@ -337,24 +361,28 @@ class PredictionEvaluator:
                     y_pred.append(1)
                 else:
                     y_pred.append(0)
-            confusion = confusion_matrix(y_true, y_pred, **confusion_matrix_parameters)
-            plt.imshow(confusion)
+            plt.imshow(confusion_matrix(y_true, y_pred, **confusion_matrix_parameters))
+
             if graph.save:
                 path = graph.save + f'/{task.name}_confusion_matrix.pdf'
                 plt.savefig(path, **graph.kwargs)
             if graph.show:
                 plt.show()
-            if not graph.show:
+            else:
                 plt.close()
 
-    def graph_calibration_curve(self, graph: GraphConfig, calibration_curve_parameters: dict):
+    def graph_calibration_curve(
+            self,
+            graph: GraphConfig,
+            calibration_curve_parameters: dict
+    ):
         """
         Creates the confusion matrix graph.
 
         Parameters
         ----------
         graph : GraphConfig
-            A NamedTuple used for the calibration_curve graph.
+            A NamedTuple used to configure the calibration_curve graph.
         calibration_curve_parameters : dict
             Dictionary of optional parameters for sklearn.calibration.calibration_curve.
 
@@ -368,22 +396,27 @@ class PredictionEvaluator:
             prob_true, prob_pred = calibration_curve(y_true, y_pred, **calibration_curve_parameters)
             plt.plot(prob_true, prob_pred, 'go')
             plt.plot([1, 0], [1, 0], 'k')
+
             if graph.save:
                 path = graph.save + f'/{task.name}_calibration_curve.pdf'
                 plt.savefig(path, **graph.kwargs)
             if graph.show:
                 plt.show()
-            if not graph.show:
+            else:
                 plt.close()
 
-    def graph_roc_curve(self, graph: GraphConfig, roc_curve_parameters: dict):
+    def graph_roc_curve(
+            self,
+            graph: GraphConfig,
+            roc_curve_parameters: dict
+    ):
         """
         Creates the confusion matrix graph.
 
         Parameters
         ----------
         graph : GraphConfig
-            A NamedTuple used for the roc_curve graph.
+            A NamedTuple used to configure the roc_curve graph.
         roc_curve_parameters : dict
             Dictionary of optional parameters for sklearn.metrics.roc_curve.
 
@@ -397,22 +430,27 @@ class PredictionEvaluator:
             fpr, tpr, threshold = roc_curve(y_true, y_pred, **roc_curve_parameters)
             plt.plot(fpr, tpr, 'g')
             plt.plot([1, 0], [1, 0], 'k')
+
             if graph.save:
                 path = graph.save + f'/{task.name}_roc_curve.pdf'
                 plt.savefig(path, **graph.kwargs)
             if graph.show:
                 plt.show()
-            if not graph.show:
+            else:
                 plt.close()
 
-    def graph_precision_recall_curve(self, graph: GraphConfig, precision_recall_curve_parameters: dict):
+    def graph_precision_recall_curve(
+            self,
+            graph: GraphConfig,
+            precision_recall_curve_parameters: dict
+    ):
         """
         Creates the confusion matrix graph.
 
         Parameters
         ----------
         graph : GraphConfig
-            A NamedTuple used for the precision_recall_curve graph.
+            A NamedTuple used to configure the precision_recall_curve graph.
         precision_recall_curve_parameters : dict
             Dictionary of optional parameters for sklearn.metrics.precision_recall_curve.
 
@@ -425,10 +463,11 @@ class PredictionEvaluator:
                 y_pred.append(predictions[task.name][0])
             precision, recall, threshold = precision_recall_curve(y_true, y_pred, **precision_recall_curve_parameters)
             plt.step(recall, precision, 'g')
+
             if graph.save:
                 path = graph.save + f'/{task.name}_precision_recall_curve.pdf'
                 plt.savefig(path, **graph.kwargs)
             if graph.show:
                 plt.show()
-            if not graph.show:
+            else:
                 plt.close()

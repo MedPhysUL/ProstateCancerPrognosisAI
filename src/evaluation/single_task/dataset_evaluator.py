@@ -23,26 +23,39 @@ from torch import device as torch_device
 
 
 class DatasetEvaluator(PredictionEvaluator):
-    def __init__(self,
-                 model,
-                 dataset,
-                 mask: List[int]
-                 ):
+    def __init__(
+            self,
+            model: TorchModel,
+            dataset: ProstateCancerDataset,
+            mask: List[int]
+    ):
+        """Sets the required values for the computation of the different metrics.
+
+        Parameters
+        ----------
+        model : TorchModel
+            The model with which the predictions will be made.
+        dataset : ProstateCancerDataset
+            The dataset to input to the model.
+        mask : List[int]
+            Mask determining which patients to use in the dataset.
+        """
         self.mask = mask
         self.dataset = dataset
         self.model = model
-        self.predictions = self._dataset_to_predictions()
-        self.tasks = self.dataset.tasks
-        self.ground_truth = []
+
+        ground_truth = []
         subset = self.dataset[self.mask]
         for _, targets in DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None):
-            self.ground_truth.append(targets)
-        super().__init__(predictions=self.predictions,
-                         ground_truth=self.ground_truth,
-                         tasks=self.tasks
-                         )
+            ground_truth.append(targets)
 
-    def _dataset_to_predictions(self) -> List[TargetsType]:
+        super().__init__(
+            predictions=self._predictions_from_dataset(),
+            ground_truth=ground_truth,
+            tasks=self.dataset.tasks
+        )
+
+    def _predictions_from_dataset(self) -> List[TargetsType]:
         """
         Generates predictions using a dataset, model and mask.
 
@@ -55,6 +68,7 @@ class DatasetEvaluator(PredictionEvaluator):
         rng_state = random.get_rng_state()
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
         random.set_rng_state(rng_state)
+
         predictions = []
         for features, _ in data_loader:
             predictions.append(self.model.predict(features=features))
