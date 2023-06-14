@@ -32,7 +32,7 @@ class PredictionEvaluator:
             predictions: List[TargetsType],
             ground_truth: List[Union[dict, FeaturesType, Tensor]],
             tasks: Union[Task, TaskList, List[Task]]
-    ):
+    ) -> None:
         """
         Sets the required values for the computation of the different metrics.
 
@@ -160,17 +160,30 @@ class PredictionEvaluator:
 
     @staticmethod
     def _terminate_figure(
+            fig: plt.Figure,
             show: bool,
-            save: Optional[str],
-            file_name: str,
+            save: Optional[str] = None,
             **kwargs
-    ):
+    ) -> None:
+        """
+        Terminates current figure.
+
+        Parameters
+        ----------
+        save : Optional[str]
+            Path to save the figure.
+        show : bool
+            Whether to show figure.
+        fig : plt.Figure
+            Current figure.
+        """
+        fig.tight_layout()
+
         if save is not None:
-            plt.savefig(f'{save}/{file_name}', **kwargs)
+            plt.savefig(save, **kwargs)
         if show:
             plt.show()
-        else:
-            plt.close()
+        plt.close(fig)
 
     def compute_metrics(
             self,
@@ -200,7 +213,7 @@ class PredictionEvaluator:
             show: bool,
             save: Optional[str] = None,
             **kwargs
-    ):
+    ) -> None:
         """
         Creates the different graphs for classification task metrics that can be visualised in a 2D graph.
 
@@ -224,7 +237,7 @@ class PredictionEvaluator:
             show: bool,
             save: Optional[str] = None,
             **kwargs
-    ):
+    ) -> None:
         """
         Creates the different graphs for survival analysis metrics that can be visualised in a 2D graph.
 
@@ -248,7 +261,7 @@ class PredictionEvaluator:
             show: bool,
             save: Optional[str] = None,
             **kwargs
-    ):
+    ) -> None:
         """
         Creates the breslow unique times graph.
 
@@ -262,22 +275,25 @@ class PredictionEvaluator:
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
         for task in self.tasks.survival_analysis_tasks:
-            plt.plot(task.breslow_estimator.unique_times_)
-
+            fig, arr = plt.subplots()
+            arr.plot(task.breslow_estimator.unique_times_)
             if save is not None:
-                path = save + f'/{task.name}_breslow_unique_times.pdf'
-                plt.savefig(path, **kwargs)
-            if show:
-                plt.show()
+                path = f'{save}/{task.name}_breslow_unique_times.pdf'
             else:
-                plt.close()
+                path = None
+            self._terminate_figure(
+                save=path,
+                show=show,
+                fig=fig,
+                **kwargs
+            )
 
     def plot_cum_baseline_hazard(
             self,
             show: bool,
             save: Optional[str] = None,
             **kwargs
-    ):
+    ) -> None:
         """
         Creates the breslow cumulative baseline hazard graph.
 
@@ -291,23 +307,27 @@ class PredictionEvaluator:
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
         for task in self.tasks.survival_analysis_tasks:
+            fig, arr = plt.subplots()
             cum_baseline_hazard = task.breslow_estimator.cum_baseline_hazard_
-            plt.plot(cum_baseline_hazard.x, cum_baseline_hazard.y)
+            arr.plot(cum_baseline_hazard.x, cum_baseline_hazard.y)
 
             if save is not None:
-                path = save + f'/{task.name}_breslow_cum_baseline_hazard.pdf'
-                plt.savefig(path, **kwargs)
-            if show:
-                plt.show()
+                path = f'{save}/{task.name}_breslow_cum_baseline_hazard.pdf'
             else:
-                plt.close()
+                path = None
+            self._terminate_figure(
+                save=path,
+                show=show,
+                fig=fig,
+                **kwargs
+            )
 
     def plot_baseline_survival(
             self,
             show: bool,
             save: Optional[str] = None,
             **kwargs
-    ):
+    ) -> None:
         """
         Creates the breslow baseline survival graph.
 
@@ -321,23 +341,27 @@ class PredictionEvaluator:
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
         for task in self.tasks.survival_analysis_tasks:
+            fig, arr = plt.subplots()
             baseline_survival = task.breslow_estimator.baseline_survival_
-            plt.plot(baseline_survival.x, baseline_survival.y)
+            arr.plot(baseline_survival.x, baseline_survival.y)
 
             if save is not None:
-                path = save + f'/{task.name}_breslow_baseline_survival.pdf'
-                plt.savefig(path, **kwargs)
-            if show:
-                plt.show()
+                path = f'{save}/{task.name}_breslow_baseline_survival.pdf'
             else:
-                plt.close()
+                path = None
+            self._terminate_figure(
+                save=path,
+                show=show,
+                fig=fig,
+                **kwargs
+            )
 
     def plot_cum_hazard_function(
             self,
             show: bool,
             save: Optional[str] = None,
             **kwargs
-    ):
+    ) -> None:
         """
         Creates the breslow cumulative hazard function graph.
 
@@ -352,8 +376,9 @@ class PredictionEvaluator:
         """
         for task in self.tasks.survival_analysis_tasks:
             prediction = {}
+            fig, arr = plt.subplots()
             for prediction_element in self.predictions:
-                if prediction.get(task.name, False):
+                if prediction.get(task.name, None) is not None:
                     prediction[task.name] = torch.cat(
                         (prediction.get(task.name), prediction_element[task.name]),
                         dim=-1
@@ -361,22 +386,25 @@ class PredictionEvaluator:
                 else:
                     prediction[task.name] = (prediction_element[task.name])
             for chf_func in task.breslow_estimator.get_cumulative_hazard_function(prediction[task.name]):
-                plt.step(chf_func.x, chf_func(chf_func.x), where="post")
+                arr.step(chf_func.x, chf_func(chf_func.x), where="post")
 
             if save is not None:
-                path = save + f'/{task.name}_breslow_cum_hazard_function.pdf'
-                plt.savefig(path, **kwargs)
-            if show:
-                plt.show()
+                path = f'{save}/{task.name}_breslow_cum_hazard_function.pdf'
             else:
-                plt.close()
+                path = None
+            self._terminate_figure(
+                save=path,
+                show=show,
+                fig=fig,
+                **kwargs
+            )
 
     def plot_survival_function(
             self,
             show: bool,
             save: Optional[str] = None,
             **kwargs
-    ):
+    ) -> None:
         """
         Creates the breslow survival function graph.
 
@@ -391,8 +419,9 @@ class PredictionEvaluator:
         """
         for task in self.tasks.survival_analysis_tasks:
             prediction = {}
+            fig, arr = plt.subplots()
             for prediction_element in self.predictions:
-                if prediction.get(task.name, False):
+                if prediction.get(task.name, None) is not None:
                     prediction[task.name] = torch.cat(
                         (prediction.get(task.name), prediction_element[task.name]),
                         dim=-1
@@ -400,15 +429,18 @@ class PredictionEvaluator:
                 else:
                     prediction[task.name] = (prediction_element[task.name])
             for survival_func in task.breslow_estimator.get_survival_function(prediction[task.name]):
-                plt.step(survival_func.x, survival_func(survival_func.x), where="post")
+                arr.step(survival_func.x, survival_func(survival_func.x), where="post")
 
             if save is not None:
-                path = save + f'/{task.name}_breslow_survival_function.pdf'
-                plt.savefig(path, **kwargs)
-            if show:
-                plt.show()
+                path = f'{save}/{task.name}_breslow_survival_function.pdf'
             else:
-                plt.close()
+                path = None
+            self._terminate_figure(
+                save=path,
+                show=show,
+                fig=fig,
+                **kwargs
+            )
 
     def plot_confusion_matrix(
             self,
@@ -416,7 +448,7 @@ class PredictionEvaluator:
             save: Optional[str] = None,
             threshold: Optional[Union[int, List[int], slice]] = None,
             **kwargs
-    ):
+    ) -> None:
         """
         Creates the confusion matrix graph.
 
@@ -435,6 +467,7 @@ class PredictionEvaluator:
 
         """
         for task in self.tasks.binary_classification_tasks:
+            fig, arr = plt.subplots()
             if not isinstance(threshold, int):
                 self._fix_thresholds_to_optimal_values(mask=threshold)
                 threshold = task.decision_threshold_metric.threshold
@@ -444,7 +477,7 @@ class PredictionEvaluator:
             for predictions in self.predictions:
                 y_pred += [1] if predictions[task.name][0] >= threshold else [0]
 
-            plt.imshow(confusion_matrix(
+            arr.imshow(confusion_matrix(
                 y_true,
                 y_pred,
                 labels=kwargs.get('labels', None),
@@ -453,19 +486,22 @@ class PredictionEvaluator:
             ))
 
             if save is not None:
-                path = save + f'/{task.name}_confusion_matrix.pdf'
-                plt.savefig(path, **kwargs)
-            if show:
-                plt.show()
+                path = f'{save}/{task.name}_confusion_matrix.pdf'
             else:
-                plt.close()
+                path = None
+            self._terminate_figure(
+                save=path,
+                show=show,
+                fig=fig,
+                **kwargs
+            )
 
     def plot_calibration_curve(
             self,
             show: bool,
             save: Optional[str] = None,
             **kwargs
-    ):
+    ) -> None:
         """
         Creates the confusion matrix graph.
 
@@ -480,6 +516,7 @@ class PredictionEvaluator:
 
         """
         for task in self.tasks.binary_classification_tasks:
+            fig, arr = plt.subplots()
             y_true, y_pred = [], []
             for ground_truth in self.targets:
                 y_true.append(ground_truth[task.name][0])
@@ -493,23 +530,26 @@ class PredictionEvaluator:
                 n_bins=kwargs.get('n_bins', 5),
                 strategy=kwargs.get('strategy', 'uniform')
                 )
-            plt.plot(prob_true, prob_pred, 'go')
-            plt.plot([1, 0], [1, 0], 'k')
+            arr.plot(prob_true, prob_pred, 'go')
+            arr.plot([1, 0], [1, 0], 'k')
 
             if save is not None:
-                path = save + f'/{task.name}_calibration_curve.pdf'
-                plt.savefig(path, **kwargs)
-            if show:
-                plt.show()
+                path = f'{save}/{task.name}_calibration_curve.pdf'
             else:
-                plt.close()
+                path = None
+            self._terminate_figure(
+                save=path,
+                show=show,
+                fig=fig,
+                **kwargs
+            )
 
     def plot_roc_curve(
             self,
             show: bool,
             save: Optional[str] = None,
             **kwargs
-    ):
+    ) -> None:
         """
         Creates the confusion matrix graph.
 
@@ -524,6 +564,7 @@ class PredictionEvaluator:
 
         """
         for task in self.tasks.binary_classification_tasks:
+            fig, arr = plt.subplots()
             y_true, y_pred = [], []
             for ground_truth in self.targets:
                 y_true.append(ground_truth[task.name][0])
@@ -536,23 +577,26 @@ class PredictionEvaluator:
                 sample_weight=kwargs.get('sample_weight', None),
                 drop_intermediate=kwargs.get('drop_intermediate', True)
             )
-            plt.plot(fpr, tpr, 'g')
-            plt.plot([1, 0], [1, 0], 'k')
+            arr.plot(fpr, tpr, 'g')
+            arr.plot([1, 0], [1, 0], 'k')
 
             if save is not None:
-                path = save + f'/{task.name}_roc_curve.pdf'
-                plt.savefig(path, **kwargs)
-            if show:
-                plt.show()
+                path = f'{save}/{task.name}_roc_curve.pdf'
             else:
-                plt.close()
+                path = None
+            self._terminate_figure(
+                save=path,
+                show=show,
+                fig=fig,
+                **kwargs
+            )
 
     def plot_precision_recall_curve(
             self,
             show: bool,
             save: Optional[str] = None,
             **kwargs
-    ):
+    ) -> None:
         """
         Creates the confusion matrix graph.
 
@@ -567,6 +611,7 @@ class PredictionEvaluator:
 
         """
         for task in self.tasks.binary_classification_tasks:
+            fig, arr = plt.subplots()
             y_true, y_pred = [], []
             for ground_truth in self.targets:
                 y_true.append(ground_truth[task.name][0])
@@ -578,12 +623,15 @@ class PredictionEvaluator:
                 pos_label=kwargs.get('pos_label', None),
                 sample_weight=kwargs.get('sample_weight', None)
             )
-            plt.step(recall, precision, 'g')
+            arr.step(recall, precision, 'g')
 
             if save is not None:
-                path = save + f'/{task.name}_precision_recall_curve.pdf'
-                plt.savefig(path, **kwargs)
-            if show:
-                plt.show()
+                path = f'{save}/{task.name}_precision_recall_curve.pdf'
             else:
-                plt.close()
+                path = None
+            self._terminate_figure(
+                save=path,
+                show=show,
+                fig=fig,
+                **kwargs
+            )

@@ -34,7 +34,7 @@ class ModelEvaluator(PredictionEvaluator):
             model: Model,
             dataset: ProstateCancerDataset,
             mask: Optional[List[int]] = None
-    ):
+    ) -> None:
         """
         Sets the required values for the computation of the different metrics.
 
@@ -69,18 +69,20 @@ class ModelEvaluator(PredictionEvaluator):
         predictions : List[TargetsType]
             The predictions of the model on the dataset in a list.
         """
-        feature_dict = self.model.predict_on_dataset(dataset=self.dataset, mask=self.mask)
-        dataset_length = len(feature_dict[list(feature_dict.keys())[0]])
-        feature_list = [{} for _ in range(dataset_length)]
+        predict_dict = self.model.predict_on_dataset(dataset=self.dataset, mask=self.mask)
+        dataset_length = len(predict_dict[list(predict_dict.keys())[0]])
+        predict_list = [{} for _ in range(dataset_length)]
         for task in self.dataset.tasks.table_tasks:
-            features = feature_dict.get(task.name).tolist()
-            for i, feature in enumerate(features):
-                feature_list[i][task.name] = tensor(feature)
+            predictions = predict_dict.get(task.name).tolist()
+            for i, prediction in enumerate(predictions):
+                predict_list[i][task.name] = tensor(prediction)
 
-        return feature_list
+        return predict_list
 
     def _targets_from_dataset(self) -> List[TargetsType]:
         """
+        Returns the targets within a given dataset and mask.
+
         Returns
         ------
         targets : List[TargetsType]
@@ -177,7 +179,7 @@ class ModelEvaluator(PredictionEvaluator):
             show: bool,
             save: Optional[str] = None,
             **kwargs
-    ):
+    ) -> None:
         """
         Creates the confusion matrix graph. Takes the mask parameter given when instantiating the ModelEvaluator object
         to select the patients used to optimize the threshold used when computing binary classification from continuous
