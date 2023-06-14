@@ -13,8 +13,10 @@ import json
 from typing import Dict, List, Optional, Union
 
 import matplotlib.pyplot as plt
+import numpy as np
 from monai.data import DataLoader
 from sklearn.metrics import confusion_matrix
+import torch
 from torch import cuda, float32, random, tensor
 from torch import device as torch_device
 
@@ -52,15 +54,9 @@ class ModelEvaluator(PredictionEvaluator):
         self.dataset = dataset
         self.model = model
 
-        ground_truth = []
-        subset = self.dataset[self.mask]
-        print(self.dataset.table_dataset[self.mask].y)
-        for _, targets in DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None):
-            ground_truth.append(targets)
-
         super().__init__(
             predictions=self._predictions_from_dataset(),
-            ground_truth=ground_truth,
+            ground_truth=self._targets_from_dataset(),
             tasks=self.dataset.tasks
         )
 
@@ -73,15 +69,15 @@ class ModelEvaluator(PredictionEvaluator):
         predictions : List[TargetsType]
             The predictions of the model on the dataset in a list.
         """
-        subset = self.dataset[self.mask]
-        rng_state = random.get_rng_state()
-        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
-        random.set_rng_state(rng_state)
+        feature_dict = self.model.predict_on_dataset(dataset=self.dataset, mask=self.mask)
+        dataset_length = len(feature_dict[list(feature_dict.keys())[0]])
+        feature_list = [{} for _ in range(dataset_length)]
+        for task in self.dataset.tasks.table_tasks:
+            features = feature_dict.get(task.name).tolist()
+            for i, feature in enumerate(features):
+                feature_list[i][task.name] = tensor(feature)
 
-        predictions = []
-        for features, _ in data_loader:
-            predictions.append(self.model.predict(features=features))
-        return predictions
+        return feature_list
 
     def _targets_from_dataset(self) -> List[TargetsType]:
         """
@@ -90,7 +86,18 @@ class ModelEvaluator(PredictionEvaluator):
         targets : List[TargetsType]
             The targets in a dataset in a list.
         """
-        y= 4
+        targets_dict = self.dataset.table_dataset[self.mask].y
+        dataset_length = len(targets_dict[list(targets_dict.keys())[0]])
+        targets_list = [{} for _ in range(dataset_length)]
+        for task in self.dataset.tasks.table_tasks:
+            targets = targets_dict.get(task.name).tolist()
+            for i, target in enumerate(targets):
+                if isinstance(target, int):
+                    targets_list[i][task.name] = tensor([target])
+                else:
+                    targets_list[i][task.name] = tensor([target], dtype=torch.float64)
+
+        return targets_list
 
     def _compute_dataset_score(self) -> Dict[str, Dict[str, float]]:
         """
