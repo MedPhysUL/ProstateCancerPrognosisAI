@@ -34,8 +34,8 @@ class ImageDataset(Dataset):
             database: PatientsDatabase,
             modalities: Set[str],
             organs: Optional[Dict[str, Set[str]]] = None,
+            augmentations: Optional[Union[Compose, MapTransform]] = None,
             tasks: Optional[Union[SegmentationTask, TaskList, List[SegmentationTask]]] = None,
-            transforms: Optional[Union[Compose, MapTransform]] = None,
             transposition: Tuple[int, int, int] = (2, 0, 1),
             **kwargs
     ):
@@ -58,10 +58,12 @@ class ImageDataset(Dataset):
                         "PT": {"Prostate"},
                         "MR": {"Brain"}
                     }.
+        augmentations : Optional[Union[Compose, MapTransform]]
+            A single or a sequence of transforms to apply to images and segmentations (depending on transform keys).
+            These transforms are applied to the dataset only if the method 'enable_augmentations' is called, usually
+            before training.
         tasks : Optional[Union[SegmentationTask, TaskList, List[SegmentationTask]]]
             Segmentation tasks to perform. These label maps are added to the dataset as targets.
-        transforms : Optional[Union[Compose, MapTransform]]
-            A single or a sequence of transforms to apply to images and segmentations (depending on transform keys).
         transposition : Tuple[int, int, int]
             The transposition to apply to images before applying transforms. The rendered images are in shape (Z, X, Y)
             by default.
@@ -73,6 +75,8 @@ class ImageDataset(Dataset):
             f"All tasks must be instances of 'SegmentationTask'."
         )
 
+        self._augmentations = augmentations
+        self._augmentations_are_enabled = False
         self._database = database
         self._modalities = modalities
         self._organs = organs if organs else {}
@@ -83,7 +87,6 @@ class ImageDataset(Dataset):
                 [t.modality for t in self._tasks]
             )
         )
-        self._transforms = transforms
         self._transposition = transposition
 
         self._organ_key_getter = kwargs.get("organ_key_getter", lambda modality, organ: f"{modality}_{organ}")
@@ -178,6 +181,18 @@ class ImageDataset(Dataset):
 
         return dict(img_dict, **seg_dict)
 
+    def enable_augmentations(self):
+        """
+        Enables augmentations on the dataset. This method should be called before training.
+        """
+        self._augmentations_are_enabled = True
+
+    def disable_augmentations(self):
+        """
+        Disables augmentations on the dataset. This method should be called before validation and testing.
+        """
+        self._augmentations_are_enabled = False
+
     def _transform(self, data: Dict[str, np.ndarray]) -> Dict[str, Union[np.array, MetaTensor]]:
         """
         Transforms images and segmentations.
@@ -192,14 +207,31 @@ class ImageDataset(Dataset):
         transformed_data : Dict[str, Union[np.array, MetaTensor]]
             The dictionary of transformed images and segmentation maps.
         """
-        if self._transforms is None:
-            keys = list(data.keys())
+        keys = list(data.keys())
+
+        if self._augmentations is None or not self._augmentations_are_enabled:
             transforms = Compose([
                 EnsureChannelFirstd(keys=keys),
                 ToTensord(keys=keys, dtype=float32)
             ])
         else:
-            transforms = self._transforms
+            if isinstance(self._augmentations, Compose):
+                transforms = Compose([
+                    EnsureChannelFirstd(keys=keys),
+                    *self._augmentations.transforms,
+                    ToTensord(keys=keys, dtype=float32)
+                ])
+            elif isinstance(self._augmentations, MapTransform):
+                transforms = Compose([
+                    EnsureChannelFirstd(keys=keys),
+                    self._augmentations,
+                    ToTensord(keys=keys, dtype=float32)
+                ])
+            else:
+                raise AssertionError(
+                    f"'augmentations' must be of type 'Compose' or 'MapTransform'. Found type "
+                    f"{type(self._augmentations)}"
+                )
 
         return apply_transform(transforms, data) if transforms else data
 
