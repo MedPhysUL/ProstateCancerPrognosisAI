@@ -9,28 +9,31 @@
     quality of a model.
 """
 import json
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, NamedTuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_curve
-import torch
-from torch import float32, tensor, Tensor
+from torch import cat, float64, tensor, Tensor
 
 from ...data.datasets.prostate_cancer import FeaturesType, TargetsType
-from ...metrics.single_task.base import Direction, MetricReduction
-from ...models.torch.base.torch_model import Output
+from ...metrics.single_task.base import Direction
 from ...tasks.base import Task
 from ...tasks.containers.list import TaskList
 from ...tools.transforms import to_numpy
 
 
+class Output(NamedTuple):
+    predictions: List
+    targets: List
+
+
 class PredictionEvaluator:
     def __init__(
             self,
-            predictions: List[TargetsType],
-            ground_truth: List[Union[dict, FeaturesType, Tensor]],
+            predictions: TargetsType,
+            ground_truth: Union[dict, FeaturesType, Tensor],
             tasks: Union[Task, TaskList, List[Task]]
     ) -> None:
         """
@@ -45,12 +48,55 @@ class PredictionEvaluator:
         tasks : Union[Task, TaskList, List[Task]]
             Object of the class TaskList that specifies for which tasks the model should be evaluated.
         """
-        self.predictions = predictions
-        self.targets = ground_truth
+        self.predictions_dict = predictions
+        self.targets_dict = ground_truth
         self.tasks = TaskList(tasks)
-        assert all(isinstance(task, Task) for task in TaskList(self.tasks)), (
+        assert all(isinstance(task, Task) for task in self.tasks), (
             f"All tasks must be instances of 'TableTask'."
         )
+        self.predictions = self._predictions_from_dataset()
+        self.targets = self._targets_from_dataset()
+
+    def _predictions_from_dataset(self) -> List[TargetsType]:
+        """
+        Generates predictions using a dataset, model and mask.
+
+        Returns
+        -------
+        predictions : List[TargetsType]
+            The predictions of the model on the dataset in a list.
+        """
+        predict_dict = self.predictions_dict
+        dataset_length = len(predict_dict[list(predict_dict.keys())[0]])
+        predict_list = [{} for _ in range(dataset_length)]
+        for task in self.tasks.table_tasks:
+            predictions = predict_dict.get(task.name).tolist()
+            for i, prediction in enumerate(predictions):
+                predict_list[i][task.name] = tensor(prediction)
+
+        return predict_list
+
+    def _targets_from_dataset(self) -> List[TargetsType]:
+        """
+        Returns the targets within a given dataset and mask.
+
+        Returns
+        ------
+        targets : List[TargetsType]
+            The targets in a dataset in a list.
+        """
+        targets_dict = self.targets_dict
+        dataset_length = len(targets_dict[list(targets_dict.keys())[0]])
+        targets_list = [{} for _ in range(dataset_length)]
+        for task in self.tasks.table_tasks:
+            targets = targets_dict.get(task.name).tolist()
+            for i, target in enumerate(targets):
+                if isinstance(target, int):
+                    targets_list[i][task.name] = tensor([target])
+                else:
+                    targets_list[i][task.name] = tensor([target], dtype=float64)
+
+        return targets_list
 
     def _compute_prediction_score(
             self,
@@ -69,10 +115,9 @@ class PredictionEvaluator:
         scores : Dict[str, Dict[str, float]]
             Score for each task and each metric.
         """
-        table_tasks, seg_tasks = self.tasks.table_tasks, self.tasks.segmentation_tasks
+        table_tasks = self.tasks.table_tasks
 
         scores = {task.name: {} for task in self.tasks}
-        segmentation_scores = {task.name: {metric.name: [] for metric in task.unique_metrics} for task in seg_tasks}
         table_outputs = {task.name: Output(predictions=[], targets=[]) for task in table_tasks}
 
         if isinstance(mask, slice):
@@ -86,22 +131,11 @@ class PredictionEvaluator:
             predictions, targets = self.predictions, self.targets
 
         for predictions, targets in tuple(zip(predictions, targets)):
-            for task in seg_tasks:
-                for metric in task.unique_metrics:
-                    segmentation_scores[task.name][metric.name].append(
-                        metric(predictions[task.name], targets[task.name], MetricReduction.NONE)
-                    )
 
             for task in table_tasks:
                 if task.metrics:
                     table_outputs[task.name].predictions.append(predictions[task.name].item())
                     table_outputs[task.name].targets.append(targets[task.name].tolist()[0])
-
-        for task in seg_tasks:
-            for metric in task.unique_metrics:
-                scores[task.name][metric.name] = metric.perform_reduction(
-                    tensor(segmentation_scores[task.name][metric.name], dtype=float32)
-                )
 
         for task in table_tasks:
             if task.metrics:
@@ -204,11 +238,11 @@ class PredictionEvaluator:
         scores = self._compute_prediction_score(mask=mask)
 
         if save is not None:
-            with open(f'{save}/scalar_metrics.json', 'w') as file_path:
+            with open(f'{save}/metrics.json', 'w') as file_path:
                 json.dump(scores, file_path)
         return scores
 
-    def plot_classification_task_curves(  # task nécéssaire? l'ajouter dans l'autre?
+    def plot_classification_task_curves(
             self,
             show: bool,
             save: Optional[str] = None,
@@ -226,7 +260,6 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
-
         self.plot_confusion_matrix(show, save, **kwargs)
         self.plot_calibration_curve(show, save, **kwargs)
         self.plot_roc_curve(show, save, **kwargs)
@@ -281,12 +314,7 @@ class PredictionEvaluator:
                 path = f'{save}/{task.name}_breslow_unique_times.pdf'
             else:
                 path = None
-            self._terminate_figure(
-                save=path,
-                show=show,
-                fig=fig,
-                **kwargs
-            )
+            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
 
     def plot_cum_baseline_hazard(
             self,
@@ -315,12 +343,7 @@ class PredictionEvaluator:
                 path = f'{save}/{task.name}_breslow_cum_baseline_hazard.pdf'
             else:
                 path = None
-            self._terminate_figure(
-                save=path,
-                show=show,
-                fig=fig,
-                **kwargs
-            )
+            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
 
     def plot_baseline_survival(
             self,
@@ -349,12 +372,7 @@ class PredictionEvaluator:
                 path = f'{save}/{task.name}_breslow_baseline_survival.pdf'
             else:
                 path = None
-            self._terminate_figure(
-                save=path,
-                show=show,
-                fig=fig,
-                **kwargs
-            )
+            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
 
     def plot_cum_hazard_function(
             self,
@@ -379,7 +397,7 @@ class PredictionEvaluator:
             fig, arr = plt.subplots()
             for prediction_element in self.predictions:
                 if prediction.get(task.name, None) is not None:
-                    prediction[task.name] = torch.cat(
+                    prediction[task.name] = cat(
                         (prediction.get(task.name), prediction_element[task.name]),
                         dim=-1
                     )
@@ -392,12 +410,7 @@ class PredictionEvaluator:
                 path = f'{save}/{task.name}_breslow_cum_hazard_function.pdf'
             else:
                 path = None
-            self._terminate_figure(
-                save=path,
-                show=show,
-                fig=fig,
-                **kwargs
-            )
+            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
 
     def plot_survival_function(
             self,
@@ -422,7 +435,7 @@ class PredictionEvaluator:
             fig, arr = plt.subplots()
             for prediction_element in self.predictions:
                 if prediction.get(task.name, None) is not None:
-                    prediction[task.name] = torch.cat(
+                    prediction[task.name] = cat(
                         (prediction.get(task.name), prediction_element[task.name]),
                         dim=-1
                     )
@@ -435,12 +448,7 @@ class PredictionEvaluator:
                 path = f'{save}/{task.name}_breslow_survival_function.pdf'
             else:
                 path = None
-            self._terminate_figure(
-                save=path,
-                show=show,
-                fig=fig,
-                **kwargs
-            )
+            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
 
     def plot_confusion_matrix(
             self,
@@ -471,11 +479,9 @@ class PredictionEvaluator:
             if not isinstance(threshold, int):
                 self._fix_thresholds_to_optimal_values(mask=threshold)
                 threshold = task.decision_threshold_metric.threshold
-            y_true, y_pred = [], []
-            for ground_truth in self.targets:
-                y_true.append(ground_truth[task.name][0])
+            y_true, y_pred = self.targets_dict[task.name], []
             for predictions in self.predictions:
-                y_pred += [1] if predictions[task.name][0] >= threshold else [0]
+                y_pred.append(1) if predictions[task.name][0] >= threshold else y_pred.append(0)
 
             arr.imshow(confusion_matrix(
                 y_true,
@@ -489,12 +495,7 @@ class PredictionEvaluator:
                 path = f'{save}/{task.name}_confusion_matrix.pdf'
             else:
                 path = None
-            self._terminate_figure(
-                save=path,
-                show=show,
-                fig=fig,
-                **kwargs
-            )
+            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
 
     def plot_calibration_curve(
             self,
@@ -517,11 +518,7 @@ class PredictionEvaluator:
         """
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
-            y_true, y_pred = [], []
-            for ground_truth in self.targets:
-                y_true.append(ground_truth[task.name][0])
-            for predictions in self.predictions:
-                y_pred.append(predictions[task.name][0])
+            y_true, y_pred = self.targets_dict[task.name], self.predictions_dict[task.name]
             prob_true, prob_pred = calibration_curve(
                 y_true,
                 y_pred,
@@ -537,12 +534,7 @@ class PredictionEvaluator:
                 path = f'{save}/{task.name}_calibration_curve.pdf'
             else:
                 path = None
-            self._terminate_figure(
-                save=path,
-                show=show,
-                fig=fig,
-                **kwargs
-            )
+            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
 
     def plot_roc_curve(
             self,
@@ -565,11 +557,7 @@ class PredictionEvaluator:
         """
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
-            y_true, y_pred = [], []
-            for ground_truth in self.targets:
-                y_true.append(ground_truth[task.name][0])
-            for predictions in self.predictions:
-                y_pred.append(predictions[task.name][0])
+            y_true, y_pred = self.targets_dict[task.name], self.predictions_dict[task.name]
             fpr, tpr, threshold = roc_curve(
                 y_true,
                 y_pred,
@@ -584,12 +572,7 @@ class PredictionEvaluator:
                 path = f'{save}/{task.name}_roc_curve.pdf'
             else:
                 path = None
-            self._terminate_figure(
-                save=path,
-                show=show,
-                fig=fig,
-                **kwargs
-            )
+            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
 
     def plot_precision_recall_curve(
             self,
@@ -612,11 +595,7 @@ class PredictionEvaluator:
         """
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
-            y_true, y_pred = [], []
-            for ground_truth in self.targets:
-                y_true.append(ground_truth[task.name][0])
-            for predictions in self.predictions:
-                y_pred.append(predictions[task.name][0])
+            y_true, y_pred = self.targets_dict[task.name], self.predictions_dict[task.name]
             precision, recall, threshold = precision_recall_curve(
                 y_true,
                 y_pred,
@@ -629,9 +608,4 @@ class PredictionEvaluator:
                 path = f'{save}/{task.name}_precision_recall_curve.pdf'
             else:
                 path = None
-            self._terminate_figure(
-                save=path,
-                show=show,
-                fig=fig,
-                **kwargs
-            )
+            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)

@@ -10,21 +10,18 @@
 """
 
 import json
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, NamedTuple
 
 import matplotlib.pyplot as plt
-import numpy as np
 from monai.data import DataLoader
+import numpy as np
 from sklearn.metrics import confusion_matrix
-import torch
-from torch import cuda, float32, random, tensor
-from torch import device as torch_device
+from torch import float32, float64, random, tensor
 
 from ...data.datasets.prostate_cancer import ProstateCancerDataset, TargetsType
-from ...evaluation.single_task.prediction_evaluator import PredictionEvaluator
-from ...metrics.single_task.base import MetricReduction
+from ...evaluation.single_task.prediction_evaluator import PredictionEvaluator, Output
+from ...metrics.single_task.base import Direction, MetricReduction
 from ...models.base.model import Model
-from ...models.torch.base.torch_model import Output
 from ...tools.transforms import batch_to_device, to_numpy
 
 
@@ -45,7 +42,8 @@ class ModelEvaluator(PredictionEvaluator):
         dataset : ProstateCancerDataset
             The dataset to input to the model.
         mask : Optional[List[int]]
-            Mask determining which patients to use in the dataset to build the predictions and targets lists.
+            Mask determining which patients to use in the dataset to build the predictions and targets lists. Defaults
+            to dataset.test_mask.
         """
         if mask is None:
             self.mask = dataset.test_mask
@@ -55,51 +53,10 @@ class ModelEvaluator(PredictionEvaluator):
         self.model = model
 
         super().__init__(
-            predictions=self._predictions_from_dataset(),
-            ground_truth=self._targets_from_dataset(),
+            predictions=self.model.predict_on_dataset(dataset=self.dataset, mask=self.mask),
+            ground_truth=self.dataset.table_dataset[self.mask].y,
             tasks=self.dataset.tasks
         )
-
-    def _predictions_from_dataset(self) -> List[TargetsType]:
-        """
-        Generates predictions using a dataset, model and mask.
-
-        Returns
-        -------
-        predictions : List[TargetsType]
-            The predictions of the model on the dataset in a list.
-        """
-        predict_dict = self.model.predict_on_dataset(dataset=self.dataset, mask=self.mask)
-        dataset_length = len(predict_dict[list(predict_dict.keys())[0]])
-        predict_list = [{} for _ in range(dataset_length)]
-        for task in self.dataset.tasks.table_tasks:
-            predictions = predict_dict.get(task.name).tolist()
-            for i, prediction in enumerate(predictions):
-                predict_list[i][task.name] = tensor(prediction)
-
-        return predict_list
-
-    def _targets_from_dataset(self) -> List[TargetsType]:
-        """
-        Returns the targets within a given dataset and mask.
-
-        Returns
-        ------
-        targets : List[TargetsType]
-            The targets in a dataset in a list.
-        """
-        targets_dict = self.dataset.table_dataset[self.mask].y
-        dataset_length = len(targets_dict[list(targets_dict.keys())[0]])
-        targets_list = [{} for _ in range(dataset_length)]
-        for task in self.dataset.tasks.table_tasks:
-            targets = targets_dict.get(task.name).tolist()
-            for i, target in enumerate(targets):
-                if isinstance(target, int):
-                    targets_list[i][task.name] = tensor([target])
-                else:
-                    targets_list[i][task.name] = tensor([target], dtype=torch.float64)
-
-        return targets_list
 
     def _compute_dataset_score(self) -> Dict[str, Dict[str, float]]:
         """
@@ -111,7 +68,6 @@ class ModelEvaluator(PredictionEvaluator):
         scores : Dict[str, Dict[str, float]]
             Score for each task and each metric.
         """
-        self.model.device if self.model.device else torch_device("cuda") if cuda.is_available() else torch_device("cpu")
         device = self.model.device
         subset = self.dataset[self.mask]
         rng_state = random.get_rng_state()
@@ -154,6 +110,44 @@ class ModelEvaluator(PredictionEvaluator):
 
         return scores
 
+    def fix_thresholds_to_optimal_values(self) -> None:
+        """
+        Fix all classification thresholds to their optimal values according to a given metric.
+        """
+        subset = self.dataset[self.dataset.train_mask]
+        device = self.model.device
+        rng_state = random.get_rng_state()
+        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
+        random.set_rng_state(rng_state)
+
+        binary_classification_tasks = self.dataset.tasks.binary_classification_tasks
+        outputs_dict = {task.name: Output(predictions=[], targets=[]) for task in binary_classification_tasks}
+        thresholds = np.linspace(start=0.01, stop=0.95, num=95)
+
+        for features, targets in data_loader:
+            features, targets = batch_to_device(features, device), batch_to_device(targets, device)
+
+            predictions = self.model.predict(features)
+
+            for task in binary_classification_tasks:
+                outputs_dict[task.name].predictions.append(predictions[task.name].item())
+                outputs_dict[task.name].targets.append(targets[task.name].item())
+
+        for task in binary_classification_tasks:
+            output = outputs_dict[task.name]
+
+            for metric in task.metrics:
+                scores = [metric(to_numpy(output.predictions), to_numpy(output.targets), t) for t in thresholds]
+
+                if metric.direction == Direction.MINIMIZE:
+                    metric.threshold = thresholds[np.argmin(scores)]
+                elif metric.direction == Direction.MAXIMIZE:
+                    metric.threshold = thresholds[np.argmax(scores)]
+
+            for metric in task.metrics:
+                if metric.direction == Direction.NONE:
+                    metric.threshold = task.decision_threshold_metric.threshold
+
     def compute_dataset_metrics(
             self,
             save_path: Optional[str] = None,
@@ -166,11 +160,16 @@ class ModelEvaluator(PredictionEvaluator):
         save_path : Union[bool, str]
             Whether to save the computed metrics. If saving the metrics is desired, then this is the path of the folder
             where they will be saved as a json file. Defaults to False which does not save the metrics.
+
+        Returns
+        -------
+        scores : Dict[str, Dict[str, float]]
+            Dictionary of the metrics of each applicable task.
         """
         scores = self._compute_dataset_score()
 
         if save_path is not None:
-            with open(f'{save_path}/scalar_metrics.json', 'w') as file_path:
+            with open(f'{save_path}/metrics.json', 'w') as file_path:
                 json.dump(scores, file_path)
         return scores
 
@@ -193,10 +192,10 @@ class ModelEvaluator(PredictionEvaluator):
             Whether to save the graph, if so, then this value is the path to the save folder.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.confusion_matrix.
-
         """
+        self.model.fix_thresholds_to_optimal_values(self.dataset)
         for task in self.tasks.binary_classification_tasks:
-            self.model.fix_thresholds_to_optimal_values()
+            fig, arr = plt.subplots()
             threshold = task.decision_threshold_metric.threshold
             y_true, y_pred = [], []
             for ground_truth in self.targets:
@@ -204,7 +203,7 @@ class ModelEvaluator(PredictionEvaluator):
             for predictions in self.predictions:
                 y_pred += [1] if predictions[task.name][0] >= threshold else [0]
 
-            plt.imshow(confusion_matrix(
+            arr.imshow(confusion_matrix(
                 y_true,
                 y_pred,
                 labels=kwargs.get('labels', None),
@@ -213,9 +212,12 @@ class ModelEvaluator(PredictionEvaluator):
             ))
 
             if save is not None:
-                path = save + f'/{task.name}_confusion_matrix.pdf'
-                plt.savefig(path, **kwargs)
-            if show:
-                plt.show()
+                path = f'{save}/{task.name}_confusion_matrix.pdf'
             else:
-                plt.close()
+                path = None
+            self._terminate_figure(
+                save=path,
+                show=show,
+                fig=fig,
+                **kwargs
+            )

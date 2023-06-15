@@ -21,6 +21,7 @@ from torch import float32, no_grad, random, round, sigmoid, stack, tensor
 
 from ...base import check_if_built, Model
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
+from ....evaluation.single_task.model_evaluator import ModelEvaluator
 from ....metrics.single_task.base import Direction, MetricReduction
 from ....tools.transforms import to_numpy, batch_to_device
 
@@ -37,11 +38,6 @@ def evaluation_function(_func):
         return out
 
     return wrapper
-
-
-class Output(NamedTuple):
-    predictions: List
-    targets: List
 
 
 class TorchModel(Model, ABC):
@@ -146,39 +142,8 @@ class TorchModel(Model, ABC):
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
         """
-        subset = dataset[dataset.train_mask]
-        rng_state = random.get_rng_state()
-        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
-        random.set_rng_state(rng_state)
-
-        binary_classification_tasks = dataset.tasks.binary_classification_tasks
-        outputs_dict = {task.name: Output(predictions=[], targets=[]) for task in binary_classification_tasks}
-
-        thresholds = linspace(start=0.01, stop=0.95, num=95)
-
-        for features, targets in data_loader:
-            features, targets = batch_to_device(features, self.device), batch_to_device(targets, self.device)
-
-            predictions = self.predict(features)
-
-            for task in binary_classification_tasks:
-                outputs_dict[task.name].predictions.append(predictions[task.name].item())
-                outputs_dict[task.name].targets.append(targets[task.name].item())
-
-        for task in binary_classification_tasks:
-            output = outputs_dict[task.name]
-
-            for metric in task.metrics:
-                scores = [metric(to_numpy(output.predictions), to_numpy(output.targets), t) for t in thresholds]
-
-                if metric.direction == Direction.MINIMIZE:
-                    metric.threshold = thresholds[argmin(scores)]
-                elif metric.direction == Direction.MAXIMIZE:
-                    metric.threshold = thresholds[argmax(scores)]
-
-            for metric in task.metrics:
-                if metric.direction == Direction.NONE:
-                    metric.threshold = task.decision_threshold_metric.threshold
+        evaluator = ModelEvaluator(self, dataset)
+        evaluator.fix_thresholds_to_optimal_values()
 
     @check_if_built
     @evaluation_function
@@ -315,7 +280,7 @@ class TorchModel(Model, ABC):
             self,
             dataset: ProstateCancerDataset,
             mask: List[int]
-    ) -> Dict[str, Dict[str, float]]:  # Est-ce que je peux le retirer d'ici puisqu'il existe déjà une méthode statique?
+    ) -> Dict[str, Dict[str, float]]:
         """
         Returns the score of all samples in a particular subset of the dataset, determined using a mask parameter.
 
@@ -331,43 +296,5 @@ class TorchModel(Model, ABC):
         scores : Dict[str, Dict[str, float]]
             Score for each task and each metric.
         """
-        subset = dataset[mask]
-        rng_state = random.get_rng_state()
-        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
-        random.set_rng_state(rng_state)
-
-        tasks = dataset.tasks
-        table_tasks, seg_tasks = tasks.table_tasks, tasks.segmentation_tasks
-
-        scores = {task.name: {} for task in tasks}
-        segmentation_scores = {task.name: {metric.name: [] for metric in task.unique_metrics} for task in seg_tasks}
-        table_outputs = {task.name: Output(predictions=[], targets=[]) for task in table_tasks}
-        for features, targets in data_loader:
-            features, targets = batch_to_device(features, self.device), batch_to_device(targets, self.device)
-
-            predictions = self.predict(features=features)
-
-            for task in seg_tasks:
-                for metric in task.unique_metrics:
-                    segmentation_scores[task.name][metric.name].append(
-                        metric(predictions[task.name], targets[task.name], MetricReduction.NONE)
-                    )
-
-            for task in table_tasks:
-                if task.metrics:
-                    table_outputs[task.name].predictions.append(predictions[task.name].item())
-                    table_outputs[task.name].targets.append(targets[task.name].tolist()[0])
-
-        for task in seg_tasks:
-            for metric in task.unique_metrics:
-                scores[task.name][metric.name] = metric.perform_reduction(
-                    tensor(segmentation_scores[task.name][metric.name], dtype=float32)
-                )
-
-        for task in table_tasks:
-            if task.metrics:
-                output = table_outputs[task.name]
-                for metric in task.unique_metrics:
-                    scores[task.name][metric.name] = metric(to_numpy(output.predictions), to_numpy(output.targets))
-
-        return scores
+        evaluator = ModelEvaluator(model=self, dataset=dataset, mask=mask)
+        return evaluator.compute_dataset_metrics()
