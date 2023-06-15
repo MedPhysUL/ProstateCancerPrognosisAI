@@ -85,28 +85,31 @@ class ModelEvaluator(PredictionEvaluator):
 
             predictions = self.model.predict(features=features)
 
-            for task in seg_tasks:
-                for metric in task.unique_metrics:
-                    segmentation_scores[task.name][metric.name].append(
-                        metric(predictions[task.name], targets[task.name], MetricReduction.NONE)
-                    )
+            segmentation_scores = self._update_segmentation_scores(
+                seg_tasks=seg_tasks,
+                segmentation_scores=segmentation_scores,
+                predictions=predictions,
+                targets=targets
+            )
 
-            for task in table_tasks:
-                if task.metrics:
-                    table_outputs[task.name].predictions.append(predictions[task.name].item())
-                    table_outputs[task.name].targets.append(targets[task.name].tolist()[0])
+            table_outputs = self._update_table_outputs(
+                table_tasks=table_tasks,
+                table_outputs=table_outputs,
+                predictions=predictions,
+                targets=targets
+            )
 
-        for task in seg_tasks:
-            for metric in task.unique_metrics:
-                scores[task.name][metric.name] = metric.perform_reduction(
-                    tensor(segmentation_scores[task.name][metric.name], dtype=float32)
-                )
+        scores = self._update_scores_with_segmentation_scores(
+            seg_tasks=seg_tasks,
+            segmentation_scores=segmentation_scores,
+            scores=scores
+        )
 
-        for task in table_tasks:
-            if task.metrics:
-                output = table_outputs[task.name]
-                for metric in task.unique_metrics:
-                    scores[task.name][metric.name] = metric(to_numpy(output.predictions), to_numpy(output.targets))
+        scores = self._update_scores_with_table_scores(
+            table_tasks=table_tasks,
+            table_outputs=table_outputs,
+            scores=scores
+        )
 
         return scores
 
@@ -129,24 +132,18 @@ class ModelEvaluator(PredictionEvaluator):
 
             predictions = self.model.predict(features)
 
-            for task in binary_classification_tasks:
-                outputs_dict[task.name].predictions.append(predictions[task.name].item())
-                outputs_dict[task.name].targets.append(targets[task.name].item())
+            outputs_dict = self._update_outputs_dict(
+                binary_classification_tasks=binary_classification_tasks,
+                outputs_dict=outputs_dict,
+                predictions=predictions,
+                targets=targets
+            )
 
-        for task in binary_classification_tasks:
-            output = outputs_dict[task.name]
-
-            for metric in task.metrics:
-                scores = [metric(to_numpy(output.predictions), to_numpy(output.targets), t) for t in thresholds]
-
-                if metric.direction == Direction.MINIMIZE:
-                    metric.threshold = thresholds[np.argmin(scores)]
-                elif metric.direction == Direction.MAXIMIZE:
-                    metric.threshold = thresholds[np.argmax(scores)]
-
-            for metric in task.metrics:
-                if metric.direction == Direction.NONE:
-                    metric.threshold = task.decision_threshold_metric.threshold
+        self._fix_metric_threshold(
+            binary_classification_tasks=binary_classification_tasks,
+            outputs_dict=outputs_dict,
+            thresholds=thresholds
+        )
 
     def compute_dataset_metrics(
             self,

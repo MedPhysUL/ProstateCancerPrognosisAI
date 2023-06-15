@@ -15,10 +15,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_curve
-from torch import cat, float64, tensor, Tensor
+from torch import cat, float32, float64, tensor, Tensor
 
 from ...data.datasets.prostate_cancer import FeaturesType, TargetsType
-from ...metrics.single_task.base import Direction
+from ...metrics.single_task.base import Direction, MetricReduction
 from ...tasks.base import Task
 from ...tasks.containers.list import TaskList
 from ...tools.transforms import to_numpy
@@ -98,6 +98,195 @@ class PredictionEvaluator:
 
         return targets_list
 
+    @staticmethod
+    def _update_segmentation_scores(
+            seg_tasks: TaskList,
+            segmentation_scores: Dict[str, Dict[str, list]],
+            predictions: TargetsType,
+            targets: TargetsType
+    ) -> Dict[str, Dict[str, list]]:
+        """
+        Adds the data of one patient to a segmentation_scores dictionary.
+
+        Parameters
+        ----------
+        seg_tasks : TaskList
+            List of segmentation tasks for a dataset.
+        segmentation_scores : Dict[str, Dict[str, list]]
+            Score for each task for each metric for each patient.
+        predictions : TargetsType
+            The model's prediction for the patient.
+        targets : TargetsType
+            The target for the patient.
+
+        Returns
+        -------
+        segmentation_scores : Dict[str, Dict[str, list]]
+            Updated dictionary with the patient added.
+        """
+        for task in seg_tasks:
+            for metric in task.unique_metrics:
+                segmentation_scores[task.name][metric.name].append(
+                    metric(predictions[task.name], targets[task.name], MetricReduction.NONE)
+                )
+        return segmentation_scores
+
+    @staticmethod
+    def _update_table_outputs(
+            table_tasks: TaskList,
+            table_outputs: Dict[str, Output],
+            predictions: TargetsType,
+            targets: TargetsType
+    ) -> Dict[str, Output]:
+        """
+        Adds the data of one patient to a table_outputs dictionary.
+
+        Parameters
+        ----------
+        table_tasks : TaskList
+            List of table tasks for a dataset.
+        table_outputs : Dict[str, Dict[str, list]]
+            Score for each task for each metric for each patient.
+        predictions : TargetsType
+            The model's prediction for the patient.
+        targets : TargetsType
+            The target for the patient.
+
+        Returns
+        -------
+        table_outputs : Dict[str, Dict[str, list]]
+            Updated dictionary with the patient added.
+        """
+        for task in table_tasks:
+            if task.metrics:
+                table_outputs[task.name].predictions.append(predictions[task.name].item())
+                table_outputs[task.name].targets.append(targets[task.name].tolist()[0])
+        return table_outputs
+
+    @staticmethod
+    def _update_scores_with_segmentation_scores(
+            seg_tasks: TaskList,
+            segmentation_scores: Dict[str, Dict[str, list]],
+            scores: Dict[str, Dict[str, float]]
+    ) -> Dict[str, Dict[str, float]]:
+        """
+        Adds the segmentation scores to the scores dictionary.
+
+        Parameters
+        ----------
+        seg_tasks : TaskList
+            List of segmentation tasks for a dataset.
+        segmentation_scores : Dict[str, Dict[str, list]]
+            Score for each task for each metric for each patient.
+        scores : Dict[str, Dict[str, float]]
+            Score for each task for each metric.
+
+        Returns
+        -------
+        scores : Dict[str, Dict[str, float]]
+            Updated dictionary with the segmentation scores added.
+        """
+        for task in seg_tasks:
+            for metric in task.unique_metrics:
+                scores[task.name][metric.name] = metric.perform_reduction(
+                    tensor(segmentation_scores[task.name][metric.name], dtype=float32)
+                )
+        return scores
+
+    @staticmethod
+    def _update_scores_with_table_scores(
+            table_tasks: TaskList,
+            table_outputs: Dict[str, Output],
+            scores: Dict[str, Dict[str, float]]
+    ) -> Dict[str, Dict[str, float]]:
+        """
+         Adds the table scores to the scores dictionary.
+
+        Parameters
+        ----------
+        table_tasks : TaskList
+            List of table tasks for a dataset.
+        table_outputs : Dict[str, Dict[str, list]]
+            Score for each task for each metric for each patient.
+        scores : Dict[str, Dict[str, float]]
+            Score for each task for each metric.
+
+        Returns
+        -------
+        scores : Dict[str, Dict[str, float]]
+            Updated dictionary with the table scores added.
+        """
+        for task in table_tasks:
+            if task.metrics:
+                output = table_outputs[task.name]
+                for metric in task.unique_metrics:
+                    scores[task.name][metric.name] = metric(to_numpy(output.predictions), to_numpy(output.targets))
+        return scores
+
+    @staticmethod
+    def _update_outputs_dict(
+            binary_classification_tasks: TaskList,
+            outputs_dict: Dict[str, Output],
+            predictions: TargetsType,
+            targets: TargetsType
+    ) -> Dict[str, Output]:
+        """
+        Creates the outputs dictionary containing the predictions and targets for a dataset.
+
+        Parameters
+        ----------
+        binary_classification_tasks : TaskList
+            List of the binary classification tasks in a dataset.
+        outputs_dict : Dict[str, Output]
+            Dictionary containing the predictions and targets for a dataset.
+        predictions : TargetsType
+            Prediction to be added to outputs_dict.
+        targets : TargetsType
+            Target to be added to outputs_dict.
+
+        Returns
+        -------
+        outputs_dict : Dict[str, Output]
+            outputs_dict with the patient added.
+        """
+        for task in binary_classification_tasks:
+            outputs_dict[task.name].predictions.append(predictions[task.name].item())
+            outputs_dict[task.name].targets.append(targets[task.name].item())
+        return outputs_dict
+
+    @staticmethod
+    def _fix_metric_threshold(
+            binary_classification_tasks: TaskList,
+            outputs_dict: Dict[str, Output],
+            thresholds: np.ndarray
+    ) -> None:
+        """
+        Fixes the threshold value to be optimized for each task.
+
+        Parameters
+        ----------
+        binary_classification_tasks : TaskList
+            List of the binary classification tasks in a dataset.
+        outputs_dict : Dict[str, Output]
+            Dictionary containing all outputs and targets for a dataset.
+        thresholds : np.ndarray
+            Array of thresholds to try when looking for the best one.
+        """
+        for task in binary_classification_tasks:
+            output = outputs_dict[task.name]
+
+            for metric in task.metrics:
+                scores = [metric(to_numpy(output.predictions), to_numpy(output.targets), t) for t in thresholds]
+
+                if metric.direction == Direction.MINIMIZE:
+                    metric.threshold = thresholds[np.argmin(scores)]
+                elif metric.direction == Direction.MAXIMIZE:
+                    metric.threshold = thresholds[np.argmax(scores)]
+
+            for metric in task.metrics:
+                if metric.direction == Direction.NONE:
+                    metric.threshold = task.decision_threshold_metric.threshold
+
     def _compute_prediction_score(
             self,
             mask: Optional[Union[List[int], slice]] = None
@@ -132,16 +321,18 @@ class PredictionEvaluator:
 
         for predictions, targets in tuple(zip(predictions, targets)):
 
-            for task in table_tasks:
-                if task.metrics:
-                    table_outputs[task.name].predictions.append(predictions[task.name].item())
-                    table_outputs[task.name].targets.append(targets[task.name].tolist()[0])
+            table_outputs = self._update_table_outputs(
+                table_tasks=table_tasks,
+                table_outputs=table_outputs,
+                predictions=predictions,
+                targets=targets
+            )
 
-        for task in table_tasks:
-            if task.metrics:
-                output = table_outputs[task.name]
-                for metric in task.unique_metrics:
-                    scores[task.name][metric.name] = metric(to_numpy(output.predictions), to_numpy(output.targets))
+        scores = self._update_scores_with_table_scores(
+            table_tasks=table_tasks,
+            table_outputs=table_outputs,
+            scores=scores
+        )
 
         return scores
 
@@ -173,24 +364,18 @@ class PredictionEvaluator:
 
         for predictions, targets in tuple(zip(predictions, targets)):
 
-            for task in binary_classification_tasks:
-                outputs_dict[task.name].predictions.append(predictions[task.name].item())
-                outputs_dict[task.name].targets.append(targets[task.name].item())
+            outputs_dict = self._update_outputs_dict(
+                binary_classification_tasks=binary_classification_tasks,
+                outputs_dict=outputs_dict,
+                predictions=predictions,
+                targets=targets
+            )
 
-        for task in binary_classification_tasks:
-            output = outputs_dict[task.name]
-
-            for metric in task.metrics:
-                scores = [metric(to_numpy(output.predictions), to_numpy(output.targets), t) for t in thresholds]
-
-                if metric.direction == Direction.MINIMIZE:
-                    metric.threshold = thresholds[np.argmin(scores)]
-                elif metric.direction == Direction.MAXIMIZE:
-                    metric.threshold = thresholds[np.argmax(scores)]
-
-            for metric in task.metrics:
-                if metric.direction == Direction.NONE:
-                    metric.threshold = task.decision_threshold_metric.threshold
+        self._fix_metric_threshold(
+            binary_classification_tasks=binary_classification_tasks,
+            outputs_dict=outputs_dict,
+            thresholds=thresholds
+        )
 
     @staticmethod
     def _terminate_figure(
