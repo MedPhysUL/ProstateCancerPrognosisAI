@@ -193,6 +193,20 @@ class ProstateCancerDataset(Dataset):
         """
         return self._test_mask
 
+    def enable_augmentations(self):
+        """
+        Enables augmentations on the dataset. This method should be called before training.
+        """
+        if isinstance(self.image_dataset, ImageDataset):
+            self.image_dataset.enable_augmentations()
+
+    def disable_augmentations(self):
+        """
+        Disables augmentations on the dataset. This method should be called before validation and testing.
+        """
+        if isinstance(self.image_dataset, ImageDataset):
+            self.image_dataset.disable_augmentations()
+
     def update_masks(
             self,
             train_mask: List[int],
