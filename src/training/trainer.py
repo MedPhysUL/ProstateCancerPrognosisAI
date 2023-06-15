@@ -506,11 +506,13 @@ class Trainer:
         dataloader : DataLoader
             Dataloader.
         """
+        dataloader.dataset.enable_augmentations()  # type: ignore
         self.model.train()
         self.callbacks.on_train_start(self)
         self._exec_batches(dataloader)
         self.epoch_state.set_losses_from_batches_state(self.batches_state, self.model.training)
         self.callbacks.on_train_end(self)
+        dataloader.dataset.disable_augmentations()  # type: ignore
 
     def _exec_validation(
             self,
