@@ -1,6 +1,13 @@
 import env_apps
 
 from delia.databases import PatientsDatabase
+from monai.transforms import (
+    Compose,
+    RandGaussianNoiseD,
+    RandFlipD,
+    RandRotateD,
+    ThresholdIntensityD
+)
 from optuna.integration.botorch import BoTorchSampler
 import pandas as pd
 from torch.optim import Adam
@@ -35,8 +42,11 @@ from src.tuning.hyperparameters.torch import (
 
 
 if __name__ == '__main__':
-    df = pd.read_csv(LEARNING_TABLE_PATH)
+    DOCKER_EXPERIMENTS_PATH = "experiments"
+    TEMP_PATH = "temp"
     task = CRPC_TASK
+
+    df = pd.read_csv(LEARNING_TABLE_PATH)
 
     table_dataset = TableDataset(
         df=df,
@@ -48,13 +58,22 @@ if __name__ == '__main__':
 
     image_dataset = ImageDataset(
         database=database,
-        modalities={"PT", "CT"}
+        modalities={"PT", "CT"},
+        augmentations=Compose([
+            RandGaussianNoiseD(keys=["CT", "PT"], prob=0.5, std=0.02),
+            ThresholdIntensityD(keys=["CT", "PT"], threshold=0, above=True, cval=0),
+            ThresholdIntensityD(keys=["CT", "PT"], threshold=1, above=False, cval=1),
+            RandFlipD(keys=["CT", "PT"], prob=0.5, spatial_axis=2),
+            RandRotateD(keys=["CT", "PT"], prob=0.5, range_x=0.261799)
+        ]),
+        seed=SEED
     )
 
     dataset = ProstateCancerDataset(image_dataset=image_dataset, table_dataset=table_dataset)
 
     path_to_record_folder = os.path.join(
-        EXPERIMENTS_PATH,
+        os.getcwd(),
+        DOCKER_EXPERIMENTS_PATH,
         f"{task.target_column}(CNN - Deep radiomics)"
     )
 
@@ -121,9 +140,16 @@ if __name__ == '__main__':
         # checkpoint=CheckpointHyperparameter(save_freq=20)
     )
 
+    path_to_temp_folder = os.path.join(
+        os.getcwd(),
+        TEMP_PATH,
+        f"{task.target_column}(CNN - Deep radiomics) - EarlyStoppingFolder"
+    )
+
     train_method_hyperparameter = TrainMethodHyperparameter(
         model=model_hyperparameter,
-        learning_algorithms=extractor_learning_algorithm_hyperparameter
+        learning_algorithms=extractor_learning_algorithm_hyperparameter,
+        path_to_temporary_folder=path_to_temp_folder
     )
 
     objective = TorchObjective(
