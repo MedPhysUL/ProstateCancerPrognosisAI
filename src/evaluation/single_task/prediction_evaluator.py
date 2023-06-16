@@ -33,7 +33,7 @@ class PredictionEvaluator:
     def __init__(
             self,
             predictions: TargetsType,
-            ground_truth: Union[dict, FeaturesType, Tensor],
+            targets: Union[dict, FeaturesType, Tensor],
             tasks: Union[Task, TaskList, List[Task]]
     ) -> None:
         """
@@ -43,13 +43,13 @@ class PredictionEvaluator:
         ----------
         predictions : TargetsType
             The predictions of the model from a dataset.
-        ground_truth : Union[dict, FeaturesType, Tensor]
+        targets : Union[dict, FeaturesType, Tensor]
             Ground truths to be used as a reference for the computation of the different metrics.
         tasks : Union[Task, TaskList, List[Task]]
             Object of the class TaskList that specifies for which tasks the model should be evaluated.
         """
         self.predictions_dict = predictions
-        self.targets_dict = ground_truth
+        self.targets_dict = targets
         self.tasks = TaskList(tasks)
         assert all(isinstance(task, Task) for task in self.tasks), (
             f"All tasks must be instances of 'TableTask'."

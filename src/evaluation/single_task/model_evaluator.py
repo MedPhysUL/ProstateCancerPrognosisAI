@@ -54,7 +54,7 @@ class ModelEvaluator(PredictionEvaluator):
 
         super().__init__(
             predictions=self.model.predict_on_dataset(dataset=self.dataset, mask=self.mask),
-            ground_truth=self.dataset.table_dataset[self.mask].y,
+            targets=self.dataset.table_dataset[self.mask].y,
             tasks=self.dataset.tasks
         )
 
@@ -189,8 +189,8 @@ class ModelEvaluator(PredictionEvaluator):
             fig, arr = plt.subplots()
             threshold = task.decision_threshold_metric.threshold
             y_true, y_pred = [], []
-            for ground_truth in self.targets:
-                y_true.append(ground_truth[task.name][0])
+            for target in self.targets:
+                y_true.append(target[task.name][0])
             for predictions in self.predictions:
                 y_pred += [1] if predictions[task.name][0] >= threshold else [0]
 
