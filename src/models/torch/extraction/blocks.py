@@ -142,3 +142,101 @@ class EncoderBlock(nn.Module):
         y_res = self.residual(x)
 
         return y + y_res
+
+
+class DecoderBlock(nn.Module):
+    """
+    A class that contains a decoder block used for segmentation models. Based on Monai.
+    """
+
+    def __init__(
+            self,
+            input_channels: int,
+            output_channels: int,
+            num_res_units: int = 3,
+            kernel_size: Union[Sequence[int], int] = 3,
+            stride: Union[Sequence[int], int] = 2,
+            act: str = "PRELU",
+            norm: str = "INSTANCE",
+            dropout: float = 0.0,
+            is_top: bool = False
+    ):
+        """
+        Description.
+        """
+        super().__init__()
+
+        self.num_res_units = num_res_units
+
+        padding = same_padding(kernel_size=kernel_size, dilation=1)
+        output_padding = stride - 1
+
+        self.up_conv = nn.Sequential()
+
+        self.up_conv.add_module(
+            "up_conv",
+            nn.ConvTranspose3d(
+                in_channels=input_channels,
+                out_channels=output_channels,
+                kernel_size=kernel_size,
+                stride=stride,
+                padding=padding,
+                output_padding=output_padding,
+                groups=1,
+                bias=True,
+                dilation=1
+            )
+        )
+
+        if not is_top or num_res_units > 0:
+            self.up_conv.add_module(
+                f"up_adn",
+                ADN(
+                    ordering="NDA",
+                    in_channels=output_channels,
+                    act=act,
+                    norm=norm,
+                    dropout=dropout,
+                    dropout_dim=1,
+                    norm_dim=3
+                )
+            )
+
+        if num_res_units > 0:
+            self.residual = nn.Identity()
+            self.conv = nn.Sequential()
+
+            self.conv.add_module(
+                'conv',
+                nn.Conv3d(
+                    in_channels=output_channels,
+                    out_channels=output_channels,
+                    kernel_size=kernel_size,
+                    stride=1,
+                    padding=padding
+                )
+            )
+
+            if not is_top:
+                self.conv.add_module(
+                    "adn",
+                    ADN(
+                        ordering="NDA",
+                        in_channels=output_channels,
+                        act=act,
+                        norm=norm,
+                        dropout=dropout,
+                        dropout_dim=1,
+                        norm_dim=3
+                    )
+                )
+
+
+    def forward(self, x):
+        y = self.up_conv(x)
+
+        if self.num_res_units > 0:
+            y_res = self.residual(y)
+            y = self.conv(y)
+
+        return y + y_res

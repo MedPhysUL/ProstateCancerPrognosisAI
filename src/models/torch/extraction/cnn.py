@@ -166,6 +166,7 @@ class CNN(Extractor):
             multi_task_mode=multi_task_mode,
             shape=shape,
             n_features=n_features,
+            return_seg=False,
             device=device,
             name=name,
             seed=seed
@@ -334,21 +335,7 @@ class CNN(Extractor):
             The extractor module. It should take as input a tensor of shape (batch_size, channels, *spatial_shape) and
             return a tensor of shape (batch_size, n_features, *spatial_shape).
         """
-        if self.multi_task_mode == MultiTaskMode.SEPARATED:
-            return ModuleDict({task.name: self._build_single_extractor() for task in self._tasks.table_tasks})
-        elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
-            return self._build_single_extractor()
-        elif self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
-            shared_module = self._build_partly_shared_extractor()
-            separated_modules = ModuleDict(
-                {task.name: self._build_single_extractor() for task in self._tasks.table_tasks}
-            )
-
-            partly_shared_module_dict = ModuleDict()
-            for name, module in separated_modules.items():
-                partly_shared_module_dict[name] = Sequential(shared_module, module)
-
-            return partly_shared_module_dict
+        return self._build_single_extractor()
 
     def _get_input_tensor(self, features: FeaturesType) -> Tensor:
         """

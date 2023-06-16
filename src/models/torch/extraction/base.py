@@ -90,9 +90,10 @@ class Extractor(TorchModel, ABC):
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
             shape: Union[str, Sequence[int]] = (128, 128, 128),
             n_features: int = 6,
+            return_seg: bool = False,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
-            seed: Optional[int] = None
+            seed: Optional[int] = None,
     ):
         """
         Initializes the model.
@@ -145,6 +146,8 @@ class Extractor(TorchModel, ABC):
 
         self.extractor = None
         self.prediction_layer = None
+
+        self._return_seg = return_seg
 
     @abstractmethod
     def _build_extractor(self, dataset: ProstateCancerDataset) -> Union[Module, ModuleDict]:
@@ -261,15 +264,7 @@ class Extractor(TorchModel, ABC):
         radiomics : Union[Tensor, Dict[str, Tensor]]
             The radiomics features.
         """
-        if self.multi_task_mode == MultiTaskMode.SEPARATED or self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
-            deep_radiomics = {}
-            for task in self._tasks.table_tasks:
-                deep_radiomics[task.name] = self.extractor[task.name](input_tensor)
-            return deep_radiomics
-        elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
-            return self.extractor(input_tensor)
-        else:
-            raise ValueError(f"{self.multi_task_mode} is not a valid MultiTaskMode")
+        return self.extractor(input_tensor)
 
     def _get_prediction(self, radiomics: Union[Tensor, Dict[str, Tensor]]) -> Dict[str, Tensor]:
         """
@@ -285,7 +280,7 @@ class Extractor(TorchModel, ABC):
         prediction : Dict[str, Tensor]
             The prediction.
         """
-        if self.multi_task_mode == MultiTaskMode.SEPARATED or self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
+        if self.multi_task_mode == MultiTaskMode.SEPARATED:
             prediction = {}
             for task in self._tasks.table_tasks:
                 prediction[task.name] = self.prediction_layer[task.name](radiomics[task.name])[:, 0]
@@ -300,7 +295,7 @@ class Extractor(TorchModel, ABC):
     def forward(
             self,
             features: FeaturesType
-    ) -> Union[Tensor, TargetsType]:
+    ) -> Union[TargetsType, Tensor, tuple]:
         """
         Performs a forward pass through the model.
 
@@ -317,11 +312,27 @@ class Extractor(TorchModel, ABC):
             each of shape (batch_size, 1).
         """
         x_image = self._get_input_tensor(features)
-        deep_radiomics = self._get_radiomics(x_image)
 
-        if self.model_mode == ModelMode.EXTRACTION:
-            return deep_radiomics
-        elif self.model_mode == ModelMode.PREDICTION:
-            return self._get_prediction(deep_radiomics)
+        if self._return_seg:
+            deep_radiomics, seg = self._get_radiomics(x_image)  # TODO dict de segs par tache ou tenseur de une seg
+
+            if self.model_mode == ModelMode.EXTRACTION:
+                return deep_radiomics, seg
+
+            elif self.model_mode == ModelMode.PREDICTION:
+                return self._get_prediction(deep_radiomics) | {task.name: seg[:, i] for i, task in enumerate(self._tasks.segmentation_tasks)}
+
+            else:
+                raise ValueError(f"{self.model_mode} is not a valid ModelMode")
+
         else:
-            raise ValueError(f"{self.model_mode} is not a valid ModelMode")
+            deep_radiomics = self._get_radiomics(x_image)
+
+            if self.model_mode == ModelMode.EXTRACTION:
+                return deep_radiomics
+
+            elif self.model_mode == ModelMode.PREDICTION:
+                return self._get_prediction(deep_radiomics)
+
+            else:
+                raise ValueError(f"{self.model_mode} is not a valid ModelMode")
