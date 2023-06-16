@@ -17,7 +17,8 @@ from delia.databases.patients_database import PatientsDatabase
 from monai.data import MetaTensor
 from monai.transforms import apply_transform, Compose, EnsureChannelFirstd, MapTransform, ToTensord
 import numpy as np
-from torch import float32
+from torch import cuda, float32
+from torch import device as torch_device
 from torch.utils.data import Dataset, Subset
 
 from ...tasks import SegmentationTask, TaskList
@@ -33,8 +34,10 @@ class ImageDataset(Dataset):
             self,
             database: PatientsDatabase,
             modalities: Set[str],
-            organs: Optional[Dict[str, Set[str]]] = None,
             augmentations: Optional[Union[Compose, MapTransform]] = None,
+            device: Optional[torch_device] = None,
+            organs: Optional[Dict[str, Set[str]]] = None,
+            seed: Optional[int] = None,
             tasks: Optional[Union[SegmentationTask, TaskList, List[SegmentationTask]]] = None,
             transposition: Tuple[int, int, int] = (2, 0, 1),
             **kwargs
@@ -49,6 +52,13 @@ class ImageDataset(Dataset):
         modalities : Set[str]
             Set of image modalities to include in the dataset. These images are added to the dataset as features.
                     Example : {"CT", "PT", "MR"}.
+        augmentations : Optional[Union[Compose, MapTransform]]
+            A single or a sequence of transforms to apply to images and segmentations (depending on transform keys).
+            These transforms are applied to the dataset only if the method 'enable_augmentations' is called, usually
+            before training.
+        device : Optional[torch_device]
+            Device to use for performing augmentations. If None, the device is set to 'cuda' if available, otherwise
+            it is set to 'cpu'.
         organs : Dict[str, Set[str]]
             Dictionary of organs to include in the dataset. Keys are modality names and values are sets of organs. The
             keys of the dictionary, i.e. modality images (CT scan for example), will NOT be added to the dataset. This
@@ -58,10 +68,8 @@ class ImageDataset(Dataset):
                         "PT": {"Prostate"},
                         "MR": {"Brain"}
                     }.
-        augmentations : Optional[Union[Compose, MapTransform]]
-            A single or a sequence of transforms to apply to images and segmentations (depending on transform keys).
-            These transforms are applied to the dataset only if the method 'enable_augmentations' is called, usually
-            before training.
+        seed : Optional[int]
+            Random state used for reproducibility.
         tasks : Optional[Union[SegmentationTask, TaskList, List[SegmentationTask]]]
             Segmentation tasks to perform. These label maps are added to the dataset as targets.
         transposition : Tuple[int, int, int]
@@ -78,8 +86,10 @@ class ImageDataset(Dataset):
         self._augmentations = augmentations
         self._augmentations_are_enabled = False
         self._database = database
+        self._device = device if device else torch_device("cuda") if cuda.is_available() else torch_device("cpu")
         self._modalities = modalities
         self._organs = organs if organs else {}
+        self._rng = np.random.RandomState(seed=seed)
         self._modalities_to_iterate_over = set(
             chain(
                 modalities,
@@ -212,26 +222,29 @@ class ImageDataset(Dataset):
         if self._augmentations is None or not self._augmentations_are_enabled:
             transforms = Compose([
                 EnsureChannelFirstd(keys=keys),
-                ToTensord(keys=keys, dtype=float32)
+                ToTensord(keys=keys, dtype=float32, device=self._device)
             ])
         else:
             if isinstance(self._augmentations, Compose):
                 transforms = Compose([
                     EnsureChannelFirstd(keys=keys),
-                    *self._augmentations.transforms,
-                    ToTensord(keys=keys, dtype=float32)
+                    ToTensord(keys=keys, dtype=float32, device=self._device),
+                    *self._augmentations.transforms
                 ])
             elif isinstance(self._augmentations, MapTransform):
                 transforms = Compose([
                     EnsureChannelFirstd(keys=keys),
+                    ToTensord(keys=keys, dtype=float32, device=self._device),
                     self._augmentations,
-                    ToTensord(keys=keys, dtype=float32)
                 ])
             else:
                 raise AssertionError(
                     f"'augmentations' must be of type 'Compose' or 'MapTransform'. Found type "
                     f"{type(self._augmentations)}"
                 )
+
+        random_seed = self._rng.randint(0, 2**16 - 1)
+        transforms = transforms.set_random_state(random_seed)
 
         return apply_transform(transforms, data) if transforms else data
 
