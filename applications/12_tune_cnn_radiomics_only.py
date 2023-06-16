@@ -11,6 +11,13 @@
 import env_apps
 
 from delia.databases import PatientsDatabase
+from monai.transforms import (
+    Compose,
+    RandGaussianNoiseD,
+    RandFlipD,
+    RandRotateD,
+    ThresholdIntensityD
+)
 from optuna.integration.botorch import BoTorchSampler
 import pandas as pd
 from torch.optim import Adam
@@ -58,7 +65,15 @@ if __name__ == '__main__':
 
     image_dataset = ImageDataset(
         database=database,
-        modalities={"PT", "CT"}
+        modalities={"PT", "CT"},
+        augmentations=Compose([
+            RandGaussianNoiseD(keys=["CT", "PT"], prob=0.5, std=0.02),
+            ThresholdIntensityD(keys=["CT", "PT"], threshold=0, above=True, cval=0),
+            ThresholdIntensityD(keys=["CT", "PT"], threshold=1, above=False, cval=1),
+            RandFlipD(keys=["CT", "PT"], prob=0.5, spatial_axis=2),
+            RandRotateD(keys=["CT", "PT"], prob=0.5, range_x=0.261799)
+        ]),
+        seed=SEED
     )
 
     dataset = ProstateCancerDataset(image_dataset=image_dataset, table_dataset=table_dataset)
