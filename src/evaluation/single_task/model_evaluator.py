@@ -10,17 +10,15 @@
 """
 
 import json
-from typing import Dict, List, Optional, Union, NamedTuple
+from typing import Dict, List, Optional, Union
 
-import matplotlib.pyplot as plt
 from monai.data import DataLoader
 import numpy as np
-from sklearn.metrics import confusion_matrix
-from torch import float32, float64, random, tensor
+from torch import float32, random, tensor
 
-from ...data.datasets.prostate_cancer import ProstateCancerDataset, TargetsType
+from ...data.datasets.prostate_cancer import ProstateCancerDataset
 from ...evaluation.single_task.prediction_evaluator import PredictionEvaluator, Output
-from ...metrics.single_task.base import Direction, MetricReduction
+from ...metrics.single_task.base import MetricReduction
 from ...models.base.model import Model
 from ...tools.transforms import batch_to_device, to_numpy
 
@@ -110,11 +108,21 @@ class ModelEvaluator(PredictionEvaluator):
 
         return scores
 
-    def fix_thresholds_to_optimal_values(self) -> None:
+    def fix_thresholds_to_optimal_values(
+            self,
+            mask: Optional[List[int]] = None
+    ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
+
+        Parameters
+        ----------
+        mask : Optional[List[int]]
+            Mask used to specify which patients to use when optimizing the thresholds. Uses train mask by default.
         """
-        subset = self.dataset[self.dataset.train_mask]
+        if mask is None:
+            mask = self.dataset.train_mask
+        subset = self.dataset[mask]
         device = self.model.device
         rng_state = random.get_rng_state()
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
@@ -160,55 +168,6 @@ class ModelEvaluator(PredictionEvaluator):
         scores = self._compute_dataset_score()
 
         if save_path is not None:
-            with open(f'{save_path}/metrics.json', 'w') as file_path:
+            with open(f"{save_path}/metrics.json", "w") as file_path:
                 json.dump(scores, file_path)
         return scores
-
-    def plot_dataset_confusion_matrix(
-            self,
-            show: bool,
-            save: Optional[str] = None,
-            **kwargs
-    ) -> None:
-        """
-        Creates the confusion matrix graph. Takes the mask parameter given when instantiating the ModelEvaluator object
-        to select the patients used to optimize the threshold used when computing binary classification from continuous
-        probability.
-
-        Parameters
-        ----------
-        show : bool
-            Whether to show the graph.
-        save : Optional[str],
-            Whether to save the graph, if so, then this value is the path to the save folder.
-        kwargs
-            These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.confusion_matrix.
-        """
-        self.model.fix_thresholds_to_optimal_values(self.dataset)
-        for task in self.tasks.binary_classification_tasks:
-            fig, arr = plt.subplots()
-            threshold = task.decision_threshold_metric.threshold
-            y_true, y_pred = [], []
-            for target in self.targets:
-                y_true.append(target[task.name][0])
-            for predictions in self.predictions:
-                y_pred += [1] if predictions[task.name][0] >= threshold else [0]
-
-            arr.imshow(confusion_matrix(
-                y_true,
-                y_pred,
-                labels=kwargs.get('labels', None),
-                sample_weight=kwargs.get('sample_weight', None),
-                normalize=kwargs.get('normalize', None)
-            ))
-
-            if save is not None:
-                path = f'{save}/{task.name}_confusion_matrix.pdf'
-            else:
-                path = None
-            self._terminate_figure(
-                save=path,
-                show=show,
-                fig=fig,
-                **kwargs
-            )
