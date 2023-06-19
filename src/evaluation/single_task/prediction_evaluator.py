@@ -35,7 +35,9 @@ class PredictionEvaluator:
             self,
             predictions: TargetsType,
             targets: TargetsType,
-            tasks: Union[Task, TaskList, List[Task]]
+            tasks: Union[Task, TaskList, List[Task]],
+            breslow_mask: List[int],
+            fit_breslow_estimators: bool = True
     ) -> None:
         """
         Sets the required values for the computation of the different metrics.
@@ -48,10 +50,15 @@ class PredictionEvaluator:
             Ground truths to be used as a reference for the computation of the different metrics.
         tasks : Union[Task, TaskList, List[Task]]
             Object of the class TaskList that specifies for which tasks the model should be evaluated.
+        breslow_mask : List[int]
+            Mask used to fit the breslow estimators, usually this is the train mask.
+        fit_breslow_estimators : bool
+            Whether to fit the breslow estimators, defaults to True.
         """
         self.predictions_dict = {k: to_numpy(v) for k, v in predictions.items()}
         self.targets_dict = {k: to_numpy(v) for k, v in targets.items()}
-        self.fit_breslow_estimators()
+        if fit_breslow_estimators:
+            self.fit_breslow_estimators(breslow_mask)
         self.tasks = TaskList(tasks)
         assert all(isinstance(task, TableTask) for task in self.tasks), (
             f"All tasks must be instances of 'TableTask'."
@@ -59,11 +66,20 @@ class PredictionEvaluator:
         self.predictions_list = self.slice_patient_dictionary(self.predictions_dict, separate_patients=True)
         self.targets_list = self.slice_patient_dictionary(self.targets_dict, separate_patients=True)
 
-    def fit_breslow_estimators(self) -> None:
+    def fit_breslow_estimators(
+            self,
+            breslow_mask: List[int]
+    ) -> None:
         """
         Fit all survival analysis tasks' breslow estimators given the training dataset.
+
+        Parameters
+        ----------
+        breslow_mask : List[int]
+            Mask used to fit the breslow estimators, usually this is the train mask.
         """
-        predictions, targets = self.predictions_dict, self.targets_dict
+        predictions = self.slice_patient_dictionary(self.predictions_dict, breslow_mask, None, False)
+        targets = self.slice_patient_dictionary(self.targets_dict, breslow_mask, None, False)
 
         for task in self.tasks:
             pred, target = to_numpy(predictions[task.name]), to_numpy(targets[task.name])

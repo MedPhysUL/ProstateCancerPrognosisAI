@@ -45,7 +45,9 @@ class ModelEvaluator(PredictionEvaluator):
         super().__init__(
             predictions=self.model.predict_on_dataset(dataset=self.dataset),
             targets=self.dataset.table_dataset.y,
-            tasks=self.dataset.tasks
+            tasks=self.dataset.tasks,
+            breslow_mask=self.dataset.train_mask,
+            fit_breslow_estimators=False
         )
 
     def _compute_dataset_score(
