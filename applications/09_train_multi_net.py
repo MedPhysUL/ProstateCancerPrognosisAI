@@ -145,5 +145,5 @@ if __name__ == '__main__':
 
     # The next part will be integrated in an evaluation tool in the near future.
     multi_net.fix_thresholds_to_optimal_values(dataset)
-    score = multi_net.score_on_dataset(dataset, dataset.test_mask)
+    score = multi_net.compute_score_on_dataset(dataset, dataset.test_mask)
     print(score)

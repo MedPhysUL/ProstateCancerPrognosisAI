@@ -243,7 +243,7 @@ class TorchModel(Model, ABC):
 
     @check_if_built
     @no_grad()
-    def score(
+    def compute_score(
             self,
             features: FeaturesType,
             targets: TargetsType
@@ -275,7 +275,7 @@ class TorchModel(Model, ABC):
 
     @check_if_built
     @no_grad()
-    def score_on_dataset(
+    def compute_score_on_dataset(
             self,
             dataset: ProstateCancerDataset,
             mask: List[int]
@@ -295,4 +295,4 @@ class TorchModel(Model, ABC):
         scores : Dict[str, Dict[str, float]]
             Score for each task and each metric.
         """
-        return ModelEvaluator.compute_dataset_score(model=self, dataset=dataset, mask=mask)
+        return ModelEvaluator.compute_score_on_dataset(model=self, dataset=dataset, mask=mask)

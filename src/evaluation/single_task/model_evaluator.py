@@ -51,7 +51,7 @@ class ModelEvaluator(PredictionEvaluator):
         )
 
     @staticmethod
-    def compute_dataset_score(
+    def compute_score_on_dataset(
             model: Model,
             dataset: ProstateCancerDataset,
             mask: Optional[List[int]] = None
@@ -156,7 +156,7 @@ class ModelEvaluator(PredictionEvaluator):
             thresholds=thresholds
         )
 
-    def compute_metrics(
+    def compute_score(
             self,
             mask: Optional[List[int]] = None,
             path_to_save_folder: Optional[str] = None,
@@ -179,7 +179,7 @@ class ModelEvaluator(PredictionEvaluator):
         scores : Dict[str, Dict[str, float]]
             Dictionary of the metrics of each applicable task.
         """
-        scores = self.compute_dataset_score(model=self.model, dataset=self.dataset, mask=mask)
+        scores = self.compute_score_on_dataset(model=self.model, dataset=self.dataset, mask=mask)
 
         if path_to_save_folder is not None:
             with open(f"{path_to_save_folder}/metrics.json", "w") as file_path:

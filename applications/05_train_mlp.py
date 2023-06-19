@@ -90,7 +90,7 @@ if __name__ == '__main__':
 
     # The next part will be integrated in an evaluation tool in the near future.
     model.fix_thresholds_to_optimal_values(dataset)
-    score = model.score_on_dataset(dataset, dataset.test_mask)
+    score = model.compute_score_on_dataset(dataset, dataset.test_mask)
     print(score)
 
     for task in dataset.tasks.survival_analysis_tasks:

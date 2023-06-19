@@ -286,7 +286,7 @@ class PredictionEvaluator:
             plt.show()
         plt.close(fig)
 
-    def compute_metrics(
+    def compute_score(
             self,
             path_to_save_folder: Optional[str] = None,
             mask: Optional[Union[List[int], slice]] = None,

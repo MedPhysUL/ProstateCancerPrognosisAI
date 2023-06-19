@@ -629,10 +629,10 @@ class Trainer:
             Whether the model is in training or evaluation mode.
         """
         if training:
-            scores = self.model.score_on_dataset(dataset=dataset, mask=dataset.train_mask)
+            scores = self.model.compute_score_on_dataset(dataset=dataset, mask=dataset.train_mask)
             self.epoch_state.train.single_task_metrics = scores
         else:
-            scores = self.model.score_on_dataset(dataset=dataset, mask=dataset.valid_mask)
+            scores = self.model.compute_score_on_dataset(dataset=dataset, mask=dataset.valid_mask)
             self.epoch_state.valid.single_task_metrics = scores
 
     def _exec_post_fit(
