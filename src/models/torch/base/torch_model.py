@@ -12,17 +12,15 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Dict, List, NamedTuple, Optional
+from typing import Dict, List, Optional
 
 from monai.data import DataLoader
-from numpy import argmin, argmax, linspace
 from torch import device as torch_device
-from torch import float32, no_grad, random, round, sigmoid, stack, tensor
+from torch import no_grad, random, round, sigmoid, stack
 
 from ...base import check_if_built, Model
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ....evaluation.single_task.model_evaluator import ModelEvaluator
-from ....metrics.single_task.base import Direction, MetricReduction
 from ....tools.transforms import to_numpy, batch_to_device
 
 
@@ -263,7 +261,7 @@ class TorchModel(Model, ABC):
         Returns
         -------
         scores : Dict[str, Dict[str, float]]
-            Score for each tasks and each metrics.
+            Score for each task and each metric.
         """
         pred = self.predict(features=features)
 
@@ -297,5 +295,4 @@ class TorchModel(Model, ABC):
         scores : Dict[str, Dict[str, float]]
             Score for each task and each metric.
         """
-        evaluator = ModelEvaluator(model=self, dataset=dataset)
-        return evaluator.compute_metrics(mask=mask)
+        return ModelEvaluator.compute_dataset_score(model=self, dataset=dataset, mask=mask)

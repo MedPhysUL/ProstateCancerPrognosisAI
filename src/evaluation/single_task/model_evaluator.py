@@ -50,8 +50,10 @@ class ModelEvaluator(PredictionEvaluator):
             fit_breslow_estimators=False
         )
 
-    def _compute_dataset_score(
-            self,
+    @staticmethod
+    def compute_dataset_score(
+            model: Model,
+            dataset: ProstateCancerDataset,
             mask: Optional[List[int]] = None
     ) -> Dict[str, Dict[str, float]]:
         """
@@ -60,6 +62,10 @@ class ModelEvaluator(PredictionEvaluator):
 
         Parameters
         ----------
+        model : Model
+            The model with which the predictions will be made.
+        dataset : ProstateCancerDataset
+            The dataset to input to the model.
         mask : Optional[List[int]]
             Mask to use when selecting the patients with which the metrics are computed. If no mask is given, all
             patients are used.
@@ -69,13 +75,13 @@ class ModelEvaluator(PredictionEvaluator):
         scores : Dict[str, Dict[str, float]]
             Score for each task and each metric.
         """
-        device = self.model.device
-        subset = self.dataset[mask] if mask is not None else self.dataset
+        device = model.device
+        subset = dataset[mask] if mask is not None else dataset
         rng_state = random.get_rng_state()
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
         random.set_rng_state(rng_state)
 
-        tasks = self.dataset.tasks
+        tasks = dataset.tasks
         table_tasks, seg_tasks = tasks.table_tasks, tasks.segmentation_tasks
 
         scores = {task.name: {} for task in tasks}
@@ -84,7 +90,7 @@ class ModelEvaluator(PredictionEvaluator):
         for features, targets in data_loader:
             features, targets = batch_to_device(features, device), batch_to_device(targets, device)
 
-            predictions = self.model.predict(features=features)
+            predictions = model.predict(features=features)
 
             for task in seg_tasks:
                 for metric in task.unique_metrics:
@@ -173,7 +179,7 @@ class ModelEvaluator(PredictionEvaluator):
         scores : Dict[str, Dict[str, float]]
             Dictionary of the metrics of each applicable task.
         """
-        scores = self._compute_dataset_score(mask)
+        scores = self.compute_dataset_score(model=self.model, dataset=self.dataset, mask=mask)
 
         if path_to_save_folder is not None:
             with open(f"{path_to_save_folder}/metrics.json", "w") as file_path:
