@@ -28,7 +28,6 @@ class ModelEvaluator(PredictionEvaluator):
             self,
             model: Model,
             dataset: ProstateCancerDataset,
-            mask: Optional[List[int]] = None
     ) -> None:
         """
         Sets the required values for the computation of the different metrics.
@@ -39,20 +38,13 @@ class ModelEvaluator(PredictionEvaluator):
             The model with which the predictions will be made.
         dataset : ProstateCancerDataset
             The dataset to input to the model.
-        mask : Optional[List[int]]
-            Mask determining which patients to use in the dataset to build the predictions and targets lists. Defaults
-            to dataset.test_mask.
         """
-        if mask is None:
-            self.mask = dataset.test_mask
-        else:
-            self.mask = mask
         self.dataset = dataset
         self.model = model
 
         super().__init__(
-            predictions=self.model.predict_on_dataset(dataset=self.dataset, mask=self.mask),
-            targets=self.dataset.table_dataset[self.mask].y,
+            predictions=self.model.predict_on_dataset(dataset=self.dataset),
+            targets=self.dataset.table_dataset.y,
             tasks=self.dataset.tasks
         )
 
@@ -75,7 +67,7 @@ class ModelEvaluator(PredictionEvaluator):
             Score for each task and each metric.
         """
         device = self.model.device
-        subset = self.dataset[self.mask]
+        subset = self.dataset[mask]
         rng_state = random.get_rng_state()
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
         random.set_rng_state(rng_state)
@@ -158,7 +150,8 @@ class ModelEvaluator(PredictionEvaluator):
     def compute_metrics(
             self,
             mask: Optional[List[int]] = None,
-            save_path: Optional[str] = None,
+            path_to_save_folder: Optional[str] = None,
+            **kwargs
     ) -> Dict[str, Dict[str, float]]:
         """
         Computes the metrics associated with each task.
@@ -168,7 +161,7 @@ class ModelEvaluator(PredictionEvaluator):
         mask : Optional[List[int]]
             Mask used to specify with which patients to compute the metrics. Defaults to the mask given when creating
             the ModelEvaluator object.
-        save_path : Union[bool, str]
+        path_to_save_folder : Union[bool, str]
             Whether to save the computed metrics. If saving the metrics is desired, then this is the path of the folder
             where they will be saved as a json file. Defaults to False which does not save the metrics.
 
@@ -178,10 +171,10 @@ class ModelEvaluator(PredictionEvaluator):
             Dictionary of the metrics of each applicable task.
         """
         if mask is None:
-            mask = self.mask
+            mask = self.dataset.train_mask
         scores = self._compute_dataset_score(mask)
 
-        if save_path is not None:
-            with open(f"{save_path}/metrics.json", "w") as file_path:
+        if path_to_save_folder is not None:
+            with open(f"{path_to_save_folder}/metrics.json", "w") as file_path:
                 json.dump(scores, file_path)
         return scores

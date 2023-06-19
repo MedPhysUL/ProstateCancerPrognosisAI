@@ -539,7 +539,8 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.confusion_matrix.
         """
-        self.fix_thresholds_to_optimal_values(mask=threshold)
+        if not isinstance(threshold, int):
+            self.fix_thresholds_to_optimal_values(mask=threshold)
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
             if not isinstance(threshold, int):

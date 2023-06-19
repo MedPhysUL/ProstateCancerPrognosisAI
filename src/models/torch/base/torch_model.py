@@ -197,7 +197,7 @@ class TorchModel(Model, ABC):
     def predict_on_dataset(
             self,
             dataset: ProstateCancerDataset,
-            mask: List[int],
+            mask: Optional[List[int]] = None,
             probability: bool = True
     ) -> Optional[TargetsType]:
         """
@@ -214,8 +214,9 @@ class TorchModel(Model, ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
-        mask : List[int]
-            A list of dataset idx for which we want to obtain the predictions.
+        mask : Optional[List[int]]
+            A list of dataset idx for which we want to obtain the predictions. If no mask is given, all patients are
+            used.
         probability : bool
             Whether to return probability predictions or class predictions for binary classification task predictions.
             Doesn't affect regression, survival and segmentation tasks predictions.
@@ -225,7 +226,10 @@ class TorchModel(Model, ABC):
         predictions : TargetsType
             Predictions (except segmentation map).
         """
-        subset = dataset[mask]
+        if mask is not None:
+            subset = dataset[mask]
+        else:
+            subset = dataset
         rng_state = random.get_rng_state()
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
         random.set_rng_state(rng_state)
@@ -296,5 +300,5 @@ class TorchModel(Model, ABC):
         scores : Dict[str, Dict[str, float]]
             Score for each task and each metric.
         """
-        evaluator = ModelEvaluator(model=self, dataset=dataset, mask=mask)
-        return evaluator.compute_metrics()
+        evaluator = ModelEvaluator(model=self, dataset=dataset)
+        return evaluator.compute_metrics(mask=mask)
