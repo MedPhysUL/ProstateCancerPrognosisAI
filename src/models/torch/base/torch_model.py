@@ -297,4 +297,4 @@ class TorchModel(Model, ABC):
             Score for each task and each metric.
         """
         evaluator = ModelEvaluator(model=self, dataset=dataset, mask=mask)
-        return evaluator.compute_dataset_metrics()
+        return evaluator.compute_metrics()

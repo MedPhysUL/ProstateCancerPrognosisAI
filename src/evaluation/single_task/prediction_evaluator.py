@@ -9,17 +9,18 @@
     quality of a model.
 """
 import json
+import os
 from typing import Dict, List, Optional, Union, NamedTuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_curve
-from torch import cat
 
 from ...data.datasets.prostate_cancer import TargetsType
 from ...metrics.single_task.base import Direction
-from ...tasks.base import Task
+from ...tasks.base import TableTask, Task
 from ...tasks.containers.list import TaskList
 from ...tools.transforms import to_numpy
 
@@ -51,7 +52,7 @@ class PredictionEvaluator:
         self.predictions_dict = {k: to_numpy(v) for k, v in predictions.items()}
         self.targets_dict = {k: to_numpy(v) for k, v in targets.items()}
         self.tasks = TaskList(tasks)
-        assert all(isinstance(task, Task) for task in self.tasks), (
+        assert all(isinstance(task, TableTask) for task in self.tasks), (
             f"All tasks must be instances of 'TableTask'."
         )
         self.predictions_list = self.slice_patient_dictionary(self.predictions_dict, separate_patients=True)
@@ -231,7 +232,7 @@ class PredictionEvaluator:
     def _terminate_figure(
             fig: plt.Figure,
             show: bool,
-            save: Optional[str] = None,
+            path_to_save_folder: Optional[str] = None,
             **kwargs
     ) -> None:
         """
@@ -239,7 +240,7 @@ class PredictionEvaluator:
 
         Parameters
         ----------
-        save : Optional[str]
+        path_to_save_folder : Optional[str]
             Path to save the figure.
         show : bool
             Whether to show figure.
@@ -248,23 +249,24 @@ class PredictionEvaluator:
         """
         fig.tight_layout()
 
-        if save is not None:
-            plt.savefig(save, **kwargs)
+        if path_to_save_folder is not None:
+            plt.savefig(path_to_save_folder, **kwargs)
         if show:
             plt.show()
         plt.close(fig)
 
     def compute_metrics(
             self,
-            save: Optional[str] = None,
-            mask: Optional[Union[List[int], slice]] = None
+            path_to_save_folder: Optional[str] = None,
+            mask: Optional[Union[List[int], slice]] = None,
+            **kwargs
     ) -> Dict[str, Dict[str, float]]:
         """
         Computes the metrics associated with each task.
 
         Parameters
         ----------
-        save : Union[bool, str]
+        path_to_save_folder : Union[bool, str]
             Whether to save the computed metrics. If saving the metrics is desired, then this is the path of the folder
             where they will be saved as a json file. Defaults to False which does not save the metrics.
         mask : Optional[Union[List[int], slice]]
@@ -272,15 +274,16 @@ class PredictionEvaluator:
         """
         scores = self._compute_prediction_score(mask=mask)
 
-        if save is not None:
-            with open(f"{save}/metrics.json", "w") as file_path:
+        if path_to_save_folder is not None:
+            path = os.path.join(path_to_save_folder, kwargs.get("filename", "metrics.json"))
+            with open(path, "w") as file_path:
                 json.dump(scores, file_path)
         return scores
 
     def plot_classification_task_curves(
             self,
             show: bool,
-            save: Optional[str] = None,
+            path_to_save_folder: Optional[str] = None,
             **kwargs
     ) -> None:
         """
@@ -290,20 +293,20 @@ class PredictionEvaluator:
         ----------
         show : bool
             Whether to show the graph.
-        save : Optional[str],
+        path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
-        self.plot_confusion_matrix(show, save, **kwargs)
-        self.plot_calibration_curve(show, save, **kwargs)
-        self.plot_roc_curve(show, save, **kwargs)
-        self.plot_precision_recall_curve(show, save, **kwargs)
+        self.plot_confusion_matrix(show, path_to_save_folder, **kwargs)
+        self.plot_calibration_curve(show, path_to_save_folder, **kwargs)
+        self.plot_roc_curve(show, path_to_save_folder, **kwargs)
+        self.plot_precision_recall_curve(show, path_to_save_folder, **kwargs)
 
     def plot_survival_analysis_curves(
             self,
             show: bool,
-            save: Optional[str] = None,
+            path_to_save_folder: Optional[str] = None,
             **kwargs
     ) -> None:
         """
@@ -313,21 +316,21 @@ class PredictionEvaluator:
         ----------
         show : bool
             Whether to show the graph.
-        save : Optional[str],
+        path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
-        self.plot_unique_times(show, save, **kwargs)
-        self.plot_cum_baseline_hazard(show, save, **kwargs)
-        self.plot_baseline_survival(show, save, **kwargs)
-        self.plot_cum_hazard_function(show, save, **kwargs)
-        self.plot_survival_function(show, save, **kwargs)
+        self.plot_unique_times(show, path_to_save_folder, **kwargs)
+        self.plot_cum_baseline_hazard(show, path_to_save_folder, **kwargs)
+        self.plot_baseline_survival(show, path_to_save_folder, **kwargs)
+        self.plot_cum_hazard_function(show, path_to_save_folder, **kwargs)
+        self.plot_survival_function(show, path_to_save_folder, **kwargs)
 
     def plot_unique_times(
             self,
             show: bool,
-            save: Optional[str] = None,
+            path_to_save_folder: Optional[str] = None,
             **kwargs
     ) -> None:
         """
@@ -337,27 +340,34 @@ class PredictionEvaluator:
         ----------
         show : bool
             Whether to show the graph.
-        save : Optional[str],
+        path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
         for task in self.tasks.survival_analysis_tasks:
             fig, arr = plt.subplots()
-            arr.plot(task.breslow_estimator.unique_times_)
+            unique_times = task.breslow_estimator.unique_times_
+            time_list = [i for i in range(1, int(max(unique_times.tolist())))]
+            event_list = [(sum(1 for time in unique_times.tolist() if time <= event_time)) for event_time in time_list]
+
+            arr.plot(time_list, event_list)
             arr.set_xlabel(kwargs.get("xlabel", f"Time"))
-            arr.set_ylabel(kwargs.get("ylabel", f"Probability"))
-            arr.set_title(kwargs.get("title", f"{task.name}: Unique Times"))
-            if save is not None:
-                path = f"{save}/{task.name}_{kwargs.get('file_name', 'breslow_unique_times.pdf')}"
+            arr.set_ylabel(kwargs.get("ylabel", f"Cumulative events"))
+            arr.set_title(kwargs.get("title", f"{task.target_column}: Unique Times"))
+            if path_to_save_folder is not None:
+                path = os.path.join(
+                    path_to_save_folder,
+                    f"{task.target_column}_{kwargs.get('filename', 'breslow_unique_times.pdf')}"
+                )
             else:
                 path = None
-            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
+            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_cum_baseline_hazard(
             self,
             show: bool,
-            save: Optional[str] = None,
+            path_to_save_folder: Optional[str] = None,
             **kwargs
     ) -> None:
         """
@@ -367,7 +377,7 @@ class PredictionEvaluator:
         ----------
         show : bool
             Whether to show the graph.
-        save : Optional[str],
+        path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
@@ -378,18 +388,21 @@ class PredictionEvaluator:
             arr.plot(cum_baseline_hazard.x, cum_baseline_hazard.y)
             arr.set_xlabel(kwargs.get("xlabel", f"Time"))
             arr.set_ylabel(kwargs.get("ylabel", f"Hazard"))
-            arr.set_title(kwargs.get("title", f"{task.name}: Cumulative Baseline Hazard"))
+            arr.set_title(kwargs.get("title", f"{task.target_column}: Cumulative Baseline Hazard"))
 
-            if save is not None:
-                path = f"{save}/{task.name}_{kwargs.get('file_name', 'breslow_cum_baseline_hazard.pdf')}"
+            if path_to_save_folder is not None:
+                path = os.path.join(
+                    path_to_save_folder,
+                    f"{task.target_column}_{kwargs.get('filename', 'cumulative_baseline_hazard.pdf')}"
+                )
             else:
                 path = None
-            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
+            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_baseline_survival(
             self,
             show: bool,
-            save: Optional[str] = None,
+            path_to_save_folder: Optional[str] = None,
             **kwargs
     ) -> None:
         """
@@ -399,7 +412,7 @@ class PredictionEvaluator:
         ----------
         show : bool
             Whether to show the graph.
-        save : Optional[str],
+        path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
@@ -409,19 +422,22 @@ class PredictionEvaluator:
             baseline_survival = task.breslow_estimator.baseline_survival_
             arr.plot(baseline_survival.x, baseline_survival.y)
             arr.set_xlabel(kwargs.get("xlabel", f"Time"))
-            arr.set_ylabel(kwargs.get("ylabel", f"Probability"))
-            arr.set_title(kwargs.get("title", f"{task.name}: Baseline Survival"))
+            arr.set_ylabel(kwargs.get("ylabel", f"Probability of survival"))
+            arr.set_title(kwargs.get("title", f"{task.target_column}: Baseline Survival"))
 
-            if save is not None:
-                path = f"{save}/{task.name}_{kwargs.get('file_name', 'breslow_baseline_survival.pdf')}"
+            if path_to_save_folder is not None:
+                path = os.path.join(
+                    path_to_save_folder,
+                    f"{task.target_column}_{kwargs.get('filename', 'baseline_survival.pdf')}"
+                )
             else:
                 path = None
-            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
+            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_cum_hazard_function(
             self,
             show: bool,
-            save: Optional[str] = None,
+            path_to_save_folder: Optional[str] = None,
             **kwargs
     ) -> None:
         """
@@ -431,7 +447,7 @@ class PredictionEvaluator:
         ----------
         show : bool
             Whether to show the graph.
-        save : Optional[str],
+        path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
@@ -448,18 +464,21 @@ class PredictionEvaluator:
                 arr.step(chf_func.x, chf_func(chf_func.x), where="post")
             arr.set_xlabel(kwargs.get("xlabel", f"Time"))
             arr.set_ylabel(kwargs.get("ylabel", f"Probability"))
-            arr.set_title(kwargs.get("title", f"{task.name}: Cumulative Hazard Function"))
+            arr.set_title(kwargs.get("title", f"{task.target_column}: Cumulative Hazard Function"))
 
-            if save is not None:
-                path = f"{save}/{task.name}_{kwargs.get('file_name', 'breslow_cum_hazard_function.pdf')}"
+            if path_to_save_folder is not None:
+                path = os.path.join(
+                    path_to_save_folder,
+                    f"{task.target_column}_{kwargs.get('filename', 'cumulative_hazard_function.pdf')}"
+                )
             else:
                 path = None
-            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
+            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_survival_function(
             self,
             show: bool,
-            save: Optional[str] = None,
+            path_to_save_folder: Optional[str] = None,
             **kwargs
     ) -> None:
         """
@@ -469,7 +488,7 @@ class PredictionEvaluator:
         ----------
         show : bool
             Whether to show the graph.
-        save : Optional[str],
+        path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
@@ -486,18 +505,21 @@ class PredictionEvaluator:
                 arr.step(survival_func.x, survival_func(survival_func.x), where="post")
             arr.set_xlabel(kwargs.get("xlabel", f"Time"))
             arr.set_ylabel(kwargs.get("ylabel", f"Probability"))
-            arr.set_title(kwargs.get("title", f"{task.name}: Survival Function"))
+            arr.set_title(kwargs.get("title", f"{task.target_column}: Survival Function"))
 
-            if save is not None:
-                path = f"{save}/{task.name}_{kwargs.get('file_name', 'breslow_survival_function.pdf')}"
+            if path_to_save_folder is not None:
+                path = os.path.join(
+                    path_to_save_folder,
+                    f"{task.target_column}_{kwargs.get('filename', 'survival_function.pdf')}"
+                )
             else:
                 path = None
-            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
+            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_confusion_matrix(
             self,
             show: bool,
-            save: Optional[str] = None,
+            path_to_save_folder: Optional[str] = None,
             threshold: Optional[Union[int, List[int], slice]] = None,
             **kwargs
     ) -> None:
@@ -508,7 +530,7 @@ class PredictionEvaluator:
         ----------
         show : bool
             Whether to show the graph.
-        save : Optional[str],
+        path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
         threshold : Optional[Union[int, List[int], slice]]
             Either the threshold or a mask describing the patients to use when optimising the threshold to use when
@@ -523,82 +545,94 @@ class PredictionEvaluator:
             if not isinstance(threshold, int):
                 threshold = task.decision_threshold_metric.threshold
             y_true, y_pred = self.targets_dict[task.name], np.where(self.predictions_dict[task.name] >= threshold, 1, 0)
-
-            arr.imshow(confusion_matrix(
+            matrix = confusion_matrix(
                 y_true,
                 y_pred,
                 labels=kwargs.get("labels", None),
                 sample_weight=kwargs.get("sample_weight", None),
                 normalize=kwargs.get("normalize", None)
-            ))
-            arr.set_title(kwargs.get("title", f"{task.name}: Confusion Matrix"))
+            )
 
-            if save is not None:
-                path = f"{save}/{task.name}_{kwargs.get('file_name', 'confusion_matrix.pdf')}"
+            sns.heatmap(np.rot90(matrix, k=0), cmap="gist_gray", annot=True)
+            arr.set_title(kwargs.get("title", f"{task.target_column}: Confusion Matrix"))
+            arr.set_xlabel(kwargs.get("xlabel", "Predictions"))
+            arr.set_ylabel(kwargs.get("ylabel", "Ground Truth"))
+
+            if path_to_save_folder is not None:
+                path = os.path.join(
+                    path_to_save_folder,
+                    f"{task.target_column}_{kwargs.get('filename', 'confusion_matrix.pdf')}"
+                )
             else:
                 path = None
-            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
+            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_calibration_curve(
             self,
             show: bool,
-            save: Optional[str] = None,
+            path_to_save_folder: Optional[str] = None,
+            normalize: bool = True,
             **kwargs
     ) -> None:
         """
-        Creates the confusion matrix graph.
+        Creates the calibration curve graph.
 
         Parameters
         ----------
         show : bool
             Whether to show the graph.
-        save : Optional[str],
+        path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
+        normalize : bool
+            Whether to normalize the prediction probability, defaults to True.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.calibration.calibration_curve.
-
         """
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
-            y_true, y_pred = self.targets_dict[task.name], self.predictions_dict[task.name]
+            y_true, y_prob = self.targets_dict[task.name], self.predictions_dict[task.name]
+            if normalize:
+                y_prob = (y_prob - y_prob.min()) / (y_prob.max() - y_prob.min())
             prob_true, prob_pred = calibration_curve(
-                y_true,
-                y_pred,
+                y_true=y_true,
+                y_prob=y_prob,
                 pos_label=kwargs.get("pos_label", None),
-                normalize=kwargs.get("normalize", "deprecated"),
-                n_bins=kwargs.get("n_bins", 5),
-                strategy=kwargs.get("strategy", "uniform")
+                n_bins=kwargs.get("n_bins", 10),
+                strategy=kwargs.get("strategy", "quantile")
                 )
-            arr.plot(prob_true, prob_pred, "go")
+            arr.plot(prob_pred, prob_true, "bo")
+            arr.plot(prob_pred, prob_true)
             arr.plot([1, 0], [1, 0], "k")
             arr.set_xlabel(kwargs.get("xlabel", f"Predicted probability"))
             arr.set_ylabel(kwargs.get("ylabel", f"Fraction of positives"))
-            arr.set_title(kwargs.get("title", f"{task.name}: Calibration Curve"))
+            arr.set_title(kwargs.get("title", f"{task.target_column}: Calibration Curve"))
 
-            if save is not None:
-                path = f"{save}/{task.name}_{kwargs.get('file_name', 'calibration_curve.pdf')}"
+            if path_to_save_folder is not None:
+                path = os.path.join(
+                    path_to_save_folder,
+                    f"{task.target_column}_{kwargs.get('filename', 'calibration_curve.pdf')}"
+                )
             else:
                 path = None
-            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
+            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_roc_curve(
             self,
             show: bool,
-            save: Optional[str] = None,
+            path_to_save_folder: Optional[str] = None,
             **kwargs
     ) -> None:
         """
-        Creates the confusion matrix graph.
+        Creates the ROC curve.
 
         Parameters
         ----------
         show : bool
             Whether to show the graph.
-        save : Optional[str],
+        path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.roc_curve.
-
         """
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
@@ -614,32 +648,34 @@ class PredictionEvaluator:
             arr.plot([1, 0], [1, 0], "k")
             arr.set_xlabel(kwargs.get("xlabel", f"False positive rate"))
             arr.set_ylabel(kwargs.get("ylabel", f"True positive rate"))
-            arr.set_title(kwargs.get("title", f"{task.name}: ROC Curve"))
+            arr.set_title(kwargs.get("title", f"{task.target_column}: ROC Curve"))
 
-            if save is not None:
-                path = f"{save}/{task.name}_{kwargs.get('file_name', 'roc_curve.pdf')}"
+            if path_to_save_folder is not None:
+                path = os.path.join(
+                    path_to_save_folder,
+                    f"{task.target_column}_{kwargs.get('filename', 'roc_curve.pdf')}"
+                )
             else:
                 path = None
-            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
+            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_precision_recall_curve(
             self,
             show: bool,
-            save: Optional[str] = None,
+            path_to_save_folder: Optional[str] = None,
             **kwargs
     ) -> None:
         """
-        Creates the confusion matrix graph.
+        Creates the precision recall curve.
 
         Parameters
         ----------
         show : bool
             Whether to show the graph.
-        save : Optional[str],
+        path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.precision_recall_curve.
-
         """
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
@@ -653,10 +689,13 @@ class PredictionEvaluator:
             arr.step(recall, precision, "g")
             arr.set_xlabel(kwargs.get("xlabel", f"Recall"))
             arr.set_ylabel(kwargs.get("ylabel", f"Precision"))
-            arr.set_title(kwargs.get("title", f"{task.name}: Precision Recall curve"))
+            arr.set_title(kwargs.get("title", f"{task.target_column}: Precision Recall curve"))
 
-            if save is not None:
-                path = f"{save}/{task.name}_{kwargs.get('file_name', 'precision_recall_curve.pdf')}"
+            if path_to_save_folder is not None:
+                path = os.path.join(
+                    path_to_save_folder,
+                    f"{task.target_column}_{kwargs.get('filename', 'precision_recall_curve.pdf')}"
+                )
             else:
                 path = None
-            self._terminate_figure(save=path, show=show, fig=fig, **kwargs)
+            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)

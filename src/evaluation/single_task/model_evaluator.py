@@ -56,10 +56,18 @@ class ModelEvaluator(PredictionEvaluator):
             tasks=self.dataset.tasks
         )
 
-    def _compute_dataset_score(self) -> Dict[str, Dict[str, float]]:
+    def _compute_dataset_score(
+            self,
+            mask: List[int]
+    ) -> Dict[str, Dict[str, float]]:
         """
         Returns the score of all samples in a particular subset of the dataset, determined using the mask parameter
         given when instantiating the ModelEvaluator object. Can compute metrics for segmentation tasks.
+
+        Parameters
+        ----------
+        mask : List[int]
+            Mask to use when selecting the patients with which the metrics are computed.
 
         Returns
         -------
@@ -147,8 +155,9 @@ class ModelEvaluator(PredictionEvaluator):
             thresholds=thresholds
         )
 
-    def compute_dataset_metrics(
+    def compute_metrics(
             self,
+            mask: Optional[List[int]] = None,
             save_path: Optional[str] = None,
     ) -> Dict[str, Dict[str, float]]:
         """
@@ -156,6 +165,9 @@ class ModelEvaluator(PredictionEvaluator):
 
         Parameters
         ----------
+        mask : Optional[List[int]]
+            Mask used to specify with which patients to compute the metrics. Defaults to the mask given when creating
+            the ModelEvaluator object.
         save_path : Union[bool, str]
             Whether to save the computed metrics. If saving the metrics is desired, then this is the path of the folder
             where they will be saved as a json file. Defaults to False which does not save the metrics.
@@ -165,7 +177,9 @@ class ModelEvaluator(PredictionEvaluator):
         scores : Dict[str, Dict[str, float]]
             Dictionary of the metrics of each applicable task.
         """
-        scores = self._compute_dataset_score()
+        if mask is None:
+            mask = self.mask
+        scores = self._compute_dataset_score(mask)
 
         if save_path is not None:
             with open(f"{save_path}/metrics.json", "w") as file_path:
