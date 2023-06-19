@@ -554,7 +554,7 @@ class PredictionEvaluator:
                 normalize=kwargs.get("normalize", None)
             )
 
-            sns.heatmap(np.rot90(matrix, k=0), cmap="gist_gray", annot=True)
+            sns.heatmap(matrix, cmap="gist_gray", annot=True, fmt="g")
             arr.set_title(kwargs.get("title", f"{task.target_column}: Confusion Matrix"))
             arr.set_xlabel(kwargs.get("xlabel", "Predictions"))
             arr.set_ylabel(kwargs.get("ylabel", "Ground Truth"))

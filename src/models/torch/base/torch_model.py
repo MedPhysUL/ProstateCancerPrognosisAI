@@ -226,10 +226,7 @@ class TorchModel(Model, ABC):
         predictions : TargetsType
             Predictions (except segmentation map).
         """
-        if mask is not None:
-            subset = dataset[mask]
-        else:
-            subset = dataset
+        subset = dataset[mask] if mask is not None else dataset
         rng_state = random.get_rng_state()
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
         random.set_rng_state(rng_state)
