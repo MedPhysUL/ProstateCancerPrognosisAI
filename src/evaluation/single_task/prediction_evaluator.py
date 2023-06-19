@@ -51,12 +51,27 @@ class PredictionEvaluator:
         """
         self.predictions_dict = {k: to_numpy(v) for k, v in predictions.items()}
         self.targets_dict = {k: to_numpy(v) for k, v in targets.items()}
+        self.fit_breslow_estimators()
         self.tasks = TaskList(tasks)
         assert all(isinstance(task, TableTask) for task in self.tasks), (
             f"All tasks must be instances of 'TableTask'."
         )
         self.predictions_list = self.slice_patient_dictionary(self.predictions_dict, separate_patients=True)
         self.targets_list = self.slice_patient_dictionary(self.targets_dict, separate_patients=True)
+
+    def fit_breslow_estimators(self) -> None:
+        """
+        Fit all survival analysis tasks' breslow estimators given the training dataset.
+        """
+        predictions, targets = self.predictions_dict, self.targets_dict
+
+        for task in self.tasks:
+            pred, target = to_numpy(predictions[task.name]), to_numpy(targets[task.name])
+
+            nonmissing_targets_idx = task.get_idx_of_nonmissing_targets(target)
+            if len(nonmissing_targets_idx) > 0:
+                pred, target = pred[nonmissing_targets_idx], target[nonmissing_targets_idx]
+                task.breslow_estimator.fit(pred[:, 0], target[:, 0], target[:, 1])
 
     @staticmethod
     def slice_patient_dictionary(
