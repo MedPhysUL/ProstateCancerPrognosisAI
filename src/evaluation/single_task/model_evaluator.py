@@ -50,7 +50,7 @@ class ModelEvaluator(PredictionEvaluator):
 
     def _compute_dataset_score(
             self,
-            mask: List[int]
+            mask: Optional[List[int]] = None
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns the score of all samples in a particular subset of the dataset, determined using the mask parameter
@@ -58,8 +58,9 @@ class ModelEvaluator(PredictionEvaluator):
 
         Parameters
         ----------
-        mask : List[int]
-            Mask to use when selecting the patients with which the metrics are computed.
+        mask : Optional[List[int]]
+            Mask to use when selecting the patients with which the metrics are computed. If no mask is given, all
+            patients are used.
 
         Returns
         -------
@@ -67,7 +68,10 @@ class ModelEvaluator(PredictionEvaluator):
             Score for each task and each metric.
         """
         device = self.model.device
-        subset = self.dataset[mask]
+        if mask is not None:
+            subset = self.dataset[mask]
+        else:
+            subset = self.dataset
         rng_state = random.get_rng_state()
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
         random.set_rng_state(rng_state)
@@ -170,8 +174,6 @@ class ModelEvaluator(PredictionEvaluator):
         scores : Dict[str, Dict[str, float]]
             Dictionary of the metrics of each applicable task.
         """
-        if mask is None:
-            mask = self.dataset.train_mask
         scores = self._compute_dataset_score(mask)
 
         if path_to_save_folder is not None:
