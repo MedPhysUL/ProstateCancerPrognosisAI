@@ -231,8 +231,7 @@ class DecoderBlock(nn.Module):
                     )
                 )
 
-
-    def forward(self, x):
+    def forward(self, x):  # TODO : Fix y_res reference before assignment. This forward does not feel right.
         y = self.up_conv(x)
 
         if self.num_res_units > 0:
