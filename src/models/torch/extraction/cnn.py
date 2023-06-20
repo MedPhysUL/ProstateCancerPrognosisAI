@@ -18,7 +18,7 @@ from torch import cat, mean, Tensor
 from torch import device as torch_device
 from torch.nn import DataParallel, Module, ModuleDict, Sequential
 
-from .base import Extractor, MergingMethod, ModelMode, MultiTaskMode
+from .base import Extractor, ModelMode, MultiTaskMode
 from .blocks import EncoderBlock
 from ....tasks import SegmentationTask
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset
@@ -80,8 +80,6 @@ class CNN(Extractor):
     def __init__(
             self,
             image_keys: Union[str, List[str]],
-            segmentation_key_or_task: Optional[str, SegmentationTask] = None,
-            merging_method: Union[str, MergingMethod] = MergingMethod.CONCATENATION,
             model_mode: Union[str, ModelMode] = ModelMode.PREDICTION,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
             shape: Union[str, Sequence[int]] = (128, 128, 128),
@@ -107,13 +105,6 @@ class CNN(Extractor):
         ----------
         image_keys : Union[str, List[str]]
             Sequence of images keys to extract deep radiomics from.
-        segmentation_key_or_task : Optional[str, SegmentationTask]
-            Key of the segmentation to merge with the images. If a segmentation task is given, the segmentation key will
-            be extracted from the task. If None, the segmentation will not be merged with the images.
-        merging_method : Union[str, MergingMethod]
-            Available methods for merging the segmentation with the images are 'concatenation' or 'multiplication'. If
-            'concatenation', the segmentation and image features are concatenated along the channel dimension. If
-            'multiplication', the segmentation is element-wise multiplied with the image features.
         model_mode : Union[str, ModelMode]
             Available modes are 'extraction' or 'prediction'. If 'extraction', the function will extract deep radiomics
             from input images. If 'prediction', the function will perform predictions using extracted radiomics.
@@ -160,8 +151,6 @@ class CNN(Extractor):
         """
         super().__init__(
             image_keys=image_keys,
-            segmentation_key_or_task=segmentation_key_or_task,
-            merging_method=merging_method,
             model_mode=model_mode,
             multi_task_mode=multi_task_mode,
             shape=shape,
@@ -351,13 +340,4 @@ class CNN(Extractor):
         input: Tensor
             The input tensor to the extractor.
         """
-        if self.segmentation_key:
-            if self.merging_method == MergingMethod.CONCATENATION:
-                image_and_seg_keys = self.image_keys + [self.segmentation_key]
-                return cat([features.image[k] for k in image_and_seg_keys], 1)
-            elif self.merging_method == MergingMethod.MULTIPLICATION:
-                return cat([features.image[k]*features.image[self.segmentation_key] for k in self.image_keys], 1)
-            else:
-                raise ValueError(f"{self.merging_method} is not a valid MergingMethod")
-        else:
-            return cat([features.image[k] for k in self.image_keys], 1)
+        return cat([features.image[k] for k in self.image_keys], 1)

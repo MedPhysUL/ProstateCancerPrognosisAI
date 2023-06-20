@@ -20,23 +20,6 @@ from torch.nn import Linear, Module, ModuleDict
 
 from ..base import check_if_built, TorchModel
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
-from ....tasks import SegmentationTask
-
-
-class MergingMethod(StrEnum):
-    """
-    This class is used to define the merging method used to merge the extracted radiomics. It can be either
-    concatenation or multiplication.
-
-    Elements
-    --------
-    CONCATENATION : str
-        Concatenation merging method.
-    MULTIPLICATION : str
-        Multiplication merging method.
-    """
-    CONCATENATION = auto()
-    MULTIPLICATION = auto()
 
 
 class ModelMode(StrEnum):
@@ -84,8 +67,6 @@ class Extractor(TorchModel, ABC):
     def __init__(
             self,
             image_keys: Union[str, List[str]],
-            segmentation_key_or_task: Optional[str, SegmentationTask] = None,
-            merging_method: Union[str, MergingMethod] = MergingMethod.CONCATENATION,
             model_mode: Union[str, ModelMode] = ModelMode.PREDICTION,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
             shape: Union[str, Sequence[int]] = (128, 128, 128),
@@ -102,13 +83,6 @@ class Extractor(TorchModel, ABC):
         ----------
         image_keys : Union[str, List[str]]
             Sequence of images keys to extract deep radiomics from.
-        segmentation_key_or_task : Optional[str, SegmentationTask]
-            Key of the segmentation to merge with the images. If a segmentation task is given, the segmentation key will
-            be extracted from the task. If None, the segmentation will not be merged with the images.
-        merging_method : Union[str, MergingMethod]
-            Available methods for merging the segmentation with the images are 'concatenation' or 'multiplication'. If
-            'concatenation', the segmentation and image features are concatenated along the channel dimension. If
-            'multiplication', the segmentation is element-wise multiplied with the image features.
         model_mode : Union[str, ModelMode]
             Available modes are 'extraction' or 'prediction'. If 'extraction', the function will extract deep radiomics
             from input images. If 'prediction', the function will perform predictions using extracted radiomics.
@@ -132,14 +106,8 @@ class Extractor(TorchModel, ABC):
         """
         super().__init__(device=device, name=name, seed=seed)
 
-        if isinstance(segmentation_key_or_task, SegmentationTask):
-            self.segmentation_key = segmentation_key_or_task.name
-        else:
-            self.segmentation_key = segmentation_key_or_task
-
         self.shape = literal_eval(shape) if isinstance(shape, str) else shape
         self.image_keys = image_keys if isinstance(image_keys, Sequence) else [image_keys]
-        self.merging_method = MergingMethod(merging_method)
         self.model_mode = ModelMode(model_mode)
         self.multi_task_mode = MultiTaskMode(multi_task_mode)
         self.n_features = n_features
@@ -177,18 +145,7 @@ class Extractor(TorchModel, ABC):
         Sequence[int]
             The shape of the input tensor expected by the model, excluding batch dimension.
         """
-        n_images = len(self.image_keys)
-        if self.segmentation_key:
-            if self.merging_method == MergingMethod.CONCATENATION:
-                in_channel = n_images + 1
-            elif self.merging_method == MergingMethod.MULTIPLICATION:
-                in_channel = n_images
-            else:
-                raise ValueError(f"{self.merging_method} is not a valid MergingMethod")
-        else:
-            in_channel = n_images
-
-        return in_channel, *self.shape
+        return len(self.image_keys), *self.shape
 
     def _build_prediction_layer(self) -> Union[Module, ModuleDict]:
         """
