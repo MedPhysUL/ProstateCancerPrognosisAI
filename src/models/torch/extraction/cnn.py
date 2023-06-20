@@ -20,7 +20,6 @@ from torch.nn import DataParallel, Module, ModuleDict, Sequential
 
 from .base import Extractor, ModelMode, MultiTaskMode
 from .blocks import EncoderBlock
-from ....tasks import SegmentationTask
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset
 
 
@@ -93,7 +92,6 @@ class CNN(Extractor):
             dropout_cnn: float = 0.0,
             dropout_fnn: float = 0.0,
             hidden_channels_fnn: Optional[Sequence[int]] = None,
-            partly_shared_convolutions: int = 2,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None
@@ -109,13 +107,12 @@ class CNN(Extractor):
             Available modes are 'extraction' or 'prediction'. If 'extraction', the function will extract deep radiomics
             from input images. If 'prediction', the function will perform predictions using extracted radiomics.
         multi_task_mode : Union[str, MultiTaskMode]
-            Available modes are 'separated', 'partly_shared' or 'fully_shared'. If 'separated', a separate extractor
-            model is used for each task. If 'partly_shared', a partly shared extractor model is used. The first layers
-            are shared between the tasks. If 'fully_shared', a fully shared extractor model is used. All layers are
-            shared between the tasks.
+            Available modes are 'separated' or 'fully_shared'. If 'separated', a separate extractor model will be used
+            for each task. If 'fully_shared', a fully shared extractor model will be used. All layers will be shared
+            between the tasks.
         shape : Union[str, Sequence[int]]
             Sequence of integers stating the dimension of the input tensor (minus batch and channel dimensions). Can
-            also be given as a string containing the sequence. Exemple: (96, 96, 96).
+            also be given as a string containing the sequence. Default to (128, 128, 128).
         n_features : int
             Integer stating the dimension of the final output tensor, i.e. the number of deep features to extract from
             the image.
@@ -138,10 +135,6 @@ class CNN(Extractor):
             Dropout rate after each fully connected layer.
         hidden_channels_fnn : Optional[Sequence[int]]
             Sequence of integers stating the number of hidden units in each fully connected layer.
-        partly_shared_convolutions : int
-            Integer stating the number of convolutional layers that are shared between the tasks when using a partly
-            shared extractor model. The first layers are shared, the last layers are not shared. Only used when
-            multi_task_mode is 'partly_shared'. Default to 2.
         device : Optional[torch_device]
             The device of the model.
         name : Optional[str]
@@ -169,14 +162,11 @@ class CNN(Extractor):
         self.norm = norm
         self.dropout_cnn = dropout_cnn
         self.dropout_fnn = dropout_fnn
-        self.partly_shared_convolutions = partly_shared_convolutions
 
         if hidden_channels_fnn:
             self.hidden_channels_fnn = hidden_channels_fnn
         else:
             self.hidden_channels_fnn = (int(sum(self.channels)/4), int(sum(self.channels)/16))
-
-        self.partly_shared_conv_final_shape = None
 
     def _get_layer(
             self,
@@ -212,38 +202,6 @@ class CNN(Extractor):
             dropout=self.dropout_cnn
         )
 
-    def _build_partly_shared_extractor(self) -> Sequential:
-        """
-        Builds a partly shared extractor model. The first layers are shared between the tasks. The last layers are
-        specific to each task. The number of shared layers is defined by the 'PARTLY_SHARED_CONVOLUTIONS' class
-        attribute.
-
-        Returns
-        -------
-        shared_extractor : Sequential
-            The shared extractor model.
-        """
-        conv_sequence = Sequential()
-        partly_shared_final_shape = copy(self.shape)
-        for i in range(self.partly_shared_convolutions):
-            layer = self._get_layer(
-                in_channels=self.in_shape[0] if i == 0 else self.channels[i - 1],
-                out_channels=self.channels[i],
-                strides=self.strides[i]
-            )
-            conv_sequence.add_module(
-                name="shared_conv_%i" % i,
-                module=DataParallel(layer).to(self.device)
-            )
-            partly_shared_final_shape = tuple(int(t/self.strides[i]) for t in partly_shared_final_shape)
-
-        self.partly_shared_final_shape = (
-            int(self.channels[self.partly_shared_convolutions - 1]),
-            *partly_shared_final_shape
-        )
-
-        return conv_sequence
-
     def __get_single_conv_sequence(self):
         """
         Returns a single convolutional sequence.
@@ -253,21 +211,12 @@ class CNN(Extractor):
         conv_sequence : Sequential
             The convolutional sequence.
         """
-        if self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
-            in_shape = self.partly_shared_final_shape
-            channels = self.channels[self.partly_shared_convolutions:]
-            strides = self.strides[self.partly_shared_convolutions:]
-        else:
-            in_shape = self.in_shape
-            channels = self.channels
-            strides = self.strides
-
         conv_sequence = Sequential()
-        for i, c in enumerate(channels):
+        for i, c in enumerate(self.channels):
             layer = self._get_layer(
-                in_channels=in_shape[0] if i == 0 else channels[i - 1],
+                in_channels=self.in_shape[0] if i == 0 else self.channels[i - 1],
                 out_channels=c,
-                strides=1 if i == len(channels) - 1 else strides[i]
+                strides=1 if i == len(self.channels) - 1 else self.strides[i]
             )
             conv_sequence.add_module(
                 name="conv_%i" % i,

@@ -41,20 +41,16 @@ class ModelMode(StrEnum):
 
 class MultiTaskMode(StrEnum):
     """
-    This class is used to define the multi-task mode of the model. It can be either separated, partly shared or fully
-    shared.
+    This class is used to define the multi-task mode of the model. It can be either separated, fully shared.
 
     Elements
     --------
     SEPARATED : str
         A separate extractor model is used for each task.
-    PARTLY_SHARED : str
-        A partly shared extractor model is used. The first layers are shared between the tasks.
     FULLY_SHARED : str
         A fully shared extractor model is used. All layers are shared between the tasks.
     """
     SEPARATED = auto()
-    PARTLY_SHARED = auto()
     FULLY_SHARED = auto()
 
 
@@ -87,13 +83,12 @@ class Extractor(TorchModel, ABC):
             Available modes are 'extraction' or 'prediction'. If 'extraction', the function will extract deep radiomics
             from input images. If 'prediction', the function will perform predictions using extracted radiomics.
         multi_task_mode : Union[str, MultiTaskMode]
-            Available modes are 'separated', 'partly_shared' or 'fully_shared'. If 'separated', a separate extractor
-            model is used for each task. If 'partly_shared', a partly shared extractor model is used. The first layers
-            are shared between the tasks. If 'fully_shared', a fully shared extractor model is used. All layers are
-            shared between the tasks.
+            Available modes are 'separated' or 'fully_shared'. If 'separated', a separate extractor model will be used
+            for each task. If 'fully_shared', a fully shared extractor model will be used. All layers will be shared
+            between the tasks.
         shape : Union[str, Sequence[int]]
             Sequence of integers stating the dimension of the input tensor (minus batch and channel dimensions). Can
-            also be given as a string containing the sequence. Exemple: (96, 96, 96).
+            also be given as a string containing the sequence. Default to (128, 128, 128).
         n_features : int
             Integer stating the dimension of the final output tensor, i.e. the number of deep features to extract from
             the image.
@@ -157,7 +152,7 @@ class Extractor(TorchModel, ABC):
             The prediction layer module. It should take as input a tensor of shape (batch_size, n_features) and return a
             tensor of shape (batch_size, n_tasks).
         """
-        if self.multi_task_mode == MultiTaskMode.SEPARATED or self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
+        if self.multi_task_mode == MultiTaskMode.SEPARATED:
             return ModuleDict({
                 task.name: Linear(in_features=self.n_features, out_features=1).to(self.device)
                 for task in self._tasks.table_tasks
