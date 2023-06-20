@@ -53,14 +53,14 @@ if __name__ == "__main__":
     # ----------------------------------------------------------------------------------------------------------- #
     patients_data_extractor = PatientsDataExtractor(
         path_to_patients_folder=r"local_data/Learning_set",
-        series_descriptions=r"local_data/series_descriptions.json",
+        tag_values=r"local_data/series_descriptions.json",
         transforms=transforms
     )
 
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                Create database                                              #
     # ----------------------------------------------------------------------------------------------------------- #
-    database = PatientsDatabase(path_to_database=r"local_data/learning_set.h5")
+    database = PatientsDatabase(path_to_database=r"local_data/dwdw.h5")
 
     database.create(
         patients_data_extractor=patients_data_extractor,
