@@ -60,7 +60,7 @@ if __name__ == "__main__":
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                Create database                                              #
     # ----------------------------------------------------------------------------------------------------------- #
-    database = PatientsDatabase(path_to_database=r"local_data/dwdw.h5")
+    database = PatientsDatabase(path_to_database=r"local_data/learning_set.h5")
 
     database.create(
         patients_data_extractor=patients_data_extractor,
