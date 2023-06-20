@@ -19,6 +19,7 @@ from torch.optim.lr_scheduler import ExponentialLR
 from constants import *
 from src.data.processing.sampling import extract_masks, Mask
 from src.data.datasets import ProstateCancerDataset, TableDataset
+from src.evaluation import ModelEvaluator
 from src.models.torch.prediction import MLP
 from src.losses.multi_task import MeanLoss
 from src.training import Trainer
@@ -92,32 +93,9 @@ if __name__ == '__main__':
 
     history.plot(show=True)
 
-    # The next part will be integrated in an evaluation tool in the near future.
-    model.fix_thresholds_to_optimal_values(dataset)
-    score = model.score_on_dataset(dataset, dataset.test_mask)
+    evaluator = ModelEvaluator(model=trained_model, dataset=dataset)
+    score = evaluator.compute_score(dataset.test_mask)
     print(score)
 
-    for task in dataset.tasks.survival_analysis_tasks:
-        breslow_estimator = task.breslow_estimator
-
-        plt.plot(breslow_estimator.unique_times_)
-        plt.show()
-
-        cum_baseline_hazard = breslow_estimator.cum_baseline_hazard_
-        plt.plot(cum_baseline_hazard.x, cum_baseline_hazard.y)
-        plt.show()
-
-        baseline_survival = breslow_estimator.baseline_survival_
-        plt.plot(baseline_survival.x, baseline_survival.y)
-        plt.show()
-
-        prediction = trained_model.predict_on_dataset(dataset, [0, 1, 2, 3])[task.name].cpu()
-        chf_funcs = breslow_estimator.get_cumulative_hazard_function(prediction)
-        for fn in chf_funcs:
-            plt.step(fn.x, fn(fn.x), where="post")
-        plt.show()
-
-        chf_funcs = breslow_estimator.get_survival_function(prediction)
-        for fn in chf_funcs:
-            plt.step(fn.x, fn(fn.x), where="post")
-        plt.show()
+    evaluator.plot_binary_classification_task_curves(show=True)
+    evaluator.plot_survival_analysis_task_curves(show=True)
