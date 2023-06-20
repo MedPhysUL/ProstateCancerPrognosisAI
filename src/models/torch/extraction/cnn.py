@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 from ast import literal_eval
-from copy import copy
 from typing import List, Optional, Sequence, Union
 
 from monai.networks.nets import FullyConnectedNet
@@ -20,7 +19,7 @@ from torch.nn import DataParallel, Module, ModuleDict, Sequential
 
 from .base import Extractor, ModelMode, MultiTaskMode
 from .blocks import EncoderBlock
-from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset
+from ....data.datasets.prostate_cancer import ProstateCancerDataset
 
 
 class _Encoder(Module):
@@ -274,19 +273,3 @@ class CNN(Extractor):
             return a tensor of shape (batch_size, n_features, *spatial_shape).
         """
         return self._build_single_extractor()
-
-    def _get_input_tensor(self, features: FeaturesType) -> Tensor:
-        """
-        Returns the input tensor to the extractor.
-
-        Parameters
-        ----------
-        features : FeaturesType
-            The features to use as input to the extractor.
-
-        Returns
-        -------
-        input: Tensor
-            The input tensor to the extractor.
-        """
-        return cat([features.image[k] for k in self.image_keys], 1)

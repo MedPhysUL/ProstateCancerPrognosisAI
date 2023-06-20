@@ -14,7 +14,7 @@ from ast import literal_eval
 from enum import auto, StrEnum
 from typing import Dict, List, Optional, Sequence, Union
 
-from torch import Tensor
+from torch import cat, Tensor
 from torch import device as torch_device
 from torch.nn import Linear, Module, ModuleDict
 
@@ -200,7 +200,7 @@ class Extractor(TorchModel, ABC):
         input: Tensor
             The input tensor to the extractor.
         """
-        raise NotImplementedError
+        return cat([features.image[k] for k in self.image_keys], 1)
 
     def _get_radiomics(self, input_tensor: Tensor) -> Union[Tensor, Dict[str, Tensor]]:
         """
