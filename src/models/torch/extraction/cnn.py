@@ -77,7 +77,7 @@ class CNN(Extractor):
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
             shape: Union[str, Sequence[int]] = (128, 128, 128),
             n_features: int = 6,
-            channels: Union[str, Sequence[int]] = (4, 8, 16, 32, 64),
+            channels: Union[str, Sequence[int]] = (64, 128, 256, 512, 1024),
             strides: Optional[Sequence[int]] = None,
             kernel_size: Union[Sequence[int], int] = 3,
             num_res_units: int = 3,
