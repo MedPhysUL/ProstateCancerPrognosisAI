@@ -9,24 +9,23 @@
 """
 
 from __future__ import annotations
-from ast import literal_eval
-from typing import Dict, List, Optional, Sequence, Union
+from typing import List, Optional, Sequence, Union
 
-from monai.networks.nets import FullyConnectedNet
 from torch import cat, mean, Tensor
 from torch import device as torch_device
-from torch.nn import DataParallel, Module, ModuleDict, Sequential
+from torch.nn import DataParallel, Module, Sequential
 
-from .base import Extractor, ModelMode, MultiTaskMode
+from .base import Extractor, ExtractorOutput, ModelMode, MultiTaskMode
 from .blocks import EncoderBlock
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
 
 
 class _Encoder(Module):
     """
-    Description.
+    This class is used to define an encoder.
     """
-    def __init__(self, conv_sequence: Sequential, linear_module: Union[Module, ModuleDict]):
+
+    def __init__(self, conv_sequence: Sequential):
         """
         Initializes the model.
 
@@ -34,15 +33,11 @@ class _Encoder(Module):
         ----------
         conv_sequence : Sequential
             The convolutional sequence.
-        linear_module : Union[Module, ModuleDict]
-            The linear module. If a ModuleDict is passed, it must contain a module for each task. If a Module is passed,
-            it will be used for all tasks.
         """
         super().__init__()
         self.conv_sequence = conv_sequence
-        self.linear_module = linear_module
 
-    def forward(self, input_tensor: Union[Tensor]) -> Union[Tensor, Dict[str, Tensor]]:
+    def forward(self, input_tensor: Union[Tensor]) -> ExtractorOutput:
         """
         Forward pass.
 
@@ -53,8 +48,8 @@ class _Encoder(Module):
 
         Returns
         -------
-        output : Union[Tensor, Dict[str, Tensor]]
-            The output tensor.
+        output : ExtractorOutput
+            The output of the forward pass. It contains the deep features.
         """
         dim = tuple(range(2, len(input_tensor.shape)))
         x = input_tensor
@@ -66,14 +61,7 @@ class _Encoder(Module):
 
         features = cat(features, dim=1)
 
-        if isinstance(self.linear_module, ModuleDict):
-            y = {k: module(features) for k, module in self.linear_module.items()}
-        elif isinstance(self.linear_module, Module):
-            y = self.linear_module(features)
-        else:
-            raise ValueError(f"Invalid type for linear_module: {type(self.linear_module)}.")
-
-        return y
+        return ExtractorOutput(deep_features=features, segmentation=None)
 
 
 class CNN(Extractor):
@@ -113,9 +101,9 @@ class CNN(Extractor):
             Available modes are 'extraction' or 'prediction'. If 'extraction', the function will extract deep radiomics
             from input images. If 'prediction', the function will perform predictions using extracted radiomics.
         multi_task_mode : Union[str, MultiTaskMode]
-            Available modes are 'separated' or 'fully_shared'. If 'separated', a separate extractor model will be used
-            for each task. If 'fully_shared', a fully shared extractor model will be used. All layers will be shared
-            between the tasks.
+            Available modes are 'partly_shared' or 'fully_shared'. If 'partly_shared', a separate extractor model will
+            be used for each task. If 'fully_shared', a fully shared extractor model will be used. All layers will be
+            shared between the tasks.
         shape : Union[str, Sequence[int]]
             Sequence of integers stating the dimension of the input tensor (minus batch and channel dimensions). Can
             also be given as a string containing the sequence. Default to (128, 128, 128).
@@ -154,25 +142,20 @@ class CNN(Extractor):
             multi_task_mode=multi_task_mode,
             shape=shape,
             n_features=n_features,
-            return_segmentation=False,
+            activation=activation,
+            channels=channels,
+            dropout_fnn=dropout_fnn,
+            hidden_channels_fnn=hidden_channels_fnn,
             device=device,
             name=name,
             seed=seed
         )
 
-        self.channels: Sequence[int] = literal_eval(channels) if isinstance(channels, str) else channels
         self.strides = strides if strides else [2] * (len(channels) - 1)
         self.kernel_size = kernel_size
         self.num_res_units = num_res_units
-        self.activation = activation
         self.norm = norm
         self.dropout_cnn = dropout_cnn
-        self.dropout_fnn = dropout_fnn
-
-        if hidden_channels_fnn:
-            self.hidden_channels_fnn = hidden_channels_fnn
-        else:
-            self.hidden_channels_fnn = (int(sum(self.channels)/4), int(sum(self.channels)/16))
 
     def __get_layer(
             self,
@@ -219,7 +202,7 @@ class CNN(Extractor):
         """
         conv_sequence = Sequential()
         for i, c in enumerate(self.channels):
-            layer = self._get_layer(
+            layer = self.__get_layer(
                 in_channels=self.in_shape[0] if i == 0 else self.channels[i - 1],
                 out_channels=c,
                 strides=1 if i == len(self.channels) - 1 else self.strides[i]
@@ -231,27 +214,9 @@ class CNN(Extractor):
 
         return conv_sequence
 
-    def _get_single_linear_module(self):
+    def _build_deep_features_extractor(self, dataset: ProstateCancerDataset) -> Module:
         """
-        Returns a single linear module.
-
-        Returns
-        -------
-        linear_module : Module
-            The linear module.
-        """
-        linear_module = FullyConnectedNet(
-            in_channels=sum(self.channels),
-            out_channels=self.n_features,
-            hidden_channels=self.hidden_channels_fnn,
-            dropout=self.dropout_fnn,
-            act=self.activation
-        )
-        return DataParallel(linear_module).to(self.device)
-
-    def _build_extractor(self, dataset: ProstateCancerDataset) -> Union[Module, ModuleDict]:
-        """
-        Returns the extractor module.
+        Returns the deep features extractor module.
 
         Parameters
         ----------
@@ -260,17 +225,11 @@ class CNN(Extractor):
 
         Returns
         -------
-        extractor : Union[Module, ModuleDict]
+        extractor : Module
             The extractor module. It should take as input a tensor of shape (batch_size, channels, *spatial_shape) and
-            return a tensor of shape (batch_size, n_features, *spatial_shape).
+            return an ExtractorOutput object. The ExtractorOutput object contains the deep features extracted from the
+            images and the segmentation of the images (optional).
         """
         conv_sequence = self._get_conv_sequence()
 
-        if self.multi_task_mode == MultiTaskMode.SEPARATED:
-            linear_module = ModuleDict(
-                {task.name: self._get_single_linear_module() for task in self._tasks.table_tasks}
-            )
-        else:
-            linear_module = self._get_single_linear_module()
-
-        return _Encoder(conv_sequence=conv_sequence, linear_module=linear_module)
+        return _Encoder(conv_sequence=conv_sequence)
