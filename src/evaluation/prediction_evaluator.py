@@ -8,6 +8,7 @@
     @Description:       This file contains a class used to show metrics and graphs for the user to gauge the
     quality of a model.
 """
+
 import json
 import os
 from typing import Dict, List, Optional, Union, NamedTuple
@@ -18,19 +19,34 @@ import seaborn as sns
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_curve
 
-from ...data.datasets.prostate_cancer import TargetsType
-from ...metrics.single_task.base import Direction
-from ...tasks.base import TableTask, Task
-from ...tasks.containers.list import TaskList
-from ...tools.transforms import to_numpy
+from ..data.datasets.prostate_cancer import TargetsType
+from ..metrics.single_task.base import Direction
+from ..tasks.base import TableTask, Task
+from ..tasks.containers.list import TaskList
+from ..tools.transforms import to_numpy
 
 
 class Output(NamedTuple):
-    predictions: List
-    targets: List
+    """
+    Class used to store the predictions and the targets of a model.
+
+    Elements
+    --------
+    predictions : List[float]
+        The predictions of the model from a dataset.
+    targets : List[float]
+        Ground truths to be used as a reference for the computation of the different metrics.
+    """
+    predictions: List[float]
+    targets: List[float]
 
 
 class PredictionEvaluator:
+    """
+    Class used to show metrics and graphs for the user to gauge the quality of a model. Can compute metrics for
+    table tasks only.
+    """
+
     def __init__(
             self,
             predictions: TargetsType,
@@ -57,16 +73,19 @@ class PredictionEvaluator:
         """
         self.predictions_dict = {k: to_numpy(v) for k, v in predictions.items()}
         self.targets_dict = {k: to_numpy(v) for k, v in targets.items()}
+
         if fit_breslow_estimators:
-            self.fit_breslow_estimators(breslow_mask)
+            self._fit_breslow_estimators(breslow_mask)
+
         self.tasks = TaskList(tasks)
         assert all(isinstance(task, TableTask) for task in self.tasks), (
             f"All tasks must be instances of 'TableTask'."
         )
+
         self.predictions_list = self.slice_patient_dictionary(self.predictions_dict, separate_patients=True)
         self.targets_list = self.slice_patient_dictionary(self.targets_dict, separate_patients=True)
 
-    def fit_breslow_estimators(
+    def _fit_breslow_estimators(
             self,
             breslow_mask: List[int]
     ) -> None:
@@ -120,7 +139,7 @@ class PredictionEvaluator:
         if isinstance(task_keys, str):
             task_keys = [task_keys]
         modified_dict = {}
-        
+
         if task_keys is not None:
             for task, values in patient_dict.items():
                 if task in task_keys:
@@ -143,6 +162,7 @@ class PredictionEvaluator:
                 for i, value in enumerate(values.tolist()):
                     patients_list[i][task] = np.array([value])
             return patients_list
+
         return modified_dict
 
     @staticmethod
@@ -223,7 +243,7 @@ class PredictionEvaluator:
 
         return scores
 
-    def fix_thresholds_to_optimal_values(
+    def _fix_thresholds_to_optimal_values(
             self,
             mask: Optional[Union[List[int], slice]] = None
     ) -> None:
@@ -311,7 +331,7 @@ class PredictionEvaluator:
                 json.dump(scores, file_path)
         return scores
 
-    def plot_classification_task_curves(
+    def plot_binary_classification_task_curves(
             self,
             show: bool,
             path_to_save_folder: Optional[str] = None,
@@ -334,7 +354,7 @@ class PredictionEvaluator:
         self.plot_roc_curve(show, path_to_save_folder, **kwargs)
         self.plot_precision_recall_curve(show, path_to_save_folder, **kwargs)
 
-    def plot_survival_analysis_curves(
+    def plot_survival_analysis_task_curves(
             self,
             show: bool,
             path_to_save_folder: Optional[str] = None,
@@ -571,15 +591,16 @@ class PredictionEvaluator:
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.confusion_matrix.
         """
         if not isinstance(threshold, int):
-            self.fix_thresholds_to_optimal_values(mask=threshold)
-        self.create_confusion_matrix_from_thresholds(
+            self._fix_thresholds_to_optimal_values(mask=threshold)
+
+        self._create_confusion_matrix_from_thresholds(
             show=show,
             path_to_save_folder=path_to_save_folder,
             threshold=threshold,
             **kwargs
         )
 
-    def create_confusion_matrix_from_thresholds(
+    def _create_confusion_matrix_from_thresholds(
             self,
             show: bool,
             path_to_save_folder: Optional[str] = None,

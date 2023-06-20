@@ -1,6 +1,6 @@
 """
     @file:              model_evaluator.py
-    @Author:            Felix Desroches
+    @Author:            Felix Desroches, Maxence Larose
 
     @Creation Date:     06/2023
     @Last modification: 06/2023
@@ -16,14 +16,19 @@ from monai.data import DataLoader
 import numpy as np
 from torch import float32, random, tensor
 
-from ...data.datasets.prostate_cancer import ProstateCancerDataset
-from ...evaluation.single_task.prediction_evaluator import PredictionEvaluator, Output
-from ...metrics.single_task.base import MetricReduction
-from ...models.base.model import Model
-from ...tools.transforms import batch_to_device, to_numpy
+from ..data.datasets.prostate_cancer import ProstateCancerDataset
+from ..evaluation.prediction_evaluator import PredictionEvaluator, Output
+from ..metrics.single_task.base import MetricReduction
+from ..models.base.model import Model
+from ..tools.transforms import batch_to_device, to_numpy
 
 
 class ModelEvaluator(PredictionEvaluator):
+    """
+    Class used to show metrics and graphs for the user to gauge the quality of a model. Inherits from the class used to
+    evaluate predictions. Can compute metrics for segmentation tasks and table tasks.
+    """
+
     def __init__(
             self,
             model: Model,
@@ -137,6 +142,7 @@ class ModelEvaluator(PredictionEvaluator):
         """
         if mask is None:
             mask = dataset.train_mask
+
         subset = dataset[mask]
         device = model.device
         rng_state = random.get_rng_state()
@@ -217,7 +223,8 @@ class ModelEvaluator(PredictionEvaluator):
         """
         if not isinstance(threshold, int):
             self.fix_thresholds_to_optimal_values_with_dataset(model=self.model, dataset=self.dataset, mask=threshold)
-        self.create_confusion_matrix_from_thresholds(
+
+        self._create_confusion_matrix_from_thresholds(
             show=show,
             path_to_save_folder=path_to_save_folder,
             threshold=threshold,

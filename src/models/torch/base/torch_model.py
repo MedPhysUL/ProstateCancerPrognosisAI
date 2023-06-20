@@ -20,7 +20,7 @@ from torch import no_grad, random, round, sigmoid, stack
 
 from ...base import check_if_built, Model
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
-from ....evaluation.single_task.model_evaluator import ModelEvaluator
+from ....evaluation.model_evaluator import ModelEvaluator
 from ....tools.transforms import to_numpy, batch_to_device
 
 
