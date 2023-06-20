@@ -140,8 +140,7 @@ class TorchModel(Model, ABC):
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
         """
-        evaluator = ModelEvaluator(self, dataset)
-        evaluator.fix_thresholds_to_optimal_values()
+        ModelEvaluator.fix_thresholds_to_optimal_values_with_dataset(model=self, dataset=dataset)
 
     @check_if_built
     @evaluation_function

@@ -572,6 +572,36 @@ class PredictionEvaluator:
         """
         if not isinstance(threshold, int):
             self.fix_thresholds_to_optimal_values(mask=threshold)
+        self.create_confusion_matrix_from_thresholds(
+            show=show,
+            path_to_save_folder=path_to_save_folder,
+            threshold=threshold,
+            **kwargs
+        )
+
+    def create_confusion_matrix_from_thresholds(
+            self,
+            show: bool,
+            path_to_save_folder: Optional[str] = None,
+            threshold: Optional[Union[int, List[int], slice]] = None,
+            **kwargs
+    ) -> None:
+        """
+        Creates the confusion matrix graph.
+
+        Parameters
+        ----------
+        show : bool
+            Whether to show the graph.
+        path_to_save_folder : Optional[str],
+            Whether to save the graph, if so, then this value is the path to the save folder.
+        threshold : Optional[Union[int, List[int], slice]]
+            Either the threshold or a mask describing the patients to use when optimising the threshold to use when
+            computing binary classification from continuous probability. If no values are given, then the threshold is
+            computed using all patients.
+        kwargs
+            These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.confusion_matrix.
+        """
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
             if not isinstance(threshold, int):

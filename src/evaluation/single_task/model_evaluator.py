@@ -117,8 +117,10 @@ class ModelEvaluator(PredictionEvaluator):
 
         return scores
 
-    def fix_thresholds_to_optimal_values(
-            self,
+    @staticmethod
+    def fix_thresholds_to_optimal_values_with_dataset(
+            model: Model,
+            dataset: ProstateCancerDataset,
             mask: Optional[List[int]] = None
     ) -> None:
         """
@@ -126,31 +128,35 @@ class ModelEvaluator(PredictionEvaluator):
 
         Parameters
         ----------
+        model : Model
+            The model with which the predictions will be made.
+        dataset : ProstateCancerDataset
+            The dataset to input to the model.
         mask : Optional[List[int]]
             Mask used to specify which patients to use when optimizing the thresholds. Uses train mask by default.
         """
         if mask is None:
-            mask = self.dataset.train_mask
-        subset = self.dataset[mask]
-        device = self.model.device
+            mask = dataset.train_mask
+        subset = dataset[mask]
+        device = model.device
         rng_state = random.get_rng_state()
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
         random.set_rng_state(rng_state)
 
-        binary_classification_tasks = self.dataset.tasks.binary_classification_tasks
+        binary_classification_tasks = dataset.tasks.binary_classification_tasks
         outputs_dict = {task.name: Output(predictions=[], targets=[]) for task in binary_classification_tasks}
         thresholds = np.linspace(start=0.01, stop=0.95, num=95)
 
         for features, targets in data_loader:
             features, targets = batch_to_device(features, device), batch_to_device(targets, device)
 
-            predictions = self.model.predict(features)
+            predictions = model.predict(features)
 
             for task in binary_classification_tasks:
                 outputs_dict[task.name].predictions.append(predictions[task.name].item())
                 outputs_dict[task.name].targets.append(targets[task.name].item())
 
-        self._fix_metric_threshold(
+        PredictionEvaluator._fix_metric_threshold(
             binary_classification_tasks=binary_classification_tasks,
             outputs_dict=outputs_dict,
             thresholds=thresholds
@@ -185,3 +191,35 @@ class ModelEvaluator(PredictionEvaluator):
             with open(f"{path_to_save_folder}/metrics.json", "w") as file_path:
                 json.dump(scores, file_path)
         return scores
+
+    def plot_confusion_matrix(
+            self,
+            show: bool,
+            path_to_save_folder: Optional[str] = None,
+            threshold: Optional[Union[int, List[int], slice]] = None,
+            **kwargs
+    ) -> None:
+        """
+        Creates the confusion matrix graph.
+
+        Parameters
+        ----------
+        show : bool
+            Whether to show the graph.
+        path_to_save_folder : Optional[str],
+            Whether to save the graph, if so, then this value is the path to the save folder.
+        threshold : Optional[Union[int, List[int], slice]]
+            Either the threshold or a mask describing the patients to use when optimising the threshold to use when
+            computing binary classification from continuous probability. If no values are given, then the threshold is
+            computed using all patients.
+        kwargs
+            These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.confusion_matrix.
+        """
+        if not isinstance(threshold, int):
+            self.fix_thresholds_to_optimal_values_with_dataset(model=self.model, dataset=self.dataset, mask=threshold)
+        self.create_confusion_matrix_from_thresholds(
+            show=show,
+            path_to_save_folder=path_to_save_folder,
+            threshold=threshold,
+            **kwargs
+        )
