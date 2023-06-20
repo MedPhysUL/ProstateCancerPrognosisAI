@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 from ast import literal_eval
-from typing import List, Optional, Sequence, Union
+from typing import Dict, List, Optional, Sequence, Union
 
 from monai.networks.nets import FullyConnectedNet
 from torch import cat, mean, Tensor
@@ -26,7 +26,7 @@ class _Encoder(Module):
     """
     Description.
     """
-    def __init__(self, conv_sequence: Sequential, linear_module: Module):
+    def __init__(self, conv_sequence: Sequential, linear_module: Union[Module, ModuleDict]):
         """
         Initializes the model.
 
@@ -34,14 +34,15 @@ class _Encoder(Module):
         ----------
         conv_sequence : Sequential
             The convolutional sequence.
-        linear_module : Module
-            The linear module.
+        linear_module : Union[Module, ModuleDict]
+            The linear module. If a ModuleDict is passed, it must contain a module for each task. If a Module is passed,
+            it will be used for all tasks.
         """
         super().__init__()
         self.conv_sequence = conv_sequence
         self.linear_module = linear_module
 
-    def forward(self, input_tensor: Tensor) -> Tensor:
+    def forward(self, input_tensor: Union[Tensor]) -> Union[Tensor, Dict[str, Tensor]]:
         """
         Forward pass.
 
@@ -52,7 +53,7 @@ class _Encoder(Module):
 
         Returns
         -------
-        Tensor
+        output : Union[Tensor, Dict[str, Tensor]]
             The output tensor.
         """
         dim = tuple(range(2, len(input_tensor.shape)))
@@ -64,7 +65,13 @@ class _Encoder(Module):
             features.append(global_average_pool)
 
         features = cat(features, dim=1)
-        y = self.linear_module(features)
+
+        if isinstance(self.linear_module, ModuleDict):
+            y = {k: module(features) for k, module in self.linear_module.items()}
+        elif isinstance(self.linear_module, Module):
+            y = self.linear_module(features)
+        else:
+            raise ValueError(f"Invalid type for linear_module: {type(self.linear_module)}.")
 
         return y
 
@@ -147,7 +154,7 @@ class CNN(Extractor):
             multi_task_mode=multi_task_mode,
             shape=shape,
             n_features=n_features,
-            return_seg=False,
+            return_segmentation=False,
             device=device,
             name=name,
             seed=seed
@@ -167,7 +174,7 @@ class CNN(Extractor):
         else:
             self.hidden_channels_fnn = (int(sum(self.channels)/4), int(sum(self.channels)/16))
 
-    def _get_layer(
+    def __get_layer(
             self,
             in_channels: int,
             out_channels: int,
@@ -201,9 +208,9 @@ class CNN(Extractor):
             dropout=self.dropout_cnn
         )
 
-    def __get_single_conv_sequence(self):
+    def _get_conv_sequence(self):
         """
-        Returns a single convolutional sequence.
+        Returns a convolutional sequence.
 
         Returns
         -------
@@ -224,7 +231,7 @@ class CNN(Extractor):
 
         return conv_sequence
 
-    def __get_single_linear_module(self):
+    def _get_single_linear_module(self):
         """
         Returns a single linear module.
 
@@ -242,21 +249,6 @@ class CNN(Extractor):
         )
         return DataParallel(linear_module).to(self.device)
 
-    def _build_single_extractor(self) -> Module:
-        """
-        Returns a single extractor module.
-
-        Returns
-        -------
-        extractor : Module
-            The extractor module. It should take as input a tensor of shape (batch_size, channels, *spatial_shape) and
-            return a tensor of shape (batch_size, n_features, *spatial_shape).
-        """
-        conv_sequence = self.__get_single_conv_sequence()
-        linear_module = self.__get_single_linear_module()
-
-        return _Encoder(conv_sequence=conv_sequence, linear_module=linear_module)
-
     def _build_extractor(self, dataset: ProstateCancerDataset) -> Union[Module, ModuleDict]:
         """
         Returns the extractor module.
@@ -272,4 +264,13 @@ class CNN(Extractor):
             The extractor module. It should take as input a tensor of shape (batch_size, channels, *spatial_shape) and
             return a tensor of shape (batch_size, n_features, *spatial_shape).
         """
-        return self._build_single_extractor()
+        conv_sequence = self._get_conv_sequence()
+
+        if self.multi_task_mode == MultiTaskMode.SEPARATED:
+            linear_module = ModuleDict(
+                {task.name: self._get_single_linear_module() for task in self._tasks.table_tasks}
+            )
+        else:
+            linear_module = self._get_single_linear_module()
+
+        return _Encoder(conv_sequence=conv_sequence, linear_module=linear_module)
