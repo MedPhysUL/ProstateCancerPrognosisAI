@@ -84,7 +84,7 @@ class Extractor(TorchModel, ABC):
             image_keys: Union[str, List[str]],
             model_mode: Union[str, ModelMode] = ModelMode.PREDICTION,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
-            shape: Union[str, Sequence[int]] = (128, 128, 128),
+            shape: Sequence[int] = (128, 128, 128),
             n_features: int = 6,
             activation: str = "PRELU",
             channels: Union[str, Sequence[int]] = (64, 128, 256, 512, 1024),
@@ -92,7 +92,7 @@ class Extractor(TorchModel, ABC):
             hidden_channels_fnn: Optional[Sequence[int]] = None,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
-            seed: Optional[int] = None,
+            seed: Optional[int] = None
     ):
         """
         Initializes the model.
@@ -111,7 +111,7 @@ class Extractor(TorchModel, ABC):
         channels : Union[str, Sequence[int]]
             Sequence of integers stating the output channels of each convolutional layer. Can also be given as a string
             containing the sequence. Default to (64, 128, 256, 512, 1024).
-        shape : Union[str, Sequence[int]]
+        shape : Sequence[int]
             Sequence of integers stating the dimension of the input tensor (minus batch and channel dimensions). Can
             also be given as a string containing the sequence. Default to (128, 128, 128).
         n_features : int
@@ -139,7 +139,7 @@ class Extractor(TorchModel, ABC):
         self.model_mode = ModelMode(model_mode)
         self.multi_task_mode = MultiTaskMode(multi_task_mode)
         self.n_features = n_features
-        self.shape = literal_eval(shape) if isinstance(shape, str) else shape
+        self.shape = shape
 
         if hidden_channels_fnn:
             self.hidden_channels_fnn = hidden_channels_fnn

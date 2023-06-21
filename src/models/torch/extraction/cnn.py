@@ -37,7 +37,7 @@ class _Encoder(Module):
         super().__init__()
         self.conv_sequence = conv_sequence
 
-    def forward(self, input_tensor: Union[Tensor]) -> ExtractorOutput:
+    def forward(self, input_tensor: Tensor) -> ExtractorOutput:
         """
         Forward pass.
 
@@ -75,7 +75,7 @@ class CNN(Extractor):
             image_keys: Union[str, List[str]],
             model_mode: Union[str, ModelMode] = ModelMode.PREDICTION,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
-            shape: Union[str, Sequence[int]] = (128, 128, 128),
+            shape: Sequence[int] = (128, 128, 128),
             n_features: int = 6,
             channels: Union[str, Sequence[int]] = (64, 128, 256, 512, 1024),
             strides: Optional[Sequence[int]] = None,
@@ -104,7 +104,7 @@ class CNN(Extractor):
             Available modes are 'partly_shared' or 'fully_shared'. If 'partly_shared', a separate extractor model will
             be used for each task. If 'fully_shared', a fully shared extractor model will be used. All layers will be
             shared between the tasks.
-        shape : Union[str, Sequence[int]]
+        shape : Sequence[int]
             Sequence of integers stating the dimension of the input tensor (minus batch and channel dimensions). Can
             also be given as a string containing the sequence. Default to (128, 128, 128).
         n_features : int
