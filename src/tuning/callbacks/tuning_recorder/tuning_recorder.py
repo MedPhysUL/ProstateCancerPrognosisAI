@@ -186,7 +186,7 @@ class TuningRecorder(TuningCallback):
         path_to_figures = os.path.join(path_to_hps, self.FIGURES_FOLDER_NAME)
         os.makedirs(path_to_figures, exist_ok=True)
 
-        for idx, task in enumerate(tuner.outer_loop_state.dataset.tasks):
+        for idx, task in enumerate(tuner.outer_loop_state.dataset.tunable_tasks):
             path_to_task_figure_folder = os.path.join(path_to_figures, task.name)
             os.makedirs(path_to_task_figure_folder, exist_ok=True)
             path_to_task_figure = os.path.join(path_to_task_figure_folder, self.HPS_IMPORTANCE_FIGURE_NAME)
@@ -359,7 +359,7 @@ class TuningRecorder(TuningCallback):
             Hyperparameters importance for each task.
         """
         hps_importance = {}
-        for idx, task in enumerate(tuner.outer_loop_state.dataset.tasks):
+        for idx, task in enumerate(tuner.outer_loop_state.dataset.tunable_tasks):
             importances = get_param_importances(
                 study=tuner.study_state.study,
                 evaluator=FanovaImportanceEvaluator(seed=self.HP_IMPORTANCE_SEED),
