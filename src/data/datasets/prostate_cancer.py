@@ -168,12 +168,7 @@ class ProstateCancerDataset(Dataset):
         tunable_tasks : TaskList
             List of tunable tasks.
         """
-        tunable_tasks = []
-        for task in self.tasks:
-            if task.hps_tuning_metric:
-                tunable_tasks.append(task)
-
-        return TaskList(tunable_tasks)
+        return TaskList([task for task in self.tasks if task.hps_tuning_metric])
 
     @property
     def train_mask(self) -> List[int]:
