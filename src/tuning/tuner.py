@@ -12,7 +12,6 @@ from typing import Dict, List, Optional, Union
 
 from monai.utils import set_determinism
 from optuna.trial import FrozenTrial
-# import ray
 
 from .callbacks import TuningRecorder
 from .callbacks.base import TuningCallback
@@ -145,7 +144,6 @@ class Tuner:
         )
         self._initialize_states()
         self._set_seed()
-        # ray.init()
 
         self.callbacks.on_tuning_start(self)
         self.outer_loop_state.scores = []
@@ -162,8 +160,6 @@ class Tuner:
             self._exec_best_model_evaluation(dataset=dataset, objective=objective)
             self.callbacks.on_outer_loop_end(self)
 
-        # We shutdown ray
-        # ray.shutdown()
         self.callbacks.on_tuning_end(self)
 
     def _exec_study(
