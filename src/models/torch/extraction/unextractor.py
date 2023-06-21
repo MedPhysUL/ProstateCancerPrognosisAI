@@ -254,6 +254,9 @@ class UNEXtractor(Extractor):
             return an ExtractorOutput object. The ExtractorOutput object contains the deep features extracted from the
             images and the segmentation of the images (optional).
         """
+        assert len(self._tasks.segmentation_tasks) > 0, (
+            "UNEXtractor requires at least one segmentation task. Found none."
+        )
 
         return _UNet(
             encoders=self._get_encoders_dict(),
