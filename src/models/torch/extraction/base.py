@@ -357,9 +357,10 @@ class Extractor(TorchModel, ABC):
         elif self.model_mode == ModelMode.PREDICTION:
             tab_dict = self._get_prediction(radiomics)
 
-            segmentation = output.segmentation
-            if segmentation:
-                seg_dict = {task.name: segmentation[:, i] for i, task in enumerate(self._tasks.segmentation_tasks)}
+            seg = output.segmentation
+
+            if seg is not None:
+                seg_dict = {task.name: seg[:, i, None] for i, task in enumerate(self._tasks.segmentation_tasks)}
                 return tab_dict | seg_dict
             else:
                 return tab_dict
