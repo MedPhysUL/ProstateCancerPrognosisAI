@@ -12,16 +12,15 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Dict, List, NamedTuple, Optional
+from typing import Dict, List, Optional
 
 from monai.data import DataLoader
-from numpy import argmin, argmax, linspace
 from torch import device as torch_device
-from torch import float32, no_grad, random, round, sigmoid, stack, tensor
+from torch import no_grad, random, round, sigmoid, stack
 
 from ...base import check_if_built, Model
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
-from ....metrics.single_task.base import Direction, MetricReduction
+from ....evaluation.model_evaluator import ModelEvaluator
 from ....tools.transforms import to_numpy, batch_to_device
 
 
@@ -37,11 +36,6 @@ def evaluation_function(_func):
         return out
 
     return wrapper
-
-
-class Output(NamedTuple):
-    predictions: List
-    targets: List
 
 
 class TorchModel(Model, ABC):
@@ -146,39 +140,7 @@ class TorchModel(Model, ABC):
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
         """
-        subset = dataset[dataset.train_mask]
-        rng_state = random.get_rng_state()
-        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
-        random.set_rng_state(rng_state)
-
-        binary_classification_tasks = dataset.tasks.binary_classification_tasks
-        outputs_dict = {task.name: Output(predictions=[], targets=[]) for task in binary_classification_tasks}
-
-        thresholds = linspace(start=0.01, stop=0.95, num=95)
-
-        for features, targets in data_loader:
-            features, targets = batch_to_device(features, self.device), batch_to_device(targets, self.device)
-
-            predictions = self.predict(features)
-
-            for task in binary_classification_tasks:
-                outputs_dict[task.name].predictions.append(predictions[task.name].item())
-                outputs_dict[task.name].targets.append(targets[task.name].item())
-
-        for task in binary_classification_tasks:
-            output = outputs_dict[task.name]
-
-            for metric in task.metrics:
-                scores = [metric(to_numpy(output.predictions), to_numpy(output.targets), t) for t in thresholds]
-
-                if metric.direction == Direction.MINIMIZE:
-                    metric.threshold = thresholds[argmin(scores)]
-                elif metric.direction == Direction.MAXIMIZE:
-                    metric.threshold = thresholds[argmax(scores)]
-
-            for metric in task.metrics:
-                if metric.direction == Direction.NONE:
-                    metric.threshold = task.decision_threshold_metric.threshold
+        ModelEvaluator.fix_thresholds_to_optimal_values_with_dataset(model=self, dataset=dataset)
 
     @check_if_built
     @evaluation_function
@@ -232,7 +194,7 @@ class TorchModel(Model, ABC):
     def predict_on_dataset(
             self,
             dataset: ProstateCancerDataset,
-            mask: List[int],
+            mask: Optional[List[int]] = None,
             probability: bool = True
     ) -> Optional[TargetsType]:
         """
@@ -249,8 +211,9 @@ class TorchModel(Model, ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
-        mask : List[int]
-            A list of dataset idx for which we want to obtain the predictions.
+        mask : Optional[List[int]]
+            A list of dataset idx for which we want to obtain the predictions. If no mask is given, all patients are
+            used.
         probability : bool
             Whether to return probability predictions or class predictions for binary classification task predictions.
             Doesn't affect regression, survival and segmentation tasks predictions.
@@ -260,7 +223,7 @@ class TorchModel(Model, ABC):
         predictions : TargetsType
             Predictions (except segmentation map).
         """
-        subset = dataset[mask]
+        subset = dataset[mask] if mask is not None else dataset
         rng_state = random.get_rng_state()
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
         random.set_rng_state(rng_state)
@@ -279,7 +242,7 @@ class TorchModel(Model, ABC):
 
     @check_if_built
     @no_grad()
-    def score(
+    def compute_score(
             self,
             features: FeaturesType,
             targets: TargetsType
@@ -297,7 +260,7 @@ class TorchModel(Model, ABC):
         Returns
         -------
         scores : Dict[str, Dict[str, float]]
-            Score for each tasks and each metrics.
+            Score for each task and each metric.
         """
         pred = self.predict(features=features)
 
@@ -311,7 +274,7 @@ class TorchModel(Model, ABC):
 
     @check_if_built
     @no_grad()
-    def score_on_dataset(
+    def compute_score_on_dataset(
             self,
             dataset: ProstateCancerDataset,
             mask: List[int]
@@ -329,45 +292,6 @@ class TorchModel(Model, ABC):
         Returns
         -------
         scores : Dict[str, Dict[str, float]]
-            Score for each tasks and each metrics.
+            Score for each task and each metric.
         """
-        subset = dataset[mask]
-        rng_state = random.get_rng_state()
-        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
-        random.set_rng_state(rng_state)
-
-        tasks = dataset.tasks
-        table_tasks, seg_tasks = tasks.table_tasks, tasks.segmentation_tasks
-
-        scores = {task.name: {} for task in tasks}
-        segmentation_scores = {task.name: {metric.name: [] for metric in task.unique_metrics} for task in seg_tasks}
-        table_outputs = {task.name: Output(predictions=[], targets=[]) for task in table_tasks}
-        for features, targets in data_loader:
-            features, targets = batch_to_device(features, self.device), batch_to_device(targets, self.device)
-
-            predictions = self.predict(features=features)
-
-            for task in seg_tasks:
-                for metric in task.unique_metrics:
-                    segmentation_scores[task.name][metric.name].append(
-                        metric(predictions[task.name], targets[task.name], MetricReduction.NONE)
-                    )
-
-            for task in table_tasks:
-                if task.metrics:
-                    table_outputs[task.name].predictions.append(predictions[task.name].item())
-                    table_outputs[task.name].targets.append(targets[task.name].tolist()[0])
-
-        for task in seg_tasks:
-            for metric in task.unique_metrics:
-                scores[task.name][metric.name] = metric.perform_reduction(
-                    tensor(segmentation_scores[task.name][metric.name], dtype=float32)
-                )
-
-        for task in table_tasks:
-            if task.metrics:
-                output = table_outputs[task.name]
-                for metric in task.unique_metrics:
-                    scores[task.name][metric.name] = metric(to_numpy(output.predictions), to_numpy(output.targets))
-
-        return scores
+        return ModelEvaluator.compute_score_on_dataset(model=self, dataset=dataset, mask=mask)

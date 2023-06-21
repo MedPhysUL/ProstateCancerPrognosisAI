@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+
 *.py[cod]
 *$py.class
 
@@ -133,3 +134,4 @@ dmypy.json
 
 # Local Data
 */local_data
+

@@ -19,6 +19,7 @@ from torch.optim.lr_scheduler import ExponentialLR
 from constants import *
 from src.data.processing.sampling import extract_masks, Mask
 from src.data.datasets import ImageDataset, ProstateCancerDataset, TableDataset
+from src.evaluation import ModelEvaluator
 from src.models.torch.combination import ModelSetup, MultiNet
 from src.models.torch.extraction import CNN
 from src.models.torch.segmentation import Unet
@@ -143,7 +144,6 @@ if __name__ == '__main__':
 
     history.plot(show=True)
 
-    # The next part will be integrated in an evaluation tool in the near future.
-    multi_net.fix_thresholds_to_optimal_values(dataset)
-    score = multi_net.score_on_dataset(dataset, dataset.test_mask)
+    evaluator = ModelEvaluator(model=trained_model, dataset=dataset)
+    score = evaluator.compute_score(dataset.test_mask)
     print(score)

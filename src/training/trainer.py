@@ -16,6 +16,7 @@ from shutil import rmtree
 from typing import Generator, List, NamedTuple, Optional, Sequence, Union
 from uuid import uuid1
 
+import numpy as np
 from monai.data import DataLoader
 from monai.utils import set_determinism
 from torch import device as torch_device
@@ -433,7 +434,7 @@ class Trainer:
 
             self.callbacks.on_epoch_end(self)
 
-            postfix = self.epoch_state.state_dict()
+            postfix = self._get_progress_postfix()
             postfix.update(self.callbacks.on_progress_bar_update(self))
             progress_bar.set_postfix(postfix)
 
@@ -448,6 +449,27 @@ class Trainer:
         progress_bar.close()
 
         return TrainingResult(model=self.model, training_history=self.training_history)
+
+    def _get_progress_postfix(self) -> dict:
+        """
+        Gives the cleaned postfix for the progress bar created from epoch_state.state_dict().
+
+        Returns
+        -------
+        postfix : dict
+            {train_loss: {algorithm: loss}, valid_loss: {algorithm: loss}}.
+        """
+        postfix = {}
+        state_dict = self.epoch_state.state_dict()
+
+        for state_key, state in state_dict.items():
+            if isinstance(state, dict):
+                postfix_key = state_key + "_loss"
+                postfix[postfix_key] = {}
+                for algorithm_key, algorithm in state["multi_task_losses"].items():
+                    for loss in algorithm.values():
+                        postfix[postfix_key][algorithm_key] = np.round_(loss, 3)
+        return postfix
 
     def _epochs_generator(self, progress_bar: tqdm) -> Generator:
         """
@@ -607,10 +629,10 @@ class Trainer:
             Whether the model is in training or evaluation mode.
         """
         if training:
-            scores = self.model.score_on_dataset(dataset=dataset, mask=dataset.train_mask)
+            scores = self.model.compute_score_on_dataset(dataset=dataset, mask=dataset.train_mask)
             self.epoch_state.train.single_task_metrics = scores
         else:
-            scores = self.model.score_on_dataset(dataset=dataset, mask=dataset.valid_mask)
+            scores = self.model.compute_score_on_dataset(dataset=dataset, mask=dataset.valid_mask)
             self.epoch_state.valid.single_task_metrics = scores
 
     def _exec_post_fit(

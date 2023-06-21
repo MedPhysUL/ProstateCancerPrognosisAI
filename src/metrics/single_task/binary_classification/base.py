@@ -50,7 +50,7 @@ class BinaryClassificationMetric(SingleTaskMetric, ABC):
         n_digits : int
             Number of digits kept.
         """
-        if not (0 < weight < 1):
+        if not (0 <= weight <= 1):
             raise ValueError("The weight parameter must be included in range [0, 1]")
 
         self._scaling_factor = None
@@ -97,7 +97,7 @@ class BinaryClassificationMetric(SingleTaskMetric, ABC):
             (N,) tensor or array with predicted labels.
         targets : Union[np.array, Tensor]
             (N,) tensor or array with ground truth
-        thresh : float
+        thresh : Optional[float]
             The threshold used to classify a sample in class 1.
 
         Returns
@@ -105,9 +105,10 @@ class BinaryClassificationMetric(SingleTaskMetric, ABC):
         metric : float
             Rounded metric score.
         """
-        assert self.scaling_factor, f"Scaling factor must be set before computing the {self.__class__.__name__}. Use " \
-                                    f"the method 'update_scaling_factor' or directly set the 'scaling_factor " \
-                                    f"attribute'."
+        assert isinstance(self.scaling_factor, np.float64), f"Scaling factor must be set before computing the " \
+                                                            f"{self.__class__.__name__}. Use the method " \
+                                                            f"'update_scaling_factor' or directly set the " \
+                                                            f"'scaling_factor attribute'."
 
         nonmissing_targets_idx = self.get_idx_of_nonmissing_targets(targets)
         if len(nonmissing_targets_idx) == 0:

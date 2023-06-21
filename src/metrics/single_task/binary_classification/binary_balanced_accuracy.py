@@ -60,7 +60,7 @@ class BinaryBalancedAccuracy(BinaryClassificationMetric):
             (N,) tensor with predicted probabilities of being in class 1
         targets : Tensor
             (N,) tensor with ground truth
-        thresh : Tensor
+        thresh : float
             Probability threshold that must be reach by a sample to be classified into class 1 (Not used here)
 
         Returns

@@ -12,8 +12,9 @@
 from abc import abstractmethod
 from typing import Any, Dict, Iterable, Iterator, Optional, Union
 
+import torch
 from torch import device as torch_device
-from torch import linalg, stack, sum, tensor, Tensor
+from torch import cat, linalg, stack, sum, tensor, Tensor
 from torch.nn import Module, Parameter, ParameterDict
 
 
@@ -236,11 +237,11 @@ class LpRegularizer(Regularizer):
             The regularization loss.
         """
         device = list(self.params.values())[0].device
-        loss = tensor(0.0, requires_grad=True).to(device)
+        loss = []
         for name, param in self.params.items():
             if "weight" in name:
-                loss += linalg.norm(param.flatten(), self.power)
-        return loss
+                loss.append(linalg.norm(param.flatten(), self.power).reshape(1))
+        return sum(cat(loss))
 
 
 class L1Regularizer(LpRegularizer):

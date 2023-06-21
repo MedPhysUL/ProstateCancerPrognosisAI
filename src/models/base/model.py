@@ -235,7 +235,7 @@ class Model(Module, ABC):
 
     @check_if_built
     @abstractmethod
-    def score(
+    def compute_score(
             self,
             features: FeaturesType,
             targets: TargetsType
@@ -259,7 +259,7 @@ class Model(Module, ABC):
 
     @check_if_built
     @abstractmethod
-    def score_on_dataset(
+    def compute_score_on_dataset(
             self,
             dataset: ProstateCancerDataset,
             mask: List[int]
