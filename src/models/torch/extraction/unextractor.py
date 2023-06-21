@@ -13,30 +13,37 @@ from typing import List, Optional, Sequence, Union
 
 from torch import cat, mean, Tensor
 from torch import device as torch_device
-from torch.nn import DataParallel, Module, Sequential
+from torch.nn import DataParallel, Module, ModuleDict, Sequential
 
 from .base import Extractor, ExtractorOutput, ModelMode, MultiTaskMode
-from .blocks import EncoderBlock
+from .blocks import EncoderBlock, DecoderBlock
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
-from ....tasks import SegmentationTask, TaskList
 
 
-class _Encoder(Module):
+class _UNet(Module):
     """
-    This class is used to define an encoder.
+    This class is used to define an unet used for segmentation and extraction of deep radiomics.
     """
 
-    def __init__(self, conv_sequence: Sequential):
+    def __init__(
+            self,
+            encoders: ModuleDict,
+            decoders: ModuleDict
+    ):
         """
         Initializes the model.
 
         Parameters
         ----------
-        conv_sequence : Sequential
-            The convolutional sequence.
+        encoders : ModuleDict
+            A ModuleDict of the encoders to be used by the unet.
+        decoders : ModuleDict
+            A ModuleDict of the decoders to be used by the unet.
         """
         super().__init__()
-        self.conv_sequence = conv_sequence
+
+        self.encoders = encoders
+        self.decoders = decoders
 
     def forward(self, input_tensor: Union[Tensor]) -> ExtractorOutput:
         """
@@ -55,19 +62,26 @@ class _Encoder(Module):
         dim = tuple(range(2, len(input_tensor.shape)))
         x = input_tensor
         features = []
-        for i, conv in enumerate(self.conv_sequence):
-            x = conv(x)
+
+        layers_output = {}
+        for key, encoder in self.encoders.items():
+            x = encoder(x)
+            layers_output[key] = x
+
             global_average_pool = mean(x, dim=dim)
             features.append(global_average_pool)
 
         features = cat(features, dim=1)
 
-        return ExtractorOutput(deep_features=features, segmentation=None)
+        for key, decoder in reversed(list(self.decoders.items())):
+            x = decoder(cat([layers_output[key], x], dim=1))
+
+        return ExtractorOutput(deep_features=features, segmentation=x)
 
 
 class UNEXtractor(Extractor):
     """
-
+    This class contains the UNEXtractor Extractor which is used to extract deep radiomics while inferring segmentations.
     """
 
     def __init__(
@@ -115,7 +129,7 @@ class UNEXtractor(Extractor):
             containing the sequence.
         strides : Optional[Sequence[int]]
             Sequence of integers stating the stride (downscale factor) of each convolutional layer. Default to 2.
-        kernel_size : Union[Sequence[int], int]
+        kernel_size : Union[int, Sequence[int]]
             Integer or sequence of integers stating size of convolutional kernels.
         num_res_units : int
             Integer stating number of convolutions in residual units, 0 means no residual units.
@@ -151,68 +165,78 @@ class UNEXtractor(Extractor):
             seed=seed
         )
 
-        self.strides = strides if strides else [2] * (len(channels) - 1)
+        self.strides = strides if strides else [2] * (len(self.channels) - 1)
         self.kernel_size = kernel_size
         self.num_res_units = num_res_units
         self.norm = norm
         self.dropout_cnn = dropout_cnn
 
-    def __get_layer(
-            self,
-            in_channels: int,
-            out_channels: int,
-            strides: int
-    ) -> EncoderBlock:
+    def _get_encoders_dict(self) -> ModuleDict:
         """
-        Returns an encoder block.
-
-        Parameters
-        ----------
-        in_channels : int
-            Number of input channels.
-        out_channels : int
-            Number of output channels.
-        strides : int
-            Stride of the convolution.
+        Returns a ModuleDict of encoder blocks to be used by the UNet in its encoding path.
 
         Returns
         -------
-        encoder : EncoderBlock
-            An encoder block.
+        encoders : ModuleDict
+            A ModuleDict of the encoder blocks to be used by the unet.
         """
-        return EncoderBlock(
-            input_channels=in_channels,
-            output_channels=out_channels,
-            num_res_units=self.num_res_units,
-            kernel_size=self.kernel_size,
-            stride=strides,
-            act=self.activation,
-            norm=self.norm,
-            dropout=self.dropout_cnn
-        )
-
-    def _get_conv_sequence(self):
-        """
-        Returns a convolutional sequence.
-
-        Returns
-        -------
-        conv_sequence : Sequential
-            The convolutional sequence.
-        """
-        conv_sequence = Sequential()
+        encoders = ModuleDict({})
         for i, c in enumerate(self.channels):
-            layer = self.__get_layer(
-                in_channels=self.in_shape[0] if i == 0 else self.channels[i - 1],
-                out_channels=c,
-                strides=1 if i == len(self.channels) - 1 else self.strides[i]
+            enc = Sequential()
+
+            conv = EncoderBlock(
+                input_channels=self.in_shape[0] if i == 0 else self.channels[i - 1],
+                output_channels=c,
+                num_res_units=self.num_res_units,
+                kernel_size=self.kernel_size,
+                stride=1 if i == len(self.channels) - 1 else self.strides[i],
+                act=self.activation,
+                norm=self.norm,
+                dropout=self.dropout_cnn
             )
-            conv_sequence.add_module(
-                name="conv_%i" % i,
-                module=DataParallel(layer).to(self.device)
+            enc.add_module(
+                name=f"conv{i}",
+                module=DataParallel(conv).to(self.device)
             )
 
-        return conv_sequence
+            encoders["bottom" if i == len(self.channels) - 1 else f"layer{i}"] = enc
+
+        return encoders
+
+    def _get_decoders_dict(self) -> ModuleDict:
+        """
+        Returns a ModuleDict of decoder blocks to be used by the UNet in its decoding path.
+
+        Returns
+        -------
+        decoders : ModuleDict
+            A ModuleDict of the decoder blocks to be used by the unet.
+        """
+        decoders = ModuleDict({})
+        for i, c in enumerate(self.channels):
+
+            if i < len(self.channels) - 1:
+                dec = Sequential()
+
+                up_conv = DecoderBlock(
+                    input_channels=c + self.channels[i + 1] if i == len(self.channels) - 2 else c * 2,
+                    output_channels=len(self._tasks.segmentation_tasks) if i == 0 else self.channels[i - 1],
+                    num_res_units=self.num_res_units,
+                    kernel_size=self.kernel_size,
+                    stride=self.strides[i],
+                    act=self.activation,
+                    norm=self.norm,
+                    dropout=self.dropout_cnn,
+                    is_top=True if i == 0 else False
+                )
+                dec.add_module(
+                    name=f"up_conv{i}",
+                    module=DataParallel(up_conv).to(self.device)
+                )
+
+                decoders[f"layer{i}"] = dec
+
+        return decoders
 
     def _build_deep_features_extractor(self, dataset: ProstateCancerDataset) -> Module:
         """
@@ -230,6 +254,8 @@ class UNEXtractor(Extractor):
             return an ExtractorOutput object. The ExtractorOutput object contains the deep features extracted from the
             images and the segmentation of the images (optional).
         """
-        conv_sequence = self._get_conv_sequence()
 
-        return _Encoder(conv_sequence=conv_sequence)
+        return _UNet(
+            encoders=self._get_encoders_dict(),
+            decoders=self._get_decoders_dict(),
+        )

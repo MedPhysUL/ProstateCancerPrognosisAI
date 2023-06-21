@@ -151,7 +151,7 @@ class CNN(Extractor):
             seed=seed
         )
 
-        self.strides = strides if strides else [2] * (len(channels) - 1)
+        self.strides = strides if strides else [2] * (len(self.channels) - 1)
         self.kernel_size = kernel_size
         self.num_res_units = num_res_units
         self.norm = norm
@@ -191,7 +191,7 @@ class CNN(Extractor):
             dropout=self.dropout_cnn
         )
 
-    def _get_conv_sequence(self):
+    def _get_conv_sequence(self) -> Sequential:
         """
         Returns a convolutional sequence.
 
