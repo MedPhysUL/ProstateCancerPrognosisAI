@@ -5,7 +5,8 @@
     @Creation Date:     04/2023
     @Last modification: 04/2023
 
-    @Description:       This script is used to train an mlp model. Each task has its own mlp and its own optimizer.
+    @Description:       This script is used to train an mlp model. Each task has its own mlp, but the model is trained
+                        using a single MeanLoss on all tasks.
 """
 
 import env_apps
@@ -56,29 +57,23 @@ if __name__ == '__main__':
         seed=SEED
     ).build(dataset)
 
-    learning_algorithms = []
-    for task in TABLE_TASKS:
-        task_specific_model = model.predictor[task.name]
+    optimizer = Adam(
+        params=model.parameters(),
+        lr=1e-3,
+        weight_decay=0.02
+    )
 
-        optimizer = Adam(
-            params=task_specific_model.parameters(),
-            lr=2e-4,
-            weight_decay=0.02
-        )
-
-        learning_algorithms.append(
-            LearningAlgorithm(
-                criterion=MeanLoss(tasks=task),
-                optimizer=optimizer,
-                lr_scheduler=ExponentialLR(optimizer=optimizer, gamma=0.99),
-                early_stopper=MultiTaskLossEarlyStopper(patience=10),
-                regularizer=L2Regularizer(task_specific_model.named_parameters(), lambda_=0.01)
-            )
-        )
+    learning_algorithm = LearningAlgorithm(
+        criterion=MeanLoss(),
+        optimizer=optimizer,
+        lr_scheduler=ExponentialLR(optimizer=optimizer, gamma=0.99),
+        early_stopper=MultiTaskLossEarlyStopper(patience=10),
+        regularizer=L2Regularizer(model.named_parameters(), lambda_=0.006)
+    )
 
     trainer = Trainer(
         batch_size=16,
-        checkpoint=Checkpoint(),
+        # checkpoint=Checkpoint(),
         exec_metrics_on_train=True,
         n_epochs=100,
         seed=SEED
@@ -87,7 +82,7 @@ if __name__ == '__main__':
     trained_model, history = trainer.train(
         model=model,
         dataset=dataset,
-        learning_algorithms=learning_algorithms
+        learning_algorithms=learning_algorithm
     )
 
     history.plot(show=True)
@@ -118,6 +113,7 @@ if __name__ == '__main__':
         plt.show()
 
         chf_funcs = breslow_estimator.get_survival_function(prediction)
-        for fn in chf_funcs:
-            plt.step(fn.x, fn(fn.x), where="post")
+        for i, fn in enumerate(chf_funcs):
+            plt.step(fn.x, fn(fn.x), where="post", label=f"Patient {i}")
+        plt.legend()
         plt.show()

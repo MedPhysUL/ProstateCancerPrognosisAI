@@ -1,11 +1,11 @@
 """
-    @file:              create_database.py
+    @file:              01_extract_radiomics.py
     @Author:            Maxence Larose
 
-    @Creation Date:     06/2022
-    @Last modification: 11/2022
+    @Creation Date:     11/2022
+    @Last modification: 06/2023
 
-    @Description:       This file shows how to create an HDF5 file database using DELIA.
+    @Description:       This file shows how to extract radiomics from CT and PET using DELIA.
 """
 
 import env_apps
@@ -55,14 +55,14 @@ if __name__ == "__main__":
     # ----------------------------------------------------------------------------------------------------------- #
     patients_data_extractor = PatientsDataExtractor(
         path_to_patients_folder=r"local_data/Learning_set",
-        series_descriptions=r"local_data/series_descriptions.json",
+        tag_values=r"local_data/series_descriptions.json",
         transforms=transforms
     )
 
     # ----------------------------------------------------------------------------------------------------------- #
     #    Extract radiomics features of the CT image from the segmentation of the prostate made on the CT image    #
     # ----------------------------------------------------------------------------------------------------------- #
-    ct_radiomics_dataset = RadiomicsDataset(path_to_dataset=r"local_data/ct_radiomics.csv")
+    ct_radiomics_dataset = RadiomicsDataset(path_to_dataset=r"local_data/learning_ct_radiomics.csv")
 
     ct_radiomics_dataset.extractor = RadiomicsFeatureExtractor(
         path_to_params="local_data/features_extractor_params_CT.yaml",
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     # ----------------------------------------------------------------------------------------------------------- #
     #    Extract radiomics features of the PT image from the segmentation of the prostate made on the CT image    #
     # ----------------------------------------------------------------------------------------------------------- #
-    pt_radiomics_dataset = RadiomicsDataset(path_to_dataset=r"local_data/pt_radiomics.csv")
+    pt_radiomics_dataset = RadiomicsDataset(path_to_dataset=r"local_data/learning_pt_radiomics.csv")
 
     pt_radiomics_dataset.extractor = RadiomicsFeatureExtractor(
         path_to_params="local_data/features_extractor_params_PT.yaml",

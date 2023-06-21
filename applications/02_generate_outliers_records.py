@@ -1,5 +1,5 @@
 """
-    @file:              01_generate_outliers_records.py
+    @file:              02_generate_outliers_records.py
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022

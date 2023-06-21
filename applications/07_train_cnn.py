@@ -1,5 +1,5 @@
 """
-    @file:              06_train_cnn.py
+    @file:              07_train_cnn.py
     @Author:            Maxence Larose
 
     @Creation Date:     04/2023
