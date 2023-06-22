@@ -71,7 +71,7 @@ class SearchAlgorithm:
         study : Study
             Study object.
         """
-        directions = [task.hps_tuning_metric.direction for task in dataset.tasks]
+        directions = [task.hps_tuning_metric.direction for task in dataset.tunable_tasks]
 
         if len(directions) == 1:
             study = create_study(

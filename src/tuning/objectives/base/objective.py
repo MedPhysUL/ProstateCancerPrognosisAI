@@ -112,7 +112,7 @@ class Objective(ABC):
 
         tuning_metric_test_scores = [
             self.trial_state.statistics.test[task.name][task.hps_tuning_metric.name].mean
-            for task in dataset.tasks
+            for task in dataset.tunable_tasks
         ]
 
         callbacks.on_trial_end(self)

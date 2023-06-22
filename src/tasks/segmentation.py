@@ -97,6 +97,10 @@ class SegmentationTask(Task):
         return self._hps_tuning_metric
 
     @property
+    def key(self) -> str:
+        return f"{self.modality}_{self.organ}"
+
+    @property
     def metrics(self) -> SingleTaskMetricList[SegmentationMetric]:
         return super().metrics
 

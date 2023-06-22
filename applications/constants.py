@@ -116,7 +116,7 @@ TABLE_TASKS = [BCR_TASK, CRPC_TASK, DEATH_TASK, HTX_TASK, METASTASIS_TASK, PN_TA
 # IMAGE TASKS
 PROSTATE_SEGMENTATION_TASK = SegmentationTask(
     criterion=DiceLoss(),
-    hps_tuning_metric=DiceMetric(),
+    evaluation_metrics=DiceMetric(),
     organ="Prostate",
     modality="CT"
 )

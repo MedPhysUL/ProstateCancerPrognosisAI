@@ -158,6 +158,19 @@ class ProstateCancerDataset(Dataset):
             return self.table_dataset.tasks + self.image_dataset.tasks
 
     @property
+    def tunable_tasks(self) -> TaskList:
+        """
+        Returns the list of tunable tasks. A tunable task is a task that has a hps_tuning_metric attribute. This
+        attribute is used to tune the hyperparameters.
+
+        Returns
+        -------
+        tunable_tasks : TaskList
+            List of tunable tasks.
+        """
+        return TaskList([task for task in self.tasks if task.hps_tuning_metric])
+
+    @property
     def train_mask(self) -> List[int]:
         """
         Returns the train mask.
