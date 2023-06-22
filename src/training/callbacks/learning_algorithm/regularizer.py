@@ -236,7 +236,6 @@ class LpRegularizer(Regularizer):
         loss : Tensor
             The regularization loss.
         """
-        device = list(self.params.values())[0].device
         loss = []
         for name, param in self.params.items():
             if "weight" in name:

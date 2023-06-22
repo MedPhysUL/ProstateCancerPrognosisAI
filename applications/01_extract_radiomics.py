@@ -1,21 +1,22 @@
 """
-    @file:              00_create_database.py
+    @file:              01_extract_radiomics.py
     @Author:            Maxence Larose
 
-    @Creation Date:     06/2022
-    @Last modification: 11/2022
+    @Creation Date:     11/2022
+    @Last modification: 06/2023
 
-    @Description:       This file shows how to create an HDF5 file database using DELIA.
+    @Description:       This file shows how to extract radiomics from CT and PET using DELIA.
 """
 
 import env_apps
 
-from delia.databases import PatientsDatabase
 from delia.extractors import PatientsDataExtractor
+from delia.radiomics import RadiomicsDataset, RadiomicsFeatureExtractor
 from delia.transforms import (
     MatchingCentroidSpatialCropD,
     MatchingCropForegroundD,
     MatchingResampleD,
+    CopySegmentationsD,
     PETtoSUVD,
     ResampleD
 )
@@ -45,7 +46,8 @@ if __name__ == "__main__":
         MatchingCentroidSpatialCropD(segmentation_key="Prostate", matching_keys=["CT", "PT"], roi_size=(128, 128, 128)),
         PETtoSUVD(keys=["PT"]),
         ScaleIntensityRangeD(keys=["CT"], a_min=-200, a_max=250, b_min=0, b_max=1, clip=True),
-        ScaleIntensityRangeD(keys=["PT"], a_min=0, a_max=25, b_min=0, b_max=1, clip=True)
+        ScaleIntensityRangeD(keys=["PT"], a_min=0, a_max=25, b_min=0, b_max=1, clip=True),
+        CopySegmentationsD(segmented_image_key="CT", unsegmented_image_key="PT")
     ])
 
     # ----------------------------------------------------------------------------------------------------------- #
@@ -58,12 +60,33 @@ if __name__ == "__main__":
     )
 
     # ----------------------------------------------------------------------------------------------------------- #
-    #                                                Create database                                              #
+    #    Extract radiomics features of the CT image from the segmentation of the prostate made on the CT image    #
     # ----------------------------------------------------------------------------------------------------------- #
-    database = PatientsDatabase(path_to_database=r"local_data/learning_set.h5")
+    ct_radiomics_dataset = RadiomicsDataset(path_to_dataset=r"local_data/learning_ct_radiomics.csv")
 
-    database.create(
+    ct_radiomics_dataset.extractor = RadiomicsFeatureExtractor(
+        path_to_params="local_data/features_extractor_params_CT.yaml",
+        geometryTolerance=1e-4
+    )
+
+    ct_radiomics_dataset.create(
         patients_data_extractor=patients_data_extractor,
-        organs_to_keep="Prostate",
-        tags_to_use_as_attributes=[(0x0008, 0x103E), (0x0020, 0x000E), (0x0008, 0x0060)]
+        organ="Prostate",
+        image_modality="CT"
+    )
+
+    # ----------------------------------------------------------------------------------------------------------- #
+    #    Extract radiomics features of the PT image from the segmentation of the prostate made on the CT image    #
+    # ----------------------------------------------------------------------------------------------------------- #
+    pt_radiomics_dataset = RadiomicsDataset(path_to_dataset=r"local_data/learning_pt_radiomics.csv")
+
+    pt_radiomics_dataset.extractor = RadiomicsFeatureExtractor(
+        path_to_params="local_data/features_extractor_params_PT.yaml",
+        geometryTolerance=1e-4
+    )
+
+    pt_radiomics_dataset.create(
+        patients_data_extractor=patients_data_extractor,
+        organ="Prostate",
+        image_modality="PT"
     )

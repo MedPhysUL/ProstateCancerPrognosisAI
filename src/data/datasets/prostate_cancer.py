@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
-    @Last modification: 02/2023
+    @Last modification: 05/2023
 
     @Description:       This file contains a custom torch dataset named 'ProstateCancerDataset'.
 """
@@ -142,6 +142,14 @@ class ProstateCancerDataset(Dataset):
 
     @property
     def tasks(self) -> TaskList:
+        """
+        Returns the list of tasks.
+
+        Returns
+        -------
+        tasks : TaskList
+            List of tasks.
+        """
         if isinstance(self.table_dataset, EmptyDataset):
             return self.image_dataset.tasks
         elif isinstance(self.image_dataset, EmptyDataset):
@@ -150,38 +158,91 @@ class ProstateCancerDataset(Dataset):
             return self.table_dataset.tasks + self.image_dataset.tasks
 
     @property
-    def test_mask(self) -> List[int]:
-        return self._test_mask
+    def tunable_tasks(self) -> TaskList:
+        """
+        Returns the list of tunable tasks. A tunable task is a task that has a hps_tuning_metric attribute. This
+        attribute is used to tune the hyperparameters.
+
+        Returns
+        -------
+        tunable_tasks : TaskList
+            List of tunable tasks.
+        """
+        return TaskList([task for task in self.tasks if task.hps_tuning_metric])
 
     @property
     def train_mask(self) -> List[int]:
+        """
+        Returns the train mask.
+
+        Returns
+        -------
+        train_mask : List[int]
+            List of idx in the training set.
+        """
         return self._train_mask
 
     @property
     def valid_mask(self) -> Optional[List[int]]:
+        """
+        Returns the valid mask.
+
+        Returns
+        -------
+        valid_mask : Optional[List[int]]
+            List of idx in the valid set.
+        """
         return self._valid_mask
+
+    @property
+    def test_mask(self) -> Optional[List[int]]:
+        """
+        Returns the test mask.
+
+        Returns
+        -------
+        test_mask : Optional[List[int]]
+            List of idx in the test set.
+        """
+        return self._test_mask
+
+    def enable_augmentations(self):
+        """
+        Enables augmentations on the dataset. This method should be called before training.
+        """
+        if isinstance(self.image_dataset, ImageDataset):
+            self.image_dataset.enable_augmentations()
+
+    def disable_augmentations(self):
+        """
+        Disables augmentations on the dataset. This method should be called before validation and testing.
+        """
+        if isinstance(self.image_dataset, ImageDataset):
+            self.image_dataset.disable_augmentations()
 
     def update_masks(
             self,
             train_mask: List[int],
-            test_mask: List[int],
-            valid_mask: Optional[List[int]] = None
+            valid_mask: Optional[List[int]] = None,
+            test_mask: Optional[List[int]] = None
     ) -> None:
         """
-        Updates the train, valid and test masks.
+        Updates the train, valid and test masks and then preprocesses the data available according to the current
+        statistics of the training data.
 
         Parameters
         ----------
         train_mask : List[int]
             List of idx in the training set.
-        test_mask : List[int]
-            List of idx in the test set.
         valid_mask : Optional[List[int]]
             List of idx in the valid set.
+        test_mask : Optional[List[int]]
+            List of idx in the test set.
         """
         # We set the new masks values
-        self._train_mask, self._test_mask = train_mask, test_mask
+        self._train_mask = train_mask
         self._valid_mask = valid_mask if valid_mask is not None else []
+        self._test_mask = test_mask if test_mask is not None else []
 
         if isinstance(self.table_dataset, TableDataset):
             self.table_dataset.update_masks(train_mask=train_mask, test_mask=test_mask, valid_mask=valid_mask)

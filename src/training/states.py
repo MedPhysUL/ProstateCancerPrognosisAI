@@ -254,6 +254,5 @@ class TrainingState(State):
     valid_dataloader: DataLoader = None
 
     def state_dict(self):
-        unserializable = ["info", "tasks", "train_dataloader", "valid_dataloader"]
-        state_dict = super().state_dict()
-        return {k: v for k, v in state_dict.items() if k not in unserializable}
+        serializable_objects = ["best_epoch", "n_epochs", "stop_training_flag"]
+        return {k: getattr(self, k) for k in serializable_objects}

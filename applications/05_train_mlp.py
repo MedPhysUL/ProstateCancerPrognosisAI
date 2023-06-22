@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     dataset = ProstateCancerDataset(table_dataset=table_dataset)
 
-    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=3)
+    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=5)
 
     dataset.update_masks(
         train_mask=masks[0][Mask.TRAIN],
@@ -52,8 +52,7 @@ if __name__ == '__main__':
     model = MLP(
         multi_task_mode="separated",
         activation="PRELU",
-        hidden_channels=(100, 100, 100),
-        dropout=0.1,
+        dropout=0.2,
         device=torch.device("cuda"),
         seed=SEED
     ).build(dataset)

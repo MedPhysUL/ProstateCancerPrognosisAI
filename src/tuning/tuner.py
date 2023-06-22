@@ -12,7 +12,6 @@ from typing import Dict, List, Optional, Union
 
 from monai.utils import set_determinism
 from optuna.trial import FrozenTrial
-# import ray
 
 from .callbacks import TuningRecorder
 from .callbacks.base import TuningCallback
@@ -140,12 +139,12 @@ class Tuner:
         masks : Dict[int, Dict[str, Union[List[int], Dict[int, Dict[str, List[int]]]]]]
             Dict with list of idx to use as train, valid and test masks.
         """
-        assert all(task.hps_tuning_metric is not None for task in dataset.tasks), (
-            f"Tuning requires that all tasks define the 'hps_tuning_metric' attribute at instance initialization."
+        assert len(dataset.tunable_tasks) > 0, (
+            "No tunable task found in the dataset. A tunable task is a task with a `hps_tuning_metric` attribute. "
+            "Please add this attribute to the task you want to tune."
         )
         self._initialize_states()
         self._set_seed()
-        # ray.init()
 
         self.callbacks.on_tuning_start(self)
         self.outer_loop_state.scores = []
@@ -162,8 +161,6 @@ class Tuner:
             self._exec_best_model_evaluation(dataset=dataset, objective=objective)
             self.callbacks.on_outer_loop_end(self)
 
-        # We shutdown ray
-        # ray.shutdown()
         self.callbacks.on_tuning_end(self)
 
     def _exec_study(

@@ -80,7 +80,8 @@ class TrainMethodHyperparameter(HyperparameterDict):
     def __init__(
             self,
             model: TorchModelHyperparameter,
-            learning_algorithms: Union[LearningAlgorithmHyperparameter, HyperparameterList]
+            learning_algorithms: Union[LearningAlgorithmHyperparameter, HyperparameterList],
+            path_to_temporary_folder: Optional[str] = None
     ) -> None:
         """
         Sets attribute using parent's constructor.
@@ -91,9 +92,16 @@ class TrainMethodHyperparameter(HyperparameterDict):
             Model to train.
         learning_algorithms : Union[LearningAlgorithmHyperparameter, HyperparameterList]
             The learning algorithm callbacks.
+        path_to_temporary_folder :
+            Path to temporary folder used to save the best model during run time. The folder is only created when early
+            stopping is used and the folder is deleted at the end of the training.
         """
         learning_algorithms = self._initialize_learning_algorithms(learning_algorithms)
-        params = dict(model=model, learning_algorithms=learning_algorithms)
+        params = dict(
+            model=model,
+            learning_algorithms=learning_algorithms,
+            path_to_temporary_folder=path_to_temporary_folder
+        )
         super().__init__(container=params)
 
         self._dataset = None

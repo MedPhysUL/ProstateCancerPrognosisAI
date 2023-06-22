@@ -9,6 +9,7 @@
 """
 
 from copy import deepcopy
+import logging
 import os
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
@@ -86,7 +87,7 @@ class TableViewer:
         dataframe : pd.DataFrame
             Original dataframe.
         """
-        df_copy = deepcopy(self.dataset.original_data)
+        df_copy = deepcopy(self.dataset.original_df)
         df_copy = pd.concat(
             objs=[df_copy.iloc[mask].assign(Sets=name) for name, mask in self._global_masks.items()],
             ignore_index=True
@@ -102,7 +103,7 @@ class TableViewer:
         dataframe : pd.DataFrame
             Imputed dataframe.
         """
-        imputed_df = deepcopy(self.dataset.get_imputed_dataframe())
+        imputed_df = deepcopy(self.dataset.imputed_df)
         imputed_df = pd.concat(
             objs=[imputed_df.iloc[mask].assign(Sets=name) for name, mask in self._global_masks.items()],
             ignore_index=True
@@ -144,7 +145,7 @@ class TableViewer:
         for task in self.dataset.tasks:
             original_dataframes[task.target_column] = pd.concat(
                 objs=[
-                    self.dataset.original_data.iloc[mask].assign(Sets=name) for name, mask in
+                    self.dataset.imputed_df.iloc[mask].assign(Sets=name) for name, mask in
                     self._target_specific_masks[task.target_column].items()
                 ],
                 ignore_index=True
@@ -166,7 +167,7 @@ class TableViewer:
         for task in self.dataset.tasks:
             imputed_dataframes[task.target_column] = pd.concat(
                 objs=[
-                    self.dataset.get_imputed_dataframe().iloc[mask].assign(Sets=name) for name, mask in
+                    self.dataset.imputed_df.iloc[mask].assign(Sets=name) for name, mask in
                     self._target_specific_masks[task.target_column].items()
                 ],
                 ignore_index=True
@@ -327,7 +328,7 @@ class TableViewer:
     def _update_axes_of_class_distribution_figure(
             self,
             axes: plt.axes,
-            targets: np.array,
+            targets: np.ndarray,
             label_names: dict,
             title: Optional[str] = None
     ) -> None:
@@ -338,7 +339,7 @@ class TableViewer:
         ----------
         axes : plt.axes
             Axes.
-        targets : np.array
+        targets : np.ndarray
             Array of class targets.
         label_names : dict
             Dictionary with names associated to target values.
@@ -504,28 +505,64 @@ class TableViewer:
         show : Optional[bool]
             Whether to show figures.
         """
+        logger = logging.getLogger('matplotlib')
+        initial_logger_level = logger.getEffectiveLevel()
+        logger.setLevel(logging.WARNING)
+
         df_copy = deepcopy(dataset)
-        df_copy[feature] = df_copy[feature].astype("category")
+        feature_series = df_copy[feature]
 
         fig, axes = plt.subplots()
 
-        unique = pd.unique(df_copy[feature])
+        feature_series_copy = deepcopy(feature_series.astype("category"))
+        unique = pd.unique(feature_series_copy)
         if all(isinstance(x, (int, float)) for x in unique):
-            axes.set_xticks(pd.unique(df_copy[feature]))
+            axes.set_xticks(unique)
 
-        sns.histplot(
-            data=df_copy,
-            x=feature,
-            hue='Sets',
-            multiple='dodge',
-            ax=axes,
-            stat='percent',
-            common_norm=False,
-            shrink=0.8
-        )
+        if feature_series.dtype == "float":
+            a, b, c = feature_series.min(), feature_series.max(), len(unique)
+            bins = np.linspace(a - (b - a) / (2 * (c - 1)), b + (b - a) / (2 * (c - 1)), c + 1)
 
-        fig_temp, axes_temp = plt.subplots()
-        sns.histplot(data=df_copy, x=feature, hue='Sets', ax=axes_temp)
+            sns.histplot(
+                data=df_copy,
+                x=feature,
+                hue='Sets',
+                bins=bins,
+                multiple='dodge',
+                ax=axes,
+                stat='percent',
+                common_norm=False,
+                shrink=0.8
+            )
+
+            fig_temp, axes_temp = plt.subplots()
+            sns.histplot(
+                data=df_copy,
+                x=feature,
+                bins=bins,
+                hue='Sets',
+                ax=axes_temp
+            )
+
+        else:
+            sns.histplot(
+                data=df_copy,
+                x=feature,
+                hue='Sets',
+                multiple='dodge',
+                ax=axes,
+                stat='percent',
+                common_norm=False,
+                shrink=0.8
+            )
+
+            fig_temp, axes_temp = plt.subplots()
+            sns.histplot(
+                data=df_copy,
+                x=feature,
+                hue='Sets',
+                ax=axes_temp
+            )
 
         for axes_container, axes_temp_container in zip(axes.containers, axes_temp.containers):
             labels = [f"{axes_temp_patch.get_height()}" for axes_temp_patch in axes_temp_container]
@@ -533,6 +570,7 @@ class TableViewer:
 
         plt.close(fig_temp)
         self._terminate_figure(path_to_save, show, fig)
+        logger.setLevel(initial_logger_level)
 
     def visualize_global_categorical_feature(
             self,

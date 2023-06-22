@@ -40,6 +40,7 @@ class LearningAlgorithm(TrainingCallback):
             self,
             criterion: MultiTaskLoss,
             optimizer: Optimizer,
+            clip_grad_max_norm: Optional[float] = None,
             early_stopper: Optional[EarlyStopper] = None,
             lr_scheduler: Optional[LRScheduler] = None,
             name: Optional[str] = None,
@@ -55,6 +56,8 @@ class LearningAlgorithm(TrainingCallback):
             Multi-task loss.
         optimizer : Optimizer
             A pytorch Optimizer.
+        clip_grad_max_norm : Optional[float]
+            Maximum norm of the gradients. If the norm of the gradients exceeds this value, the gradients are clipped.
         early_stopper : Optional[EarlyStopper]
             An early stopper.
         lr_scheduler : Optional[LRScheduler]
@@ -68,7 +71,7 @@ class LearningAlgorithm(TrainingCallback):
         name = name if name else f"{self.__class__.__name__}({self.instance_id})"
         super().__init__(name=name, **kwargs)
 
-        self.clip_grad_max_norm = kwargs.get("clip_grad_max_norm", 3.0)
+        self.clip_grad_max_norm = clip_grad_max_norm
         self.criterion = criterion
         self.early_stopper = early_stopper
         self.is_last = False
@@ -76,6 +79,9 @@ class LearningAlgorithm(TrainingCallback):
         self.optimizer = optimizer
         self.regularizer = RegularizerList(regularizer)
         self.stopped = False
+
+        self._current_grads = []
+        self._params = [param for group in optimizer.param_groups for param in group['params']]
 
     @property
     def priority(self) -> int:
@@ -219,6 +225,48 @@ class LearningAlgorithm(TrainingCallback):
 
         return loss_with_regularization if loss_with_regularization else loss_without_regularization
 
+    def _compute_grad(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor], trainer):
+        """
+        Computes gradients.
+
+        Parameters
+        ----------
+        pred_batch : Dict[str, Tensor]
+            Predictions.
+        y_batch : Dict[str, Tensor]
+            Targets.
+        trainer : Trainer
+            The trainer.
+        """
+        batch_loss = self._compute_loss(pred_batch, y_batch, trainer)
+        if self.is_last:
+            batch_loss.backward()
+        else:
+            batch_loss.backward(retain_graph=True)
+
+        if self.clip_grad_max_norm:
+            clip_grad_norm_(self._params, self.clip_grad_max_norm)
+
+        self._set_current_grads()
+
+    def _set_current_grads(self):
+        """
+        Sets current gradients.
+        """
+        self._current_grads = []
+        for param in self._params:
+            if param.grad is not None:
+                self._current_grads.append(param.grad.detach().clone())
+            else:
+                self._current_grads.append(None)
+
+    def _set_params_grads(self):
+        """
+        Sets parameter gradients.
+        """
+        for i, param in enumerate(self._params):
+            param.grad = self._current_grads[i]
+
     def on_fit_start(self, trainer, **kwargs):
         """
         Sets criterion tasks.
@@ -236,33 +284,6 @@ class LearningAlgorithm(TrainingCallback):
         if self.early_stopper:
             self.early_stopper.on_fit_start(self, trainer)
 
-    def _optimizer_step(self, pred_batch: Dict[str, Tensor], y_batch: Dict[str, Tensor], trainer):
-        """
-        Performs an optimizer step, i.e computes loss and performs backward pass.
-
-        Parameters
-        ----------
-        pred_batch : Dict[str, Tensor]
-            Predictions.
-        y_batch : Dict[str, Tensor]
-            Targets.
-        trainer : Trainer
-            The trainer.
-
-        Returns
-        -------
-        batch_loss : Tensor
-            Tensor with loss value.
-        """
-        self.optimizer.zero_grad()
-        batch_loss = self._compute_loss(pred_batch, y_batch, trainer)
-        if self.is_last:
-            batch_loss.backward()
-        else:
-            batch_loss.backward(retain_graph=True)
-        clip_grad_norm_(self.optimizer.param_groups[0]["params"], self.clip_grad_max_norm)
-        self.optimizer.step()
-
     def on_optimization_start(self, trainer, **kwargs):
         """
         Computes loss and updates 'batch_loss' value in trainer state.
@@ -274,9 +295,11 @@ class LearningAlgorithm(TrainingCallback):
         kwargs : dict
             Keyword arguments.
         """
+        trainer.model.zero_grad()
         pred_batch = trainer.batch_state.pred
         y_batch = trainer.batch_state.y
-        self._optimizer_step(pred_batch, y_batch, trainer)
+        self._compute_grad(pred_batch, y_batch, trainer)
+        trainer.model.zero_grad()
 
     def on_optimization_end(self, trainer, **kwargs):
         """
@@ -289,6 +312,9 @@ class LearningAlgorithm(TrainingCallback):
         kwargs : dict
             Keyword arguments.
         """
+        self.optimizer.zero_grad()
+        self._set_params_grads()
+        self.optimizer.step()
         self.optimizer.zero_grad()
 
     def on_validation_batch_end(self, trainer, **kwargs):

@@ -105,16 +105,14 @@ class Objective(ABC):
             self.inner_loop_state.idx = idx
 
             self._exec_inner_loop = self._build_inner_loop_runner()
-            # score = self._exec_inner_loop.remote(callbacks=callbacks, suggestion=suggestion)
             score = self._exec_inner_loop(callbacks=callbacks, suggestion=suggestion)
             futures.append(score)
 
-        # self.trial_state.scores = ray.get(futures)
         self.trial_state.scores = futures
 
         tuning_metric_test_scores = [
             self.trial_state.statistics.test[task.name][task.hps_tuning_metric.name].mean
-            for task in dataset.tasks
+            for task in dataset.tunable_tasks
         ]
 
         callbacks.on_trial_end(self)
@@ -164,7 +162,6 @@ class Objective(ABC):
             Function that train a single model using given masks and trial.
         """
 
-        # @ray.remote(num_cpus=self.num_cpus, num_gpus=self.num_gpus)
         def exec_inner_loop(
                 callbacks: TuningCallbackList,
                 suggestion: Dict[str, Any]

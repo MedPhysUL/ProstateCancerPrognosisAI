@@ -1,25 +1,33 @@
 """
-    @file:              10_tune_mlp.py
+    @file:              11_tune_extractor_and_predictor.py
     @Author:            Maxence Larose
 
     @Creation Date:     07/2022
-    @Last modification: 03/2023
+    @Last modification: 05/2023
 
-    @Description:       This script is used to tune an MLP model.
+    @Description:       This script is used to tune a multi-net model.
 """
 
 import env_apps
 
+from delia.databases import PatientsDatabase
+from monai.transforms import (
+    Compose,
+    RandGaussianNoiseD,
+    RandFlipD,
+    RandRotateD,
+    ThresholdIntensityD
+)
 from optuna.integration.botorch import BoTorchSampler
 import pandas as pd
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 
 from constants import *
-from src.data.datasets import ProstateCancerDataset, TableDataset
+from src.data.datasets import ImageDataset, ProstateCancerDataset, TableDataset
 from src.data.processing.sampling import extract_masks
 from src.losses.multi_task import MeanLoss
-from src.models.torch.prediction import MLP
+from src.models.torch import CNN
 from src.training.callbacks.learning_algorithm import L2Regularizer, MultiTaskLossEarlyStopper
 from src.tuning import SearchAlgorithm, TorchObjective, Tuner
 from src.tuning.callbacks import TuningRecorder
@@ -50,16 +58,29 @@ if __name__ == '__main__':
         table_dataset = TableDataset(
             df=df,
             ids_col=ID,
-            tasks=task,
-            cont_features=CONTINUOUS_FEATURES,
-            cat_features=CATEGORICAL_FEATURES
+            tasks=task
         )
 
-        dataset = ProstateCancerDataset(image_dataset=None, table_dataset=table_dataset)
+        database = PatientsDatabase(path_to_database=r"local_data/learning_set.h5")
+
+        image_dataset = ImageDataset(
+            database=database,
+            modalities={"PT", "CT"},
+            augmentations=Compose([
+                RandGaussianNoiseD(keys=["CT", "PT"], prob=0.5, std=0.05),
+                ThresholdIntensityD(keys=["CT", "PT"], threshold=0, above=True, cval=0),
+                ThresholdIntensityD(keys=["CT", "PT"], threshold=1, above=False, cval=1),
+                RandFlipD(keys=["CT", "PT"], prob=0.5, spatial_axis=2),
+                RandRotateD(keys=["CT", "PT"], prob=0.5, range_x=0.174533)
+            ]),
+            seed=SEED
+        )
+
+        dataset = ProstateCancerDataset(image_dataset=image_dataset, table_dataset=table_dataset)
 
         path_to_record_folder = os.path.join(
             EXPERIMENTS_PATH,
-            f"{task.target_column}(MLP - Clinical data only)"
+            f"{task.target_column}(CNN - Deep radiomics)"
         )
 
         search_algo = SearchAlgorithm(
@@ -78,57 +99,66 @@ if __name__ == '__main__':
         )
 
         model_hyperparameter = TorchModelHyperparameter(
-            constructor=MLP,
+            constructor=CNN,
             parameters={
-                "activation": FixedHyperparameter(name="activation", value="PReLU"),
-                "hidden_channels": CategoricalHyperparameter(
-                    name="hidden_channels",
-                    choices=["(10, 10, 10)", "(20, 20, 20)", "(30, 30, 30)"]
-                ),
-                "dropout": FloatHyperparameter(name="dropout", low=0.05, high=0.25)
+                        "image_keys": ["CT", "PT"],
+                        "model_mode": "prediction",
+                        "channels": FixedHyperparameter(name="channels", value=(64, 128, 256, 512, 1024)),
+                        "kernel_size": FixedHyperparameter(name="kernel_size", value=3),
+                        "num_res_units": FixedHyperparameter(name="num_res_units", value=2),
+                        "dropout_cnn": FloatHyperparameter(name="dropout_cnn", low=0.2, high=0.8),
+                        "dropout_fnn": FloatHyperparameter(name="dropout_fnn", low=0.1, high=0.4)
             }
         )
 
-        learning_algorithm_hyperparameter = LearningAlgorithmHyperparameter(
+        extractor_learning_algorithm_hyperparameter = LearningAlgorithmHyperparameter(
             criterion=CriterionHyperparameter(
                 constructor=MeanLoss
             ),
             optimizer=OptimizerHyperparameter(
                 constructor=Adam,
+                model_params_getter=lambda model: model.extractor.parameters(),
                 parameters={
-                    "lr": FloatHyperparameter(name="lr", low=1e-4, high=1e-2, log=True),
-                    "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-4, high=1e-2, log=True)
+                    "lr": FloatHyperparameter(
+                        name="lr",
+                        low=1e-5,
+                        high=EXTRACTOR_LR_HIGH_BOUND_DICT[task.target_column],
+                        log=True
+                    ),
+                    "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-3, high=1e-1, log=True)
                 }
             ),
-            clip_grad_max_norm=PREDICTOR_CLIP_GRAD_MAX_NORM_DICT[task.target_column],
+            clip_grad_max_norm=EXTRACTOR_CLIP_GRAD_MAX_NORM_DICT[task.target_column],
             early_stopper=EarlyStopperHyperparameter(
                 constructor=MultiTaskLossEarlyStopper,
                 parameters={"patience": 20}
             ),
             lr_scheduler=LRSchedulerHyperparameter(
                 constructor=ExponentialLR,
-                parameters={"gamma": FixedHyperparameter(name="gamma", value=0.99)}
+                parameters={"gamma": FixedHyperparameter(name="gamma", value=0.95)}
             ),
             regularizer=RegularizerHyperparameter(
                 constructor=L2Regularizer,
-                parameters={"lambda_": FloatHyperparameter(name="alpha", low=1e-5, high=1e-2, log=True)}
+                model_params_getter=lambda model: model.extractor.named_parameters(),
+                parameters={"lambda_": FloatHyperparameter(name="alpha", low=1e-4, high=1e-2, log=True)}
             )
         )
 
         trainer_hyperparameter = TrainerHyperparameter(
             batch_size=16,
-            n_epochs=100
+            n_epochs=100,
+            verbose=False
             # checkpoint=CheckpointHyperparameter(save_freq=20)
         )
 
-        train_methode_hyperparameter = TrainMethodHyperparameter(
+        train_method_hyperparameter = TrainMethodHyperparameter(
             model=model_hyperparameter,
-            learning_algorithms=learning_algorithm_hyperparameter
+            learning_algorithms=extractor_learning_algorithm_hyperparameter
         )
 
         objective = TorchObjective(
             trainer_hyperparameter=trainer_hyperparameter,
-            train_method_hyperparameter=train_methode_hyperparameter
+            train_method_hyperparameter=train_method_hyperparameter
         )
 
         masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=5)

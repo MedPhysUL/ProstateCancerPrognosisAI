@@ -12,31 +12,15 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from ast import literal_eval
 from enum import auto, StrEnum
-from typing import Dict, List, Optional, Sequence, Union
+from typing import Dict, List, Optional, NamedTuple, Sequence, Union
 
+from monai.networks.nets import FullyConnectedNet
 from torch import cat, Tensor
 from torch import device as torch_device
-from torch.nn import Linear, Module, ModuleDict
+from torch.nn import DataParallel, Linear, Module, ModuleDict
 
 from ..base import check_if_built, TorchModel
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
-from ....tasks import SegmentationTask
-
-
-class MergingMethod(StrEnum):
-    """
-    This class is used to define the merging method used to merge the extracted radiomics. It can be either
-    concatenation or multiplication.
-
-    Elements
-    --------
-    CONCATENATION : str
-        Concatenation merging method.
-    MULTIPLICATION : str
-        Multiplication merging method.
-    """
-    CONCATENATION = auto()
-    MULTIPLICATION = auto()
 
 
 class ModelMode(StrEnum):
@@ -58,21 +42,35 @@ class ModelMode(StrEnum):
 
 class MultiTaskMode(StrEnum):
     """
-    This class is used to define the multi-task mode of the model. It can be either separated, partly shared or fully
-    shared.
+    This class is used to define the multi-task mode of the model. It can be either partly shared, fully shared.
 
     Elements
     --------
-    SEPARATED : str
-        A separate extractor model is used for each task.
     PARTLY_SHARED : str
-        A partly shared extractor model is used. The first layers are shared between the tasks.
+        A shared extractor model is used to get a large tensor of radiomics from the images. Then, a separate linear
+        model is used for each task to obtain the final (reduced) deep features.
     FULLY_SHARED : str
-        A fully shared extractor model is used. All layers are shared between the tasks.
+        A shared extractor model is used to get a large tensor of radiomics from the images. Then, a shared linear
+        model is used for each task to obtain the final (reduced) deep features.
     """
-    SEPARATED = auto()
     PARTLY_SHARED = auto()
     FULLY_SHARED = auto()
+
+
+class ExtractorOutput(NamedTuple):
+    """
+    This class is used to define the output of the extractor model. It contains the deep features extracted from the
+    images and the segmentation of the images (optional).
+
+    Elements
+    --------
+    deep_features : Union[Tensor, Dict[str, Tensor]]
+        The deep features extracted from the images.
+    segmentation : Optional[Tensor]
+        The segmentation of the images. This is optional.
+    """
+    deep_features: Union[Tensor, Dict[str, Tensor]]
+    segmentation: Optional[Tensor] = None
 
 
 class Extractor(TorchModel, ABC):
@@ -84,12 +82,14 @@ class Extractor(TorchModel, ABC):
     def __init__(
             self,
             image_keys: Union[str, List[str]],
-            segmentation_key_or_task: Optional[str, SegmentationTask] = None,
-            merging_method: Union[str, MergingMethod] = MergingMethod.CONCATENATION,
             model_mode: Union[str, ModelMode] = ModelMode.PREDICTION,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
-            shape: Union[str, Sequence[int]] = (96, 96, 96),
-            n_features: int = 5,
+            shape: Sequence[int] = (128, 128, 128),
+            n_features: int = 6,
+            activation: str = "PRELU",
+            channels: Union[str, Sequence[int]] = (64, 128, 256, 512, 1024),
+            dropout_fnn: float = 0.0,
+            hidden_channels_fnn: Optional[Sequence[int]] = None,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None
@@ -101,27 +101,28 @@ class Extractor(TorchModel, ABC):
         ----------
         image_keys : Union[str, List[str]]
             Sequence of images keys to extract deep radiomics from.
-        segmentation_key_or_task : Optional[str, SegmentationTask]
-            Key of the segmentation to merge with the images. If a segmentation task is given, the segmentation key will
-            be extracted from the task. If None, the segmentation will not be merged with the images.
-        merging_method : Union[str, MergingMethod]
-            Available methods for merging the segmentation with the images are 'concatenation' or 'multiplication'. If
-            'concatenation', the segmentation and image features are concatenated along the channel dimension. If
-            'multiplication', the segmentation is element-wise multiplied with the image features.
         model_mode : Union[str, ModelMode]
             Available modes are 'extraction' or 'prediction'. If 'extraction', the function will extract deep radiomics
             from input images. If 'prediction', the function will perform predictions using extracted radiomics.
         multi_task_mode : Union[str, MultiTaskMode]
-            Available modes are 'separated', 'partly_shared' or 'fully_shared'. If 'separated', a separate extractor
-            model is used for each task. If 'partly_shared', a partly shared extractor model is used. The first layers
-            are shared between the tasks. If 'fully_shared', a fully shared extractor model is used. All layers are
+            Available modes are 'partly_shared' or 'fully_shared'. If 'partly_shared', a separate extractor model will
+            be used for each task. If 'fully_shared', a fully shared extractor model will be used. All layers will be
             shared between the tasks.
-        shape : Union[str, Sequence[int]]
+        channels : Union[str, Sequence[int]]
+            Sequence of integers stating the output channels of each convolutional layer. Can also be given as a string
+            containing the sequence. Default to (64, 128, 256, 512, 1024).
+        shape : Sequence[int]
             Sequence of integers stating the dimension of the input tensor (minus batch and channel dimensions). Can
-            also be given as a string containing the sequence. Exemple: (96, 96, 96).
+            also be given as a string containing the sequence. Default to (128, 128, 128).
         n_features : int
-            Integer stating the dimension of the final output tensor, i.e. the number of deep radiomics/features to
-            extract from the image.
+            Integer stating the dimension of the final output tensor, i.e. the number of deep features to extract from
+            the image.
+        activation : str
+             Name defining activation layers.
+        dropout_fnn : float
+            Dropout rate after each fully connected layers.
+        hidden_channels_fnn : Optional[Sequence[int]]
+            Sequence of integers stating the number of hidden units in each fully connected layer.
         device : Optional[torch_device]
             The device of the model.
         name : Optional[str]
@@ -131,38 +132,23 @@ class Extractor(TorchModel, ABC):
         """
         super().__init__(device=device, name=name, seed=seed)
 
-        if isinstance(segmentation_key_or_task, SegmentationTask):
-            self.segmentation_key = segmentation_key_or_task.name
-        else:
-            self.segmentation_key = segmentation_key_or_task
-
-        self.shape = literal_eval(shape) if isinstance(shape, str) else shape
+        self.activation = activation
+        self.channels: Sequence[int] = literal_eval(channels) if isinstance(channels, str) else channels
+        self.dropout_fnn = dropout_fnn
         self.image_keys = image_keys if isinstance(image_keys, Sequence) else [image_keys]
-        self.merging_method = MergingMethod(merging_method)
         self.model_mode = ModelMode(model_mode)
         self.multi_task_mode = MultiTaskMode(multi_task_mode)
         self.n_features = n_features
+        self.shape = shape
+
+        if hidden_channels_fnn:
+            self.hidden_channels_fnn = hidden_channels_fnn
+        else:
+            self.hidden_channels_fnn = (int(sum(self.channels)/4), int(sum(self.channels)/16))
 
         self.extractor = None
-        self.linear_layer = None
-
-    @abstractmethod
-    def _build_extractor(self, dataset: ProstateCancerDataset) -> Union[Module, ModuleDict]:
-        """
-        Returns the extractor module.
-
-        Parameters
-        ----------
-        dataset : ProstateCancerDataset
-            The dataset used to build the extractor.
-
-        Returns
-        -------
-        extractor : Union[Module, ModuleDict]
-            The extractor module. It should take as input a tensor of shape (batch_size, channels, *spatial_shape) and
-            return a tensor of shape (batch_size, n_features, *spatial_shape).
-        """
-        raise NotImplementedError
+        self.linear_module = None
+        self.prediction_layer = None
 
     @property
     def in_shape(self) -> Sequence[int]:
@@ -174,36 +160,81 @@ class Extractor(TorchModel, ABC):
         Sequence[int]
             The shape of the input tensor expected by the model, excluding batch dimension.
         """
-        n_images = len(self.image_keys)
-        if self.segmentation_key:
-            if self.merging_method == MergingMethod.CONCATENATION:
-                in_channel = n_images + 1
-            elif self.merging_method == MergingMethod.MULTIPLICATION:
-                in_channel = n_images
-            else:
-                raise ValueError(f"{self.merging_method} is not a valid MergingMethod")
-        else:
-            in_channel = n_images
+        return len(self.image_keys), *self.shape
 
-        return in_channel, *self.shape
-
-    def _build_linear_layer(self) -> Union[Module, ModuleDict]:
+    @abstractmethod
+    def _build_deep_features_extractor(self, dataset: ProstateCancerDataset) -> Module:
         """
-        Returns the linear layer module.
+        Returns the deep features extractor module.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            The dataset used to build the extractor.
 
         Returns
         -------
-        linear_layer : Union[Module, ModuleDict]
-            The linear layer module. It should take as input a tensor of shape (batch_size, n_features, *spatial_shape)
-            and return a tensor of shape (batch_size, n_features).
+        extractor : Module
+            The extractor module. It should take as input a tensor of shape (batch_size, channels, *spatial_shape) and
+            return an ExtractorOutput object. The ExtractorOutput object contains the deep features extracted from the
+            images and the segmentation of the images (optional).
         """
-        if self.multi_task_mode == MultiTaskMode.SEPARATED or self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
+        raise NotImplementedError
+
+    def _get_single_linear_module(self):
+        """
+        Returns a single linear module.
+
+        Returns
+        -------
+        linear_module : Module
+            The linear module.
+        """
+        linear_module = FullyConnectedNet(
+            in_channels=sum(self.channels),
+            out_channels=self.n_features,
+            hidden_channels=self.hidden_channels_fnn,
+            dropout=self.dropout_fnn,
+            act=self.activation
+        )
+        return DataParallel(linear_module).to(self.device)
+
+    def _build_linear_module(self):
+        """
+        Returns the linear module. If the model is in extraction mode, the linear module will be a single module. If the
+        model is in prediction mode, the linear module will be a ModuleDict containing a separate module for each task.
+
+        Returns
+        -------
+        linear_module : Union[Module, ModuleDict]
+            The linear module.
+        """
+        if self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
+            return ModuleDict(
+                {task.name: self._get_single_linear_module() for task in self._tasks.table_tasks}
+            )
+        else:
+            return self._get_single_linear_module()
+
+    def _build_prediction_layer(self) -> Union[Module, ModuleDict]:
+        """
+        Returns the prediction layer module.
+
+        Returns
+        -------
+        prediction_layer : Union[Module, ModuleDict]
+            The prediction layer module. It should take as input a tensor of shape (batch_size, n_features) and return a
+            tensor of shape (batch_size, n_tasks).
+        """
+        if self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
             return ModuleDict({
-                task.name: Linear(in_features=self.n_features, out_features=1).to(self.device)
+                task.name: DataParallel(Linear(in_features=self.n_features, out_features=1)).to(self.device)
                 for task in self._tasks.table_tasks
             })
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
-            return Linear(in_features=self.n_features, out_features=len(self._tasks.table_tasks)).to(self.device)
+            return DataParallel(
+                Linear(in_features=self.n_features, out_features=len(self._tasks.table_tasks))
+            ).to(self.device)
         else:
             raise ValueError(f"{self.multi_task_mode} is not a valid MultiTaskMode")
 
@@ -223,8 +254,11 @@ class Extractor(TorchModel, ABC):
         """
         super().build(dataset=dataset)
 
-        self.extractor = self._build_extractor(dataset)
-        self.linear_layer = self._build_linear_layer()
+        self.extractor = self._build_deep_features_extractor(dataset)
+        self.linear_module = self._build_linear_module()
+
+        if self.model_mode == ModelMode.PREDICTION:
+            self.prediction_layer = self._build_prediction_layer()
 
         return self
 
@@ -242,38 +276,29 @@ class Extractor(TorchModel, ABC):
         input: Tensor
             The input tensor to the extractor.
         """
-        if self.segmentation_key:
-            if self.merging_method == MergingMethod.CONCATENATION:
-                image_and_seg_keys = self.image_keys + [self.segmentation_key]
-                return cat([features.image[k] for k in image_and_seg_keys], 1)
-            elif self.merging_method == MergingMethod.MULTIPLICATION:
-                return cat([features.image[k]*features.image[self.segmentation_key] for k in self.image_keys], 1)
-            else:
-                raise ValueError(f"{self.merging_method} is not a valid MergingMethod")
-        else:
-            return cat([features.image[k] for k in self.image_keys], 1)
+        return cat([features.image[k] for k in self.image_keys], 1)
 
-    def _get_radiomics(self, input_tensor: Tensor) -> Union[Tensor, Dict[str, Tensor]]:
+    def _get_radiomics(self, deep_features: Tensor) -> Union[Tensor, Dict[str, Tensor]]:
         """
-        Returns the radiomics features.
+        Returns the reduced deep features, i.e. the radiomics.
 
         Parameters
         ----------
-        input_tensor : Tensor
-            The input tensor to the extractor.
+        deep_features : Tensor
+            The deep features extracted from the images.
 
         Returns
         -------
-        radiomics : Union[Tensor, Dict[str, Tensor]]
-            The radiomics features.
+        reduced_features : Union[Tensor, Dict[str, Tensor]]
+            The reduced deep features.
         """
-        if self.multi_task_mode == MultiTaskMode.SEPARATED or self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
-            deep_radiomics = {}
+        if self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
+            reduced_deep_features = {}
             for task in self._tasks.table_tasks:
-                deep_radiomics[task.name] = self.extractor[task.name](input_tensor)
-            return deep_radiomics
+                reduced_deep_features[task.name] = self.linear_module[task.name](deep_features)
+            return reduced_deep_features
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
-            return self.extractor(input_tensor)
+            return self.linear_module(deep_features)
         else:
             raise ValueError(f"{self.multi_task_mode} is not a valid MultiTaskMode")
 
@@ -291,13 +316,13 @@ class Extractor(TorchModel, ABC):
         prediction : Dict[str, Tensor]
             The prediction.
         """
-        if self.multi_task_mode == MultiTaskMode.SEPARATED or self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
+        if self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
             prediction = {}
             for task in self._tasks.table_tasks:
-                prediction[task.name] = self.linear_layer[task.name](radiomics[task.name])[:, 0]
+                prediction[task.name] = self.prediction_layer[task.name](radiomics[task.name])[:, 0]
             return prediction
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
-            y = self.linear_layer(radiomics)
+            y = self.prediction_layer(radiomics)
             return {task.name: y[:, i] for i, task in enumerate(self._tasks.table_tasks)}
         else:
             raise ValueError(f"{self.multi_task_mode} is not a valid MultiTaskMode")
@@ -306,7 +331,7 @@ class Extractor(TorchModel, ABC):
     def forward(
             self,
             features: FeaturesType
-    ) -> Union[Tensor, TargetsType]:
+    ) -> Union[ExtractorOutput, TargetsType]:
         """
         Performs a forward pass through the model.
 
@@ -317,17 +342,25 @@ class Extractor(TorchModel, ABC):
 
         Returns
         -------
-        targets : Union[Tensor, TargetsType]
-            The output targets. If the model is in 'extraction' mode, it will return a tensor of shape
-            (batch_size, n_features). If the model is in 'prediction' mode, it will return a dictionary of tensors,
-            each of shape (batch_size, 1).
+        targets : Union[ExtractorOutput, TargetsType]
+            The output targets. If the model is in 'extraction' mode, it will return an ExtractorOutput. If the model
+            is in 'prediction' mode, it will return a dictionary of tensors, one for each task.
         """
         x_image = self._get_input_tensor(features)
-        deep_radiomics = self._get_radiomics(x_image)
+        extractor_output = self.extractor(x_image)
+
+        radiomics = self._get_radiomics(extractor_output.deep_features)
+        output = ExtractorOutput(deep_features=radiomics, segmentation=extractor_output.segmentation)
 
         if self.model_mode == ModelMode.EXTRACTION:
-            return deep_radiomics
+            return output
         elif self.model_mode == ModelMode.PREDICTION:
-            return self._get_prediction(deep_radiomics)
-        else:
-            raise ValueError(f"{self.model_mode} is not a valid ModelMode")
+            tab_dict = self._get_prediction(radiomics)
+
+            seg = output.segmentation
+
+            if seg is not None:
+                seg_dict = {task.name: seg[:, i, None] for i, task in enumerate(self._tasks.segmentation_tasks)}
+                return tab_dict | seg_dict
+            else:
+                return tab_dict

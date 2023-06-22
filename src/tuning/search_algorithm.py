@@ -18,7 +18,6 @@ from optuna.logging import FATAL, set_verbosity
 from optuna.pruners import BasePruner, NopPruner
 from optuna.samplers import BaseSampler
 from optuna.study import Study
-# import ray
 
 from .callbacks.containers import TuningCallbackList
 from ..data.datasets import ProstateCancerDataset
@@ -72,7 +71,7 @@ class SearchAlgorithm:
         study : Study
             Study object.
         """
-        directions = [task.hps_tuning_metric.direction for task in dataset.tasks]
+        directions = [task.hps_tuning_metric.direction for task in dataset.tunable_tasks]
 
         if len(directions) == 1:
             study = create_study(
@@ -128,13 +127,9 @@ class SearchAlgorithm:
         study : Study
             Study object.
         """
-        # We check ray status
-        # ray_already_init = self._is_ray_initialized()
-
         study = self._create_new_study(dataset, study_name)
 
-        # We perform the optimization
-        set_verbosity(FATAL)  # We remove verbosity from loading bar
+        set_verbosity(FATAL)
         study.optimize(
             func=partial(objective.__call__, masks=masks, dataset=dataset, callbacks=callbacks),
             n_trials=n_trials,
@@ -142,26 +137,4 @@ class SearchAlgorithm:
             show_progress_bar=verbose
         )
 
-        # We shutdown ray if it has been initialized in this function
-        # if not ray_already_init:
-        #   ray.shutdown()
-
         return study
-
-    @staticmethod
-    def _is_ray_initialized() -> bool:
-        """
-        Checks if ray was already initialized and initialize it if it's not.
-
-        Returns
-        -------
-        already_init : bool
-            Whether ray was already initialized.
-        """
-        # We initialize ray if it is not initialized yet
-        # ray_was_init = True
-        # if not ray.is_initialized():
-        #     ray_was_init = False
-        #     ray.init()
-        #
-        # return ray_was_init

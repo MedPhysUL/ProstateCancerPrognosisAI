@@ -69,6 +69,7 @@ class LearningAlgorithmHyperparameter(ModelDependantHyperparameter):
             self,
             criterion: CriterionHyperparameter,
             optimizer: OptimizerHyperparameter,
+            clip_grad_max_norm: Optional[float] = None,
             early_stopper: Optional[EarlyStopperHyperparameter] = None,
             lr_scheduler: Optional[LRSchedulerHyperparameter] = None,
             name: Optional[Union[str, FixedHyperparameter]] = None,
@@ -83,6 +84,8 @@ class LearningAlgorithmHyperparameter(ModelDependantHyperparameter):
             Multi-task loss.
         optimizer : OptimizerHyperparameter
             A pytorch Optimizer.
+        clip_grad_max_norm : Optional[float]
+            Maximum norm of the gradients.
         early_stopper : Optional[EarlyStopperHyperparameter]
             An early stopper.
         lr_scheduler : Optional[LRSchedulerHyperparameter]
@@ -95,6 +98,7 @@ class LearningAlgorithmHyperparameter(ModelDependantHyperparameter):
         params = dict(
             criterion=criterion,
             optimizer=optimizer,
+            clip_grad_max_norm=clip_grad_max_norm,
             early_stopper=early_stopper,
             lr_scheduler=lr_scheduler,
             name=name,
