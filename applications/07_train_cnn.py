@@ -59,10 +59,6 @@ if __name__ == '__main__':
 
     model = CNN(
         image_keys=["PT"],
-        segmentation_key_or_task="CT_Prostate",
-        model_mode="prediction",
-        merging_method="multiplication",
-        multi_task_mode="separated",
         dropout_cnn=0.1,
         dropout_fnn=0.1,
         device=torch.device("cuda"),
