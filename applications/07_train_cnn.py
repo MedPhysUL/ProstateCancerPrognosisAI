@@ -43,8 +43,7 @@ if __name__ == '__main__':
 
     image_dataset = ImageDataset(
         database=database,
-        modalities={"PT", "CT"},
-        organs={"CT": {"Prostate"}}
+        modalities={"PT", "CT"}
     )
 
     dataset = ProstateCancerDataset(image_dataset=image_dataset, table_dataset=table_dataset)
@@ -58,16 +57,16 @@ if __name__ == '__main__':
     )
 
     model = CNN(
-        image_keys=["PT"],
-        dropout_cnn=0.1,
-        dropout_fnn=0.1,
+        image_keys=["CT", "PT"],
+        dropout_cnn=0.4,
+        dropout_fnn=0.2,
         device=torch.device("cuda"),
         seed=SEED
     ).build(dataset)
 
     optimizer = Adam(
         params=model.parameters(),
-        lr=3e-5,
+        lr=1e-4,
         weight_decay=0.01
     )
 
@@ -75,7 +74,7 @@ if __name__ == '__main__':
         criterion=MeanLoss(),
         optimizer=optimizer,
         lr_scheduler=ExponentialLR(optimizer=optimizer, gamma=0.99),
-        early_stopper=MultiTaskLossEarlyStopper(patience=10),
+        early_stopper=MultiTaskLossEarlyStopper(patience=20),
         regularizer=L2Regularizer(model.named_parameters(), lambda_=0.02)
     )
     trainer = Trainer(
