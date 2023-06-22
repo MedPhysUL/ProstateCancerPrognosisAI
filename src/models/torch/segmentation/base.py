@@ -18,7 +18,6 @@ from torch.nn import Module
 
 from ..base import check_if_built, TorchModel
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
-from ....tasks import SegmentationTask
 
 
 class Segmentor(TorchModel, ABC):
