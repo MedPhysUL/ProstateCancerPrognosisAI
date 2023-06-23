@@ -8,6 +8,7 @@
     @Description:       This file is used to define the `WeightedSumLoss` class.
 """
 
+from ast import literal_eval
 from typing import Dict, Iterable, List, Optional, Union
 
 from torch import is_tensor, nansum, ones, stack, tensor, Tensor
@@ -26,7 +27,7 @@ class WeightedSumLoss(MultiTaskLoss):
             self,
             name: Optional[str] = None,
             tasks: Optional[Union[Task, TaskList, List[Task]]] = None,
-            weights: Optional[Iterable[float]] = None
+            weights: Optional[str, Iterable[float]] = None
     ):
         """
         Sets protected attributes.
@@ -37,11 +38,11 @@ class WeightedSumLoss(MultiTaskLoss):
             Name of the multi-task loss.
         tasks : Optional[Union[Task, TaskList, List[Task]]]
             Tasks to include in the multi-task loss calculation. By default, we use all available tasks in the dataset.
-        weights : Optional[Iterable[float]]
-            Tasks weights for sum computation.
+        weights : Optional[str, Iterable[float]]
+            Tasks weights for sum computation. Can also be given as a string containing the sequence of weights.
         """
         super().__init__(name=name, tasks=tasks)
-        self.weights = weights
+        self.weights = literal_eval(weights) if isinstance(weights, str) else weights
 
     def _compute_loss(
             self,
