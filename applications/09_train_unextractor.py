@@ -33,9 +33,7 @@ if __name__ == '__main__':
     table_dataset = TableDataset(
         df=df,
         ids_col=ID,
-        tasks=BCR_TASK,
-        cont_features=CONTINUOUS_FEATURES,
-        cat_features=CATEGORICAL_FEATURES
+        tasks=BCR_TASK
     )
 
     database = PatientsDatabase(path_to_database=r"local_data/learning_set.h5")
@@ -73,6 +71,7 @@ if __name__ == '__main__':
     learning_algorithm = LearningAlgorithm(
         criterion=WeightedSumLoss(weights=[1/2, 1/2], tasks=[BCR_TASK, PROSTATE_SEGMENTATION_TASK]),
         optimizer=optimizer,
+        clip_grad_max_norm=EXTRACTOR_CLIP_GRAD_MAX_NORM_DICT[BCR_TASK.target_column],
         lr_scheduler=ExponentialLR(optimizer=optimizer, gamma=0.99),
         early_stopper=MultiTaskLossEarlyStopper(criterion=MeanLoss(tasks=BCR_TASK), patience=20),
         regularizer=L2Regularizer(model.named_parameters(), lambda_=0.001)
@@ -94,11 +93,11 @@ if __name__ == '__main__':
     history.plot(show=True)
 
     trained_model.fix_thresholds_to_optimal_values(dataset)
-    score = trained_model.score_on_dataset(dataset, dataset.train_mask)
+    score = trained_model.compute_score_on_dataset(dataset, dataset.train_mask)
     print(score)
 
-    score = trained_model.score_on_dataset(dataset, dataset.valid_mask)
+    score = trained_model.compute_score_on_dataset(dataset, dataset.valid_mask)
     print(score)
 
-    score = trained_model.score_on_dataset(dataset, dataset.test_mask)
+    score = trained_model.compute_score_on_dataset(dataset, dataset.test_mask)
     print(score)
