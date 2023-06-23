@@ -27,7 +27,7 @@ class WeightedSumLoss(MultiTaskLoss):
             self,
             name: Optional[str] = None,
             tasks: Optional[Union[Task, TaskList, List[Task]]] = None,
-            weights: Optional[str, Iterable[float]] = None
+            weights: Optional[Union[str, Iterable[float]]] = None
     ):
         """
         Sets protected attributes.
@@ -38,7 +38,7 @@ class WeightedSumLoss(MultiTaskLoss):
             Name of the multi-task loss.
         tasks : Optional[Union[Task, TaskList, List[Task]]]
             Tasks to include in the multi-task loss calculation. By default, we use all available tasks in the dataset.
-        weights : Optional[str, Iterable[float]]
+        weights : Optional[Union[str, Iterable[float]]]
             Tasks weights for sum computation. Can also be given as a string containing the sequence of weights.
         """
         super().__init__(name=name, tasks=tasks)
