@@ -8,7 +8,6 @@
     @Description:       This file is used to define the `SklearnObjective` class used for hyperparameters tuning.
 """
 
-from os import cpu_count
 from typing import Any, Dict
 
 from .base import ModelEvaluationContainer, Objective
@@ -28,9 +27,7 @@ class SklearnObjective(Objective):
     def __init__(
             self,
             model_hyperparameter: SklearnModelHyperparameter,
-            fit_method_hyperparameter: FitMethodHyperparameter,
-            num_cpus: int = cpu_count(),
-            num_gpus: int = 0
+            fit_method_hyperparameter: FitMethodHyperparameter
     ) -> None:
         """
         Sets protected and public attributes of the objective.
@@ -41,16 +38,8 @@ class SklearnObjective(Objective):
             Model constructor hyperparameters.
         fit_method_hyperparameter : FitMethodHyperparameter
             Fit method hyperparameters.
-        num_cpus : int
-            The quantity of CPU cores to reserve for the tuning task. This parameter does not affect the device used
-            for training the model during each trial. For now, we have to use all cpus per trial, otherwise 'Ray' thinks
-            the tasks have to be parallelized and everything falls apart because the GPU memory is not big enough to
-            hold 2 trials (models) at a time.
-        num_gpus : int
-            The quantity of GPUs to reserve for the tuning task. This parameter does not affect the device used for
-            training the model during each trial.
         """
-        super().__init__(num_cpus=num_cpus, num_gpus=num_gpus)
+        super().__init__()
 
         self._hyperparameters = HyperparameterDict(
             {
