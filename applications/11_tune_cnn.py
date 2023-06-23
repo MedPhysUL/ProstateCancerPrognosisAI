@@ -5,7 +5,7 @@
     @Creation Date:     07/2022
     @Last modification: 05/2023
 
-    @Description:       This script is used to tune a multi-net model.
+    @Description:       This script is used to tune a cnn model.
 """
 
 import env_apps
@@ -111,7 +111,7 @@ if __name__ == '__main__':
             }
         )
 
-        extractor_learning_algorithm_hyperparameter = LearningAlgorithmHyperparameter(
+        learning_algorithm_hyperparameter = LearningAlgorithmHyperparameter(
             criterion=CriterionHyperparameter(
                 constructor=MeanLoss
             ),
@@ -122,7 +122,7 @@ if __name__ == '__main__':
                     "lr": FloatHyperparameter(
                         name="lr",
                         low=1e-5,
-                        high=EXTRACTOR_LR_HIGH_BOUND_DICT[task.target_column],
+                        high=CNN_LR_HIGH_BOUND_DICT[task.target_column],
                         log=True
                     ),
                     "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-3, high=1e-1, log=True)
@@ -153,7 +153,7 @@ if __name__ == '__main__':
 
         train_method_hyperparameter = TrainMethodHyperparameter(
             model=model_hyperparameter,
-            learning_algorithms=extractor_learning_algorithm_hyperparameter
+            learning_algorithms=learning_algorithm_hyperparameter
         )
 
         objective = TorchObjective(
