@@ -138,7 +138,7 @@ if __name__ == '__main__':
                         high=UNEXTRACTOR_LR_HIGH_BOUND_DICT[task.target_column],
                         log=True
                     ),
-                    "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-3, high=1e-1, log=True)
+                    "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-4, high=1e-2, log=True)
                 }
             ),
             clip_grad_max_norm=EXTRACTOR_CLIP_GRAD_MAX_NORM_DICT[task.target_column],
