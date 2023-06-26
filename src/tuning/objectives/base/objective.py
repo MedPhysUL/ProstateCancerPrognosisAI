@@ -79,7 +79,7 @@ class Objective(ABC):
 
         suggestion = self.hyperparameters.suggest(trial)
 
-        futures = []
+        scores = []
         for idx, mask in enumerate(masks.values()):
             dataset.update_masks(mask[Mask.TRAIN], mask[Mask.VALID], mask[Mask.TEST])
             self.inner_loop_state.dataset = dataset
@@ -87,9 +87,9 @@ class Objective(ABC):
 
             self._exec_inner_loop = self._build_inner_loop_runner()
             score = self._exec_inner_loop(callbacks=callbacks, suggestion=suggestion)
-            futures.append(score)
+            scores.append(score)
 
-        self.trial_state.scores = futures
+        self.trial_state.scores = scores
 
         tuning_metric_test_scores = [
             self.trial_state.statistics.test[task.name][task.hps_tuning_metric.name].mean
