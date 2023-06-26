@@ -35,9 +35,9 @@ class SklearnObjective(Objective):
         Parameters
         ----------
         model_hyperparameter : SklearnModelHyperparameter
-            Model constructor hyperparameters.
+            Model constructor hyperparameter.
         fit_method_hyperparameter : FitMethodHyperparameter
-            Fit method hyperparameters.
+            Fit method hyperparameter.
         """
         super().__init__()
 

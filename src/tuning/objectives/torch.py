@@ -40,9 +40,9 @@ class TorchObjective(Objective):
         Parameters
         ----------
         trainer_hyperparameter : TrainerHyperparameter
-            Trainer constructor hyperparameters.
+            Trainer constructor hyperparameter.
         train_method_hyperparameter : TrainMethodHyperparameter
-            Train method hyperparameters.
+            Train method hyperparameter.
         """
         super().__init__()
 
