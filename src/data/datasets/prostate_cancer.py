@@ -124,10 +124,7 @@ class ProstateCancerDataset(Dataset):
             if self.table_dataset:
                 x_table, y_table = self.table_dataset[index].x, self.table_dataset[index].y
 
-            return DataType(
-                x=FeaturesType(image=x_image, table=x_table),
-                y=dict(**y_table, **y_image)
-            )
+            return DataType(x=FeaturesType(image=x_image, table=x_table), y=dict(**y_table, **y_image))
         elif isinstance(index, list):
             return Subset(dataset=self, indices=index)
         else:
