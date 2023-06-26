@@ -119,6 +119,7 @@ class TableDataset(Dataset):
         self._x_cat, self._x_cont = None, None
 
         self._initialize_dataset()
+        self.update_masks(self._train_mask, self._valid_mask, self._test_mask)
 
     def __len__(self) -> int:
         """
@@ -304,19 +305,6 @@ class TableDataset(Dataset):
         """
         return self._original_df
 
-    @dataframe.setter
-    def dataframe(self, dataframe: pd.DataFrame):
-        """
-        Returns the original data.
-
-        Parameters
-        ----------
-        dataframe : pd.DataFrame
-            Original dataframe.
-        """
-        self._original_df = dataframe
-        self._initialize_dataset()
-
     @property
     def target_columns(self) -> List[str]:
         """
@@ -446,7 +434,6 @@ class TableDataset(Dataset):
         self._validate_tasks()
         self._initialize_features()
         self._initialize_targets()
-        self.update_masks(self._train_mask, self._valid_mask, self._test_mask)
 
     def _validate_features(self):
         """
@@ -560,6 +547,27 @@ class TableDataset(Dataset):
                 return np.concatenate((self.x_cont, self.x_cat), axis=1)
             else:
                 return cat((self.x_cont, self.x_cat), dim=1)
+
+    def update_dataframe(
+            self,
+            dataframe: pd.DataFrame,
+            update_masks: bool = True
+    ) -> None:
+        """
+        Updates the dataframe and then preprocesses the data available according to the current statistics of the
+        training data. If update_masks is True, also updates the masks.
+
+        Parameters
+        ----------
+        dataframe : pd.DataFrame
+            New dataframe. Must have the same columns as the original dataframe.
+        update_masks : bool
+            If True, also updates the masks.
+        """
+        self._original_df = dataframe
+        self._initialize_dataset()
+        if update_masks:
+            self.update_masks(self._train_mask, self._valid_mask, self._test_mask)
 
     def update_masks(
             self,
