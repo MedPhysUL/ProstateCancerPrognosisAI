@@ -53,7 +53,7 @@ class TableViewer:
         """
         sns.set_style("whitegrid")
         self.dataset = dataset
-        self._target_cols = dataset.target_cols
+        self._target_cols = dataset.target_columns
 
         self._global_masks = self._get_global_masks()
         self._global_original_df = self.get_global_original_dataframe()
@@ -87,7 +87,7 @@ class TableViewer:
         dataframe : pd.DataFrame
             Original dataframe.
         """
-        df_copy = deepcopy(self.dataset.original_df)
+        df_copy = deepcopy(self.dataset.original_dataframe)
         df_copy = pd.concat(
             objs=[df_copy.iloc[mask].assign(Sets=name) for name, mask in self._global_masks.items()],
             ignore_index=True
@@ -103,7 +103,7 @@ class TableViewer:
         dataframe : pd.DataFrame
             Imputed dataframe.
         """
-        imputed_df = deepcopy(self.dataset.imputed_df)
+        imputed_df = deepcopy(self.dataset.imputed_dataframe)
         imputed_df = pd.concat(
             objs=[imputed_df.iloc[mask].assign(Sets=name) for name, mask in self._global_masks.items()],
             ignore_index=True
@@ -145,7 +145,7 @@ class TableViewer:
         for task in self.dataset.tasks:
             original_dataframes[task.target_column] = pd.concat(
                 objs=[
-                    self.dataset.imputed_df.iloc[mask].assign(Sets=name) for name, mask in
+                    self.dataset.imputed_dataframe.iloc[mask].assign(Sets=name) for name, mask in
                     self._target_specific_masks[task.target_column].items()
                 ],
                 ignore_index=True
@@ -167,7 +167,7 @@ class TableViewer:
         for task in self.dataset.tasks:
             imputed_dataframes[task.target_column] = pd.concat(
                 objs=[
-                    self.dataset.imputed_df.iloc[mask].assign(Sets=name) for name, mask in
+                    self.dataset.imputed_dataframe.iloc[mask].assign(Sets=name) for name, mask in
                     self._target_specific_masks[task.target_column].items()
                 ],
                 ignore_index=True
@@ -923,7 +923,7 @@ class TableViewer:
             Path to save correlations figures.
         """
         ds = self.dataset
-        sets = [("features", ds.features_cols), ["targets", ds.target_cols], ["all", ds.columns]]
+        sets = [("features", ds.features_columns), ["targets", ds.target_columns], ["all", ds.columns]]
         for imputed, path in [(False, self.ORIGINAL_DF_PATH), (True, self.IMPUTED_DF_PATH)]:
             for name, columns in sets:
                 path_to_fig = os.path.join(
@@ -963,10 +963,10 @@ class TableViewer:
         """
         for imputed, path in [(False, self.ORIGINAL_DF_PATH), (True, self.IMPUTED_DF_PATH)]:
             directory = os.path.join(path_to_save, self.GLOBAL_PATH, self.FIGURES_PATH, self.FEATURES_PATH, path)
-            for cont_col in self.dataset.cont_features_cols:
+            for cont_col in self.dataset.continuous_features_columns:
                 path_to_fig = os.path.join(directory, f"{cont_col}.png")
                 self.visualize_global_continuous_feature(cont_col, imputed, path_to_fig, False)
-            for cat_col in self.dataset.cat_features_cols:
+            for cat_col in self.dataset.categorical_features_columns:
                 path_to_fig = os.path.join(directory, f"{cat_col}.png")
                 self.visualize_global_categorical_feature(cat_col, imputed, path_to_fig, False)
 
@@ -987,10 +987,10 @@ class TableViewer:
                 directory = os.path.join(
                     path_to_save, self.TARGETS_PATH, target, self.FIGURES_PATH, self.FEATURES_PATH, path
                 )
-                for cont_col in self.dataset.cont_features_cols:
+                for cont_col in self.dataset.continuous_features_columns:
                     path_to_fig = os.path.join(directory, f"{cont_col}.png")
                     self.visualize_target_specific_continuous_features(cont_col, target, imputed, path_to_fig, False)
-                for cat_col in self.dataset.cat_features_cols:
+                for cat_col in self.dataset.categorical_features_columns:
                     path_to_fig = os.path.join(directory, f"{cat_col}.png")
                     self.visualize_target_specific_categorical_features(cat_col, target, imputed, path_to_fig, False)
 
@@ -1030,7 +1030,7 @@ class TableViewer:
                 path_to_fig = os.path.join(directory, "survival (global).png")
                 self.visualize_kaplan_meier_curve(event, time, imputed, None, path_to_fig, False)
 
-                for cat_col in self.dataset.cat_features_cols:
+                for cat_col in self.dataset.categorical_features_columns:
                     path_to_fig = os.path.join(directory, f"survival({cat_col}).png")
                     self.visualize_kaplan_meier_curve(event, time, imputed, cat_col, path_to_fig, False)
 

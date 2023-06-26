@@ -65,11 +65,11 @@ class TableDataset(Dataset):
 
     def __init__(
             self,
-            df: pd.DataFrame,
-            ids_col: str,
+            dataframe: pd.DataFrame,
+            ids_column: str,
             tasks: Union[TableTask, TaskList, List[TableTask]],
-            cont_features: Optional[List[Feature]] = None,
-            cat_features: Optional[List[Feature]] = None,
+            continuous_features: Optional[List[Feature]] = None,
+            categorical_features: Optional[List[Feature]] = None,
             to_tensor: bool = False,
             random_state: int = 0
     ):
@@ -78,15 +78,15 @@ class TableDataset(Dataset):
 
         Parameters
         ----------
-        df : pd.DataFrame
+        dataframe : pd.DataFrame
             Dataframe with the original data.
-        ids_col : str
+        ids_column : str
             Name of the column containing the patient ids.
         tasks : Union[TableTask, TaskList, List[TableTask]]
             List of tasks.
-        cont_features : Optional[List[Feature]]
+        continuous_features : Optional[List[Feature]]
             List of column names associated with continuous feature data.
-        cat_features : Optional[List[Feature]]
+        categorical_features : Optional[List[Feature]]
             List of column names associated with categorical feature data.
         to_tensor : bool
             Whether we want the features and targets in tensors. False for numpy arrays.
@@ -95,22 +95,17 @@ class TableDataset(Dataset):
         """
         super(TableDataset).__init__()
 
-        # Validate features and set original data
-        self._imputed_df = None
-        self._original_df = df
-
-        self._cat_features = cat_features if cat_features else []
-        self._cont_features = cont_features if cont_features else []
+        self._imputed_df, self._original_df = None, dataframe
+        self._cat_features = categorical_features if categorical_features else []
+        self._cont_features = continuous_features if continuous_features else []
         self._validate_features()
 
-        # Validate tasks and set task list
         self._tasks = TaskList(tasks)
         self._validate_tasks()
 
-        # Set default protected attributes
         self._cat_features_cols = [f.column for f in self._cat_features]
         self._cont_features_cols = [f.column for f in self._cont_features]
-        self._ids_col = ids_col
+        self._ids_col = ids_column
         self._iterative_imputer = IterativeImputer(
             estimator=RandomForestRegressor(random_state=random_state),
             tol=1e-2,
@@ -124,7 +119,6 @@ class TableDataset(Dataset):
         self._initialize_features()
         self._initialize_targets()
 
-        # Update masks
         self.update_masks(list(range(len(self))), [], [])
 
     def __len__(self) -> int:
@@ -159,13 +153,13 @@ class TableDataset(Dataset):
             features are a dictionary containing the continuous and categorical features. The targets are a dictionary
             containing the targets of each task. The keys of the dictionaries are the names of the columns.
         """
-        x = dict((col, self.x[idx, i]) for i, col in enumerate(self.features_cols))
+        x = dict((col, self.x[idx, i]) for i, col in enumerate(self.features_columns))
         y = dict((col, y_task[idx]) for col, y_task in self.y.items())
 
         return TableDataModel(x=x, y=y)
 
     @property
-    def cat_features(self) -> List[Feature]:
+    def categorical_features(self) -> List[Feature]:
         """
         Returns the list of categorical features.
 
@@ -177,7 +171,7 @@ class TableDataset(Dataset):
         return self._cat_features
 
     @property
-    def cat_features_cols(self) -> List[str]:
+    def categorical_features_columns(self) -> List[str]:
         """
         Returns the list of column names associated with categorical feature data.
 
@@ -199,10 +193,10 @@ class TableDataset(Dataset):
         columns : List[str]
             List of column names associated with the data.
         """
-        return self.features_cols + self.target_cols
+        return self.features_columns + self.target_columns
 
     @property
-    def cont_features(self) -> List[Feature]:
+    def continuous_features(self) -> List[Feature]:
         """
         Returns the list of continuous features.
 
@@ -214,7 +208,7 @@ class TableDataset(Dataset):
         return self._cont_features
 
     @property
-    def cont_features_cols(self) -> List[str]:
+    def continuous_features_columns(self) -> List[str]:
         """
         Returns the list of column names associated with continuous feature data.
 
@@ -226,7 +220,7 @@ class TableDataset(Dataset):
         return self._cont_features_cols
 
     @property
-    def features_cols(self) -> List[str]:
+    def features_columns(self) -> List[str]:
         """
         Returns the list of column names associated with feature data. The list of column names is equal to the list of
         continuous feature column names plus the list of categorical feature column names.
@@ -236,7 +230,7 @@ class TableDataset(Dataset):
         features_cols : List[str]
             List of column names associated with feature data.
         """
-        return self.cont_features_cols + self.cat_features_cols
+        return self._cont_features_cols + self._cat_features_cols
 
     @property
     def ids(self) -> List[str]:
@@ -251,7 +245,7 @@ class TableDataset(Dataset):
         return list(self._original_df[self._ids_col].values)
 
     @property
-    def ids_col(self) -> str:
+    def ids_column(self) -> str:
         """
         Returns the name of the column containing the ids.
 
@@ -275,7 +269,7 @@ class TableDataset(Dataset):
         return {id_: i for i, id_ in enumerate(self.ids)}
 
     @property
-    def imputed_df(self) -> pd.DataFrame:
+    def imputed_dataframe(self) -> pd.DataFrame:
         """
         Returns the imputed data.
 
@@ -287,7 +281,7 @@ class TableDataset(Dataset):
         return self._imputed_df
 
     @property
-    def original_df(self) -> pd.DataFrame:
+    def original_dataframe(self) -> pd.DataFrame:
         """
         Returns the original data.
 
@@ -299,7 +293,7 @@ class TableDataset(Dataset):
         return self._original_df
 
     @property
-    def target_cols(self) -> List[str]:
+    def target_columns(self) -> List[str]:
         """
         Returns the list of column names associated with target data.
 
@@ -603,11 +597,11 @@ class TableDataset(Dataset):
         additional step to map the imputed values to the closest category, as an iterative imputer only works with
         float values.
         """
-        df = self._imputed_df[self.features_cols]
+        df = self._imputed_df[self.features_columns]
 
         self._iterative_imputer.fit(df.iloc[self._train_mask])
         data = self._iterative_imputer.transform(df)
-        temp_df = pd.DataFrame(data, columns=self.features_cols)
+        temp_df = pd.DataFrame(data, columns=self.features_columns)
 
         for column in self._cat_features_cols:
             original_array = np.array(df[column].dropna())
@@ -619,7 +613,7 @@ class TableDataset(Dataset):
             result = categories[indices - 1]
             temp_df[column] = result
 
-        self._imputed_df[self.features_cols] = temp_df
+        self._imputed_df[self.features_columns] = temp_df
 
     @staticmethod
     def _convert_categories_to_bins(categories: np.ndarray) -> np.ndarray:

@@ -147,7 +147,7 @@ class Predictor(TorchModel, ABC):
         super().build(dataset=dataset)
 
         if self.features_columns is None:
-            self.features_columns = dataset.table_dataset.features_cols
+            self.features_columns = dataset.table_dataset.features_columns
 
         self.predictor = self._build_predictor(dataset)
 
