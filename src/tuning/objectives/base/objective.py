@@ -9,13 +9,14 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
+import pandas as pd
 from optuna.trial import FrozenTrial, Trial
 
 from ...callbacks.containers import TuningCallbackList
 from .containers import ModelEvaluationContainer, ScoreContainer
-from ....data.datasets import Mask, ProstateCancerDataset
+from ....data.datasets import Mask, ProstateCancerDataset, Split
 from ...hyperparameters.containers import HyperparameterDict
 from ....models.base.model import Model
 from .states import InnerLoopState, TrialState
@@ -54,6 +55,7 @@ class Objective(ABC):
             callbacks: TuningCallbackList,
             dataset: ProstateCancerDataset,
             masks: Dict[int, Dict[str, List[int]]],
+            dataframes: Optional[Dict[int, pd.DataFrame]] = None
     ) -> List[float]:
         """
         Extracts hyperparameters suggested by optuna and executes the parallel inner loops.
@@ -68,6 +70,8 @@ class Objective(ABC):
             The dataset used for the current trial.
         masks : Dict[int, Dict[str, List[int]]]
             Dictionary of inner loops masks, i.e a dictionary with list of idx to use as train, valid and test masks.
+        dataframes : Optional[Dict[int, pd.DataFrame]]
+            Dictionary of dataframes to use for different inner splits.
 
         Returns
         -------
@@ -81,7 +85,7 @@ class Objective(ABC):
 
         scores = []
         for idx, mask in enumerate(masks.values()):
-            dataset.update_masks(mask[Mask.TRAIN], mask[Mask.VALID], mask[Mask.TEST])
+            self._update_dataset(dataset=dataset, mask=mask, dataframe=dataframes[idx] if dataframes else None)
             self.inner_loop_state.dataset = dataset
             self.inner_loop_state.idx = idx
 
@@ -99,6 +103,29 @@ class Objective(ABC):
         callbacks.on_trial_end(self)
 
         return tuning_metric_test_scores
+
+    @staticmethod
+    def _update_dataset(
+            dataset: ProstateCancerDataset,
+            mask: Dict[str, List[int]],
+            dataframe: Optional[pd.DataFrame] = None
+    ) -> None:
+        """
+        Updates the dataset with the given mask and dataframe.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            The dataset to update.
+        mask : Dict[str, List[int]]
+            Dictionary of masks.
+        dataframe : Optional[pd.DataFrame]
+            Dataframe to use for the update.
+        """
+        if dataframe:
+            dataset.update_dataframe(dataframe=dataframe, update_masks=False)
+
+        dataset.update_masks(train_mask=mask[Mask.TRAIN], valid_mask=mask[Mask.VALID], test_mask=mask[Mask.TEST])
 
     def exec_best_model_evaluation(
             self,

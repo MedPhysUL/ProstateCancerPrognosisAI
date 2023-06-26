@@ -11,8 +11,9 @@
 
 from copy import deepcopy
 from functools import partial
-from typing import Dict, List
+from typing import Dict, List, Optional
 
+import pandas as pd
 from optuna import create_study
 from optuna.logging import FATAL, set_verbosity
 from optuna.pruners import BasePruner, NopPruner
@@ -99,6 +100,7 @@ class SearchAlgorithm:
             masks: Dict[int, Dict[str, List[int]]],
             objective: Objective,
             n_trials: int = 100,
+            dataframes: Optional[Dict[int, pd.DataFrame]] = None,
             study_name: str = None,
             verbose: bool = True
     ) -> Study:
@@ -117,6 +119,8 @@ class SearchAlgorithm:
             The objective.
         n_trials : int
             Number of sets of hyperparameters tested.
+        dataframes : Optional[Dict[int, pd.DataFrame]]
+            Dictionary of dataframes to use for different inner splits.
         study_name : str
             Study's name. If this argument is set to None, a unique name is generated automatically.
         verbose : bool
@@ -131,7 +135,7 @@ class SearchAlgorithm:
 
         set_verbosity(FATAL)
         study.optimize(
-            func=partial(objective.__call__, masks=masks, dataset=dataset, callbacks=callbacks),
+            func=partial(objective.__call__, masks=masks, dataset=dataset, callbacks=callbacks, dataframes=dataframes),
             n_trials=n_trials,
             gc_after_trial=True,
             show_progress_bar=verbose

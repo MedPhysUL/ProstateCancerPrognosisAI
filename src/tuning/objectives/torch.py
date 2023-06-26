@@ -9,8 +9,9 @@
 """
 
 from os import path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
+import pandas as pd
 from optuna.trial import FrozenTrial, Trial
 
 from .base import ModelEvaluationContainer, Objective
@@ -71,6 +72,7 @@ class TorchObjective(Objective):
             callbacks: TuningCallbackList,
             dataset: ProstateCancerDataset,
             masks: Dict[int, Dict[str, List[int]]],
+            dataframes: Optional[Dict[int, pd.DataFrame]] = None
     ) -> List[float]:
         """
         Extracts hyperparameters suggested by optuna and executes the parallel inner loops.
@@ -85,6 +87,8 @@ class TorchObjective(Objective):
             The dataset used for the current trial.
         masks : Dict[int, Dict[str, List[int]]]
             Dictionary of inner loops masks, i.e a dictionary with list of idx to use as train, valid and test masks.
+        dataframes : Optional[Dict[int, pd.DataFrame]]
+            Dictionary of dataframes to use for the inner loops.
 
         Returns
         -------
@@ -92,7 +96,7 @@ class TorchObjective(Objective):
             List of task scores associated with the set of hyperparameters.
         """
         self._set_dataset(dataset)
-        return super().__call__(trial, callbacks, dataset, masks)
+        return super().__call__(trial, callbacks, dataset, masks, dataframes)
 
     def exec_best_model_evaluation(
             self,
