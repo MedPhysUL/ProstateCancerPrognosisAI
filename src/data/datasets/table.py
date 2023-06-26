@@ -42,7 +42,8 @@ class TableDataModel(NamedTuple):
 
 class Feature(NamedTuple):
     """
-    Feature column named tuple. This tuple is used to store the name of a column and its associated transform.
+    Feature column named tuple. This tuple is used to store the name of a column, its associated transform and whether
+    it should be used for imputation.
 
     Elements
     --------
@@ -50,9 +51,12 @@ class Feature(NamedTuple):
         Name of the column.
     transform : Optional[Transform]
         Transform to apply to the column. If None, the identity transform is used.
+    impute : bool
+        Whether the column should be used for imputation.
     """
     column: str
     transform: Optional[Transform] = Identity()
+    impute: bool = True
 
 
 class TableDataset(Dataset):
@@ -95,31 +99,26 @@ class TableDataset(Dataset):
         """
         super(TableDataset).__init__()
 
-        self._imputed_df, self._original_df = None, dataframe
         self._cat_features = categorical_features if categorical_features else []
-        self._cont_features = continuous_features if continuous_features else []
-        self._validate_features()
-
-        self._tasks = TaskList(tasks)
-        self._validate_tasks()
-
         self._cat_features_cols = [f.column for f in self._cat_features]
+        self._cont_features = continuous_features if continuous_features else []
         self._cont_features_cols = [f.column for f in self._cont_features]
         self._ids_col = ids_column
+        self._imputed_df = None
+        self._imputer_features_cols = [f.column for f in self.features if f.impute is True]
         self._iterative_imputer = IterativeImputer(
             estimator=RandomForestRegressor(random_state=random_state),
             tol=1e-2,
             random_state=random_state
         )
+        self._original_df = dataframe
+        self._tasks = TaskList(tasks)
         self._target_cols = [task.target_column for task in self._tasks.table_tasks]
         self._to_tensor = to_tensor
-        self._train_mask, self._valid_mask, self._test_mask = [], [], []
+        self._train_mask, self._valid_mask, self._test_mask = list(range(len(self))), [], []
         self._x_cat, self._x_cont = None, None
 
-        self._initialize_features()
-        self._initialize_targets()
-
-        self.update_masks(list(range(len(self))), [], [])
+        self._initialize_dataset()
 
     def __len__(self) -> int:
         """
@@ -220,6 +219,19 @@ class TableDataset(Dataset):
         return self._cont_features_cols
 
     @property
+    def features(self) -> List[Feature]:
+        """
+        Returns the list of features. The list of features is equal to the list of continuous features plus the list of
+        categorical features.
+
+        Returns
+        -------
+        features : List[Feature]
+            List of features.
+        """
+        return self._cont_features + self._cat_features
+
+    @property
     def features_columns(self) -> List[str]:
         """
         Returns the list of column names associated with feature data. The list of column names is equal to the list of
@@ -291,6 +303,19 @@ class TableDataset(Dataset):
             Original data.
         """
         return self._original_df
+
+    @dataframe.setter
+    def dataframe(self, dataframe: pd.DataFrame):
+        """
+        Returns the original data.
+
+        Parameters
+        ----------
+        dataframe : pd.DataFrame
+            Original dataframe.
+        """
+        self._original_df = dataframe
+        self._initialize_dataset()
 
     @property
     def target_columns(self) -> List[str]:
@@ -412,6 +437,17 @@ class TableDataset(Dataset):
         """
         return self._y
 
+    def _initialize_dataset(self):
+        """
+        Initializes the dataset. Validates the features and tasks provided by the user. Initializes the features and
+        targets. Updates the masks.
+        """
+        self._validate_features()
+        self._validate_tasks()
+        self._initialize_features()
+        self._initialize_targets()
+        self.update_masks(self._train_mask, self._valid_mask, self._test_mask)
+
     def _validate_features(self):
         """
         Validates the features provided by the user. Raises an error if the features are not valid. If no features are
@@ -439,8 +475,7 @@ class TableDataset(Dataset):
         if features is not None:
             dataframe_columns = list(self._original_df.columns.values)
             for f in features:
-                if f.column not in dataframe_columns:
-                    raise ValueError(f"Column {f.column} is not part of the given dataframe")
+                assert f.column in dataframe_columns, f"Column {f.column} is not part of the given dataframe."
 
                 if f.transform:
                     if continuous:
@@ -462,6 +497,12 @@ class TableDataset(Dataset):
         assert all(isinstance(task, TableTask) for task in TaskList(self._tasks)), (
             f"All tasks must be instances of 'TableTask'."
         )
+
+        dataframe_columns = list(self._original_df.columns.values)
+        for task in self._tasks:
+            assert task.target_column in dataframe_columns, (
+                f"Column {task.target_column} is not part of the given dataframe."
+            )
 
     def _initialize_features(self):
         """
@@ -539,25 +580,18 @@ class TableDataset(Dataset):
         test_mask : Optional[List[int]]
             List of idx in the test set.
         """
-        # Create imputed dataframe
         self._imputed_df = self._original_df.copy()
 
-        # We set the new masks values
         self._train_mask = train_mask
         self._valid_mask = valid_mask if valid_mask is not None else []
         self._test_mask = test_mask if test_mask is not None else []
 
-        # We compute the current values of mean, std
-        mean, std = self._get_current_train_stats()
-
-        # We update the data that will be available via __get_item__
         if self._cat_features or self._cont_features:
             self._preprocess_cat_features()
             self._impute_missing_features()
-            self._preprocess_cont_features(mean, std)
-        self._set_features()
+            self._preprocess_cont_features()
 
-        # We set the classification tasks scaling factors
+        self._set_features()
         self._set_scaling_factors()
 
     def _get_current_train_stats(self) -> Tuple[Optional[pd.Series], Optional[pd.Series]]:
@@ -597,11 +631,11 @@ class TableDataset(Dataset):
         additional step to map the imputed values to the closest category, as an iterative imputer only works with
         float values.
         """
-        df = self._imputed_df[self.features_columns]
+        df = self._imputed_df[self._imputer_features_cols]
 
         self._iterative_imputer.fit(df.iloc[self._train_mask])
         data = self._iterative_imputer.transform(df)
-        temp_df = pd.DataFrame(data, columns=self.features_columns)
+        temp_df = pd.DataFrame(data, columns=self._imputer_features_cols)
 
         for column in self._cat_features_cols:
             original_array = np.array(df[column].dropna())
@@ -613,7 +647,7 @@ class TableDataset(Dataset):
             result = categories[indices - 1]
             temp_df[column] = result
 
-        self._imputed_df[self.features_columns] = temp_df
+        self._imputed_df[self._imputer_features_cols] = temp_df
 
     @staticmethod
     def _convert_categories_to_bins(categories: np.ndarray) -> np.ndarray:
@@ -635,18 +669,12 @@ class TableDataset(Dataset):
         bins = np.concatenate(([-np.inf], mid_values, [np.inf]))
         return bins
 
-    def _preprocess_cont_features(self, mean: pd.Series, std: pd.Series):
+    def _preprocess_cont_features(self):
         """
         Preprocesses the continuous features according to the transforms provided by the user. If no transforms are
         provided, does nothing.
-
-        Parameters
-        ----------
-        mean : pd.Series
-            Means of the numerical columns according to the training mask.
-        std : pd.Series
-            Standard deviations of the numerical columns according to the training mask.
         """
+        mean, std = self._get_current_train_stats()
         if self._cont_features_cols:
             for feature in self._cont_features:
                 col = feature.column
@@ -669,10 +697,8 @@ class TableDataset(Dataset):
         Sets scaling factor of all binary classification tasks.
         """
         for task in self.tasks.binary_classification_tasks:
-            # We set the scaling factors of all classification metrics
             for metric in task.metrics:
                 metric.update_scaling_factor(y_train=self.y[task.name][self.train_mask])
 
-            # We set the scaling factor of the criterion
             if task.criterion:
                 task.criterion.update_scaling_factor(y_train=self.y[task.name][self.train_mask])
