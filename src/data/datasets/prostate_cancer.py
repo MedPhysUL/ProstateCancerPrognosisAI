@@ -11,6 +11,7 @@
 from typing import Dict, List, NamedTuple, Optional, TypeAlias, Union
 
 import numpy as np
+import pandas as pd
 from torch import Tensor
 from torch.utils.data import Dataset, Subset
 
@@ -200,15 +201,34 @@ class ProstateCancerDataset(Dataset):
         """
         Enables augmentations on the dataset. This method should be called before training.
         """
-        if isinstance(self.image_dataset, ImageDataset):
+        if self.image_dataset:
             self.image_dataset.enable_augmentations()
 
     def disable_augmentations(self):
         """
         Disables augmentations on the dataset. This method should be called before validation and testing.
         """
-        if isinstance(self.image_dataset, ImageDataset):
+        if self.image_dataset:
             self.image_dataset.disable_augmentations()
+
+    def update_dataframe(
+            self,
+            dataframe: pd.DataFrame,
+            update_masks: bool = True
+    ) -> None:
+        """
+        Updates the dataframe and then preprocesses the data available according to the current statistics of the
+        training data. This method should be called before training.
+
+        Parameters
+        ----------
+        dataframe : pd.DataFrame
+            Dataframe.
+        update_masks : bool
+            Whether to update the masks or not.
+        """
+        if self.table_dataset:
+            self.table_dataset.update_dataframe(dataframe=dataframe, update_masks=update_masks)
 
     def update_masks(
             self,
@@ -234,5 +254,5 @@ class ProstateCancerDataset(Dataset):
         self._valid_mask = valid_mask if valid_mask is not None else []
         self._test_mask = test_mask if test_mask is not None else []
 
-        if isinstance(self.table_dataset, TableDataset):
+        if self.table_dataset:
             self.table_dataset.update_masks(train_mask=train_mask, test_mask=test_mask, valid_mask=valid_mask)
