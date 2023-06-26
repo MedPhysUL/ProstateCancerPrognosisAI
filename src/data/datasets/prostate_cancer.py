@@ -81,8 +81,7 @@ class ProstateCancerDataset(Dataset):
             )
             self._n = len(image_dataset)
 
-        self.table_dataset = table_dataset
-        self.image_dataset = image_dataset
+        self.table_dataset, self.image_dataset = table_dataset, image_dataset
 
         self._train_mask, self._valid_mask, self._test_mask = [], None, []
         self.update_masks(list(range(self._n)), [], [])
@@ -123,7 +122,7 @@ class ProstateCancerDataset(Dataset):
 
             x_table, y_table = {}, {}
             if self.table_dataset:
-                x_table, y_image = self.table_dataset[index].x, self.table_dataset[index].y
+                x_table, y_table = self.table_dataset[index].x, self.table_dataset[index].y
 
             return DataType(
                 x=FeaturesType(image=x_image, table=x_table),
