@@ -108,8 +108,8 @@ class TableDataset(Dataset):
         self._validate_tasks()
 
         # Set default protected attributes
-        self._cat_features_cols, self._cat_features_idx = [f.column for f in self._cat_features], []
-        self._cont_features_cols, self._cont_features_idx = [f.column for f in self._cont_features], []
+        self._cat_features_cols = [f.column for f in self._cat_features]
+        self._cont_features_cols = [f.column for f in self._cont_features]
         self._ids_col = ids_col
         self._iterative_imputer = IterativeImputer(
             estimator=RandomForestRegressor(random_state=random_state),
@@ -189,18 +189,6 @@ class TableDataset(Dataset):
         return self._cat_features_cols
 
     @property
-    def cat_features_idx(self) -> List[int]:
-        """
-        Returns the list of indices associated with categorical feature data.
-
-        Returns
-        -------
-        cat_features_idx : List[int]
-            List of indices associated with categorical feature data.
-        """
-        return self._cat_features_idx
-
-    @property
     def columns(self) -> List[str]:
         """
         Returns the list of column names associated with the data. The list of column names is equal to the list of
@@ -236,18 +224,6 @@ class TableDataset(Dataset):
             List of column names associated with continuous feature data.
         """
         return self._cont_features_cols
-
-    @property
-    def cont_features_idx(self) -> List[int]:
-        """
-        Returns the list of indices associated with continuous feature data.
-
-        Returns
-        -------
-        cont_features_idx : List[int]
-            List of indices associated with continuous feature data.
-        """
-        return self._cont_features_idx
 
     @property
     def features_cols(self) -> List[str]:
@@ -541,16 +517,10 @@ class TableDataset(Dataset):
             Feature data.
         """
         if self._cont_features_cols is None:
-            self._cat_features_idx = list(range(len(self._cat_features_cols)))
             return self.x_cat
         elif self._cat_features_cols is None:
-            self._cont_features_idx = list(range(len(self._cont_features_cols)))
             return self.x_cont
         else:
-            n_cont_features = len(self._cont_features_cols)
-            self._cont_features_idx = list(range(n_cont_features))
-            self._cat_features_idx = list(range(n_cont_features, n_cont_features + len(self._cat_features_cols)))
-
             if not self._to_tensor:
                 return np.concatenate((self.x_cont, self.x_cat), axis=1)
             else:
