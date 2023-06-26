@@ -87,7 +87,7 @@ class TableViewer:
         dataframe : pd.DataFrame
             Original dataframe.
         """
-        df_copy = deepcopy(self.dataset.original_dataframe)
+        df_copy = deepcopy(self.dataset.dataframe)
         df_copy = pd.concat(
             objs=[df_copy.iloc[mask].assign(Sets=name) for name, mask in self._global_masks.items()],
             ignore_index=True

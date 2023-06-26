@@ -281,7 +281,7 @@ class TableDataset(Dataset):
         return self._imputed_df
 
     @property
-    def original_dataframe(self) -> pd.DataFrame:
+    def dataframe(self) -> pd.DataFrame:
         """
         Returns the original data.
 
