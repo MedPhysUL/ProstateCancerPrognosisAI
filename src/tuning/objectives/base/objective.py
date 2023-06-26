@@ -9,11 +9,9 @@
 """
 
 from abc import ABC, abstractmethod
-from os import cpu_count
 from typing import Any, Callable, Dict, List
 
 from optuna.trial import FrozenTrial, Trial
-# import ray
 
 from ...callbacks.containers import TuningCallbackList
 from .containers import ModelEvaluationContainer, ScoreContainer
@@ -30,27 +28,10 @@ class Objective(ABC):
 
     DATASET_KEY = "dataset"
 
-    def __init__(
-            self,
-            num_cpus: int = cpu_count(),
-            num_gpus: int = 0
-    ) -> None:
+    def __init__(self) -> None:
         """
         Sets protected and public attributes of the objective.
-
-        Parameters
-        ----------
-        num_cpus : int
-            The quantity of CPU cores to reserve for the tuning task. This parameter does not affect the device used
-            for training the model during each trial. For now, we have to use all cpus per trial, otherwise 'Ray' thinks
-            the tasks have to be parallelized and everything falls apart because the GPU memory is not big enough to
-            hold 2 trials/models at a time.
-        num_gpus : int
-            The quantity of GPUs to reserve for the tuning task. This parameter does not affect the device used for
-            training the model during each trial.
         """
-        self.num_cpus = num_cpus
-        self.num_gpus = num_gpus
         self.inner_loop_state = InnerLoopState()
         self.trial_state = TrialState()
 

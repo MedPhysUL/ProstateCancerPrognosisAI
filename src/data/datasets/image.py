@@ -102,6 +102,8 @@ class ImageDataset(Dataset):
         self._organ_key_getter = kwargs.get("organ_key_getter", lambda modality, organ: f"{modality}_{organ}")
         self._seg_series = kwargs.get("seg_series", "0")
 
+        self._task_key_to_task_name_mapping = {task.key: task.name for task in self._tasks}
+
     def __len__(self) -> int:
         """
         Gets dataset length.
@@ -187,7 +189,7 @@ class ImageDataset(Dataset):
                     for task in self.tasks.segmentation_tasks:
                         if modality == task.modality:
                             seg_array = series[self._seg_series][task.organ]
-                            seg_dict[task.name] = self._transpose(seg_array)
+                            seg_dict[task.key] = self._transpose(seg_array)
 
         return dict(img_dict, **seg_dict)
 
@@ -246,7 +248,10 @@ class ImageDataset(Dataset):
         random_seed = self._rng.randint(0, 2**16 - 1)
         transforms = transforms.set_random_state(random_seed)
 
-        return apply_transform(transforms, data) if transforms else data
+        transformed_data = apply_transform(transforms, data) if transforms else data
+        transformed_data = self._transform_task_key_to_task_name(transformed_data)
+
+        return transformed_data
 
     def _transpose(self, array: np.ndarray) -> np.array:
         """
@@ -263,3 +268,29 @@ class ImageDataset(Dataset):
             The transposed array.
         """
         return np.transpose(np.array(array), self._transposition)
+
+    def _transform_task_key_to_task_name(
+            self,
+            data: Dict[str, Union[np.array, MetaTensor]]
+    ) -> Dict[str, Union[np.array, MetaTensor]]:
+        """
+        Transforms task keys to task names. This is useful when the task keys are different from the task names.
+
+        Parameters
+        ----------
+        data : Dict[str, Union[np.array, MetaTensor]]
+            A dictionary containing 3D images or segmentation maps of a single patient.
+
+        Returns
+        -------
+        transformed_data : Dict[str, Union[np.array, MetaTensor]]
+            The dictionary of transformed images and segmentation maps.
+        """
+        transformed_data = {}
+        for key, value in data.items():
+            if key in self._task_key_to_task_name_mapping.keys():
+                transformed_data[self._task_key_to_task_name_mapping[key]] = value
+            else:
+                transformed_data[key] = value
+
+        return transformed_data
