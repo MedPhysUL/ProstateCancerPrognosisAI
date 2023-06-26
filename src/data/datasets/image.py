@@ -11,7 +11,7 @@
 
 import collections.abc
 from itertools import chain
-from typing import Dict, List, Optional, Union, Sequence, Set, Tuple
+from typing import Dict, List, NamedTuple, Optional, Union, Sequence, Set, Tuple
 
 from delia.databases.patients_database import PatientsDatabase
 from monai.data import MetaTensor
@@ -22,6 +22,16 @@ from torch import device as torch_device
 from torch.utils.data import Dataset, Subset
 
 from ...tasks import SegmentationTask, TaskList
+
+
+class ImageDataModel(NamedTuple):
+    """
+    Image data element named tuple. This tuple is used to separate features (x) and targets (y) where
+        - x : I-dimensional dictionary containing (N, Z, X, Y) tensor where I is the number of images used as features.
+        - y : T-dimensional dictionary containing (N, Z, X, Y) tensor where T is the number of tasks.
+    """
+    x: Dict[str, MetaTensor]
+    y: Dict[str, MetaTensor]
 
 
 class ImageDataset(Dataset):
@@ -118,7 +128,7 @@ class ImageDataset(Dataset):
     def __getitem__(
             self,
             index: Union[int, slice, Sequence[int]]
-    ) -> Union[Dict[str, Union[np.array, MetaTensor]], Subset]:
+    ) -> Union[ImageDataModel, Subset]:
         """
         Gets specific items in the dataset.
 
@@ -129,7 +139,7 @@ class ImageDataset(Dataset):
 
         Returns
         -------
-        item : Union[Dict[str, Union[np.array, MetaTensor]], Subset]
+        item : Union[ImageDataModel, Subset]
             A single patient data or a subset of the dataset.
         """
         if isinstance(index, slice):
@@ -140,7 +150,16 @@ class ImageDataset(Dataset):
             return Subset(dataset=self, indices=index)
         elif isinstance(index, int):
             data = self._get_patient_data(index)
-            return self._transform(data)
+            transformed_data = self._transform(data)
+
+            x_image, y_image = {}, {}
+            for key, item in transformed_data.items():
+                if key in [task.name for task in self.tasks]:
+                    y_image[key] = item
+                else:
+                    x_image[key] = item
+
+            return ImageDataModel(x=x_image, y=y_image)
         else:
             raise AssertionError(f"'index' must be of type 'int', 'slice' or 'Sequence[int]'. Found type {type(index)}")
 
@@ -205,7 +224,7 @@ class ImageDataset(Dataset):
         """
         self._augmentations_are_enabled = False
 
-    def _transform(self, data: Dict[str, np.ndarray]) -> Dict[str, Union[np.array, MetaTensor]]:
+    def _transform(self, data: Dict[str, np.ndarray]) -> Dict[str, MetaTensor]:
         """
         Transforms images and segmentations.
 
@@ -216,7 +235,7 @@ class ImageDataset(Dataset):
 
         Returns
         -------
-        transformed_data : Dict[str, Union[np.array, MetaTensor]]
+        transformed_data : Dict[str, MetaTensor]
             The dictionary of transformed images and segmentation maps.
         """
         keys = list(data.keys())
