@@ -11,8 +11,6 @@
 from __future__ import annotations
 from typing import Any, Callable, Dict, Optional
 
-from optuna.trial import FrozenTrial, Trial
-
 from .dict import HyperparameterDict
 
 
