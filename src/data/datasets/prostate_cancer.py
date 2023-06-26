@@ -14,7 +14,6 @@ import numpy as np
 from torch import Tensor
 from torch.utils.data import Dataset, Subset
 
-from .empty import DatasetType, EmptyDataset
 from .image import ImageDataset
 from .table import TableDataset
 from ...tasks import TaskList
@@ -67,13 +66,9 @@ class ProstateCancerDataset(Dataset):
         """
         if (image_dataset is None) and (table_dataset is None):
             raise AssertionError("At least one image dataset or one table dataset must be provided.")
-        elif table_dataset is None or isinstance(table_dataset, EmptyDataset):
-            self.table_dataset = EmptyDataset(DatasetType.TABLE)
-            self.image_dataset = image_dataset
+        elif table_dataset is None:
             self._n = len(image_dataset)
-        elif image_dataset is None or isinstance(image_dataset, EmptyDataset):
-            self.table_dataset = table_dataset
-            self.image_dataset = EmptyDataset(DatasetType.IMAGE)
+        elif image_dataset is None:
             self._n = len(table_dataset)
         else:
             tab_n, img_n = len(table_dataset), len(image_dataset)
@@ -84,13 +79,12 @@ class ProstateCancerDataset(Dataset):
             assert not set(table_dataset.tasks).intersection(image_dataset.tasks), (
                 f"Tasks in table and image datasets should not overlap."
             )
-            self.table_dataset = table_dataset
-            self.image_dataset = image_dataset
             self._n = len(image_dataset)
 
-        self._train_mask, self._valid_mask, self._test_mask = [], None, []
+        self.table_dataset = table_dataset
+        self.image_dataset = image_dataset
 
-        # We update current training mask with all the data
+        self._train_mask, self._valid_mask, self._test_mask = [], None, []
         self.update_masks(list(range(self._n)), [], [])
 
     def __len__(self) -> int:
@@ -122,18 +116,18 @@ class ProstateCancerDataset(Dataset):
             Data items from image and table datasets.
         """
         if isinstance(index, int):
-            imaging_dict = self.image_dataset[index]
 
-            y_imaging, x_imaging = {}, {}
-            for key, item in imaging_dict.items():
-                if key in [task.name for task in self.image_dataset.tasks]:
-                    y_imaging[key] = item
-                else:
-                    x_imaging[key] = item
+            x_image, y_image = {}, {}
+            if self.image_dataset:
+                x_image, y_image = self.image_dataset[index].x, self.image_dataset[index].y
+
+            x_table, y_table = {}, {}
+            if self.table_dataset:
+                x_table, y_image = self.table_dataset[index].x, self.table_dataset[index].y
 
             return DataType(
-                x=FeaturesType(image=x_imaging, table=self.table_dataset[index].x),
-                y=dict(**self.table_dataset[index].y, **y_imaging)
+                x=FeaturesType(image=x_image, table=x_table),
+                y=dict(**y_table, **y_image)
             )
         elif isinstance(index, list):
             return Subset(dataset=self, indices=index)
@@ -150,9 +144,9 @@ class ProstateCancerDataset(Dataset):
         tasks : TaskList
             List of tasks.
         """
-        if isinstance(self.table_dataset, EmptyDataset):
+        if self.table_dataset is None:
             return self.image_dataset.tasks
-        elif isinstance(self.image_dataset, EmptyDataset):
+        elif self.image_dataset is None:
             return self.table_dataset.tasks
         else:
             return self.table_dataset.tasks + self.image_dataset.tasks
