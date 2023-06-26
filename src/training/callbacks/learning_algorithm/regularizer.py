@@ -12,7 +12,6 @@
 from abc import abstractmethod
 from typing import Any, Dict, Iterable, Iterator, Optional, Union
 
-import torch
 from torch import device as torch_device
 from torch import cat, linalg, stack, sum, tensor, Tensor
 from torch.nn import Module, Parameter, ParameterDict

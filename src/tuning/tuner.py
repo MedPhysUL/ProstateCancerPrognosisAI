@@ -10,13 +10,14 @@
 
 from typing import Dict, List, Optional, Union
 
+import pandas as pd
 from monai.utils import set_determinism
 from optuna.trial import FrozenTrial
 
 from .callbacks import TuningRecorder
 from .callbacks.base import TuningCallback
 from .callbacks.containers import TuningCallbackList
-from ..data.datasets import Mask, ProstateCancerDataset
+from ..data.datasets import Mask, ProstateCancerDataset, Split
 from .search_algorithm import Objective, SearchAlgorithm
 from .states import BestModelState, OuterLoopState, StudyState, TuningState
 
@@ -125,7 +126,8 @@ class Tuner:
             self,
             objective: Objective,
             dataset: ProstateCancerDataset,
-            masks: Dict[int, Dict[str, Union[List[int], Dict[int, Dict[str, List[int]]]]]]
+            masks: Dict[int, Dict[str, Union[List[int], Dict[int, Dict[str, List[int]]]]]],
+            dataframes: Optional[Dict[int, Dict[str, Union[pd.DataFrame, Dict[int, pd.DataFrame]]]]] = None
     ) -> None:
         """
         Performs nested subsampling validations to evaluate a model and tune the hyperparameters.
@@ -138,6 +140,8 @@ class Tuner:
             Custom dataset containing the whole learning dataset needed for our evaluations.
         masks : Dict[int, Dict[str, Union[List[int], Dict[int, Dict[str, List[int]]]]]]
             Dict with list of idx to use as train, valid and test masks.
+        dataframes : Optional[Dict[int, Dict[str, Union[pd.DataFrame, Dict[int, pd.DataFrame]]]]]
+            Dictionary with dataframes to use for different splits.
         """
         assert len(dataset.tunable_tasks) > 0, (
             "No tunable task found in the dataset. A tunable task is a task with a `hps_tuning_metric` attribute. "
@@ -148,26 +152,49 @@ class Tuner:
 
         self.callbacks.on_tuning_start(self)
         self.outer_loop_state.scores = []
-        for k, v in masks.items():
-            self.outer_loop_state.idx = k
-            train_mask, valid_mask, test_mask, inner_masks = v[Mask.TRAIN], v[Mask.VALID], v[Mask.TEST], v[Mask.INNER]
-            dataset.update_masks(train_mask=train_mask, valid_mask=valid_mask, test_mask=test_mask)
+        for idx, mask in masks.items():
+            self.outer_loop_state.idx = idx
+            self._update_dataset(dataset, mask, dataframes[idx][Split.OUTER] if dataframes else None)
             self.outer_loop_state.dataset = dataset
 
             self.callbacks.on_outer_loop_start(self)
-            self._exec_study(dataset=dataset, inner_masks=inner_masks, objective=objective)
+            self._exec_study(dataset, mask[Mask.INNER], objective, dataframes[idx][Split.INNER] if dataframes else None)
+            self._update_dataset(dataset, mask, dataframes[idx][Split.OUTER] if dataframes else None)
 
-            dataset.update_masks(train_mask=train_mask, valid_mask=valid_mask, test_mask=test_mask)
-            self._exec_best_model_evaluation(dataset=dataset, objective=objective)
+            self._exec_best_model_evaluation(dataset, objective)
             self.callbacks.on_outer_loop_end(self)
 
         self.callbacks.on_tuning_end(self)
+
+    @staticmethod
+    def _update_dataset(
+            dataset: ProstateCancerDataset,
+            mask: Dict[str, List[int]],
+            dataframe: Optional[pd.DataFrame] = None
+    ) -> None:
+        """
+        Updates the dataset with the given mask and dataframe.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            The dataset to update.
+        mask : Dict[str, List[int]]
+            Dictionary of masks.
+        dataframe : Optional[pd.DataFrame]
+            Dataframe to use for the update.
+        """
+        if dataframe:
+            dataset.update_dataframe(dataframe=dataframe, update_masks=False)
+
+        dataset.update_masks(train_mask=mask[Mask.TRAIN], valid_mask=mask[Mask.VALID], test_mask=mask[Mask.TEST])
 
     def _exec_study(
             self,
             dataset: ProstateCancerDataset,
             inner_masks: Dict[int, Dict[str, List[int]]],
-            objective: Objective
+            objective: Objective,
+            inner_dataframes: Optional[Dict[int, pd.DataFrame]] = None
     ):
         """
         Executes a single study.
@@ -180,6 +207,8 @@ class Tuner:
             Dictionary of inner loops masks, i.e a dictionary with list of idx to use as train, valid and test masks.
         objective : Objective
             The objective.
+        inner_dataframes : Optional[Dict[int, pd.DataFrame]]
+            Dictionary of dataframes to use for different inner splits.
         """
         self.callbacks.on_study_start(self)
 
@@ -189,6 +218,7 @@ class Tuner:
             masks=inner_masks,
             dataset=dataset,
             callbacks=self.callbacks,
+            dataframes=inner_dataframes,
             study_name=f"{self.SPLIT_PREFIX}_{self.outer_loop_state.idx}",
             verbose=self.verbose
         )

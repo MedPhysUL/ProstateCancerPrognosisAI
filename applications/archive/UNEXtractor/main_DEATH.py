@@ -49,8 +49,8 @@ if __name__ == '__main__':
     df = pd.read_csv(LEARNING_TABLE_PATH)
 
     table_dataset = TableDataset(
-        df=df,
-        ids_col=ID,
+        dataframe=df,
+        ids_column=ID,
         tasks=task
     )
 

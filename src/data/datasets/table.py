@@ -42,16 +42,20 @@ class TableDataModel(NamedTuple):
 
 class Feature(NamedTuple):
     """
-    Feature column named tuple. This tuple is used to store the name of a column and its associated transform.
+    Feature column named tuple. This tuple is used to store the name of a column, its associated transform and whether
+    it should be used for imputation.
 
     Elements
     --------
     column : str
         Name of the column.
+    impute : bool
+        Whether the column should be used for imputation.
     transform : Optional[Transform]
         Transform to apply to the column. If None, the identity transform is used.
     """
     column: str
+    impute: bool = True
     transform: Optional[Transform] = Identity()
 
 
@@ -65,11 +69,11 @@ class TableDataset(Dataset):
 
     def __init__(
             self,
-            df: pd.DataFrame,
-            ids_col: str,
+            dataframe: pd.DataFrame,
+            ids_column: str,
             tasks: Union[TableTask, TaskList, List[TableTask]],
-            cont_features: Optional[List[Feature]] = None,
-            cat_features: Optional[List[Feature]] = None,
+            continuous_features: Optional[List[Feature]] = None,
+            categorical_features: Optional[List[Feature]] = None,
             to_tensor: bool = False,
             random_state: int = 0
     ):
@@ -78,15 +82,15 @@ class TableDataset(Dataset):
 
         Parameters
         ----------
-        df : pd.DataFrame
+        dataframe : pd.DataFrame
             Dataframe with the original data.
-        ids_col : str
+        ids_column : str
             Name of the column containing the patient ids.
         tasks : Union[TableTask, TaskList, List[TableTask]]
             List of tasks.
-        cont_features : Optional[List[Feature]]
+        continuous_features : Optional[List[Feature]]
             List of column names associated with continuous feature data.
-        cat_features : Optional[List[Feature]]
+        categorical_features : Optional[List[Feature]]
             List of column names associated with categorical feature data.
         to_tensor : bool
             Whether we want the features and targets in tensors. False for numpy arrays.
@@ -95,37 +99,27 @@ class TableDataset(Dataset):
         """
         super(TableDataset).__init__()
 
-        # Validate features and set original data
+        self._cat_features = categorical_features if categorical_features else []
+        self._cat_features_cols = [f.column for f in self._cat_features]
+        self._cont_features = continuous_features if continuous_features else []
+        self._cont_features_cols = [f.column for f in self._cont_features]
+        self._ids_col = ids_column
         self._imputed_df = None
-        self._original_df = df
-
-        self._cat_features = cat_features if cat_features else []
-        self._cont_features = cont_features if cont_features else []
-        self._validate_features()
-
-        # Validate tasks and set task list
-        self._tasks = TaskList(tasks)
-        self._validate_tasks()
-
-        # Set default protected attributes
-        self._cat_features_cols, self._cat_features_idx = [f.column for f in self._cat_features], []
-        self._cont_features_cols, self._cont_features_idx = [f.column for f in self._cont_features], []
-        self._ids_col = ids_col
+        self._imputer_features_cols = [f.column for f in self.features if f.impute is True]
         self._iterative_imputer = IterativeImputer(
             estimator=RandomForestRegressor(random_state=random_state),
             tol=1e-2,
             random_state=random_state
         )
+        self._original_df = dataframe
+        self._tasks = TaskList(tasks)
         self._target_cols = [task.target_column for task in self._tasks.table_tasks]
         self._to_tensor = to_tensor
-        self._train_mask, self._valid_mask, self._test_mask = [], [], []
+        self._train_mask, self._valid_mask, self._test_mask = list(range(len(self))), [], []
         self._x_cat, self._x_cont = None, None
 
-        self._initialize_features()
-        self._initialize_targets()
-
-        # Update masks
-        self.update_masks(list(range(len(self))), [], [])
+        self._initialize_dataset()
+        self.update_masks(self._train_mask, self._valid_mask, self._test_mask)
 
     def __len__(self) -> int:
         """
@@ -159,13 +153,13 @@ class TableDataset(Dataset):
             features are a dictionary containing the continuous and categorical features. The targets are a dictionary
             containing the targets of each task. The keys of the dictionaries are the names of the columns.
         """
-        x = dict((col, self.x[idx, i]) for i, col in enumerate(self.features_cols))
+        x = dict((col, self.x[idx, i]) for i, col in enumerate(self.features_columns))
         y = dict((col, y_task[idx]) for col, y_task in self.y.items())
 
         return TableDataModel(x=x, y=y)
 
     @property
-    def cat_features(self) -> List[Feature]:
+    def categorical_features(self) -> List[Feature]:
         """
         Returns the list of categorical features.
 
@@ -177,7 +171,7 @@ class TableDataset(Dataset):
         return self._cat_features
 
     @property
-    def cat_features_cols(self) -> List[str]:
+    def categorical_features_columns(self) -> List[str]:
         """
         Returns the list of column names associated with categorical feature data.
 
@@ -187,18 +181,6 @@ class TableDataset(Dataset):
             List of column names associated with categorical feature data.
         """
         return self._cat_features_cols
-
-    @property
-    def cat_features_idx(self) -> List[int]:
-        """
-        Returns the list of indices associated with categorical feature data.
-
-        Returns
-        -------
-        cat_features_idx : List[int]
-            List of indices associated with categorical feature data.
-        """
-        return self._cat_features_idx
 
     @property
     def columns(self) -> List[str]:
@@ -211,10 +193,10 @@ class TableDataset(Dataset):
         columns : List[str]
             List of column names associated with the data.
         """
-        return self.features_cols + self.target_cols
+        return self.features_columns + self.target_columns
 
     @property
-    def cont_features(self) -> List[Feature]:
+    def continuous_features(self) -> List[Feature]:
         """
         Returns the list of continuous features.
 
@@ -226,7 +208,7 @@ class TableDataset(Dataset):
         return self._cont_features
 
     @property
-    def cont_features_cols(self) -> List[str]:
+    def continuous_features_columns(self) -> List[str]:
         """
         Returns the list of column names associated with continuous feature data.
 
@@ -238,19 +220,20 @@ class TableDataset(Dataset):
         return self._cont_features_cols
 
     @property
-    def cont_features_idx(self) -> List[int]:
+    def features(self) -> List[Feature]:
         """
-        Returns the list of indices associated with continuous feature data.
+        Returns the list of features. The list of features is equal to the list of continuous features plus the list of
+        categorical features.
 
         Returns
         -------
-        cont_features_idx : List[int]
-            List of indices associated with continuous feature data.
+        features : List[Feature]
+            List of features.
         """
-        return self._cont_features_idx
+        return self._cont_features + self._cat_features
 
     @property
-    def features_cols(self) -> List[str]:
+    def features_columns(self) -> List[str]:
         """
         Returns the list of column names associated with feature data. The list of column names is equal to the list of
         continuous feature column names plus the list of categorical feature column names.
@@ -260,7 +243,7 @@ class TableDataset(Dataset):
         features_cols : List[str]
             List of column names associated with feature data.
         """
-        return self.cont_features_cols + self.cat_features_cols
+        return self._cont_features_cols + self._cat_features_cols
 
     @property
     def ids(self) -> List[str]:
@@ -275,7 +258,7 @@ class TableDataset(Dataset):
         return list(self._original_df[self._ids_col].values)
 
     @property
-    def ids_col(self) -> str:
+    def ids_column(self) -> str:
         """
         Returns the name of the column containing the ids.
 
@@ -299,7 +282,7 @@ class TableDataset(Dataset):
         return {id_: i for i, id_ in enumerate(self.ids)}
 
     @property
-    def imputed_df(self) -> pd.DataFrame:
+    def imputed_dataframe(self) -> pd.DataFrame:
         """
         Returns the imputed data.
 
@@ -311,7 +294,7 @@ class TableDataset(Dataset):
         return self._imputed_df
 
     @property
-    def original_df(self) -> pd.DataFrame:
+    def dataframe(self) -> pd.DataFrame:
         """
         Returns the original data.
 
@@ -323,7 +306,7 @@ class TableDataset(Dataset):
         return self._original_df
 
     @property
-    def target_cols(self) -> List[str]:
+    def target_columns(self) -> List[str]:
         """
         Returns the list of column names associated with target data.
 
@@ -442,6 +425,16 @@ class TableDataset(Dataset):
         """
         return self._y
 
+    def _initialize_dataset(self):
+        """
+        Initializes the dataset. Validates the features and tasks provided by the user. Initializes the features and
+        targets. Updates the masks.
+        """
+        self._validate_features()
+        self._validate_tasks()
+        self._initialize_features()
+        self._initialize_targets()
+
     def _validate_features(self):
         """
         Validates the features provided by the user. Raises an error if the features are not valid. If no features are
@@ -469,8 +462,7 @@ class TableDataset(Dataset):
         if features is not None:
             dataframe_columns = list(self._original_df.columns.values)
             for f in features:
-                if f.column not in dataframe_columns:
-                    raise ValueError(f"Column {f.column} is not part of the given dataframe")
+                assert f.column in dataframe_columns, f"Column {f.column} is not part of the given dataframe."
 
                 if f.transform:
                     if continuous:
@@ -492,6 +484,12 @@ class TableDataset(Dataset):
         assert all(isinstance(task, TableTask) for task in TaskList(self._tasks)), (
             f"All tasks must be instances of 'TableTask'."
         )
+
+        dataframe_columns = list(self._original_df.columns.values)
+        for task in self._tasks:
+            assert task.target_column in dataframe_columns, (
+                f"Column {task.target_column} is not part of the given dataframe."
+            )
 
     def _initialize_features(self):
         """
@@ -541,20 +539,35 @@ class TableDataset(Dataset):
             Feature data.
         """
         if self._cont_features_cols is None:
-            self._cat_features_idx = list(range(len(self._cat_features_cols)))
             return self.x_cat
         elif self._cat_features_cols is None:
-            self._cont_features_idx = list(range(len(self._cont_features_cols)))
             return self.x_cont
         else:
-            n_cont_features = len(self._cont_features_cols)
-            self._cont_features_idx = list(range(n_cont_features))
-            self._cat_features_idx = list(range(n_cont_features, n_cont_features + len(self._cat_features_cols)))
-
             if not self._to_tensor:
                 return np.concatenate((self.x_cont, self.x_cat), axis=1)
             else:
                 return cat((self.x_cont, self.x_cat), dim=1)
+
+    def update_dataframe(
+            self,
+            dataframe: pd.DataFrame,
+            update_masks: bool = True
+    ) -> None:
+        """
+        Updates the dataframe and then preprocesses the data available according to the current statistics of the
+        training data. If update_masks is True, also updates the masks.
+
+        Parameters
+        ----------
+        dataframe : pd.DataFrame
+            New dataframe. Must have the same columns as the original dataframe.
+        update_masks : bool
+            If True, also updates the masks.
+        """
+        self._original_df = dataframe
+        self._initialize_dataset()
+        if update_masks:
+            self.update_masks(self._train_mask, self._valid_mask, self._test_mask)
 
     def update_masks(
             self,
@@ -575,25 +588,18 @@ class TableDataset(Dataset):
         test_mask : Optional[List[int]]
             List of idx in the test set.
         """
-        # Create imputed dataframe
         self._imputed_df = self._original_df.copy()
 
-        # We set the new masks values
         self._train_mask = train_mask
         self._valid_mask = valid_mask if valid_mask is not None else []
         self._test_mask = test_mask if test_mask is not None else []
 
-        # We compute the current values of mean, std
-        mean, std = self._get_current_train_stats()
-
-        # We update the data that will be available via __get_item__
         if self._cat_features or self._cont_features:
             self._preprocess_cat_features()
             self._impute_missing_features()
-            self._preprocess_cont_features(mean, std)
-        self._set_features()
+            self._preprocess_cont_features()
 
-        # We set the classification tasks scaling factors
+        self._set_features()
         self._set_scaling_factors()
 
     def _get_current_train_stats(self) -> Tuple[Optional[pd.Series], Optional[pd.Series]]:
@@ -633,11 +639,11 @@ class TableDataset(Dataset):
         additional step to map the imputed values to the closest category, as an iterative imputer only works with
         float values.
         """
-        df = self._imputed_df[self.features_cols]
+        df = self._imputed_df[self._imputer_features_cols]
 
         self._iterative_imputer.fit(df.iloc[self._train_mask])
         data = self._iterative_imputer.transform(df)
-        temp_df = pd.DataFrame(data, columns=self.features_cols)
+        temp_df = pd.DataFrame(data, columns=self._imputer_features_cols)
 
         for column in self._cat_features_cols:
             original_array = np.array(df[column].dropna())
@@ -649,7 +655,7 @@ class TableDataset(Dataset):
             result = categories[indices - 1]
             temp_df[column] = result
 
-        self._imputed_df[self.features_cols] = temp_df
+        self._imputed_df[self._imputer_features_cols] = temp_df
 
     @staticmethod
     def _convert_categories_to_bins(categories: np.ndarray) -> np.ndarray:
@@ -671,18 +677,12 @@ class TableDataset(Dataset):
         bins = np.concatenate(([-np.inf], mid_values, [np.inf]))
         return bins
 
-    def _preprocess_cont_features(self, mean: pd.Series, std: pd.Series):
+    def _preprocess_cont_features(self):
         """
         Preprocesses the continuous features according to the transforms provided by the user. If no transforms are
         provided, does nothing.
-
-        Parameters
-        ----------
-        mean : pd.Series
-            Means of the numerical columns according to the training mask.
-        std : pd.Series
-            Standard deviations of the numerical columns according to the training mask.
         """
+        mean, std = self._get_current_train_stats()
         if self._cont_features_cols:
             for feature in self._cont_features:
                 col = feature.column
@@ -705,10 +705,8 @@ class TableDataset(Dataset):
         Sets scaling factor of all binary classification tasks.
         """
         for task in self.tasks.binary_classification_tasks:
-            # We set the scaling factors of all classification metrics
             for metric in task.metrics:
                 metric.update_scaling_factor(y_train=self.y[task.name][self.train_mask])
 
-            # We set the scaling factor of the criterion
             if task.criterion:
                 task.criterion.update_scaling_factor(y_train=self.y[task.name][self.train_mask])

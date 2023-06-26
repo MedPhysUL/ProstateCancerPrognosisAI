@@ -32,11 +32,11 @@ if __name__ == '__main__':
     df = pd.read_csv(LEARNING_TABLE_PATH)
 
     table_dataset = TableDataset(
-        df=df,
-        ids_col=ID,
+        dataframe=df,
+        ids_column=ID,
         tasks=TABLE_TASKS,
-        cont_features=CONTINUOUS_FEATURES,
-        cat_features=CATEGORICAL_FEATURES
+        continuous_features=CONTINUOUS_FEATURES,
+        categorical_features=CATEGORICAL_FEATURES
     )
 
     dataset = ProstateCancerDataset(table_dataset=table_dataset)

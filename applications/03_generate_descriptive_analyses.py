@@ -30,11 +30,11 @@ if __name__ == '__main__':
     #                                            Descriptive analysis                                             #
     # ----------------------------------------------------------------------------------------------------------- #
     table_dataset = TableDataset(
-        df=df,
-        ids_col=ID,
+        dataframe=df,
+        ids_column=ID,
         tasks=TABLE_TASKS,
-        cont_features=CONTINUOUS_FEATURES,
-        cat_features=CATEGORICAL_FEATURES
+        continuous_features=CONTINUOUS_FEATURES,
+        categorical_features=CATEGORICAL_FEATURES
     )
 
     table_dataset.update_masks(
