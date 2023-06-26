@@ -49,14 +49,14 @@ class Feature(NamedTuple):
     --------
     column : str
         Name of the column.
-    transform : Optional[Transform]
-        Transform to apply to the column. If None, the identity transform is used.
     impute : bool
         Whether the column should be used for imputation.
+    transform : Optional[Transform]
+        Transform to apply to the column. If None, the identity transform is used.
     """
     column: str
-    transform: Optional[Transform] = Identity()
     impute: bool = True
+    transform: Optional[Transform] = Identity()
 
 
 class TableDataset(Dataset):
