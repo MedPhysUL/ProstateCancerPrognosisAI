@@ -51,8 +51,8 @@ if __name__ == '__main__':
             dataframe=df,
             ids_column=ID,
             tasks=task,
-            continuous_features=CONTINUOUS_FEATURES,
-            categorical_features=CATEGORICAL_FEATURES
+            continuous_features=CLINICAL_CONTINUOUS_FEATURES,
+            categorical_features=CLINICAL_CATEGORICAL_FEATURES
         )
 
         dataset = ProstateCancerDataset(image_dataset=None, table_dataset=table_dataset)
