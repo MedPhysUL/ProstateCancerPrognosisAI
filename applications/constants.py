@@ -55,6 +55,16 @@ CLINICAL_CONTINUOUS_FEATURES = [AGE, PSA]
 CLINICAL_CATEGORICAL_FEATURES = [CLINICAL_STAGE, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY]
 CLINICAL_FEATURES = CLINICAL_CONTINUOUS_FEATURES + CLINICAL_CATEGORICAL_FEATURES
 
+# RADIOMICS FEATURES
+RADIOMIC_1 = Feature(column="RADIOMIC_1", transform=Normalization(), impute=False)
+RADIOMIC_2 = Feature(column="RADIOMIC_2", transform=Normalization(), impute=False)
+RADIOMIC_3 = Feature(column="RADIOMIC_3", transform=Normalization(), impute=False)
+RADIOMIC_4 = Feature(column="RADIOMIC_4", transform=Normalization(), impute=False)
+RADIOMIC_5 = Feature(column="RADIOMIC_5", transform=Normalization(), impute=False)
+RADIOMIC_6 = Feature(column="RADIOMIC_6", transform=Normalization(), impute=False)
+
+RADIOMICS_FEATURES = [RADIOMIC_1, RADIOMIC_2, RADIOMIC_3, RADIOMIC_4, RADIOMIC_5, RADIOMIC_6]
+
 # TARGETS
 BCR = "BCR"
 BCR_TIME = "BCR_TIME"
