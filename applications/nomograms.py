@@ -75,7 +75,7 @@ class NomogramDataframe:
 
         dataframe = self.table_dataset.imputed_dataframe.copy()
 
-        if mapping:
+        if mapping and clinical_stage_column:
             dataframe[clinical_stage_column] = dataframe[clinical_stage_column].map(mapping)
 
         if valid_mask:
@@ -229,12 +229,10 @@ if __name__ == "__main__":
     # CUSTOM
     nomogram_dataframe.save_outer_splits_dataframes(
         path_to_folder="local_data/nomograms/CUSTOM/",
-        masks=masks,
-        clinical_stage_column=CLINICAL_STAGE.column
+        masks=masks
     )
     nomogram_dataframe.save_final_dataframe(
         path_to_folder="local_data/nomograms/CUSTOM/",
         train_mask=list(range(len(learning_df))),
-        test_mask=list(range(len(learning_df), len(learning_df) + len(holdout_df))),
-        clinical_stage_column=CLINICAL_STAGE.column
+        test_mask=list(range(len(learning_df), len(learning_df) + len(holdout_df)))
     )
