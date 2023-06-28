@@ -396,37 +396,6 @@ if __name__ == "__main__":
 
     PATH_TO_NOMOGRAMS_FOLDER = "local_data/nomograms"
 
-    # Outer split
-    table_dataset = TableDataset(
-        dataframe=pd.read_csv(LEARNING_TABLE_PATH),
-        ids_column=ID,
-        tasks=TABLE_TASKS,
-        continuous_features=[AGE, PSA],
-        categorical_features=[CLINICAL_STAGE, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY]
-    )
-
-    radiomics_dataframe = RadiomicsDataframe(table_dataset=table_dataset)
-
-    ct_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/learning_ct_radiomics.csv", "CT")
-    pt_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/learning_pt_radiomics.csv", "PT")
-    radiomics_df = pd.concat([ct_radiomics_df, pt_radiomics_df], axis=1)
-
-    path_to_custom_nomogram = os.path.join(PATH_TO_NOMOGRAMS_FOLDER, "CUSTOM")
-    os.makedirs(path_to_custom_nomogram, exist_ok=True)
-
-    radiomics_dataframe.save_outer_splits_dataframes(
-        path_to_folder=os.path.join(path_to_custom_nomogram, "radiomics"),
-        radiomics_df=radiomics_df,
-        masks=masks
-    )
-
-    # Outer and inner split
-    radiomics_dataframe.save_outer_and_inner_splits_dataframes(
-        path_to_folder="local_data/radiomics",
-        radiomics_df=radiomics_df,
-        masks=masks
-    )
-
     # Final set
     learning_df, holdout_df = pd.read_csv(LEARNING_TABLE_PATH), pd.read_csv(HOLDOUT_TABLE_PATH)
 
@@ -450,6 +419,9 @@ if __name__ == "__main__":
 
     radiomics_df = pd.concat([learning_radiomics_df, holdout_radiomics_df], ignore_index=True)
 
+    path_to_custom_nomogram = os.path.join(PATH_TO_NOMOGRAMS_FOLDER, "CUSTOM")
+    os.makedirs(path_to_custom_nomogram, exist_ok=True)
+
     radiomics_dataframe.save_final_dataframe(
         path_to_folder=os.path.join(path_to_custom_nomogram, "radiomics"),
         radiomics_df=radiomics_df,
@@ -457,7 +429,35 @@ if __name__ == "__main__":
         test_mask=list(range(len(learning_df), len(learning_df) + len(holdout_df)))
     )
 
+    # Outer split
+    table_dataset = TableDataset(
+        dataframe=pd.read_csv(LEARNING_TABLE_PATH),
+        ids_column=ID,
+        tasks=TABLE_TASKS,
+        continuous_features=[AGE, PSA],
+        categorical_features=[CLINICAL_STAGE, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY]
+    )
+
+    radiomics_dataframe = RadiomicsDataframe(table_dataset=table_dataset)
+
+    ct_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/learning_ct_radiomics.csv", "CT")
+    pt_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/learning_pt_radiomics.csv", "PT")
+    radiomics_df = pd.concat([ct_radiomics_df, pt_radiomics_df], axis=1)
+
+    radiomics_dataframe.save_outer_splits_dataframes(
+        path_to_folder=os.path.join(path_to_custom_nomogram, "radiomics"),
+        radiomics_df=radiomics_df,
+        masks=masks
+    )
+
     shutil.copytree(
         os.path.join(path_to_custom_nomogram, "radiomics"),
         os.path.join(path_to_custom_nomogram, "clinical_and_radiomics")
+    )
+
+    # Outer and inner split
+    radiomics_dataframe.save_outer_and_inner_splits_dataframes(
+        path_to_folder="local_data/radiomics",
+        radiomics_df=radiomics_df,
+        masks=masks
     )
