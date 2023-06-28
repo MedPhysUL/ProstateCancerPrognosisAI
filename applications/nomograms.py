@@ -7,6 +7,7 @@
 
     @Description:       This file shows how to compute and save the clinical data used for nomograms.
 """
+import os
 
 import env_apps
 
@@ -109,6 +110,7 @@ class NomogramDataframe:
         mapping : Optional[Dict[Union[float, int], str]]
             The mapping.
         """
+        os.makedirs(path_to_folder, exist_ok=True)
         for k, v in masks.items():
             train_mask, valid_mask, test_mask, inner_masks = v[Mask.TRAIN], v[Mask.VALID], v[Mask.TEST], v[Mask.INNER]
 
@@ -146,6 +148,7 @@ class NomogramDataframe:
         mapping : Optional[Dict[Union[float, int], str]]
             The mapping.
         """
+        os.makedirs(path_to_folder, exist_ok=True)
         self.table_dataset.update_masks(train_mask=train_mask, test_mask=test_mask)
 
         dataframe = self._get_imputed_dataframe(
@@ -172,6 +175,8 @@ if __name__ == "__main__":
     GLEASON_SECONDARY = Feature(column="GLEASON_SECONDARY")
     PSA = Feature(column="PSA")
 
+    PATH_TO_NOMOGRAMS_FOLDER = "local_data/nomograms"
+
     masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=5)
 
     # MSKCC
@@ -187,13 +192,13 @@ if __name__ == "__main__":
 
     nomogram_dataframe = NomogramDataframe(table_dataset=table_dataset)
     nomogram_dataframe.save_outer_splits_dataframes(
-        path_to_folder="local_data/nomograms/MSKCC/",
+        path_to_folder=os.path.join(PATH_TO_NOMOGRAMS_FOLDER, "MSKCC"),
         masks=masks,
         clinical_stage_column=CLINICAL_STAGE_MSKCC.column,
         mapping={0: "T1c", 0.2: "T2a", 0.4: "T2b", 0.6: "T2c", 0.8: "T3a", 1: "T3b"}
     )
     nomogram_dataframe.save_final_dataframe(
-        path_to_folder="local_data/nomograms/MSKCC/",
+        path_to_folder=os.path.join(PATH_TO_NOMOGRAMS_FOLDER, "MSKCC"),
         train_mask=list(range(len(mskcc_learning_df))),
         test_mask=list(range(len(mskcc_learning_df), len(mskcc_learning_df) + len(mskcc_holdout_df))),
         clinical_stage_column=CLINICAL_STAGE_MSKCC.column,
@@ -213,13 +218,13 @@ if __name__ == "__main__":
 
     nomogram_dataframe = NomogramDataframe(table_dataset=table_dataset)
     nomogram_dataframe.save_outer_splits_dataframes(
-        path_to_folder="local_data/nomograms/CAPRA/",
+        path_to_folder=os.path.join(PATH_TO_NOMOGRAMS_FOLDER, "CAPRA"),
         masks=masks,
         clinical_stage_column=CLINICAL_STAGE.column,
         mapping={0: "T1-T2", 1: "T3a"}
     )
     nomogram_dataframe.save_final_dataframe(
-        path_to_folder="local_data/nomograms/CAPRA/",
+        path_to_folder=os.path.join(PATH_TO_NOMOGRAMS_FOLDER, "CAPRA"),
         train_mask=list(range(len(learning_df))),
         test_mask=list(range(len(learning_df), len(learning_df) + len(holdout_df))),
         clinical_stage_column=CLINICAL_STAGE.column,
@@ -227,12 +232,14 @@ if __name__ == "__main__":
     )
 
     # CUSTOM
+    path_to_custom_nomogram = os.path.join(PATH_TO_NOMOGRAMS_FOLDER, "CUSTOM")
+    os.makedirs(path_to_custom_nomogram, exist_ok=True)
     nomogram_dataframe.save_outer_splits_dataframes(
-        path_to_folder="local_data/nomograms/CUSTOM/clinical",
+        path_to_folder=os.path.join(path_to_custom_nomogram, "clinical"),
         masks=masks
     )
     nomogram_dataframe.save_final_dataframe(
-        path_to_folder="local_data/nomograms/CUSTOM/clinical",
+        path_to_folder=os.path.join(path_to_custom_nomogram, "clinical"),
         train_mask=list(range(len(learning_df))),
         test_mask=list(range(len(learning_df), len(learning_df) + len(holdout_df)))
     )
