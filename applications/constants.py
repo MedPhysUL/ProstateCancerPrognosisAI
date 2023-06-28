@@ -34,9 +34,10 @@ HOLDOUT_TABLE_PATH = os.path.join(DATA_PATH, "holdout_table.csv")
 MSKCC_LEARNING_TABLE_PATH = os.path.join(DATA_PATH, "mskcc_learning_table.csv")
 MSKCC_HOLDOUT_TABLE_PATH = os.path.join(DATA_PATH, "mskcc_holdout_table.csv")
 
-MASKS_PATH: str = os.path.join(DATA_PATH, "masks")
+MASKS_PATH = os.path.join(DATA_PATH, "masks")
+RADIOMICS_PATH = os.path.join(DATA_PATH, "radiomics")
 
-RECORDS_PATH = os.path.join("local_data", "records")
+RECORDS_PATH = os.path.join(DATA_PATH, "records")
 OUTLIERS_RECORDS_PATH = os.path.join(RECORDS_PATH, "outliers")
 DESCRIPTIVE_ANALYSIS_PATH = os.path.join(RECORDS_PATH, "descriptive_analyses")
 EXPERIMENTS_PATH = os.path.join(RECORDS_PATH, "experiments")
