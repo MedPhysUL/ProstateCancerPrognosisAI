@@ -71,6 +71,7 @@ class ExtractorOutput(NamedTuple):
     """
     deep_features: Union[Tensor, Dict[str, Tensor]]
     segmentation: Optional[Tensor] = None
+    kl_divergence: Optional[Tensor] = None
 
 
 class Extractor(TorchModel, ABC):
