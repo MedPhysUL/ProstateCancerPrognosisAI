@@ -7,7 +7,6 @@
 
     @Description:       This file shows how to compute and save the clinical data used for nomograms.
 """
-import os
 
 import env_apps
 
