@@ -596,7 +596,10 @@ class TableDataset(Dataset):
 
         if self._cat_features or self._cont_features:
             self._preprocess_cat_features()
-            self._impute_missing_features()
+
+            if self._imputer_features_cols:
+                self._impute_missing_features()
+
             self._preprocess_cont_features()
 
         self._set_features()
