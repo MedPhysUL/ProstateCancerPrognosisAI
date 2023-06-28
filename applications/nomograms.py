@@ -228,11 +228,11 @@ if __name__ == "__main__":
 
     # CUSTOM
     nomogram_dataframe.save_outer_splits_dataframes(
-        path_to_folder="local_data/nomograms/CUSTOM/",
+        path_to_folder="local_data/nomograms/CUSTOM/clinical",
         masks=masks
     )
     nomogram_dataframe.save_final_dataframe(
-        path_to_folder="local_data/nomograms/CUSTOM/",
+        path_to_folder="local_data/nomograms/CUSTOM/clinical",
         train_mask=list(range(len(learning_df))),
         test_mask=list(range(len(learning_df), len(learning_df) + len(holdout_df)))
     )
