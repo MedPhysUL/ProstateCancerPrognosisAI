@@ -7,9 +7,11 @@
 
     @Description:       This file shows how to compute and save the data used for radiomics analysis.
 """
+import os
 
 import env_apps
 
+import shutil
 from typing import List, Optional
 
 import matplotlib.pyplot as plt
@@ -208,6 +210,43 @@ class RadiomicsDataframe:
             ignore_index=True
         )
 
+    def save_outer_splits_dataframes(
+            self,
+            path_to_folder: str,
+            radiomics_df: pd.DataFrame,
+            masks: dict,
+            show: bool = False
+    ):
+        """
+        This method saves the outer splits dataframes.
+
+        Parameters
+        ----------
+        path_to_folder : str
+            The path to the folder where to save the dataframes.
+        radiomics_df : pd.DataFrame
+            The radiomics dataframe.
+        masks : dict
+            The masks.
+        show : bool
+            If True, it shows the feature importance.
+        """
+        os.makedirs(path_to_folder, exist_ok=True)
+        for task in TABLE_TASKS:
+            path_to_task = os.path.join(path_to_folder, task.target_column)
+            os.makedirs(path_to_task, exist_ok=True)
+            for k, v in masks.items():
+                dataframe = self._get_imputed_dataframe(
+                    radiomics_df=radiomics_df,
+                    target_col=task.target_column,
+                    train_mask=v[Mask.TRAIN],
+                    valid_mask=v[Mask.VALID],
+                    test_mask=v[Mask.TEST],
+                    show=show
+                )
+
+                dataframe.to_csv(os.path.join(path_to_task, f"{self.OUTER_SPLIT_KEY}_{k}.csv"), index=False)
+
     def save_outer_and_inner_splits_dataframes(
             self,
             path_to_folder: str,
@@ -229,6 +268,7 @@ class RadiomicsDataframe:
         show : bool
             If True, it shows the feature importance.
         """
+        os.makedirs(path_to_folder, exist_ok=True)
         for task in TABLE_TASKS:
             os.makedirs(os.path.join(path_to_folder, task.target_column), exist_ok=True)
             for k, v in masks.items():
@@ -287,6 +327,7 @@ class RadiomicsDataframe:
         dataframe : pd.DataFrame
             The imputed dataframe.
         """
+        os.makedirs(path_to_folder, exist_ok=True)
         for task in TABLE_TASKS:
             path_to_task = os.path.join(path_to_folder, task.target_column)
             os.makedirs(path_to_task, exist_ok=True)
@@ -299,7 +340,7 @@ class RadiomicsDataframe:
                 show=show
             )
 
-            dataframe.to_csv(os.path.join(path_to_task, f"{self.INNER_SPLIT_KEY}.csv"), index=False)
+            dataframe.to_csv(os.path.join(path_to_task, f"{self.FINAL_SET_KEY}.csv"), index=False)
 
     @staticmethod
     def _plot_features_importance(
@@ -353,6 +394,8 @@ if __name__ == "__main__":
 
     masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=5)
 
+    PATH_TO_NOMOGRAMS_FOLDER = "local_data/nomograms"
+
     # Outer split
     table_dataset = TableDataset(
         dataframe=pd.read_csv(LEARNING_TABLE_PATH),
@@ -368,8 +411,18 @@ if __name__ == "__main__":
     pt_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/learning_pt_radiomics.csv", "PT")
     radiomics_df = pd.concat([ct_radiomics_df, pt_radiomics_df], axis=1)
 
+    path_to_custom_nomogram = os.path.join(PATH_TO_NOMOGRAMS_FOLDER, "CUSTOM")
+    os.makedirs(path_to_custom_nomogram, exist_ok=True)
+
+    radiomics_dataframe.save_outer_splits_dataframes(
+        path_to_folder=os.path.join(path_to_custom_nomogram, "radiomics"),
+        radiomics_df=radiomics_df,
+        masks=masks
+    )
+
+    # Outer and inner split
     radiomics_dataframe.save_outer_and_inner_splits_dataframes(
-        path_to_folder="local_data/radiomics/",
+        path_to_folder="local_data/radiomics",
         radiomics_df=radiomics_df,
         masks=masks
     )
@@ -398,8 +451,13 @@ if __name__ == "__main__":
     radiomics_df = pd.concat([learning_radiomics_df, holdout_radiomics_df], ignore_index=True)
 
     radiomics_dataframe.save_final_dataframe(
-        path_to_folder="local_data/radiomics/",
+        path_to_folder=os.path.join(path_to_custom_nomogram, "radiomics"),
         radiomics_df=radiomics_df,
         train_mask=list(range(len(learning_df))),
         test_mask=list(range(len(learning_df), len(learning_df) + len(holdout_df)))
+    )
+
+    shutil.copytree(
+        os.path.join(path_to_custom_nomogram, "radiomics"),
+        os.path.join(path_to_custom_nomogram, "clinical_and_radiomics")
     )
