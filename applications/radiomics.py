@@ -11,7 +11,7 @@
 import env_apps
 
 import shutil
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -161,6 +161,8 @@ class RadiomicsDataframe:
             target_col: str,
             train_mask: List[int],
             test_mask: List[int],
+            clinical_stage_column: Optional[str] = None,
+            mapping: Optional[Dict[Union[float, int], str]] = None,
             valid_mask: Optional[List[int]] = None,
             remove_patients: bool = True,
             show: bool = False
@@ -178,6 +180,10 @@ class RadiomicsDataframe:
             The train mask.
         test_mask : List[int]
             The test mask.
+        clinical_stage_column : Optional[str]
+            The clinical stage column.
+        mapping : Optional[Dict[Union[float, int], str]]
+            The mapping.
         valid_mask : Optional[List[int]]
             The valid mask.
         remove_patients : bool
@@ -200,6 +206,9 @@ class RadiomicsDataframe:
         radiomics = self._get_filtered_radiomics_dataframe(radiomics_df, forest)
 
         clinical_df = self.table_dataset.imputed_dataframe.copy()
+        if mapping and clinical_stage_column:
+            clinical_df[clinical_stage_column] = clinical_df[clinical_stage_column].map(mapping)
+
         dataframe = pd.concat([clinical_df, radiomics], axis=1)
 
         if remove_patients:
@@ -257,6 +266,8 @@ class RadiomicsDataframe:
             path_to_folder: str,
             radiomics_df: pd.DataFrame,
             masks: dict,
+            clinical_stage_column: str,
+            mapping: Dict[Union[float, int], str],
             show: bool = False
     ):
         """
@@ -270,6 +281,10 @@ class RadiomicsDataframe:
             The radiomics dataframe.
         masks : dict
             The masks.
+        clinical_stage_column : str
+            The clinical stage column.
+        mapping : Dict[Union[float, int], str]
+            The mapping.
         show : bool
             If True, it shows the feature importance.
         """
@@ -284,6 +299,8 @@ class RadiomicsDataframe:
                     radiomics_df=radiomics_df,
                     target_col=task.target_column,
                     train_mask=v[Mask.TRAIN],
+                    clinical_stage_column=clinical_stage_column,
+                    mapping=mapping,
                     valid_mask=v[Mask.VALID],
                     test_mask=v[Mask.TEST],
                     remove_patients=False,
@@ -299,6 +316,8 @@ class RadiomicsDataframe:
                         radiomics_df=radiomics_df,
                         target_col=task.target_column,
                         train_mask=inner_mask[Mask.TRAIN],
+                        clinical_stage_column=clinical_stage_column,
+                        mapping=mapping,
                         valid_mask=inner_mask[Mask.VALID],
                         test_mask=inner_mask[Mask.TEST],
                         remove_patients=False,
@@ -470,5 +489,7 @@ if __name__ == "__main__":
     radiomics_dataframe.save_outer_and_inner_splits_dataframes(
         path_to_folder="local_data/radiomics",
         radiomics_df=radiomics_df,
-        masks=masks
+        masks=masks,
+        clinical_stage_column=CLINICAL_STAGE.column,
+        mapping={0: "T1-T2", 1: "T3a"}
     )
