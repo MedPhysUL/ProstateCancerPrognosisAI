@@ -391,8 +391,8 @@ if __name__ == "__main__":
     learning_pt_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/learning_pt_radiomics.csv", "PT")
     learning_radiomics_df = pd.concat([learning_ct_radiomics_df, learning_pt_radiomics_df], axis=1)
 
-    holdout_ct_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/holdout_ct_radiomics", "CT")
-    holdout_pt_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/holdout_pt_radiomics", "PT")
+    holdout_ct_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/holdout_ct_radiomics.csv", "CT")
+    holdout_pt_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/holdout_pt_radiomics.csv", "PT")
     holdout_radiomics_df = pd.concat([holdout_ct_radiomics_df, holdout_pt_radiomics_df], axis=1)
 
     radiomics_df = pd.concat([learning_radiomics_df, holdout_radiomics_df], ignore_index=True)
