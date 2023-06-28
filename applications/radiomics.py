@@ -7,7 +7,6 @@
 
     @Description:       This file shows how to compute and save the data used for radiomics analysis.
 """
-import os
 
 import env_apps
 
@@ -163,6 +162,7 @@ class RadiomicsDataframe:
             train_mask: List[int],
             test_mask: List[int],
             valid_mask: Optional[List[int]] = None,
+            remove_patients: bool = True,
             show: bool = False
     ) -> pd.DataFrame:
         """
@@ -180,6 +180,8 @@ class RadiomicsDataframe:
             The test mask.
         valid_mask : Optional[List[int]]
             The valid mask.
+        remove_patients : bool
+            If True, it removes the patients.
         show : bool
             If True, it shows the feature importance.
 
@@ -200,15 +202,18 @@ class RadiomicsDataframe:
         clinical_df = self.table_dataset.imputed_dataframe.copy()
         dataframe = pd.concat([clinical_df, radiomics], axis=1)
 
-        if valid_mask:
-            named_masks = {"train": train_mask, "valid": valid_mask, "test": test_mask}
-        else:
-            named_masks = {"train": train_mask, "test": test_mask}
+        if remove_patients:
+            if valid_mask:
+                named_masks = {"train": train_mask, "valid": valid_mask, "test": test_mask}
+            else:
+                named_masks = {"train": train_mask, "test": test_mask}
 
-        return pd.concat(
-            objs=[dataframe.iloc[mask].assign(SETS=name) for name, mask in named_masks.items()],
-            ignore_index=True
-        )
+            return pd.concat(
+                objs=[dataframe.iloc[mask].assign(SETS=name) for name, mask in named_masks.items()],
+                ignore_index=True
+            )
+        else:
+            return dataframe
 
     def save_outer_splits_dataframes(
             self,
@@ -281,11 +286,14 @@ class RadiomicsDataframe:
                     train_mask=v[Mask.TRAIN],
                     valid_mask=v[Mask.VALID],
                     test_mask=v[Mask.TEST],
+                    remove_patients=False,
                     show=show
                 )
 
                 dataframe.to_csv(os.path.join(outer_split_path, f"{self.OUTER_SPLIT_KEY}.csv"), index=False)
 
+                path_to_inner_splits = os.path.join(outer_split_path, f"{self.INNER_SPLIT_KEY}s")
+                os.makedirs(path_to_inner_splits, exist_ok=True)
                 for idx, inner_mask in v[Mask.INNER].items():
                     dataframe = self._get_imputed_dataframe(
                         radiomics_df=radiomics_df,
@@ -293,10 +301,13 @@ class RadiomicsDataframe:
                         train_mask=inner_mask[Mask.TRAIN],
                         valid_mask=inner_mask[Mask.VALID],
                         test_mask=inner_mask[Mask.TEST],
+                        remove_patients=False,
                         show=show
                     )
 
-                    dataframe.to_csv(os.path.join(outer_split_path, f"{self.INNER_SPLIT_KEY}_{idx}.csv"), index=False)
+                    dataframe.to_csv(
+                        os.path.join(path_to_inner_splits, f"{self.INNER_SPLIT_KEY}_{idx}.csv"), index=False
+                    )
 
     def save_final_dataframe(
             self,
