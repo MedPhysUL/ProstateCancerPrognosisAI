@@ -82,6 +82,8 @@ def get_dataframes_dictionary(
 
 
 if __name__ == '__main__':
+    LR_HIGH_BOUND_DICT = {BCR: 1e-2, CRPC: 5e-3, DEATH: 5e-3, HTX: 1e-2, METASTASIS: 5e-3, PN: 1e-2}
+
     for task in TABLE_TASKS:
         df_dict = get_dataframes_dictionary(path_to_dataframes_folder=os.path.join(RADIOMICS_PATH, task.target_column))
 
@@ -134,7 +136,12 @@ if __name__ == '__main__':
             optimizer=OptimizerHyperparameter(
                 constructor=Adam,
                 parameters={
-                    "lr": FloatHyperparameter(name="lr", low=1e-4, high=1e-2, log=True),
+                    "lr": FloatHyperparameter(
+                        name="lr",
+                        low=1e-4,
+                        high=LR_HIGH_BOUND_DICT[task.target_column],
+                        log=True
+                    ),
                     "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-4, high=1e-2, log=True)
                 }
             ),
