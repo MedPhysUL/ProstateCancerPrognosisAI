@@ -133,7 +133,8 @@ class _UNet(Module):
         Returns
         -------
         output : ExtractorOutput
-            The output of the forward pass. It contains the deep features.
+            The output of the forward pass. It contains the deep features, the segmentation and the kl divergence if the
+            model is in bayesian mode.
         """
         if self.bayesian:
             return self._bayesian_forward(input_tensor=input_tensor)

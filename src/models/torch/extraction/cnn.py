@@ -11,12 +11,12 @@
 from __future__ import annotations
 from typing import List, Optional, Sequence, Union
 
-from torch import cat, mean, Tensor
+from torch import cat, mean, Tensor, zeros
 from torch import device as torch_device
 from torch.nn import DataParallel, Module, Sequential
 
 from .base import Extractor, ExtractorOutput, ModelMode, MultiTaskMode
-from .blocks import EncoderBlock
+from .blocks import BayesianEncoderBlock, EncoderBlock
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
 
 
@@ -25,7 +25,11 @@ class _Encoder(Module):
     This class is used to define an encoder.
     """
 
-    def __init__(self, conv_sequence: Sequential):
+    def __init__(
+            self,
+            conv_sequence: Sequential,
+            bayesian: bool = False
+    ):
         """
         Initializes the model.
 
@@ -33,13 +37,48 @@ class _Encoder(Module):
         ----------
         conv_sequence : Sequential
             The convolutional sequence.
+        bayesian : bool
+            Whether the model implements variational inference.
         """
         super().__init__()
         self.conv_sequence = conv_sequence
+        self.bayesian = bayesian
 
-    def forward(self, input_tensor: Tensor) -> ExtractorOutput:
+    def _bayesian_forward(self, input_tensor: Tensor) -> ExtractorOutput:
         """
-        Forward pass.
+        Forward pass for bayesian model.
+
+        Parameters
+        ----------
+        input_tensor : Tensor
+            The input tensor.
+
+        Returns
+        -------
+        output : ExtractorOutput
+            The output of the forward pass. It contains the deep features and the sum of the KL
+            divergence accumulated by all the VI operations.
+        """
+        dim = tuple(range(2, len(input_tensor.shape)))
+        x = input_tensor
+        features = []
+
+        kl_sum = zeros([1])
+
+        for i, conv in enumerate(self.conv_sequence):
+            x, kl = conv(x)
+            kl_sum += kl
+
+            global_average_pool = mean(x, dim=dim)
+            features.append(global_average_pool)
+
+        features = cat(features, dim=1)
+
+        return ExtractorOutput(deep_features=features, segmentation=None, kl_divergence=kl_sum)
+
+    def _deterministic_forward(self, input_tensor: Tensor) -> ExtractorOutput:
+        """
+        Forward pass for deterministic model.
 
         Parameters
         ----------
@@ -61,7 +100,28 @@ class _Encoder(Module):
 
         features = cat(features, dim=1)
 
-        return ExtractorOutput(deep_features=features, segmentation=None)
+        return ExtractorOutput(deep_features=features, segmentation=None, kl_divergence=None)
+
+    def forward(self, input_tensor: Tensor) -> ExtractorOutput:
+        """
+        Forward pass. Applies different forward methods depending on whether the model is bayesian.
+
+        Parameters
+        ----------
+        input_tensor : Tensor
+            The input tensor.
+
+        Returns
+        -------
+        output : ExtractorOutput
+            The output of the forward pass. It contains the deep features, the segmentation and the kl divergence if the
+            model is in bayesian mode.
+        """
+        if self.bayesian:
+            return self._bayesian_forward(input_tensor=input_tensor)
+
+        else:
+            return self._deterministic_forward(input_tensor=input_tensor)
 
 
 class CNN(Extractor):
@@ -88,7 +148,8 @@ class CNN(Extractor):
             hidden_channels_fnn: Optional[Sequence[int]] = None,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
-            seed: Optional[int] = None
+            seed: Optional[int] = None,
+            bayesian: bool = False
     ):
         """
         Initializes the model.
@@ -135,6 +196,8 @@ class CNN(Extractor):
             The name of the model.
         seed : Optional[int]
             Random state used for reproducibility.
+        bayesian : bool
+            Whether the model implements variational inference.
         """
         super().__init__(
             image_keys=image_keys,
@@ -157,12 +220,15 @@ class CNN(Extractor):
         self.norm = norm
         self.dropout_cnn = dropout_cnn
 
+        self.bayesian = bayesian
+
     def __get_layer(
             self,
             in_channels: int,
             out_channels: int,
-            strides: int
-    ) -> EncoderBlock:
+            strides: int,
+            bayesian: bool = False
+    ) -> Union[BayesianEncoderBlock, EncoderBlock]:
         """
         Returns an encoder block.
 
@@ -174,26 +240,46 @@ class CNN(Extractor):
             Number of output channels.
         strides : int
             Stride of the convolution.
+        bayesian : bool
+            Whether the layer implements variational inference.
 
         Returns
         -------
-        encoder : EncoderBlock
+        encoder : Union[BayesianEncoderBlock, EncoderBlock]
             An encoder block.
         """
-        return EncoderBlock(
-            input_channels=in_channels,
-            output_channels=out_channels,
-            num_res_units=self.num_res_units,
-            kernel_size=self.kernel_size,
-            stride=strides,
-            act=self.activation,
-            norm=self.norm,
-            dropout=self.dropout_cnn
-        )
+        if bayesian:
+            return BayesianEncoderBlock(
+                input_channels=in_channels,
+                output_channels=out_channels,
+                num_res_units=self.num_res_units,
+                kernel_size=self.kernel_size,
+                stride=strides,
+                act=self.activation,
+                norm=self.norm,
+                dropout=self.dropout_cnn
+            )
 
-    def _get_conv_sequence(self) -> Sequential:
+        else:
+            return EncoderBlock(
+                input_channels=in_channels,
+                output_channels=out_channels,
+                num_res_units=self.num_res_units,
+                kernel_size=self.kernel_size,
+                stride=strides,
+                act=self.activation,
+                norm=self.norm,
+                dropout=self.dropout_cnn
+            )
+
+    def _get_conv_sequence(self, bayesian: bool = False) -> Sequential:
         """
         Returns a convolutional sequence.
+
+        Parameters
+        ----------
+        bayesian : bool
+            Whether the model implements variational inference.
 
         Returns
         -------
@@ -205,7 +291,8 @@ class CNN(Extractor):
             layer = self.__get_layer(
                 in_channels=self.in_shape[0] if i == 0 else self.channels[i - 1],
                 out_channels=c,
-                strides=1 if i == len(self.channels) - 1 else self.strides[i]
+                strides=1 if i == len(self.channels) - 1 else self.strides[i],
+                bayesian=bayesian
             )
             conv_sequence.add_module(
                 name="conv_%i" % i,
@@ -230,6 +317,6 @@ class CNN(Extractor):
             return an ExtractorOutput object. The ExtractorOutput object contains the deep features extracted from the
             images and the segmentation of the images (optional).
         """
-        conv_sequence = self._get_conv_sequence()
+        conv_sequence = self._get_conv_sequence(bayesian=self.bayesian)
 
-        return _Encoder(conv_sequence=conv_sequence)
+        return _Encoder(conv_sequence=conv_sequence, bayesian=self.bayesian)
