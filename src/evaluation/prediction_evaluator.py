@@ -280,7 +280,7 @@ class PredictionEvaluator:
         )
 
     @staticmethod
-    def _terminate_figure(
+    def terminate_figure(
             fig: plt.Figure,
             show: bool,
             path_to_save_folder: Optional[str] = None,
@@ -413,7 +413,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_cum_baseline_hazard(
             self,
@@ -448,7 +448,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_baseline_survival(
             self,
@@ -483,7 +483,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_cum_hazard_function(
             self,
@@ -524,7 +524,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_survival_function(
             self,
@@ -565,7 +565,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_confusion_matrix(
             self,
@@ -648,7 +648,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_calibration_curve(
             self,
@@ -697,7 +697,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_roc_curve(
             self,
@@ -740,7 +740,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_precision_recall_curve(
             self,
@@ -781,4 +781,4 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self._terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)

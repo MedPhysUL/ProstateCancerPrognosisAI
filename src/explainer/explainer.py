@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Union, NamedTuple, Tuple
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 from captum.attr import IntegratedGradients
 import matplotlib.pyplot as plt
+from monai.data import DataLoader
 import numpy as np
 import seaborn as sns
 import shap
@@ -23,6 +24,7 @@ from sklearn.calibration import calibration_curve
 from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_curve
 
 from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
+from ..evaluation.prediction_evaluator import PredictionEvaluator
 from ..metrics.single_task.base import Direction
 from ..models.base.model import Model
 from ..tasks.base import TableTask, Task
@@ -31,14 +33,37 @@ from ..tools.transforms import to_numpy
 
 
 class CaptumWrapper(torch.nn.Module):
+    """
+
+    """
 
     def __init__(self, model: Model, dataset: ProstateCancerDataset, *args, **kwargs):
+        """
+
+        """
         super().__init__(*args, **kwargs)
         self.model = model
         self.targets_order = [task for task in dataset.tasks]
+        self.table_targets_order = [task for task in dataset.tasks.table_tasks]
         self.features_order = {'image': list(dataset[0].x.image.keys()), 'table': list(dataset[0].x.table.keys())}
 
-    def _convert_tensor_to_features_type(self, tensor_tuple: TensorOrTupleOfTensorsGeneric) -> FeaturesType:
+    def convert_tensor_to_features_type(
+            self,
+            tensor_tuple: TensorOrTupleOfTensorsGeneric
+    ) -> FeaturesType:
+        """
+        Transforms a (N, M) tensor or a tuple of M (N, ) tensors into a FeaturesType.
+
+        Parameters
+        ----------
+        tensor_tuple : TensorOrTupleOfTensorsGeneric
+            The tensor or the tuple of tensors to convert.
+
+        Returns
+        -------
+        features : FeaturesType
+            The FeaturesType object corresponding to the input data.
+        """
         if isinstance(tensor_tuple, tuple):
             tensor_list = list(tensor_tuple)
         else:
@@ -52,27 +77,101 @@ class CaptumWrapper(torch.nn.Module):
             table[key] = tensor_list[i]
         return FeaturesType(image=image, table=table)
 
-    def _convert_tensor_to_targets_type(self, tensor_tuple: TensorOrTupleOfTensorsGeneric) -> TargetsType:
+    def convert_tensor_to_targets_type(
+            self,
+            tensor_tuple: TensorOrTupleOfTensorsGeneric
+    ) -> TargetsType:
+        """
+        Transforms a (N, M) tensor or a tuple of M (N, ) tensors into a TargetsType.
+
+        Parameters
+        ----------
+        tensor_tuple : TensorOrTupleOfTensorsGeneric
+            The tensor or the tuple of tensors to convert.
+
+        Returns
+        -------
+        targets : TargetsType
+            The TargetsType object corresponding to the input data.
+        """
         return {task.name: value for task, value in zip(self.targets_order, tensor_tuple)}
 
-    def _convert_features_type_to_tensor(self, features: FeaturesType) -> TensorOrTupleOfTensorsGeneric:
-        image_list = [FeaturesType.image[image_key] for image_key in self.features_order['image']]
-        table_list = [FeaturesType.table[table_key] for table_key in self.features_order['table']]
+    def convert_features_type_to_tuple_of_tensor(
+            self,
+            features: FeaturesType
+    ) -> Tuple[torch.Tensor, ...]:
+        """
+        Transforms a FeaturesType into a tuple of M (N, ) tensors.
+
+        Parameters
+        ----------
+        features : FeaturesType
+            A FeaturesType object to convert into a tuple of tensors.
+
+        Returns
+        -------
+        tensor_tuple : TensorOrTupleOfTensorsGeneric
+            The Tuple of tensors corresponding to the input FeaturesType
+        """
+        image_list = [features.image[image_key] for image_key in self.features_order['image']]
+        table_list = []
+        for table_key in self.features_order['table']:
+            datum = features.table[table_key]
+            if isinstance(datum, torch.Tensor):
+                table_list.append(features.table[table_key])
+            elif isinstance(datum, np.ndarray):
+                table_list.append((torch.from_numpy(datum)))
+            else:
+                table_list.append(torch.tensor([datum]))
+        # table_list = [features.table[table_key] for table_key in self.features_order['table']]
         return tuple(image_list + table_list)
 
-    def _convert_targets_type_to_tensor(self, targets: TargetsType) -> TensorOrTupleOfTensorsGeneric:
-        targets_list = []
-        for task in self.targets_order:
-            targets_list.append(targets[task.name])
-        return tuple(targets_list)
-        # return tuple(targets.values())
+    def convert_targets_type_to_tuple_of_tensor(
+            self,
+            targets: TargetsType,
+            ignore_seg_tasks: bool = False
+    ) -> Tuple[torch.Tensor, ...]:
+        """
+        Transforms a TargetsType into a tuple of M (N, ) tensors.
 
-    def forward(self, inputs: TensorOrTupleOfTensorsGeneric) -> Tuple[torch.Tensor, ...]:
-        inputs = self._convert_tensor_to_features_type(inputs)
+        Parameters
+        ----------
+        targets : TargetsType
+            A TargetsType object to convert into a tuple of tensors.
+        ignore_seg_tasks : bool
+            Whether to ignore the seg tasks when converting to a tensor.
+
+        Returns
+        -------
+        tensor_tuple : TensorOrTupleOfTensorsGeneric
+            The tuple of tensors corresponding to the input TargetsType
+        """
+        targets_list = []
+        if ignore_seg_tasks:
+            task_list = self.table_targets_order
+        else:
+            task_list = self.targets_order
+
+        for task in task_list:
+            datum = targets[task.name]
+            if isinstance(datum, torch.Tensor):
+                targets_list.append(datum)
+            elif isinstance(datum, np.ndarray):
+                targets_list.append(torch.from_numpy(datum))
+            else:
+                targets_list.append(torch.tensor([datum]))
+        return tuple(targets_list)
+
+    def forward(self, *inputs: TensorOrTupleOfTensorsGeneric) -> torch.Tensor:
+        """
+        Wrapper around the forward method of the model to use tensors as input and output rather than FeaturesType and
+        TargetsType.
+        """
+        inputs = self.convert_tensor_to_features_type(tuple([*inputs]))
 
         targets_type = self.model(inputs)
-
-        target_tensor = self._convert_targets_type_to_tensor(targets_type)
+        target_tensor = self.convert_targets_type_to_tuple_of_tensor(targets_type, ignore_seg_tasks=True)
+        target_tensor = torch.stack(target_tensor, dim=0)
 
         return target_tensor
 
@@ -88,12 +187,74 @@ class PredictionModelExplainer:
             dataset: ProstateCancerDataset,
             mask: List[int]
     ):
-        self.model = model
+        self.model = CaptumWrapper(model, dataset)
         self.dataset = dataset
         self.mask = mask
 
     def compute_shap_values(
             self,
-            mask
+            target
     ):
-        raise NotImplementedError
+        """
+
+        """
+        integrated_gradient = IntegratedGradients(self.model)
+        rng_state = torch.random.get_rng_state()
+        data_loader = DataLoader(dataset=self.dataset[self.mask], batch_size=1, shuffle=False, collate_fn=None)
+        torch.random.set_rng_state(rng_state)
+
+        n = 0
+        attr_tensor = torch.tensor([])
+        for features, targets in data_loader:
+            print(targets)
+            features = self.model.convert_features_type_to_tuple_of_tensor(features)
+            features = tuple([feature.requires_grad_() for feature in features])
+            attr = integrated_gradient.attribute(features, target=target)
+            cat_tensor = torch.tensor([])
+
+            for i, tensor in enumerate(attr):
+                if i == 0:
+                    cat_tensor = tensor
+                else:
+                    cat_tensor = torch.cat((cat_tensor, tensor))
+            if n == 0:
+                attr_tensor = torch.unsqueeze(cat_tensor, 0)
+            else:
+                attr_tensor = torch.cat((attr_tensor, torch.unsqueeze(cat_tensor, 0)))
+            n += 1
+
+        return attr_tensor.detach().numpy()
+
+    def compute_average_shap_values(
+            self,
+            target: int,
+            show: bool = True,
+            path_to_save_folder: Optional[str] = None,
+            **kwargs
+    ):
+        """
+
+        """
+        fig, arr = plt.subplots()
+        feature_names = [task.target_column for task in self.dataset.tasks]
+        average_attributions = np.mean(self.compute_shap_values(target=target), axis=0)
+
+        if path_to_save_folder is not None:
+            path_to_save_folder = os.path.join(
+                path_to_save_folder,
+                f"{kwargs.get('filename', 'average_shap_values.pdf')}"
+            )
+        title = kwargs.get('title', "Average Feature Importances")
+        axis_title = kwargs.get('axis', "Features")
+        x_pos = (np.arange(len(feature_names)))
+
+        arr.figure(figsize=(12, 6))
+        arr.bar(x_pos, average_attributions, align='center')
+        arr.xticks(x_pos, feature_names, wrap=True)
+        arr.xlabel(axis_title)
+        arr.title(title)
+
+        PredictionEvaluator.terminate_figure(fig=fig, show=show, path_to_save_folder=path_to_save_folder)
+
+        average_shap = {feature_names[i]: average_attributions[i] for i in range(len(feature_names))}
+        return average_shap
