@@ -12,13 +12,13 @@ import json
 import os
 from typing import Dict, List, Optional, Union, NamedTuple, Tuple
 
+import shap
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 from captum.attr import IntegratedGradients
 import matplotlib.pyplot as plt
 from monai.data import DataLoader
 import numpy as np
 import seaborn as sns
-import shap
 import torch
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_curve
@@ -185,28 +185,27 @@ class PredictionModelExplainer:
             self,
             model: Model,
             dataset: ProstateCancerDataset,
-            mask: List[int]
     ):
         self.model = CaptumWrapper(model, dataset)
         self.dataset = dataset
-        self.mask = mask
 
-    def compute_shap_values(
+    def compute_table_shap_values(
             self,
-            target
+            target,
+            mask: Optional[List[int]] = None
     ):
         """
 
         """
         integrated_gradient = IntegratedGradients(self.model)
         rng_state = torch.random.get_rng_state()
-        data_loader = DataLoader(dataset=self.dataset[self.mask], batch_size=1, shuffle=False, collate_fn=None)
+        subset = self.dataset if mask is None else self.dataset[mask]
+        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
         torch.random.set_rng_state(rng_state)
 
         n = 0
         attr_tensor = torch.tensor([])
         for features, targets in data_loader:
-            print(targets)
             features = self.model.convert_features_type_to_tuple_of_tensor(features)
             features = tuple([feature.requires_grad_() for feature in features])
             attr = integrated_gradient.attribute(features, target=target)
@@ -222,12 +221,12 @@ class PredictionModelExplainer:
             else:
                 attr_tensor = torch.cat((attr_tensor, torch.unsqueeze(cat_tensor, 0)))
             n += 1
-
         return attr_tensor.detach().numpy()
 
     def compute_average_shap_values(
             self,
-            target: int,
+            target: int, # si list de int, avoir un subplot de tous les targets
+            mask: Optional[List[int]],
             show: bool = True,
             path_to_save_folder: Optional[str] = None,
             **kwargs
@@ -236,8 +235,8 @@ class PredictionModelExplainer:
 
         """
         fig, arr = plt.subplots()
-        feature_names = [task.target_column for task in self.dataset.tasks]
-        average_attributions = np.mean(self.compute_shap_values(target=target), axis=0)
+        feature_names = self.dataset.table_dataset.features_columns
+        average_attributions = np.mean(self.compute_table_shap_values(target=target, mask=mask), axis=0)
 
         if path_to_save_folder is not None:
             path_to_save_folder = os.path.join(
@@ -248,13 +247,85 @@ class PredictionModelExplainer:
         axis_title = kwargs.get('axis', "Features")
         x_pos = (np.arange(len(feature_names)))
 
-        arr.figure(figsize=(12, 6))
         arr.bar(x_pos, average_attributions, align='center')
-        arr.xticks(x_pos, feature_names, wrap=True)
-        arr.xlabel(axis_title)
-        arr.title(title)
+        arr.set_xticks(x_pos, feature_names, wrap=True)
+        arr.set_xlabel(axis_title)
+        arr.set_title(title)
 
         PredictionEvaluator.terminate_figure(fig=fig, show=show, path_to_save_folder=path_to_save_folder)
 
         average_shap = {feature_names[i]: average_attributions[i] for i in range(len(feature_names))}
         return average_shap
+
+    def plot_force(
+            self,
+            target: int,
+            patient_id: int
+    ):
+        values = self.compute_table_shap_values(target=target)
+        shap_values = shap.Explanation(
+            values=values,
+            base_values=np.zeros_like(values),
+            feature_names=self.dataset.table_dataset.features_columns,
+            data=self.dataset.table_dataset.x
+        )
+
+        shap.force_plot(shap_values[patient_id],
+                        matplotlib=True
+                        )
+        plt.close()
+
+    def plot_waterfall(
+            self,
+            target: int,
+            patient_id: int
+    ):
+        values = self.compute_table_shap_values(target=target)
+        shap_values = shap.Explanation(
+            values=values,
+            base_values=0
+        )
+        shap.plots.waterfall(shap_values[patient_id])
+        plt.close()
+
+    def plot_beeswarm(
+            self,
+            target: int
+    ):
+        values = self.compute_table_shap_values(target=target)
+        shap_values = shap.Explanation(
+            values=values,
+            base_values=0,
+            feature_names=self.dataset.table_dataset.features_columns,
+            data=self.dataset.table_dataset.x
+        )
+        shap.plots.beeswarm(shap_values)
+        plt.close()
+
+    def plot_bar(
+            self,
+            target: int
+    ):
+        values = self.compute_table_shap_values(target=target)
+        shap_values = shap.Explanation(
+            values=values,
+            base_values=np.zeros_like(values),
+            feature_names=self.dataset.table_dataset.features_columns,
+            data=self.dataset.table_dataset.x
+        )
+        shap.plots.bar(shap_values)
+        plt.close()
+
+    def plot_scatter(
+            self,
+            target
+    ):
+        values = self.compute_table_shap_values(target=target)
+        shap_values = shap.Explanation(
+            values=values,
+            base_values=np.zeros_like(values),
+            feature_names=self.dataset.table_dataset.features_columns,
+            data=self.dataset.table_dataset.x
+        )
+        shap.plots.scatter(shap_values)
+        plt.close()

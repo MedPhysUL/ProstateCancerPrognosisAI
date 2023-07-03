@@ -336,7 +336,7 @@ class PredictionEvaluator:
             show: bool,
             path_to_save_folder: Optional[str] = None,
             **kwargs
-    ) -> None:
+    ) -> None: # ajouter un mask pour les méthodes qui le demande
         """
         Creates the different graphs for classification task metrics that can be visualised in a 2D graph.
 
@@ -359,7 +359,7 @@ class PredictionEvaluator:
             show: bool,
             path_to_save_folder: Optional[str] = None,
             **kwargs
-    ) -> None:
+    ) -> None: # ajouter un mask pour les méthodes qui le demande
         """
         Creates the different graphs for survival analysis metrics that can be visualised in a 2D graph.
 
@@ -506,7 +506,7 @@ class PredictionEvaluator:
         for task in self.tasks.survival_analysis_tasks:
             prediction = {}
             fig, arr = plt.subplots()
-            for prediction_element in self.predictions_list:
+            for prediction_element in self.predictions_list: # slice with a mask as argument
                 if prediction.get(task.name, None) is not None:
                     prediction[task.name] = np.concatenate((prediction.get(task.name), prediction_element[task.name]))
                 else:
@@ -547,7 +547,7 @@ class PredictionEvaluator:
         for task in self.tasks.survival_analysis_tasks:
             prediction = {}
             fig, arr = plt.subplots()
-            for prediction_element in self.predictions_list:
+            for prediction_element in self.predictions_list: # slice with a mask as argument
                 if prediction.get(task.name, None) is not None:
                     prediction[task.name] = np.concatenate((prediction.get(task.name), prediction_element[task.name]))
                 else:
@@ -627,7 +627,7 @@ class PredictionEvaluator:
             fig, arr = plt.subplots()
             if not isinstance(threshold, int):
                 threshold = task.decision_threshold_metric.threshold
-            y_true, y_pred = self.targets_dict[task.name], np.where(self.predictions_dict[task.name] >= threshold, 1, 0)
+            y_true, y_pred = self.targets_dict[task.name], np.where(self.predictions_dict[task.name] >= threshold, 1, 0) # slice with a mask
             matrix = confusion_matrix(
                 y_true,
                 y_pred,
@@ -673,7 +673,7 @@ class PredictionEvaluator:
         """
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
-            y_true, y_prob = self.targets_dict[task.name], self.predictions_dict[task.name]
+            y_true, y_prob = self.targets_dict[task.name], self.predictions_dict[task.name] # slice with a mask
             if normalize:
                 y_prob = (y_prob - y_prob.min()) / (y_prob.max() - y_prob.min())
             prob_true, prob_pred = calibration_curve(
@@ -719,7 +719,7 @@ class PredictionEvaluator:
         """
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
-            y_true, y_pred = self.targets_dict[task.name], self.predictions_dict[task.name]
+            y_true, y_pred = self.targets_dict[task.name], self.predictions_dict[task.name] # slice with a mask
             fpr, tpr, threshold = roc_curve(
                 y_true,
                 y_pred,
@@ -762,7 +762,7 @@ class PredictionEvaluator:
         """
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
-            y_true, y_pred = self.targets_dict[task.name], self.predictions_dict[task.name]
+            y_true, y_pred = self.targets_dict[task.name], self.predictions_dict[task.name] # slice with a mask
             precision, recall, threshold = precision_recall_curve(
                 y_true,
                 y_pred,
