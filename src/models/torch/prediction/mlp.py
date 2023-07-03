@@ -31,7 +31,7 @@ class MLP(Predictor):
             features_columns: Optional[Union[str, Sequence[str]]] = None,
             input_mode: Union[str, InputMode] = InputMode.TABULAR,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
-            n_radiomics: int = 6,
+            n_features: int = 6,
             hidden_channels: Union[str, Sequence[int]] = (25, 25, 25),
             activation: Union[Tuple, str] = "PRELU",
             dropout: Union[Tuple, str, float] = 0.0,
@@ -55,7 +55,7 @@ class MLP(Predictor):
             Available modes are 'separated' or 'fully_shared'. If 'separated', a separate extractor model is used for
             each task. If 'fully_shared', a fully shared extractor model is used. All layers are shared between the
             tasks.
-        n_radiomics : int
+        n_features : int
             Number of radiomics features. Defaults to 5. This parameter is only used when `input_mode` is set to
             'radiomics' or 'hybrid'.
         hidden_channels : Union[str, Sequence[int]]
@@ -79,7 +79,7 @@ class MLP(Predictor):
             features_columns=features_columns,
             input_mode=input_mode,
             multi_task_mode=multi_task_mode,
-            n_radiomics=n_radiomics,
+            n_features=n_features,
             device=device,
             name=name,
             seed=seed
@@ -108,13 +108,13 @@ class MLP(Predictor):
             A single predictor module.
         """
         if self.input_mode == InputMode.RADIOMICS:
-            input_size = self.n_radiomics
+            input_size = self.n_features
         else:
             table_input_size = len(self.features_columns)
             if self.input_mode == InputMode.TABULAR:
                 input_size = table_input_size
             elif self.input_mode == InputMode.HYBRID:
-                input_size = table_input_size + self.n_radiomics
+                input_size = table_input_size + self.n_features
             else:
                 raise ValueError(f"Invalid input_mode: {self.input_mode}")
 

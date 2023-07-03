@@ -66,7 +66,7 @@ class Predictor(TorchModel, ABC):
             features_columns: Optional[Union[str, Sequence[str]]] = None,
             input_mode: Union[str, InputMode] = InputMode.TABULAR,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
-            n_radiomics: int = 5,
+            n_features: int = 6,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None
@@ -85,7 +85,7 @@ class Predictor(TorchModel, ABC):
             Available modes are 'separated' or 'fully_shared'. If 'separated', a separate extractor model is used for
             each task. If 'fully_shared', a fully shared extractor model is used. All layers are shared between the
             tasks.
-        n_radiomics : int
+        n_features : int
             Number of radiomics features. Defaults to 5. This parameter is only used when `input_mode` is set to
             'radiomics' or 'hybrid'.
         device : Optional[torch_device]
@@ -98,8 +98,8 @@ class Predictor(TorchModel, ABC):
         super().__init__(device=device, name=name, seed=seed)
 
         if input_mode == InputMode.RADIOMICS or input_mode == InputMode.HYBRID:
-            assert n_radiomics > 0, (
-                "n_radiomics must be greater than 0 when input_mode is set to 'radiomics' or 'hybrid'"
+            assert n_features > 0, (
+                "n_features must be greater than 0 when input_mode is set to 'radiomics' or 'hybrid'"
             )
 
         if features_columns is None or isinstance(features_columns, Sequence):
@@ -109,7 +109,7 @@ class Predictor(TorchModel, ABC):
 
         self.input_mode = InputMode(input_mode)
         self.multi_task_mode = MultiTaskMode(multi_task_mode)
-        self.n_radiomics = n_radiomics
+        self.n_features = n_features
 
         self.predictor = None
 
