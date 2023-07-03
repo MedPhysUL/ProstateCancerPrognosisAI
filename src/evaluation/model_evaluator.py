@@ -203,6 +203,7 @@ class ModelEvaluator(PredictionEvaluator):
             show: bool,
             path_to_save_folder: Optional[str] = None,
             threshold: Optional[Union[int, List[int], slice]] = None,
+            mask: Optional[List[int]] = None,
             **kwargs
     ) -> None:
         """
@@ -218,6 +219,9 @@ class ModelEvaluator(PredictionEvaluator):
             Either the threshold or a mask describing the patients to use when optimising the threshold to use when
             computing binary classification from continuous probability. If no values are given, then the threshold is
             computed using all patients.
+        mask : Optional[List[int]]
+            A mask to select which patients to use. If a subset was given, then the patient's ID refers to the position
+            within the subset and not the original dataset. If no mask is given, all patients are used.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.confusion_matrix.
         """
@@ -228,5 +232,6 @@ class ModelEvaluator(PredictionEvaluator):
             show=show,
             path_to_save_folder=path_to_save_folder,
             threshold=threshold,
+            mask=mask,
             **kwargs
         )

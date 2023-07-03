@@ -335,8 +335,9 @@ class PredictionEvaluator:
             self,
             show: bool,
             path_to_save_folder: Optional[str] = None,
+            mask: Optional[List[int]] = None,
             **kwargs
-    ) -> None: # ajouter un mask pour les méthodes qui le demande
+    ) -> None:
         """
         Creates the different graphs for classification task metrics that can be visualised in a 2D graph.
 
@@ -346,20 +347,24 @@ class PredictionEvaluator:
             Whether to show the graph.
         path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
+        mask : Optional[List[int]]
+            A mask to select which patients to use. If a subset was given, then the patient's ID refers to the position
+            within the subset and not the original dataset. If no mask is given, all patients are used.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
-        self.plot_confusion_matrix(show, path_to_save_folder, **kwargs)
-        self.plot_calibration_curve(show, path_to_save_folder, **kwargs)
-        self.plot_roc_curve(show, path_to_save_folder, **kwargs)
-        self.plot_precision_recall_curve(show, path_to_save_folder, **kwargs)
+        self.plot_confusion_matrix(show, path_to_save_folder, mask=mask, **kwargs)
+        self.plot_calibration_curve(show, path_to_save_folder, mask=mask, **kwargs)
+        self.plot_roc_curve(show, path_to_save_folder, mask=mask, **kwargs)
+        self.plot_precision_recall_curve(show, path_to_save_folder, mask=mask, **kwargs)
 
     def plot_survival_analysis_task_curves(
             self,
             show: bool,
             path_to_save_folder: Optional[str] = None,
+            mask: Optional[List[int]] = None,
             **kwargs
-    ) -> None: # ajouter un mask pour les méthodes qui le demande
+    ) -> None:
         """
         Creates the different graphs for survival analysis metrics that can be visualised in a 2D graph.
 
@@ -369,14 +374,17 @@ class PredictionEvaluator:
             Whether to show the graph.
         path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
+        mask : Optional[List[int]]
+            A mask to select which patients to use. If a subset was given, then the patient's ID refers to the position
+            within the subset and not the original dataset. If no mask is given, all patients are used.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
         self.plot_unique_times(show, path_to_save_folder, **kwargs)
         self.plot_cum_baseline_hazard(show, path_to_save_folder, **kwargs)
         self.plot_baseline_survival(show, path_to_save_folder, **kwargs)
-        self.plot_cum_hazard_function(show, path_to_save_folder, **kwargs)
-        self.plot_survival_function(show, path_to_save_folder, **kwargs)
+        self.plot_cum_hazard_function(show, path_to_save_folder, mask=mask, **kwargs)
+        self.plot_survival_function(show, path_to_save_folder, mask=mask, **kwargs)
 
     def plot_unique_times(
             self,
@@ -489,6 +497,7 @@ class PredictionEvaluator:
             self,
             show: bool,
             path_to_save_folder: Optional[str] = None,
+            mask: Optional[List[int]] = None,
             **kwargs
     ) -> None:
         """
@@ -500,13 +509,17 @@ class PredictionEvaluator:
             Whether to show the graph.
         path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
+        mask : Optional[List[int]]
+            A mask to select which patients to use. If a subset was given, then the patient's ID refers to the position
+            within the subset and not the original dataset. If no mask is given, all patients are used.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
         for task in self.tasks.survival_analysis_tasks:
             prediction = {}
             fig, arr = plt.subplots()
-            for prediction_element in self.predictions_list: # slice with a mask as argument
+            preds = self.slice_patient_dictionary(self.predictions_dict, patient_indexes=mask, separate_patients=True)
+            for prediction_element in preds:
                 if prediction.get(task.name, None) is not None:
                     prediction[task.name] = np.concatenate((prediction.get(task.name), prediction_element[task.name]))
                 else:
@@ -530,6 +543,7 @@ class PredictionEvaluator:
             self,
             show: bool,
             path_to_save_folder: Optional[str] = None,
+            mask: Optional[List[int]] = None,
             **kwargs
     ) -> None:
         """
@@ -541,13 +555,17 @@ class PredictionEvaluator:
             Whether to show the graph.
         path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
+        mask : Optional[List[int]]
+            A mask to select which patients to use. If a subset was given, then the patient's ID refers to the position
+            within the subset and not the original dataset. If no mask is given, all patients are used.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
         for task in self.tasks.survival_analysis_tasks:
             prediction = {}
             fig, arr = plt.subplots()
-            for prediction_element in self.predictions_list: # slice with a mask as argument
+            preds = self.slice_patient_dictionary(self.predictions_dict, patient_indexes=mask, separate_patients=True)
+            for prediction_element in preds:
                 if prediction.get(task.name, None) is not None:
                     prediction[task.name] = np.concatenate((prediction.get(task.name), prediction_element[task.name]))
                 else:
@@ -572,6 +590,7 @@ class PredictionEvaluator:
             show: bool,
             path_to_save_folder: Optional[str] = None,
             threshold: Optional[Union[int, List[int], slice]] = None,
+            mask: Optional[List[int]] = None,
             **kwargs
     ) -> None:
         """
@@ -587,6 +606,9 @@ class PredictionEvaluator:
             Either the threshold or a mask describing the patients to use when optimising the threshold to use when
             computing binary classification from continuous probability. If no values are given, then the threshold is
             computed using all patients.
+        mask : Optional[List[int]]
+            A mask to select which patients to use. If a subset was given, then the patient's ID refers to the position
+            within the subset and not the original dataset. If no mask is given, all patients are used.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.confusion_matrix.
         """
@@ -597,6 +619,7 @@ class PredictionEvaluator:
             show=show,
             path_to_save_folder=path_to_save_folder,
             threshold=threshold,
+            mask=mask,
             **kwargs
         )
 
@@ -605,6 +628,7 @@ class PredictionEvaluator:
             show: bool,
             path_to_save_folder: Optional[str] = None,
             threshold: Optional[Union[int, List[int], slice]] = None,
+            mask: Optional[List[int]] = None,
             **kwargs
     ) -> None:
         """
@@ -620,6 +644,9 @@ class PredictionEvaluator:
             Either the threshold or a mask describing the patients to use when optimising the threshold to use when
             computing binary classification from continuous probability. If no values are given, then the threshold is
             computed using all patients.
+        mask : Optional[List[int]]
+            A mask to select which patients to use. If a subset was given, then the patient's ID refers to the position
+            within the subset and not the original dataset. If no mask is given, all patients are used.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.confusion_matrix.
         """
@@ -627,7 +654,11 @@ class PredictionEvaluator:
             fig, arr = plt.subplots()
             if not isinstance(threshold, int):
                 threshold = task.decision_threshold_metric.threshold
-            y_true, y_pred = self.targets_dict[task.name], np.where(self.predictions_dict[task.name] >= threshold, 1, 0) # slice with a mask
+            y_true = self.slice_patient_dictionary(self.targets_dict, patient_indexes=mask)[task.name]
+            y_pred = np.where(
+                self.slice_patient_dictionary(self.predictions_dict, patient_indexes=mask)[task.name]
+                >= threshold, 1, 0
+            )
             matrix = confusion_matrix(
                 y_true,
                 y_pred,
@@ -655,6 +686,7 @@ class PredictionEvaluator:
             show: bool,
             path_to_save_folder: Optional[str] = None,
             normalize: bool = True,
+            mask: Optional[List[int]] = None,
             **kwargs
     ) -> None:
         """
@@ -668,12 +700,16 @@ class PredictionEvaluator:
             Whether to save the graph, if so, then this value is the path to the save folder.
         normalize : bool
             Whether to normalize the prediction probability, defaults to True.
+        mask : Optional[List[int]]
+            A mask to select which patients to use. If a subset was given, then the patient's ID refers to the position
+            within the subset and not the original dataset. If no mask is given, all patients are used.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.calibration.calibration_curve.
         """
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
-            y_true, y_prob = self.targets_dict[task.name], self.predictions_dict[task.name] # slice with a mask
+            y_true = self.slice_patient_dictionary(self.targets_dict, patient_indexes=mask)[task.name]
+            y_prob = self.slice_patient_dictionary(self.predictions_dict, patient_indexes=mask)[task.name]
             if normalize:
                 y_prob = (y_prob - y_prob.min()) / (y_prob.max() - y_prob.min())
             prob_true, prob_pred = calibration_curve(
@@ -703,6 +739,7 @@ class PredictionEvaluator:
             self,
             show: bool,
             path_to_save_folder: Optional[str] = None,
+            mask: Optional[List[int]] = None,
             **kwargs
     ) -> None:
         """
@@ -714,12 +751,16 @@ class PredictionEvaluator:
             Whether to show the graph.
         path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
+        mask : Optional[List[int]]
+            A mask to select which patients to use. If a subset was given, then the patient's ID refers to the position
+            within the subset and not the original dataset. If no mask is given, all patients are used.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.roc_curve.
         """
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
-            y_true, y_pred = self.targets_dict[task.name], self.predictions_dict[task.name] # slice with a mask
+            y_true = self.slice_patient_dictionary(self.targets_dict, patient_indexes=mask)[task.name]
+            y_pred = self.slice_patient_dictionary(self.predictions_dict, patient_indexes=mask)[task.name]
             fpr, tpr, threshold = roc_curve(
                 y_true,
                 y_pred,
@@ -746,6 +787,7 @@ class PredictionEvaluator:
             self,
             show: bool,
             path_to_save_folder: Optional[str] = None,
+            mask: Optional[List[int]] = None,
             **kwargs
     ) -> None:
         """
@@ -757,12 +799,16 @@ class PredictionEvaluator:
             Whether to show the graph.
         path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
+        mask : Optional[List[int]]
+            A mask to select which patients to use. If a subset was given, then the patient's ID refers to the position
+            within the subset and not the original dataset. If no mask is given, all patients are used.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.precision_recall_curve.
         """
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
-            y_true, y_pred = self.targets_dict[task.name], self.predictions_dict[task.name] # slice with a mask
+            y_true = self.slice_patient_dictionary(self.targets_dict, patient_indexes=mask)[task.name]
+            y_pred = self.slice_patient_dictionary(self.predictions_dict, patient_indexes=mask)[task.name]
             precision, recall, threshold = precision_recall_curve(
                 y_true,
                 y_pred,
