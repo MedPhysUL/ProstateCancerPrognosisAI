@@ -13,6 +13,7 @@ import os
 from typing import Dict, List, Optional, Union, NamedTuple, Tuple
 
 import shap
+from shap.plots import waterfall, beeswarm, bar, scatter, force
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 from captum.attr import IntegratedGradients
 import matplotlib.pyplot as plt
@@ -257,10 +258,36 @@ class PredictionModelExplainer:
         average_shap = {feature_names[i]: average_attributions[i] for i in range(len(feature_names))}
         return average_shap
 
+    @staticmethod
+    def terminate_figure(
+            show: bool,
+            path_to_save_folder: Optional[str] = None,
+            **kwargs
+    ) -> None:
+        """
+        Terminates current figure.
+
+        Parameters
+        ----------
+        path_to_save_folder : Optional[str]
+            Path to save the figure.
+        show : bool
+            Whether to show figure.
+        """
+
+        if path_to_save_folder is not None:
+            plt.savefig(path_to_save_folder, **kwargs)
+        if show:
+            plt.show()
+        plt.close()
+
     def plot_force(
             self,
             target: int,
-            patient_id: int
+            patient_id: int,
+            show: bool,
+            path_to_save_folder: Optional[str] = None,
+            **kwargs
     ):
         values = self.compute_table_shap_values(target=target)
         shap_values = shap.Explanation(
@@ -271,26 +298,49 @@ class PredictionModelExplainer:
         )
 
         shap.force_plot(shap_values[patient_id],
-                        matplotlib=True
+                        matplotlib=True,
+                        show=False
                         )
-        plt.close()
+        if path_to_save_folder is not None:
+            features = self.dataset.table_dataset.features_columns
+            path = os.path.join(
+                path_to_save_folder,
+                f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'force_plot.pdf')}"
+            )
+        else:
+            path = None
+        self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
 
     def plot_waterfall(
             self,
             target: int,
-            patient_id: int
+            patient_id: int,
+            show: bool,
+            path_to_save_folder: Optional[str] = None,
+            **kwargs
     ):
         values = self.compute_table_shap_values(target=target)
         shap_values = shap.Explanation(
             values=values,
             base_values=0
         )
-        shap.plots.waterfall(shap_values[patient_id])
-        plt.close()
+        shap.plots.waterfall(shap_values[patient_id], show=False)
+        if path_to_save_folder is not None:
+            features = self.dataset.table_dataset.features_columns
+            path = os.path.join(
+                path_to_save_folder,
+                f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'waterfall_plot.pdf')}"
+            )
+        else:
+            path = None
+        self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
 
     def plot_beeswarm(
             self,
-            target: int
+            target: int,
+            show: bool,
+            path_to_save_folder: Optional[str] = None,
+            **kwargs
     ):
         values = self.compute_table_shap_values(target=target)
         shap_values = shap.Explanation(
@@ -299,12 +349,23 @@ class PredictionModelExplainer:
             feature_names=self.dataset.table_dataset.features_columns,
             data=self.dataset.table_dataset.x
         )
-        shap.plots.beeswarm(shap_values)
-        plt.close()
+        shap.plots.beeswarm(shap_values, show=False)
+        if path_to_save_folder is not None:
+            features = self.dataset.table_dataset.features_columns
+            path = os.path.join(
+                path_to_save_folder,
+                f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'beeswarm_plot.pdf')}"
+            )
+        else:
+            path = None
+        self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
 
     def plot_bar(
             self,
-            target: int
+            target: int,
+            show: bool,
+            path_to_save_folder: Optional[str] = None,
+            **kwargs
     ):
         values = self.compute_table_shap_values(target=target)
         shap_values = shap.Explanation(
@@ -313,12 +374,23 @@ class PredictionModelExplainer:
             feature_names=self.dataset.table_dataset.features_columns,
             data=self.dataset.table_dataset.x
         )
-        shap.plots.bar(shap_values)
-        plt.close()
+        shap.plots.bar(shap_values, show=False)
+        if path_to_save_folder is not None:
+            features = self.dataset.table_dataset.features_columns
+            path = os.path.join(
+                path_to_save_folder,
+                f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'bar_plot.pdf')}"
+            )
+        else:
+            path = None
+        self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
 
     def plot_scatter(
             self,
-            target
+            target: int,
+            show: bool,
+            path_to_save_folder: Optional[str] = None,
+            **kwargs
     ):
         values = self.compute_table_shap_values(target=target)
         shap_values = shap.Explanation(
@@ -327,5 +399,13 @@ class PredictionModelExplainer:
             feature_names=self.dataset.table_dataset.features_columns,
             data=self.dataset.table_dataset.x
         )
-        shap.plots.scatter(shap_values)
-        plt.close()
+        shap.plots.scatter(shap_values, show=False)
+        if path_to_save_folder is not None:
+            features = self.dataset.table_dataset.features_columns
+            path = os.path.join(
+                path_to_save_folder,
+                f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'scatter_plot.pdf')}"
+            )
+        else:
+            path = None
+        self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
