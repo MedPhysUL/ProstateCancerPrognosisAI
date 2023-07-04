@@ -46,7 +46,9 @@ from src.tuning.hyperparameters.torch import (
 
 
 def get_dataframes_dictionary(
-        path_to_dataframes_folder: str
+        path_to_dataframes_folder: str,
+        n_outer_loops: int,
+        n_inner_loops: int
 ) -> Dict[int, Dict[str, Union[pd.DataFrame, Dict[int, pd.DataFrame]]]]:
     """
     This function returns a dictionary of dataframes. The keys of the first level are the outer split indices. The keys
@@ -56,16 +58,18 @@ def get_dataframes_dictionary(
     ----------
     path_to_dataframes_folder : str
         The path to the folder containing the dataframes.
+    n_outer_loops : int
+        The number of outer loops.
+    n_inner_loops : int
+        The number of inner loops.
 
     Returns
     -------
     dataframes_dict : Dict[int, Dict[str, Union[pd.DataFrame, Dict[int, pd.DataFrame]]]]
         The dictionary of dataframes.
     """
-    n_outer_splits = len(os.listdir(path_to_dataframes_folder))
-
     dataframes = {}
-    for k in range(n_outer_splits):
+    for k in range(n_outer_loops):
         path_to_outer_split_folder = os.path.join(path_to_dataframes_folder, f"outer_split_{k}")
 
         dataframes[k] = {}
@@ -73,8 +77,7 @@ def get_dataframes_dictionary(
         dataframes[k][str(Split.INNER)] = {}
 
         path_to_inner_splits_folder = os.path.join(path_to_outer_split_folder, "inner_splits")
-        n_inner_splits = len(os.listdir(path_to_inner_splits_folder))
-        for l in range(n_inner_splits):
+        for l in range(n_inner_loops):
             path_to_inner_split = os.path.join(path_to_inner_splits_folder, f"inner_split_{l}.csv")
             dataframes[k][str(Split.INNER)][l] = pd.read_csv(path_to_inner_split)
 
@@ -85,7 +88,11 @@ if __name__ == '__main__':
     LR_HIGH_BOUND_DICT = {BCR: 1e-2, CRPC: 5e-3, DEATH: 5e-3, HTX: 1e-2, METASTASIS: 5e-3, PN: 1e-2}
 
     for task in TABLE_TASKS:
-        df_dict = get_dataframes_dictionary(path_to_dataframes_folder=os.path.join(RADIOMICS_PATH, task.target_column))
+        df_dict = get_dataframes_dictionary(
+            path_to_dataframes_folder=os.path.join(RADIOMICS_PATH, task.target_column),
+            n_outer_loops=5,
+            n_inner_loops=5
+        )
 
         table_dataset = TableDataset(
             dataframe=df_dict[0][str(Split.OUTER)],  # Dummy dataset - Never used
