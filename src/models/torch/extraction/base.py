@@ -351,7 +351,11 @@ class Extractor(TorchModel, ABC):
         extractor_output = self.extractor(x_image)
 
         radiomics = self._get_radiomics(extractor_output.deep_features)
-        output = ExtractorOutput(deep_features=radiomics, segmentation=extractor_output.segmentation)
+        output = ExtractorOutput(
+            deep_features=radiomics,
+            segmentation=extractor_output.segmentation,
+            kl_divergence=extractor_output.kl_divergence
+        )
 
         if self.model_mode == ModelMode.EXTRACTION:
             return output

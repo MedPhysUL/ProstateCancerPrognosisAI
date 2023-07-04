@@ -5,13 +5,13 @@
     @Creation Date:     06/2022
     @Last modification: 06/2023
 
-    @Description:       This file is used to define a UNEXtractor model. TODO -- possib de changer priors et positeriors?
+    @Description:       This file is used to define a UNEXtractor model.
 """
 
 from __future__ import annotations
 from typing import List, Optional, Sequence, Union
 
-from torch import cat, mean, Tensor, zeros
+from torch import cat, mean, sum, Tensor
 from torch import device as torch_device
 from torch.nn import DataParallel, Module, ModuleDict, Sequential
 
@@ -69,13 +69,13 @@ class _UNet(Module):
         x = input_tensor
         features = []
 
-        kl_sum = zeros([1])
+        kl_list = []
 
         layers_output = {}
         for key, encoder in self.encoders.items():
             x, kl = encoder(x)
             layers_output[key] = x
-            kl_sum += kl
+            kl_list.append(kl)
 
             global_average_pool = mean(x, dim=dim)
             features.append(global_average_pool)
@@ -84,9 +84,9 @@ class _UNet(Module):
 
         for key, decoder in reversed(list(self.decoders.items())):
             x, kl = decoder(cat([layers_output[key], x], dim=1))
-            kl_sum += kl
+            kl_list.append(kl)
 
-        return ExtractorOutput(deep_features=features, segmentation=x, kl_divergence=kl_sum)
+        return ExtractorOutput(deep_features=features, segmentation=x, kl_divergence=sum(cat(kl_list)))
 
     def _deterministic_forward(self, input_tensor: Tensor) -> ExtractorOutput:
         """

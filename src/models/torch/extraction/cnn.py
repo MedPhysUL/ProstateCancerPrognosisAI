@@ -11,7 +11,7 @@
 from __future__ import annotations
 from typing import List, Optional, Sequence, Union
 
-from torch import cat, mean, Tensor, zeros
+from torch import cat, mean, sum, Tensor
 from torch import device as torch_device
 from torch.nn import DataParallel, Module, Sequential
 
@@ -63,18 +63,18 @@ class _Encoder(Module):
         x = input_tensor
         features = []
 
-        kl_sum = zeros([1])
+        kl_list = []
 
         for i, conv in enumerate(self.conv_sequence):
             x, kl = conv(x)
-            kl_sum += kl
+            kl_list.append(kl)
 
             global_average_pool = mean(x, dim=dim)
             features.append(global_average_pool)
 
         features = cat(features, dim=1)
 
-        return ExtractorOutput(deep_features=features, segmentation=None, kl_divergence=kl_sum)
+        return ExtractorOutput(deep_features=features, segmentation=None, kl_divergence=sum(cat(kl_list)))
 
     def _deterministic_forward(self, input_tensor: Tensor) -> ExtractorOutput:
         """

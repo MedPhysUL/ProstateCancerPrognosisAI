@@ -5,7 +5,7 @@
     @Creation Date:     06/2022
     @Last modification: 06/2023
 
-    @Description:       This file contains blocks to build image processing models. TODO -- prior mean default dans upconv?
+    @Description:       This file contains blocks to build image processing models.
 """
 
 from typing import Sequence, Union
@@ -18,7 +18,7 @@ from bayesian_torch.layers.variational_layers.conv_variational import (
 from monai.networks.blocks import ADN
 from monai.networks.layers.convutils import same_padding
 import numpy as np
-from torch import Tensor, zeros
+from torch import cat, sum, Tensor
 from torch.nn import Conv3d, ConvTranspose3d, Identity, Module, Sequential
 
 
@@ -61,6 +61,8 @@ class EncoderBlock(Module):
             Dropout probability to be used in NDA layers.
         """
         super().__init__()
+
+        self.num_res_units = num_res_units
 
         padding = same_padding(kernel_size=kernel_size, dilation=1)
 
@@ -152,9 +154,13 @@ class EncoderBlock(Module):
             Output tensor.
         """
         y = self.conv(x)
-        y_res = self.residual(x)
 
-        return y + y_res
+        if self.num_res_units > 0:
+            y_res = self.residual(x)
+            return y + y_res
+
+        else:
+            return y
 
 
 class DecoderBlock(Module):
@@ -281,6 +287,7 @@ class DecoderBlock(Module):
         """
         y = self.up_conv(x)
 
+        # Residual block following upsizing
         if self.num_res_units > 0:
             y_res = self.residual(y)
             y = self.conv(y)
@@ -345,6 +352,8 @@ class BayesianEncoderBlock(Module):
             approximate of the posterior distribution.
         """
         super().__init__()
+
+        self.num_res_units = num_res_units
 
         padding = same_padding(kernel_size=kernel_size, dilation=1)
 
@@ -447,22 +456,25 @@ class BayesianEncoderBlock(Module):
         return : tuple[Tensor, Tensor]
             Tuple containing the transformed tensor and the sum of the KL divergence of each probabilistic operation.
         """
-        kl_sum = zeros([1])
+        kl_list = []
 
         y = x
         for name, module in self.conv.named_children():
             if name.startswith("conv"):     # Module is a convolution layer
                 y, kl = module(y)
-                kl_sum += kl
+                kl_list.append(kl)
 
             else:                           # Module is a NDA layer
                 y = module(y)
 
-        # Residual path
-        y_res, kl = self.residual(x)
-        kl_sum += kl
+        if self.num_res_units > 0:
+            y_res, kl = self.residual(x)
+            kl_list.append(kl)
 
-        return y + y_res, kl_sum
+            return y + y_res, sum(cat(kl_list))
+
+        else:
+            return y, sum(cat(kl_list))
 
 
 class BayesianDecoderBlock(Module):
@@ -481,10 +493,10 @@ class BayesianDecoderBlock(Module):
             norm: str = "INSTANCE",
             dropout: float = 0.0,
             is_top: bool = False,
-            prior_mean: float = ...,
-            prior_variance: float = ...,
-            posterior_mu_init: float = ...,
-            posterior_rho_init: float = ...,
+            prior_mean: float = 0.0,
+            prior_variance: float = 0.1,
+            posterior_mu_init: float = 0.0,
+            posterior_rho_init: float = -3.0,
     ):
         """
         Builds the operations used by the bayesian encoder block. Implements variational inference for
@@ -610,12 +622,12 @@ class BayesianDecoderBlock(Module):
         output : tuple[Tensor, Tensor]
             Tuple containing the transformed tensor and the sum of the KL divergence of each probabilistic operation.
         """
-        kl_sum = zeros([1])
+        kl_list = []
 
         for name, module in self.up_conv.named_children():
             if name.startswith("conv"):     # Module is a convolution layer
                 x, kl = module(x)
-                kl_sum += kl
+                kl_list.append(kl)
 
             else:                           # Module is a NDA layer
                 x = module(x)
@@ -627,11 +639,11 @@ class BayesianDecoderBlock(Module):
             for name, module in self.conv.named_children():
                 if name.startswith("conv"):     # Module is a convolution layer
                     x, kl = module(x)
-                    kl_sum += kl
+                    kl_list.append(kl)
                 else:                           # Module is a NDA layer
                     x = module(x)
 
-            return x + res, kl_sum
+            return x + res, sum(cat(kl_list))
 
         else:
-            return x, kl_sum
+            return x, sum(cat(kl_list))
