@@ -35,12 +35,20 @@ from ..tools.transforms import to_numpy
 
 class CaptumWrapper(torch.nn.Module):
     """
-
+    A wrapper to allow the usage of captum with the modified models requiring FeaturesType input and having TargetsType
+    outputs.
     """
 
     def __init__(self, model: Model, dataset: ProstateCancerDataset, *args, **kwargs):
         """
+        Creates the required variables.
 
+        Parameters
+        ----------
+        model : Model
+            The model to use.
+        dataset : ProstateCancerDataset
+            The dataset to transform and use as an input.
         """
         super().__init__(*args, **kwargs)
         self.model = model
@@ -53,7 +61,7 @@ class CaptumWrapper(torch.nn.Module):
             tensor_tuple: TensorOrTupleOfTensorsGeneric
     ) -> FeaturesType:
         """
-        Transforms a (N, M) tensor or a tuple of M (N, ) tensors into a FeaturesType.
+        Transforms a (N, M) tensor or a tuple of M tensors of shape (N, ) into a FeaturesType.
 
         Parameters
         ----------
@@ -83,7 +91,7 @@ class CaptumWrapper(torch.nn.Module):
             tensor_tuple: TensorOrTupleOfTensorsGeneric
     ) -> TargetsType:
         """
-        Transforms a (N, M) tensor or a tuple of M (N, ) tensors into a TargetsType.
+        Transforms a (N, M) tensor or a tuple of M tensors of shape (N, ) into a TargetsType.
 
         Parameters
         ----------
@@ -102,7 +110,7 @@ class CaptumWrapper(torch.nn.Module):
             features: FeaturesType
     ) -> Tuple[torch.Tensor, ...]:
         """
-        Transforms a FeaturesType into a tuple of M (N, ) tensors.
+        Transforms a FeaturesType into a tuple of M tensors of shape (N, ).
 
         Parameters
         ----------
@@ -133,7 +141,7 @@ class CaptumWrapper(torch.nn.Module):
             ignore_seg_tasks: bool = False
     ) -> Tuple[torch.Tensor, ...]:
         """
-        Transforms a TargetsType into a tuple of M (N, ) tensors.
+        Transforms a TargetsType into a tuple of M tensors of shape (N, ).
 
         Parameters
         ----------
@@ -167,14 +175,24 @@ class CaptumWrapper(torch.nn.Module):
         """
         Wrapper around the forward method of the model to use tensors as input and output rather than FeaturesType and
         TargetsType.
+
+        Parameters
+        ----------
+        inputs : TensorOrTupleOfTensorsGeneric
+            Data in the form of tensors or tuple of tensors.
+
+        Returns
+        -------
+        prediction_tensor : torch.Tensor
+            Predictions in the form of a Tensor.
         """
         inputs = self.convert_tensor_to_features_type(tuple([*inputs]))
 
         targets_type = self.model(inputs)
         target_tensor = self.convert_targets_type_to_tuple_of_tensor(targets_type, ignore_seg_tasks=True)
-        target_tensor = torch.stack(target_tensor, dim=0)
+        prediction_tensor = torch.stack(target_tensor, dim=0)
 
-        return target_tensor
+        return prediction_tensor
 
 
 class PredictionModelExplainer:
@@ -186,17 +204,40 @@ class PredictionModelExplainer:
             self,
             model: Model,
             dataset: ProstateCancerDataset,
-    ):
+    ) -> None:
+        """
+        Sets the required variables of the class.
+
+        Parameters
+        ----------
+        model : Model
+            The model to explain.
+        dataset : ProstateCancerDataset
+            The dataset with which to explain the model.
+        """
         self.model = CaptumWrapper(model, dataset)
         self.dataset = dataset
 
     def compute_table_shap_values(
             self,
-            target,
+            target: int,
             mask: Optional[List[int]] = None
-    ):
+    ) -> np.ndarray:
         """
+        Computes the shap values for the tabular data used within the model.
 
+        Parameters
+        ----------
+        target : int
+            Index of the output for which the shap values are desired.
+        mask : Optional[List[int]]
+            Mask to select the patients used when computing the shap values.
+
+        Returns
+        -------
+        shap_values : np.ndarray
+            Array of the shap values for the patients, with the first dimension being the patients and the second the
+            features.
         """
         integrated_gradient = IntegratedGradients(self.model)
         rng_state = torch.random.get_rng_state()
@@ -226,36 +267,75 @@ class PredictionModelExplainer:
 
     def compute_average_shap_values(
             self,
-            target: int, # si list de int, avoir un subplot de tous les targets
-            mask: Optional[List[int]],
+            targets: Union[int, List[int]],
+            mask: Optional[List[int]] = None,
             show: bool = True,
             path_to_save_folder: Optional[str] = None,
             **kwargs
-    ):
+    ) -> Dict[str, float]:
         """
+        Computes the average shap values and shows them in a graph.
 
+        Parameters
+        ----------
+        targets : Union[int, List[int]]
+            The index or a list of the indexes of the desired output for which to compute the shap values.
+        mask : Optional[List[int]]
+            A mask to select which patients to use.
+        show : bool
+            Whether to show the graph
+        path_to_save_folder : Optional[str]
+            The path to the folder within which to save the graph, if no path is given then the graph is not saved.
+        kwargs
+            Kwargs to give to matplotlib.pyplot.savefig.
+
+        Returns
+        -------
+        average_shap : Dict[str, float]
+            A dictionary of the average shap value for each feature.
         """
-        fig, arr = plt.subplots()
-        feature_names = self.dataset.table_dataset.features_columns
-        average_attributions = np.mean(self.compute_table_shap_values(target=target, mask=mask), axis=0)
+        if not isinstance(targets, list):
+            targets = [targets]
+        average_attributions = {}
+        feature_names = []
 
-        if path_to_save_folder is not None:
-            path_to_save_folder = os.path.join(
-                path_to_save_folder,
-                f"{kwargs.get('filename', 'average_shap_values.pdf')}"
-            )
-        title = kwargs.get('title', "Average Feature Importances")
-        axis_title = kwargs.get('axis', "Features")
-        x_pos = (np.arange(len(feature_names)))
+        for target in targets:
+            fig, arr = plt.subplots()
+            feature_names = self.dataset.table_dataset.features_columns
+            average_attributions = {
+                target: np.mean(self.compute_table_shap_values(target=target, mask=mask), axis=0)
+                for target in targets
+            }
 
-        arr.bar(x_pos, average_attributions, align='center')
-        arr.set_xticks(x_pos, feature_names, wrap=True)
-        arr.set_xlabel(axis_title)
-        arr.set_title(title)
+            if path_to_save_folder is not None:
+                path_to_save_folder = os.path.join(
+                    path_to_save_folder,
+                    f"{kwargs.get('filename', 'average_shap_values.pdf')}"
+                )
+            title = kwargs.get('title', "Average Feature Importances")
+            axis_title = kwargs.get('axis', "Features")
+            x_pos = (np.arange(len(feature_names)))
 
-        PredictionEvaluator.terminate_figure(fig=fig, show=show, path_to_save_folder=path_to_save_folder)
+            arr.bar(x_pos, average_attributions[target], align='center')
+            arr.set_xticks(x_pos, feature_names, wrap=True)
+            arr.set_xlabel(axis_title)
+            arr.set_title(title)
 
-        average_shap = {feature_names[i]: average_attributions[i] for i in range(len(feature_names))}
+            if path_to_save_folder is not None:
+                features = self.dataset.table_dataset.features_columns
+                path = os.path.join(
+                    path_to_save_folder,
+                    f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'average_shap_plot.pdf')}"
+                )
+            else:
+                path = None
+
+            PredictionEvaluator.terminate_figure(fig=fig, show=show, path_to_save_folder=path)
+
+        average_shap = {
+            target: {feature_names[i]: average_attributions[target][i] for i in range(len(feature_names))}
+            for target in targets
+        }
         return average_shap
 
     @staticmethod
@@ -274,7 +354,6 @@ class PredictionModelExplainer:
         show : bool
             Whether to show figure.
         """
-
         if path_to_save_folder is not None:
             plt.savefig(path_to_save_folder, **kwargs)
         if show:
@@ -283,129 +362,208 @@ class PredictionModelExplainer:
 
     def plot_force(
             self,
-            target: int,
+            targets: Union[int, List[int]],
             patient_id: int,
             show: bool,
             path_to_save_folder: Optional[str] = None,
             **kwargs
-    ):
-        values = self.compute_table_shap_values(target=target)
-        shap_values = shap.Explanation(
-            values=values,
-            base_values=np.zeros_like(values),
-            feature_names=self.dataset.table_dataset.features_columns,
-            data=self.dataset.table_dataset.x
-        )
+    ) -> None:
+        """
+        Computes the force graph.
 
-        shap.force_plot(shap_values[patient_id],
-                        matplotlib=True,
-                        show=False
-                        )
-        if path_to_save_folder is not None:
-            features = self.dataset.table_dataset.features_columns
-            path = os.path.join(
-                path_to_save_folder,
-                f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'force_plot.pdf')}"
+        Parameters
+        ----------
+        targets : Union[int, List[int]]
+            The index or a list of the indexes of the desired output for which to compute the shap values.
+        patient_id : int
+            The index of the patient for whom to compute the graph.
+        show : bool
+            Whether to show the graph
+        path_to_save_folder : Optional[str]
+            The path to the folder within which to save the graph, if no path is given then the graph is not saved.
+        kwargs
+            Kwargs to give to matplotlib.pyplot.savefig.
+        """
+        for target in targets:
+            values = self.compute_table_shap_values(target=target)
+            shap_values = shap.Explanation(
+                values=values,
+                base_values=np.zeros_like(values),
+                feature_names=self.dataset.table_dataset.features_columns,
+                data=self.dataset.table_dataset.x
             )
-        else:
-            path = None
-        self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
+
+            shap.force_plot(shap_values[patient_id],
+                            matplotlib=True,
+                            show=False
+                            )
+            if path_to_save_folder is not None:
+                features = self.dataset.table_dataset.features_columns
+                path = os.path.join(
+                    path_to_save_folder,
+                    f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'force_plot.pdf')}"
+                )
+            else:
+                path = None
+            self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
 
     def plot_waterfall(
             self,
-            target: int,
+            targets: Union[int, List[int]],
             patient_id: int,
             show: bool,
             path_to_save_folder: Optional[str] = None,
             **kwargs
-    ):
-        values = self.compute_table_shap_values(target=target)
-        shap_values = shap.Explanation(
-            values=values,
-            base_values=0
-        )
-        shap.plots.waterfall(shap_values[patient_id], show=False)
-        if path_to_save_folder is not None:
-            features = self.dataset.table_dataset.features_columns
-            path = os.path.join(
-                path_to_save_folder,
-                f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'waterfall_plot.pdf')}"
+    ) -> None:
+        """
+        Computes the waterfall graph.
+
+        Parameters
+        ----------
+        targets : Union[int, List[int]]
+            The index or a list of the indexes of the desired output for which to compute the shap values.
+        patient_id : int
+            The index of the patient for whom to compute the graph.
+        show : bool
+            Whether to show the graph
+        path_to_save_folder : Optional[str]
+            The path to the folder within which to save the graph, if no path is given then the graph is not saved.
+        kwargs
+            Kwargs to give to matplotlib.pyplot.savefig.
+        """
+        for target in targets:
+            values = self.compute_table_shap_values(target=target)
+            shap_values = shap.Explanation(
+                values=values,
+                base_values=0
             )
-        else:
-            path = None
-        self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
+            shap.plots.waterfall(shap_values[patient_id], show=False)
+            if path_to_save_folder is not None:
+                features = self.dataset.table_dataset.features_columns
+                path = os.path.join(
+                    path_to_save_folder,
+                    f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'waterfall_plot.pdf')}"
+                )
+            else:
+                path = None
+            self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
 
     def plot_beeswarm(
             self,
-            target: int,
+            targets: Union[int, List[int]],
             show: bool,
             path_to_save_folder: Optional[str] = None,
             **kwargs
-    ):
-        values = self.compute_table_shap_values(target=target)
-        shap_values = shap.Explanation(
-            values=values,
-            base_values=0,
-            feature_names=self.dataset.table_dataset.features_columns,
-            data=self.dataset.table_dataset.x
-        )
-        shap.plots.beeswarm(shap_values, show=False)
-        if path_to_save_folder is not None:
-            features = self.dataset.table_dataset.features_columns
-            path = os.path.join(
-                path_to_save_folder,
-                f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'beeswarm_plot.pdf')}"
+    ) -> None:
+        """
+        Computes the waterfall graph.
+
+        Parameters
+        ----------
+        targets : Union[int, List[int]]
+            The index or a list of the indexes of the desired output for which to compute the shap values.
+        show : bool
+            Whether to show the graph
+        path_to_save_folder : Optional[str]
+            The path to the folder within which to save the graph, if no path is given then the graph is not saved.
+        kwargs
+            Kwargs to give to matplotlib.pyplot.savefig.
+        """
+        for target in targets:
+            values = self.compute_table_shap_values(target=target)
+            shap_values = shap.Explanation(
+                values=values,
+                base_values=0,
+                feature_names=self.dataset.table_dataset.features_columns,
+                data=self.dataset.table_dataset.x
             )
-        else:
-            path = None
-        self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
+            shap.plots.beeswarm(shap_values, show=False)
+            if path_to_save_folder is not None:
+                features = self.dataset.table_dataset.features_columns
+                path = os.path.join(
+                    path_to_save_folder,
+                    f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'beeswarm_plot.pdf')}"
+                )
+            else:
+                path = None
+            self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
 
     def plot_bar(
             self,
-            target: int,
+            targets: Union[int, List[int]],
             show: bool,
             path_to_save_folder: Optional[str] = None,
             **kwargs
-    ):
-        values = self.compute_table_shap_values(target=target)
-        shap_values = shap.Explanation(
-            values=values,
-            base_values=np.zeros_like(values),
-            feature_names=self.dataset.table_dataset.features_columns,
-            data=self.dataset.table_dataset.x
-        )
-        shap.plots.bar(shap_values, show=False)
-        if path_to_save_folder is not None:
-            features = self.dataset.table_dataset.features_columns
-            path = os.path.join(
-                path_to_save_folder,
-                f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'bar_plot.pdf')}"
+    ) -> None:
+        """
+        Computes the waterfall graph.
+
+        Parameters
+        ----------
+        targets : Union[int, List[int]]
+            The index or a list of the indexes of the desired output for which to compute the shap values.
+        show : bool
+            Whether to show the graph
+        path_to_save_folder : Optional[str]
+            The path to the folder within which to save the graph, if no path is given then the graph is not saved.
+        kwargs
+            Kwargs to give to matplotlib.pyplot.savefig.
+        """
+        for target in targets:
+            values = self.compute_table_shap_values(target=target)
+            shap_values = shap.Explanation(
+                values=values,
+                base_values=np.zeros_like(values),
+                feature_names=self.dataset.table_dataset.features_columns,
+                data=self.dataset.table_dataset.x
             )
-        else:
-            path = None
-        self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
+            shap.plots.bar(shap_values, show=False)
+            if path_to_save_folder is not None:
+                features = self.dataset.table_dataset.features_columns
+                path = os.path.join(
+                    path_to_save_folder,
+                    f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'bar_plot.pdf')}"
+                )
+            else:
+                path = None
+            self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
 
     def plot_scatter(
             self,
-            target: int,
+            targets: Union[int, List[int]],
             show: bool,
             path_to_save_folder: Optional[str] = None,
             **kwargs
-    ):
-        values = self.compute_table_shap_values(target=target)
-        shap_values = shap.Explanation(
-            values=values,
-            base_values=np.zeros_like(values),
-            feature_names=self.dataset.table_dataset.features_columns,
-            data=self.dataset.table_dataset.x
-        )
-        shap.plots.scatter(shap_values, show=False)
-        if path_to_save_folder is not None:
-            features = self.dataset.table_dataset.features_columns
-            path = os.path.join(
-                path_to_save_folder,
-                f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'scatter_plot.pdf')}"
+    ) -> None:
+        """
+        Computes the waterfall graph.
+
+        Parameters
+        ----------
+        targets : Union[int, List[int]]
+            The index or a list of the indexes of the desired output for which to compute the shap values.
+        show : bool
+            Whether to show the graph
+        path_to_save_folder : Optional[str]
+            The path to the folder within which to save the graph, if no path is given then the graph is not saved.
+        kwargs
+            Kwargs to give to matplotlib.pyplot.savefig.
+        """
+        for target in targets:
+            values = self.compute_table_shap_values(target=target)
+            shap_values = shap.Explanation(
+                values=values,
+                base_values=np.zeros_like(values),
+                feature_names=self.dataset.table_dataset.features_columns,
+                data=self.dataset.table_dataset.x
             )
-        else:
-            path = None
-        self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
+            shap.plots.scatter(shap_values, show=False)
+            if path_to_save_folder is not None:
+                features = self.dataset.table_dataset.features_columns
+                path = os.path.join(
+                    path_to_save_folder,
+                    f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'scatter_plot.pdf')}"
+                )
+            else:
+                path = None
+            self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
