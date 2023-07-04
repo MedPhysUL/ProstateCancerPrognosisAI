@@ -231,14 +231,12 @@ if __name__ == "__main__":
     )
 
     # CUSTOM
-    path_to_custom_nomogram = os.path.join(PATH_TO_NOMOGRAMS_FOLDER, "CUSTOM")
-    os.makedirs(path_to_custom_nomogram, exist_ok=True)
     nomogram_dataframe.save_outer_splits_dataframes(
-        path_to_folder=os.path.join(path_to_custom_nomogram, "clinical"),
+        path_to_folder=os.path.join(PATH_TO_NOMOGRAMS_FOLDER, "CUSTOM"),
         masks=masks
     )
     nomogram_dataframe.save_final_dataframe(
-        path_to_folder=os.path.join(path_to_custom_nomogram, "clinical"),
+        path_to_folder=os.path.join(PATH_TO_NOMOGRAMS_FOLDER, "CUSTOM"),
         train_mask=list(range(len(learning_df))),
         test_mask=list(range(len(learning_df), len(learning_df) + len(holdout_df)))
     )
