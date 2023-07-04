@@ -32,8 +32,7 @@ class MLP(Predictor):
             input_mode: Union[str, InputMode] = InputMode.TABULAR,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
             n_features: int = 6,
-            n_hidden_layers: int = 3,
-            n_hidden_neurons: int = 25,
+            hidden_channels: Union[str, Sequence[int]] = (25, 25, 25),
             activation: Union[Tuple, str] = "PRELU",
             dropout: Union[Tuple, str, float] = 0.0,
             bias: bool = True,
@@ -59,10 +58,8 @@ class MLP(Predictor):
         n_features : int
             Number of radiomics features. Defaults to 5. This parameter is only used when `input_mode` is set to
             'radiomics' or 'hybrid'.
-        n_hidden_layers : int
-            Number of hidden layers. Defaults to 3.
-        n_hidden_neurons : int
-            Number of neurons per hidden layer. Defaults to 25.
+        hidden_channels : Union[str, Sequence[int]]
+            List with number of units in each hidden layer. Defaults to (25, 25, 25).
         activation : Union[Tuple, str]
             Activation function. Defaults to "PRELU".
         dropout : Union[Tuple, str, float]
@@ -88,7 +85,7 @@ class MLP(Predictor):
             seed=seed
         )
 
-        self.hidden_channels = [n_hidden_neurons] * n_hidden_layers
+        self.hidden_channels = literal_eval(hidden_channels) if isinstance(hidden_channels, str) else hidden_channels
         self.activation = activation
         self.dropout = dropout
         self.bias = bias

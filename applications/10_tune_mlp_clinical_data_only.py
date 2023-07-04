@@ -27,8 +27,7 @@ from src.tuning.callbacks import TuningRecorder
 from src.tuning.hyperparameters.optuna import (
     CategoricalHyperparameter,
     FixedHyperparameter,
-    FloatHyperparameter,
-    IntegerHyperparameter
+    FloatHyperparameter
 )
 from src.tuning.hyperparameters.torch import (
     CheckpointHyperparameter,
@@ -82,8 +81,10 @@ if __name__ == '__main__':
             constructor=MLP,
             parameters={
                 "activation": FixedHyperparameter(name="activation", value="PReLU"),
-                "n_hidden_layers": IntegerHyperparameter(name="n_hidden_layers", low=1, high=3),
-                "n_hidden_neurons": IntegerHyperparameter(name="n_hidden_neurons", low=10, high=30, step=10),
+                "hidden_channels": CategoricalHyperparameter(
+                    name="hidden_channels",
+                    choices=["(10, 10, 10)", "(20, 20, 20)", "(30, 30, 30)"]
+                ),
                 "dropout": FloatHyperparameter(name="dropout", low=0.05, high=0.25)
             }
         )
