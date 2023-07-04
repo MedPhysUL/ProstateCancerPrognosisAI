@@ -224,43 +224,6 @@ class RadiomicsDataframe:
         else:
             return dataframe
 
-    def save_outer_splits_dataframes(
-            self,
-            path_to_folder: str,
-            radiomics_df: pd.DataFrame,
-            masks: dict,
-            show: bool = False
-    ):
-        """
-        This method saves the outer splits dataframes.
-
-        Parameters
-        ----------
-        path_to_folder : str
-            The path to the folder where to save the dataframes.
-        radiomics_df : pd.DataFrame
-            The radiomics dataframe.
-        masks : dict
-            The masks.
-        show : bool
-            If True, it shows the feature importance.
-        """
-        os.makedirs(path_to_folder, exist_ok=True)
-        for task in TABLE_TASKS:
-            path_to_task = os.path.join(path_to_folder, task.target_column)
-            os.makedirs(path_to_task, exist_ok=True)
-            for k, v in masks.items():
-                dataframe = self._get_imputed_dataframe(
-                    radiomics_df=radiomics_df,
-                    target_col=task.target_column,
-                    train_mask=v[Mask.TRAIN],
-                    valid_mask=v[Mask.VALID],
-                    test_mask=v[Mask.TEST],
-                    show=show
-                )
-
-                dataframe.to_csv(os.path.join(path_to_task, f"{self.OUTER_SPLIT_KEY}_{k}.csv"), index=False)
-
     def save_outer_and_inner_splits_dataframes(
             self,
             path_to_folder: str,
@@ -334,6 +297,8 @@ class RadiomicsDataframe:
             radiomics_df: pd.DataFrame,
             train_mask: List[int],
             test_mask: List[int],
+            clinical_stage_column: str,
+            mapping: Dict[Union[float, int], str],
             show: bool = False
     ):
         """
@@ -349,6 +314,10 @@ class RadiomicsDataframe:
             The train mask.
         test_mask : List[int]
             The test mask.
+        clinical_stage_column : str
+            The clinical stage column.
+        mapping : Dict[Union[float, int], str]
+            The mapping.
         show : bool
             If True, it shows the feature importance.
 
@@ -367,6 +336,8 @@ class RadiomicsDataframe:
                 target_col=task.target_column,
                 train_mask=train_mask,
                 test_mask=test_mask,
+                clinical_stage_column=clinical_stage_column,
+                mapping=mapping,
                 show=show
             )
 
@@ -424,7 +395,28 @@ if __name__ == "__main__":
 
     masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=5)
 
-    PATH_TO_NOMOGRAMS_FOLDER = "local_data/nomograms"
+    # Outer and inner split
+    table_dataset = TableDataset(
+        dataframe=pd.read_csv(LEARNING_TABLE_PATH),
+        ids_column=ID,
+        tasks=TABLE_TASKS,
+        continuous_features=[AGE, PSA],
+        categorical_features=[CLINICAL_STAGE, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY]
+    )
+
+    radiomics_dataframe = RadiomicsDataframe(table_dataset=table_dataset)
+
+    ct_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/learning_ct_radiomics.csv", "CT")
+    pt_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/learning_pt_radiomics.csv", "PT")
+    radiomics_df = pd.concat([ct_radiomics_df, pt_radiomics_df], axis=1)
+
+    radiomics_dataframe.save_outer_and_inner_splits_dataframes(
+        path_to_folder="local_data/radiomics",
+        radiomics_df=radiomics_df,
+        masks=masks,
+        clinical_stage_column=CLINICAL_STAGE.column,
+        mapping={0: "T1-T2", 1: "T3a"}
+    )
 
     # Final set
     learning_df, holdout_df = pd.read_csv(LEARNING_TABLE_PATH), pd.read_csv(HOLDOUT_TABLE_PATH)
@@ -449,47 +441,11 @@ if __name__ == "__main__":
 
     radiomics_df = pd.concat([learning_radiomics_df, holdout_radiomics_df], ignore_index=True)
 
-    path_to_custom_nomogram = os.path.join(PATH_TO_NOMOGRAMS_FOLDER, "CUSTOM")
-    os.makedirs(path_to_custom_nomogram, exist_ok=True)
-
     radiomics_dataframe.save_final_dataframe(
-        path_to_folder=os.path.join(path_to_custom_nomogram, "radiomics"),
-        radiomics_df=radiomics_df,
-        train_mask=list(range(len(learning_df))),
-        test_mask=list(range(len(learning_df), len(learning_df) + len(holdout_df)))
-    )
-
-    # Outer split
-    table_dataset = TableDataset(
-        dataframe=pd.read_csv(LEARNING_TABLE_PATH),
-        ids_column=ID,
-        tasks=TABLE_TASKS,
-        continuous_features=[AGE, PSA],
-        categorical_features=[CLINICAL_STAGE, GLEASON_GLOBAL, GLEASON_PRIMARY, GLEASON_SECONDARY]
-    )
-
-    radiomics_dataframe = RadiomicsDataframe(table_dataset=table_dataset)
-
-    ct_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/learning_ct_radiomics.csv", "CT")
-    pt_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/learning_pt_radiomics.csv", "PT")
-    radiomics_df = pd.concat([ct_radiomics_df, pt_radiomics_df], axis=1)
-
-    radiomics_dataframe.save_outer_splits_dataframes(
-        path_to_folder=os.path.join(path_to_custom_nomogram, "radiomics"),
-        radiomics_df=radiomics_df,
-        masks=masks
-    )
-
-    shutil.copytree(
-        os.path.join(path_to_custom_nomogram, "radiomics"),
-        os.path.join(path_to_custom_nomogram, "clinical_and_radiomics")
-    )
-
-    # Outer and inner split
-    radiomics_dataframe.save_outer_and_inner_splits_dataframes(
         path_to_folder="local_data/radiomics",
         radiomics_df=radiomics_df,
-        masks=masks,
+        train_mask=list(range(len(learning_df))),
+        test_mask=list(range(len(learning_df), len(learning_df) + len(holdout_df))),
         clinical_stage_column=CLINICAL_STAGE.column,
         mapping={0: "T1-T2", 1: "T3a"}
     )
