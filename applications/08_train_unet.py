@@ -62,13 +62,13 @@ if __name__ == '__main__':
         criterion=MeanLoss(),
         optimizer=optimizer,
         lr_scheduler=ExponentialLR(optimizer=optimizer, gamma=0.99),
-        early_stopper=MultiTaskLossEarlyStopper(patience=10)
+        early_stopper=MultiTaskLossEarlyStopper(patience=20)
     )
     trainer = Trainer(
         batch_size=16,
         checkpoint=Checkpoint(),
         exec_metrics_on_train=True,
-        n_epochs=150,
+        n_epochs=100,
         seed=SEED
     )
 
