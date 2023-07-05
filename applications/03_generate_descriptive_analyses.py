@@ -12,7 +12,15 @@ import env_apps
 
 import pandas as pd
 
-from constants import *
+from constants import (
+    CLINICAL_CATEGORICAL_FEATURES,
+    CLINICAL_CONTINUOUS_FEATURES,
+    DESCRIPTIVE_ANALYSIS_PATH,
+    HOLDOUT_TABLE_PATH,
+    ID,
+    LEARNING_TABLE_PATH,
+    TABLE_TASKS
+)
 from src.data.datasets import TableDataset
 from src.visualization import TableViewer
 

@@ -10,6 +10,7 @@
 
 import env_apps
 
+import os
 from typing import Dict, List, Optional, Union
 
 import matplotlib.pyplot as plt
@@ -17,7 +18,15 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 
-from constants import *
+from constants import (
+    HOLDOUT_TABLE_PATH,
+    ID,
+    LEARNING_TABLE_PATH,
+    MANUAL_EXTRACTED_RADIOMICS_PATH,
+    MANUAL_FILTERED_RADIOMICS_PATH,
+    MASKS_PATH,
+    TABLE_TASKS
+)
 from src.data.datasets import Feature, Mask, TableDataset
 from src.data.processing.sampling import extract_masks
 from src.data.transforms import MappingEncoding
@@ -378,7 +387,7 @@ if __name__ == "__main__":
     GLEASON_SECONDARY = Feature(column="GLEASON_SECONDARY")
     PSA = Feature(column="PSA")
 
-    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=5)
+    masks = extract_masks(MASKS_PATH, k=5, l=5)
 
     # Outer and inner split
     table_dataset = TableDataset(
@@ -391,12 +400,16 @@ if __name__ == "__main__":
 
     radiomics_dataframe = RadiomicsDataframe(table_dataset=table_dataset)
 
-    ct_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/learning_ct_radiomics.csv", "CT")
-    pt_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/learning_pt_radiomics.csv", "PT")
+    ct_radiomics_df = radiomics_dataframe.get_radiomics_dataframe(
+        os.path.join(MANUAL_EXTRACTED_RADIOMICS_PATH, "learning_ct_radiomics.csv"), "CT"
+    )
+    pt_radiomics_df = radiomics_dataframe.get_radiomics_dataframe(
+        os.path.join(MANUAL_EXTRACTED_RADIOMICS_PATH, "learning_pt_radiomics.csv"), "PT"
+    )
     radiomics_df = pd.concat([ct_radiomics_df, pt_radiomics_df], axis=1)
 
     radiomics_dataframe.save_outer_and_inner_splits_dataframes(
-        path_to_folder="local_data/radiomics",
+        path_to_folder=MANUAL_FILTERED_RADIOMICS_PATH,
         radiomics_df=radiomics_df,
         masks=masks,
         clinical_stage_column=CLINICAL_STAGE.column,
@@ -416,18 +429,26 @@ if __name__ == "__main__":
 
     radiomics_dataframe = RadiomicsDataframe(table_dataset=table_dataset)
 
-    learning_ct_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/learning_ct_radiomics.csv", "CT")
-    learning_pt_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/learning_pt_radiomics.csv", "PT")
+    learning_ct_radiomics_df = radiomics_dataframe.get_radiomics_dataframe(
+        os.path.join(MANUAL_EXTRACTED_RADIOMICS_PATH, "learning_ct_radiomics.csv"), "CT"
+    )
+    learning_pt_radiomics_df = radiomics_dataframe.get_radiomics_dataframe(
+        os.path.join(MANUAL_EXTRACTED_RADIOMICS_PATH, "learning_pt_radiomics.csv"), "PT"
+    )
     learning_radiomics_df = pd.concat([learning_ct_radiomics_df, learning_pt_radiomics_df], axis=1)
 
-    holdout_ct_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/holdout_ct_radiomics.csv", "CT")
-    holdout_pt_radiomics_df = radiomics_dataframe.get_radiomics_dataframe("local_data/holdout_pt_radiomics.csv", "PT")
+    holdout_ct_radiomics_df = radiomics_dataframe.get_radiomics_dataframe(
+        os.path.join(MANUAL_EXTRACTED_RADIOMICS_PATH, "holdout_ct_radiomics.csv"), "CT"
+    )
+    holdout_pt_radiomics_df = radiomics_dataframe.get_radiomics_dataframe(
+        os.path.join(MANUAL_EXTRACTED_RADIOMICS_PATH, "holdout_pt_radiomics.csv"), "PT"
+    )
     holdout_radiomics_df = pd.concat([holdout_ct_radiomics_df, holdout_pt_radiomics_df], axis=1)
 
     radiomics_df = pd.concat([learning_radiomics_df, holdout_radiomics_df], ignore_index=True)
 
     radiomics_dataframe.save_final_dataframe(
-        path_to_folder="local_data/radiomics",
+        path_to_folder=MANUAL_FILTERED_RADIOMICS_PATH,
         radiomics_df=radiomics_df,
         train_mask=list(range(len(learning_df))),
         test_mask=list(range(len(learning_df), len(learning_df) + len(holdout_df))),

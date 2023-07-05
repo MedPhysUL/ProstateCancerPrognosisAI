@@ -26,12 +26,19 @@ from monai.transforms import (
     SpatialCropD
 )
 
+from constants import (
+    LEARNING_SET_FOLDER_PATH,
+    LEARNING_SET_PATH,
+    LOGGING_CONFIG_PATH,
+    SERIES_DESCRIPTIONS_PATH
+)
+
 
 if __name__ == "__main__":
     # ----------------------------------------------------------------------------------------------------------- #
     #                                               Logs Setup                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
-    env_apps.configure_logging("logging_conf.yaml")
+    env_apps.configure_logging(LOGGING_CONFIG_PATH)
 
     # ----------------------------------------------------------------------------------------------------------- #
     #                                               Transforms                                                    #
@@ -52,15 +59,15 @@ if __name__ == "__main__":
     #                                      Create patients data extractor                                         #
     # ----------------------------------------------------------------------------------------------------------- #
     patients_data_extractor = PatientsDataExtractor(
-        path_to_patients_folder=r"local_data/Learning_set",
-        tag_values=r"local_data/series_descriptions.json",
+        path_to_patients_folder=LEARNING_SET_FOLDER_PATH,
+        tag_values=SERIES_DESCRIPTIONS_PATH,
         transforms=transforms
     )
 
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                Create database                                              #
     # ----------------------------------------------------------------------------------------------------------- #
-    database = PatientsDatabase(path_to_database=r"local_data/learning_set.h5")
+    database = PatientsDatabase(path_to_database=LEARNING_SET_PATH)
 
     database.create(
         patients_data_extractor=patients_data_extractor,

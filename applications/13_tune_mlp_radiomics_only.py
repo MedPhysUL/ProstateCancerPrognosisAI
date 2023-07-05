@@ -10,6 +10,7 @@
 
 import env_apps
 
+import os
 from typing import Dict, Union
 
 from optuna.integration.botorch import BoTorchSampler
@@ -17,7 +18,17 @@ import pandas as pd
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 
-from constants import *
+from constants import (
+    EXPERIMENTS_PATH,
+    ID,
+    MANUAL_FILTERED_RADIOMICS_PATH,
+    MASKS_PATH,
+    MLP_RAD_LR_HIGH_BOUND_DICT,
+    PREDICTOR_CLIP_GRAD_MAX_NORM_DICT,
+    RADIOMICS_FEATURES,
+    SEED,
+    TABLE_TASKS
+)
 from src.data.datasets import ProstateCancerDataset, TableDataset, Split
 from src.data.processing.sampling import extract_masks
 from src.losses.multi_task import MeanLoss
@@ -85,11 +96,9 @@ def get_dataframes_dictionary(
 
 
 if __name__ == '__main__':
-    LR_HIGH_BOUND_DICT = {BCR: 1e-2, CRPC: 1e-2, DEATH: 5e-3, HTX: 1e-2, METASTASIS: 5e-3, PN: 1e-2}
-
     for task in TABLE_TASKS:
         df_dict = get_dataframes_dictionary(
-            path_to_dataframes_folder=os.path.join(RADIOMICS_PATH, task.target_column),
+            path_to_dataframes_folder=os.path.join(MANUAL_FILTERED_RADIOMICS_PATH, task.target_column),
             n_outer_loops=5,
             n_inner_loops=5
         )
@@ -145,7 +154,7 @@ if __name__ == '__main__':
                     "lr": FloatHyperparameter(
                         name="lr",
                         low=1e-4,
-                        high=LR_HIGH_BOUND_DICT[task.target_column],
+                        high=MLP_RAD_LR_HIGH_BOUND_DICT[task.target_column],
                         log=True
                     ),
                     "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-4, high=1e-2, log=True)
@@ -182,7 +191,7 @@ if __name__ == '__main__':
             train_method_hyperparameter=train_methode_hyperparameter
         )
 
-        masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=5)
+        masks = extract_masks(MASKS_PATH, k=5, l=5)
 
         tuner.tune(
             objective=objective,

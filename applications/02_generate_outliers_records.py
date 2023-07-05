@@ -12,7 +12,13 @@ import env_apps
 
 import pandas as pd
 
-from constants import *
+from constants import (
+    CLINICAL_FEATURES,
+    HOLDOUT_TABLE_PATH,
+    ID,
+    LEARNING_TABLE_PATH,
+    OUTLIERS_RECORDS_PATH
+)
 from src.data.processing import Cleaner
 
 

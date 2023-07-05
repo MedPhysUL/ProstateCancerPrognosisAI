@@ -10,6 +10,8 @@
 
 import env_apps
 
+import os
+
 from delia.databases import PatientsDatabase
 from monai.transforms import (
     Compose,
@@ -23,7 +25,19 @@ import pandas as pd
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 
-from constants import *
+from constants import (
+    EXPERIMENTS_PATH,
+    EXTRACTOR_CLIP_GRAD_MAX_NORM_DICT,
+    ID,
+    LEARNING_SET_PATH,
+    LEARNING_TABLE_PATH,
+    MASKS_PATH,
+    PROSTATE_SEGMENTATION_TASK,
+    SEED,
+    TABLE_TASKS,
+    UNEXTRACTOR_LR_LOW_BOUND_DICT,
+    UNEXTRACTOR_LR_HIGH_BOUND_DICT
+)
 from src.data.datasets import ImageDataset, ProstateCancerDataset, TableDataset
 from src.data.processing.sampling import extract_masks
 from src.losses.multi_task import MeanLoss, WeightedSumLoss
@@ -61,7 +75,7 @@ if __name__ == '__main__':
             tasks=task
         )
 
-        database = PatientsDatabase(path_to_database=r"local_data/learning_set.h5")
+        database = PatientsDatabase(path_to_database=LEARNING_SET_PATH)
 
         image_dataset = ImageDataset(
             database=database,
@@ -177,7 +191,7 @@ if __name__ == '__main__':
             train_method_hyperparameter=train_method_hyperparameter
         )
 
-        masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=5)
+        masks = extract_masks(MASKS_PATH, k=5, l=5)
 
         tuner.tune(
             objective=objective,

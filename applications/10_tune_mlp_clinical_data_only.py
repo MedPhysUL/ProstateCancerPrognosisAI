@@ -10,12 +10,24 @@
 
 import env_apps
 
+import os
+
 from optuna.integration.botorch import BoTorchSampler
 import pandas as pd
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 
-from constants import *
+from constants import (
+    CLINICAL_CATEGORICAL_FEATURES,
+    CLINICAL_CONTINUOUS_FEATURES,
+    EXPERIMENTS_PATH,
+    ID,
+    LEARNING_TABLE_PATH,
+    MASKS_PATH,
+    PREDICTOR_CLIP_GRAD_MAX_NORM_DICT,
+    SEED,
+    TABLE_TASKS
+)
 from src.data.datasets import ProstateCancerDataset, TableDataset
 from src.data.processing.sampling import extract_masks
 from src.losses.multi_task import MeanLoss
@@ -131,7 +143,7 @@ if __name__ == '__main__':
             train_method_hyperparameter=train_methode_hyperparameter
         )
 
-        masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=5)
+        masks = extract_masks(MASKS_PATH, k=5, l=5)
 
         tuner.tune(
             objective=objective,

@@ -16,8 +16,14 @@ import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 
-
-from constants import *
+from constants import (
+    ID,
+    LEARNING_SET_PATH,
+    LEARNING_TABLE_PATH,
+    MASKS_PATH,
+    SEED,
+    TABLE_TASKS,
+)
 from src.data.processing.sampling import extract_masks, Mask
 from src.data.datasets import ImageDataset, ProstateCancerDataset, TableDataset
 from src.models.torch.extraction import CNN
@@ -37,7 +43,7 @@ if __name__ == '__main__':
         tasks=TABLE_TASKS
     )
 
-    database = PatientsDatabase(path_to_database=r"local_data/learning_set.h5")
+    database = PatientsDatabase(path_to_database=LEARNING_SET_PATH)
 
     image_dataset = ImageDataset(
         database=database,
@@ -46,7 +52,7 @@ if __name__ == '__main__':
 
     dataset = ProstateCancerDataset(image_dataset=image_dataset, table_dataset=table_dataset)
 
-    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=5)
+    masks = extract_masks(MASKS_PATH, k=5, l=5)
 
     dataset.update_masks(
         train_mask=masks[0][Mask.TRAIN],
