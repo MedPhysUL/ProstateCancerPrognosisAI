@@ -1,36 +1,27 @@
 """
-    @file:              explainer.py
+    @file:              shap_explainer.py
     @Author:            Felix Desroches
 
     @Creation Date:     06/2023
     @Last modification: 06/2023
 
-    @Description:       This file contains a class used to analyse and explain how a model works.
+    @Description:       This file contains a class used to analyse and explain how a model works using shapley values.
 """
 
-import json
 import os
-from typing import Dict, List, Optional, Union, NamedTuple, Tuple
+from typing import Dict, List, Optional, Union, Tuple
 
 import shap
-from shap.plots import waterfall, beeswarm, bar, scatter, force
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 from captum.attr import IntegratedGradients
 import matplotlib.pyplot as plt
 from monai.data import DataLoader
 import numpy as np
-import seaborn as sns
 import torch
-from sklearn.calibration import calibration_curve
-from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_curve
 
 from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ..evaluation.prediction_evaluator import PredictionEvaluator
-from ..metrics.single_task.base import Direction
 from ..models.base.model import Model
-from ..tasks.base import TableTask, Task
-from ..tasks.containers.list import TaskList
-from ..tools.transforms import to_numpy
 
 
 class CaptumWrapper(torch.nn.Module):
@@ -55,6 +46,52 @@ class CaptumWrapper(torch.nn.Module):
         self.targets_order = [task for task in dataset.tasks]
         self.table_targets_order = [task for task in dataset.tasks.table_tasks]
         self.features_order = {'image': list(dataset[0].x.image.keys()), 'table': list(dataset[0].x.table.keys())}
+
+    @staticmethod
+    def convert_dict_to_tensor(
+            dictionary: dict
+    ) -> torch.Tensor:
+        """
+        Converts a M dimensional dictionary of (N, ) tensors into a (N, M) tensor.
+
+        Parameters
+        ----------
+        dictionary : dict
+            The dictionary to convert.
+
+        Returns
+        -------
+        tensor : torch.Tensor
+             The converted tensor.
+        """
+        tensor = []
+        print(list(dictionary.keys()))
+        for i, datum in enumerate(dictionary.values()):
+            if i == 0:
+                if isinstance(datum, torch.Tensor):
+                    tensor = datum
+                elif isinstance(datum, np.ndarray):
+                    tensor = torch.from_numpy(datum)
+                else:
+                    tensor = torch.tensor([datum])
+                tensor = torch.unsqueeze(tensor, dim=1)
+            if isinstance(datum, torch.Tensor):
+                datum = torch.unsqueeze(datum, dim=1)
+                print(datum)
+                print(datum.shape)
+                tensor = torch.cat((tensor, datum), dim=1)
+            elif isinstance(datum, np.ndarray):
+                datum = torch.unsqueeze(torch.from_numpy(datum), dim=1)
+                print(datum)
+                print(datum.shape)
+                tensor = torch.cat((tensor, datum), dim=1)
+            else:
+                datum = torch.unsqueeze(torch.tensor([datum]), dim=1)
+                print(datum)
+                print(datum.shape)
+                tensor = torch.cat((tensor, datum), dim=1)
+            print(tensor)
+        return tensor
 
     def convert_tensor_to_features_type(
             self,
@@ -132,7 +169,6 @@ class CaptumWrapper(torch.nn.Module):
                 table_list.append((torch.from_numpy(datum)))
             else:
                 table_list.append(torch.tensor([datum]))
-        # table_list = [features.table[table_key] for table_key in self.features_order['table']]
         return tuple(image_list + table_list)
 
     def convert_targets_type_to_tuple_of_tensor(
@@ -195,7 +231,7 @@ class CaptumWrapper(torch.nn.Module):
         return prediction_tensor
 
 
-class PredictionModelExplainer:
+class TableShapValueExplainer:
     """
     This class aims to show how a model works and allow the user to interpret it by using metrics and graphs.
     """
@@ -218,7 +254,7 @@ class PredictionModelExplainer:
         self.model = CaptumWrapper(model, dataset)
         self.dataset = dataset
 
-    def compute_table_shap_values(
+    def compute_shap_values(
             self,
             target: int,
             mask: Optional[List[int]] = None
@@ -303,7 +339,7 @@ class PredictionModelExplainer:
             fig, arr = plt.subplots()
             feature_names = self.dataset.table_dataset.features_columns
             average_attributions = {
-                target: np.mean(self.compute_table_shap_values(target=target, mask=mask), axis=0)
+                target: np.mean(self.compute_shap_values(target=target, mask=mask), axis=0)
                 for target in targets
             }
 
@@ -385,7 +421,7 @@ class PredictionModelExplainer:
             Kwargs to give to matplotlib.pyplot.savefig.
         """
         for target in targets:
-            values = self.compute_table_shap_values(target=target)
+            values = self.compute_shap_values(target=target)
             shap_values = shap.Explanation(
                 values=values,
                 base_values=np.zeros_like(values),
@@ -432,7 +468,7 @@ class PredictionModelExplainer:
             Kwargs to give to matplotlib.pyplot.savefig.
         """
         for target in targets:
-            values = self.compute_table_shap_values(target=target)
+            values = self.compute_shap_values(target=target)
             shap_values = shap.Explanation(
                 values=values,
                 base_values=0
@@ -470,7 +506,7 @@ class PredictionModelExplainer:
             Kwargs to give to matplotlib.pyplot.savefig.
         """
         for target in targets:
-            values = self.compute_table_shap_values(target=target)
+            values = self.compute_shap_values(target=target)
             shap_values = shap.Explanation(
                 values=values,
                 base_values=0,
@@ -510,7 +546,7 @@ class PredictionModelExplainer:
             Kwargs to give to matplotlib.pyplot.savefig.
         """
         for target in targets:
-            values = self.compute_table_shap_values(target=target)
+            values = self.compute_shap_values(target=target)
             shap_values = shap.Explanation(
                 values=values,
                 base_values=np.zeros_like(values),
@@ -550,7 +586,7 @@ class PredictionModelExplainer:
             Kwargs to give to matplotlib.pyplot.savefig.
         """
         for target in targets:
-            values = self.compute_table_shap_values(target=target)
+            values = self.compute_shap_values(target=target)
             shap_values = shap.Explanation(
                 values=values,
                 base_values=np.zeros_like(values),
