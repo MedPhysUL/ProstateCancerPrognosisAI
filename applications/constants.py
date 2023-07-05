@@ -36,6 +36,7 @@ MSKCC_HOLDOUT_TABLE_PATH = os.path.join(DATA_PATH, "mskcc_holdout_table.csv")
 
 MASKS_PATH = os.path.join(DATA_PATH, "masks")
 RADIOMICS_PATH = os.path.join(DATA_PATH, "radiomics")
+AUTOMATIC_RADIOMICS_PATH = os.path.join(DATA_PATH, "radiomics_auto")
 
 RECORDS_PATH = os.path.join(DATA_PATH, "records")
 OUTLIERS_RECORDS_PATH = os.path.join(RECORDS_PATH, "outliers")
