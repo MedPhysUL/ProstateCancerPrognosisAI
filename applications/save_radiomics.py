@@ -212,7 +212,7 @@ class RadiomicsDataframe:
     def save_outer_and_inner_splits_dataframes(
             self,
             path_to_folder: str,
-            radiomics_df: Union[pd.DataFrame, Dict[str, pd.DataFrame]],
+            radiomics_df: Union[pd.DataFrame, Dict[int, pd.DataFrame]],
             masks: dict,
             clinical_stage_column: str,
             mapping: Dict[Union[float, int], str],
@@ -225,7 +225,7 @@ class RadiomicsDataframe:
         ----------
         path_to_folder : str
             The path to the folder where to save the dataframes.
-        radiomics_df : Union[pd.DataFrame, Dict[str, pd.DataFrame]]
+        radiomics_df : Union[pd.DataFrame, Dict[int, pd.DataFrame]]
             The radiomics dataframe.
         masks : dict
             The masks.
