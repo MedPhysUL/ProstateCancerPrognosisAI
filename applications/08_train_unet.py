@@ -88,7 +88,7 @@ if __name__ == '__main__':
         batch_size=16,
         checkpoint=Checkpoint(),
         exec_metrics_on_train=True,
-        n_epochs=100,
+        n_epochs=200,
         seed=SEED
     )
 
