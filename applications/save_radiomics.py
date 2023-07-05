@@ -10,7 +10,6 @@
 
 import env_apps
 
-import shutil
 from typing import Dict, List, Optional, Union
 
 import matplotlib.pyplot as plt
@@ -213,7 +212,7 @@ class RadiomicsDataframe:
     def save_outer_and_inner_splits_dataframes(
             self,
             path_to_folder: str,
-            radiomics_df: pd.DataFrame,
+            radiomics_df: Union[pd.DataFrame, Dict[str, pd.DataFrame]],
             masks: dict,
             clinical_stage_column: str,
             mapping: Dict[Union[float, int], str],
@@ -226,7 +225,7 @@ class RadiomicsDataframe:
         ----------
         path_to_folder : str
             The path to the folder where to save the dataframes.
-        radiomics_df : pd.DataFrame
+        radiomics_df : Union[pd.DataFrame, Dict[str, pd.DataFrame]]
             The radiomics dataframe.
         masks : dict
             The masks.
@@ -244,8 +243,10 @@ class RadiomicsDataframe:
                 outer_split_path = os.path.join(path_to_folder, task.target_column, f"{self.OUTER_SPLIT_KEY}_{k}")
                 os.makedirs(outer_split_path, exist_ok=True)
 
+                df = radiomics_df[k] if isinstance(radiomics_df, dict) else radiomics_df
+
                 dataframe = self._get_imputed_dataframe(
-                    radiomics_df=radiomics_df,
+                    radiomics_df=df,
                     target_col=task.target_column,
                     train_mask=v[Mask.TRAIN],
                     clinical_stage_column=clinical_stage_column,
@@ -261,7 +262,7 @@ class RadiomicsDataframe:
                 os.makedirs(path_to_inner_splits, exist_ok=True)
                 for idx, inner_mask in v[Mask.INNER].items():
                     dataframe = self._get_imputed_dataframe(
-                        radiomics_df=radiomics_df,
+                        radiomics_df=df,
                         target_col=task.target_column,
                         train_mask=inner_mask[Mask.TRAIN],
                         clinical_stage_column=clinical_stage_column,
