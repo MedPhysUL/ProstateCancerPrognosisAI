@@ -164,7 +164,6 @@ class RadiomicsDataframe:
             clinical_stage_column: Optional[str] = None,
             mapping: Optional[Dict[Union[float, int], str]] = None,
             valid_mask: Optional[List[int]] = None,
-            remove_patients: bool = True,
             show: bool = False
     ) -> pd.DataFrame:
         """
@@ -186,8 +185,6 @@ class RadiomicsDataframe:
             The mapping.
         valid_mask : Optional[List[int]]
             The valid mask.
-        remove_patients : bool
-            If True, it removes the patients.
         show : bool
             If True, it shows the feature importance.
 
@@ -211,18 +208,7 @@ class RadiomicsDataframe:
 
         dataframe = pd.concat([clinical_df, radiomics], axis=1)
 
-        if remove_patients:
-            if valid_mask:
-                named_masks = {"train": train_mask, "valid": valid_mask, "test": test_mask}
-            else:
-                named_masks = {"train": train_mask, "test": test_mask}
-
-            return pd.concat(
-                objs=[dataframe.iloc[mask].assign(SETS=name) for name, mask in named_masks.items()],
-                ignore_index=True
-            )
-        else:
-            return dataframe
+        return dataframe
 
     def save_outer_and_inner_splits_dataframes(
             self,
@@ -266,7 +252,6 @@ class RadiomicsDataframe:
                     mapping=mapping,
                     valid_mask=v[Mask.VALID],
                     test_mask=v[Mask.TEST],
-                    remove_patients=False,
                     show=show
                 )
 
@@ -283,7 +268,6 @@ class RadiomicsDataframe:
                         mapping=mapping,
                         valid_mask=inner_mask[Mask.VALID],
                         test_mask=inner_mask[Mask.TEST],
-                        remove_patients=False,
                         show=show
                     )
 
