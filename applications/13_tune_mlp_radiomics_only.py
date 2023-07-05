@@ -19,6 +19,7 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 
 from constants import (
+    AUTOMATIC_FILTERED_RADIOMICS_PATH,
     EXPERIMENTS_PATH,
     ID,
     MANUAL_FILTERED_RADIOMICS_PATH,
@@ -98,7 +99,7 @@ def get_dataframes_dictionary(
 if __name__ == '__main__':
     for task in TABLE_TASKS:
         df_dict = get_dataframes_dictionary(
-            path_to_dataframes_folder=os.path.join(MANUAL_FILTERED_RADIOMICS_PATH, task.target_column),
+            path_to_dataframes_folder=os.path.join(AUTOMATIC_FILTERED_RADIOMICS_PATH, task.target_column),
             n_outer_loops=5,
             n_inner_loops=5
         )
