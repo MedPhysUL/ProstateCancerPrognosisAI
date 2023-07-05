@@ -118,7 +118,7 @@ if __name__ == '__main__':
 
         path_to_record_folder = os.path.join(
             EXPERIMENTS_PATH,
-            f"{task.target_column}(MLP - Clinical data and radiomics)"
+            f"{task.target_column}(MLP - Clinical data and automatic radiomics)"
         )
 
         search_algo = SearchAlgorithm(
