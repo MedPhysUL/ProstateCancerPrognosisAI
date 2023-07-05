@@ -66,10 +66,10 @@ if __name__ == '__main__':
         )
 
         trainer = Trainer(
-            batch_size=8,
+            batch_size=16,
             checkpoint=Checkpoint(
                 path_to_checkpoint_folder=os.path.join(AUTOMATIC_RADIOMICS_MODELS_PATH, f"outer_split_{k}"),
-                save_freq=50
+                save_freq=5
             ),
             exec_metrics_on_train=True,
             n_epochs=100,
