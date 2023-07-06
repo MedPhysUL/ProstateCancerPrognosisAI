@@ -10,13 +10,20 @@
 
 import env_apps
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 
-from constants import *
+from constants import (
+    CLINICAL_CATEGORICAL_FEATURES,
+    CLINICAL_CONTINUOUS_FEATURES,
+    ID,
+    LEARNING_TABLE_PATH,
+    MASKS_PATH,
+    SEED,
+    TABLE_TASKS
+)
 from src.data.processing.sampling import extract_masks, Mask
 from src.data.datasets import ProstateCancerDataset, TableDataset
 from src.evaluation import ModelEvaluator
@@ -35,13 +42,13 @@ if __name__ == '__main__':
         dataframe=df,
         ids_column=ID,
         tasks=TABLE_TASKS,
-        continuous_features=CONTINUOUS_FEATURES,
-        categorical_features=CATEGORICAL_FEATURES
+        continuous_features=CLINICAL_CONTINUOUS_FEATURES,
+        categorical_features=CLINICAL_CATEGORICAL_FEATURES
     )
 
     dataset = ProstateCancerDataset(table_dataset=table_dataset)
 
-    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=5)
+    masks = extract_masks(MASKS_PATH, k=5, l=5)
 
     dataset.update_masks(
         train_mask=masks[0][Mask.TRAIN],

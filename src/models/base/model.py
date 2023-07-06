@@ -119,17 +119,18 @@ class Model(Module, ABC):
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
         """
-        predictions = self.predict_on_dataset(dataset, dataset.train_mask)
-        targets = dataset.table_dataset[dataset.train_mask].y
+        if dataset.table_dataset:
+            predictions = self.predict_on_dataset(dataset, dataset.train_mask)
+            targets = dataset.table_dataset[dataset.train_mask].y
 
-        for task in dataset.tasks.survival_analysis_tasks:
-            pred, target = to_numpy(predictions[task.name]), to_numpy(targets[task.name])
+            for task in dataset.tasks.survival_analysis_tasks:
+                pred, target = to_numpy(predictions[task.name]), to_numpy(targets[task.name])
 
-            nonmissing_targets_idx = task.get_idx_of_nonmissing_targets(target)
-            if len(nonmissing_targets_idx) > 0:
-                pred, target = pred[nonmissing_targets_idx], target[nonmissing_targets_idx]
-                task.breslow_estimator.fit(pred[:, 0], target[:, 0], target[:, 1])
-                self._breslow_estimators[task.name] = task.breslow_estimator
+                nonmissing_targets_idx = task.get_idx_of_nonmissing_targets(target)
+                if len(nonmissing_targets_idx) > 0:
+                    pred, target = pred[nonmissing_targets_idx], target[nonmissing_targets_idx]
+                    task.breslow_estimator.fit(pred[:, 0], target[:, 0], target[:, 1])
+                    self._breslow_estimators[task.name] = task.breslow_estimator
 
     @check_if_built
     @abstractmethod

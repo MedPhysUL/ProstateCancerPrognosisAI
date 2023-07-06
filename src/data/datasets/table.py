@@ -106,6 +106,7 @@ class TableDataset(Dataset):
         self._ids_col = ids_column
         self._imputed_df = None
         self._imputer_features_cols = [f.column for f in self.features if f.impute is True]
+        self._imputer_cat_features_cols = list(set(self._cat_features_cols).intersection(self._imputer_features_cols))
         self._iterative_imputer = IterativeImputer(
             estimator=RandomForestRegressor(random_state=random_state),
             tol=1e-2,
@@ -596,7 +597,10 @@ class TableDataset(Dataset):
 
         if self._cat_features or self._cont_features:
             self._preprocess_cat_features()
-            self._impute_missing_features()
+
+            if self._imputer_features_cols:
+                self._impute_missing_features()
+
             self._preprocess_cont_features()
 
         self._set_features()
@@ -645,7 +649,7 @@ class TableDataset(Dataset):
         data = self._iterative_imputer.transform(df)
         temp_df = pd.DataFrame(data, columns=self._imputer_features_cols)
 
-        for column in self._cat_features_cols:
+        for column in self._imputer_cat_features_cols:
             original_array = np.array(df[column].dropna())
             categories = np.unique(original_array)
             bins = self._convert_categories_to_bins(categories)

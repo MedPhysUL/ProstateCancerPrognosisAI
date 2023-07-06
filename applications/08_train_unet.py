@@ -11,6 +11,13 @@
 import env_apps
 
 from delia.databases import PatientsDatabase
+from monai.transforms import (
+    Compose,
+    RandGaussianNoiseD,
+    RandFlipD,
+    RandRotateD,
+    ThresholdIntensityD
+)
 import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
@@ -31,7 +38,20 @@ if __name__ == '__main__':
     image_dataset = ImageDataset(
         database=database,
         modalities={"CT"},
-        tasks=PROSTATE_SEGMENTATION_TASK
+        tasks=PROSTATE_SEGMENTATION_TASK,
+        augmentations=Compose([
+            RandGaussianNoiseD(keys=["CT"], prob=0.5, std=0.05),
+            ThresholdIntensityD(keys=["CT"], threshold=0, above=True, cval=0),
+            ThresholdIntensityD(keys=["CT"], threshold=1, above=False, cval=1),
+            RandFlipD(keys=["CT", "CT_Prostate"], prob=0.5, spatial_axis=2),
+            RandRotateD(
+                keys=["CT", "CT_Prostate"],
+                mode=["bilinear", "nearest"],
+                prob=0.5,
+                range_x=0.174533
+            )
+        ]),
+        seed=SEED
     )
 
     dataset = ProstateCancerDataset(image_dataset=image_dataset, table_dataset=None)
@@ -62,13 +82,13 @@ if __name__ == '__main__':
         criterion=MeanLoss(),
         optimizer=optimizer,
         lr_scheduler=ExponentialLR(optimizer=optimizer, gamma=0.99),
-        early_stopper=MultiTaskLossEarlyStopper(patience=10)
+        early_stopper=MultiTaskLossEarlyStopper(patience=20)
     )
     trainer = Trainer(
         batch_size=16,
-        checkpoint=Checkpoint(),
+        checkpoint=Checkpoint(save_freq=20),
         exec_metrics_on_train=True,
-        n_epochs=150,
+        n_epochs=100,
         seed=SEED
     )
 

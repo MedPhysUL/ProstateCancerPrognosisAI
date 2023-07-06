@@ -122,7 +122,7 @@ class Objective(ABC):
         dataframe : Optional[pd.DataFrame]
             Dataframe to use for the update.
         """
-        if dataframe:
+        if dataframe is not None:
             dataset.update_dataframe(dataframe=dataframe, update_masks=False)
 
         dataset.update_masks(train_mask=mask[Mask.TRAIN], valid_mask=mask[Mask.VALID], test_mask=mask[Mask.TEST])

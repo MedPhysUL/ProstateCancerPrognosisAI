@@ -12,7 +12,13 @@ import env_apps
 
 import pandas as pd
 
-from constants import *
+from constants import (
+    CLINICAL_FEATURES,
+    HOLDOUT_TABLE_PATH,
+    ID,
+    LEARNING_TABLE_PATH,
+    OUTLIERS_RECORDS_PATH
+)
 from src.data.processing import Cleaner
 
 
@@ -20,8 +26,8 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                DataFrames                                                   #
     # ----------------------------------------------------------------------------------------------------------- #
-    learning_df = pd.read_csv(LEARNING_TABLE_PATH)[[ID] + [f.column for f in FEATURES]]
-    holdout_df = pd.read_csv(HOLDOUT_TABLE_PATH)[[ID] + [f.column for f in FEATURES]]
+    learning_df = pd.read_csv(LEARNING_TABLE_PATH)[[ID] + [f.column for f in CLINICAL_FEATURES]]
+    holdout_df = pd.read_csv(HOLDOUT_TABLE_PATH)[[ID] + [f.column for f in CLINICAL_FEATURES]]
 
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                 Cleaner                                                     #

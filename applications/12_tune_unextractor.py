@@ -10,6 +10,8 @@
 
 import env_apps
 
+import os
+
 from delia.databases import PatientsDatabase
 from monai.transforms import (
     Compose,
@@ -23,7 +25,19 @@ import pandas as pd
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 
-from constants import *
+from constants import (
+    EXPERIMENTS_PATH,
+    EXTRACTOR_CLIP_GRAD_MAX_NORM_DICT,
+    ID,
+    LEARNING_SET_PATH,
+    LEARNING_TABLE_PATH,
+    MASKS_PATH,
+    PROSTATE_SEGMENTATION_TASK,
+    SEED,
+    TABLE_TASKS,
+    UNEXTRACTOR_LR_LOW_BOUND_DICT,
+    UNEXTRACTOR_LR_HIGH_BOUND_DICT
+)
 from src.data.datasets import ImageDataset, ProstateCancerDataset, TableDataset
 from src.data.processing.sampling import extract_masks
 from src.losses.multi_task import MeanLoss, WeightedSumLoss
@@ -61,7 +75,7 @@ if __name__ == '__main__':
             tasks=task
         )
 
-        database = PatientsDatabase(path_to_database=r"local_data/learning_set.h5")
+        database = PatientsDatabase(path_to_database=LEARNING_SET_PATH)
 
         image_dataset = ImageDataset(
             database=database,
@@ -112,7 +126,7 @@ if __name__ == '__main__':
                         "channels": FixedHyperparameter(name="channels", value=(64, 128, 256, 512, 1024)),
                         "kernel_size": FixedHyperparameter(name="kernel_size", value=3),
                         "num_res_units": FixedHyperparameter(name="num_res_units", value=2),
-                        "dropout_cnn": FloatHyperparameter(name="dropout_cnn", low=0.1, high=0.4),
+                        "dropout_cnn": FloatHyperparameter(name="dropout_cnn", low=0.2, high=0.8),
                         "dropout_fnn": FloatHyperparameter(name="dropout_fnn", low=0.1, high=0.4)
             }
         )
@@ -124,7 +138,7 @@ if __name__ == '__main__':
                     "tasks": [task, PROSTATE_SEGMENTATION_TASK],
                     "weights": CategoricalHyperparameter(
                         name="weights",
-                        choices=["(0.5, 0.5)", "(0.667, 0.333)", "(0.75, 0.25)"]
+                        choices=["(0.25, 0.75)", "(0.333, 0.667)", "(0.5, 0.5)", "(0.667, 0.333)", "(0.75, 0.25)"]
                     )
                 }
             ),
@@ -138,7 +152,7 @@ if __name__ == '__main__':
                         high=UNEXTRACTOR_LR_HIGH_BOUND_DICT[task.target_column],
                         log=True
                     ),
-                    "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-4, high=1e-2, log=True)
+                    "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-3, high=1e-1, log=True)
                 }
             ),
             clip_grad_max_norm=EXTRACTOR_CLIP_GRAD_MAX_NORM_DICT[task.target_column],
@@ -151,7 +165,7 @@ if __name__ == '__main__':
             ),
             lr_scheduler=LRSchedulerHyperparameter(
                 constructor=ExponentialLR,
-                parameters={"gamma": FixedHyperparameter(name="gamma", value=0.99)}
+                parameters={"gamma": FixedHyperparameter(name="gamma", value=0.95)}
             ),
             regularizer=RegularizerHyperparameter(
                 constructor=L2Regularizer,
@@ -177,7 +191,7 @@ if __name__ == '__main__':
             train_method_hyperparameter=train_method_hyperparameter
         )
 
-        masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=5)
+        masks = extract_masks(MASKS_PATH, k=5, l=5)
 
         tuner.tune(
             objective=objective,

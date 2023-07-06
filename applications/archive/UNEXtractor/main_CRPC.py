@@ -106,7 +106,7 @@ if __name__ == '__main__':
             "channels": FixedHyperparameter(name="channels", value=(64, 128, 256, 512, 1024)),
             "kernel_size": FixedHyperparameter(name="kernel_size", value=3),
             "num_res_units": FixedHyperparameter(name="num_res_units", value=2),
-            "dropout_cnn": FloatHyperparameter(name="dropout_cnn", low=0.1, high=0.4),
+            "dropout_cnn": FloatHyperparameter(name="dropout_cnn", low=0.2, high=0.8),
             "dropout_fnn": FloatHyperparameter(name="dropout_fnn", low=0.1, high=0.4)
         }
     )
@@ -118,7 +118,7 @@ if __name__ == '__main__':
                 "tasks": [task, PROSTATE_SEGMENTATION_TASK],
                 "weights": CategoricalHyperparameter(
                     name="weights",
-                    choices=["(0.5, 0.5)", "(0.667, 0.333)", "(0.75, 0.25)"]
+                    choices=["(0.25, 0.75)", "(0.333, 0.667)", "(0.5, 0.5)", "(0.667, 0.333)", "(0.75, 0.25)"]
                 )
             }
         ),
@@ -132,7 +132,7 @@ if __name__ == '__main__':
                     high=UNEXTRACTOR_LR_HIGH_BOUND_DICT[task.target_column],
                     log=True
                 ),
-                "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-4, high=1e-2, log=True)
+                "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-3, high=1e-1, log=True)
             }
         ),
         clip_grad_max_norm=EXTRACTOR_CLIP_GRAD_MAX_NORM_DICT[task.target_column],
@@ -145,7 +145,7 @@ if __name__ == '__main__':
         ),
         lr_scheduler=LRSchedulerHyperparameter(
             constructor=ExponentialLR,
-            parameters={"gamma": FixedHyperparameter(name="gamma", value=0.99)}
+            parameters={"gamma": FixedHyperparameter(name="gamma", value=0.95)}
         ),
         regularizer=RegularizerHyperparameter(
             constructor=L2Regularizer,

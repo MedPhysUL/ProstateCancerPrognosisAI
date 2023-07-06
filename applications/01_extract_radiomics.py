@@ -10,6 +10,8 @@
 
 import env_apps
 
+import os
+
 from delia.extractors import PatientsDataExtractor
 from delia.radiomics import RadiomicsDataset, RadiomicsFeatureExtractor
 from delia.transforms import (
@@ -27,12 +29,21 @@ from monai.transforms import (
     SpatialCropD
 )
 
+from constants import (
+    CT_FEATURES_EXTRACTOR_PARAMS_PATH,
+    LEARNING_SET_FOLDER_PATH,
+    LOGGING_CONFIG_PATH,
+    MANUAL_EXTRACTED_RADIOMICS_PATH,
+    PT_FEATURES_EXTRACTOR_PARAMS_PATH,
+    SERIES_DESCRIPTIONS_PATH
+)
+
 
 if __name__ == "__main__":
     # ----------------------------------------------------------------------------------------------------------- #
     #                                               Logs Setup                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
-    env_apps.configure_logging("logging_conf.yaml")
+    env_apps.configure_logging(LOGGING_CONFIG_PATH)
 
     # ----------------------------------------------------------------------------------------------------------- #
     #                                               Transforms                                                    #
@@ -54,18 +65,20 @@ if __name__ == "__main__":
     #                                      Create patients data extractor                                         #
     # ----------------------------------------------------------------------------------------------------------- #
     patients_data_extractor = PatientsDataExtractor(
-        path_to_patients_folder=r"local_data/Learning_set",
-        tag_values=r"local_data/series_descriptions.json",
+        path_to_patients_folder=LEARNING_SET_FOLDER_PATH,
+        tag_values=SERIES_DESCRIPTIONS_PATH,
         transforms=transforms
     )
 
     # ----------------------------------------------------------------------------------------------------------- #
     #    Extract radiomics features of the CT image from the segmentation of the prostate made on the CT image    #
     # ----------------------------------------------------------------------------------------------------------- #
-    ct_radiomics_dataset = RadiomicsDataset(path_to_dataset=r"local_data/learning_ct_radiomics.csv")
+    ct_radiomics_dataset = RadiomicsDataset(
+        path_to_dataset=os.path.join(MANUAL_EXTRACTED_RADIOMICS_PATH, "learning_ct_radiomics.csv")
+    )
 
     ct_radiomics_dataset.extractor = RadiomicsFeatureExtractor(
-        path_to_params="local_data/features_extractor_params_CT.yaml",
+        path_to_params=CT_FEATURES_EXTRACTOR_PARAMS_PATH,
         geometryTolerance=1e-4
     )
 
@@ -78,10 +91,12 @@ if __name__ == "__main__":
     # ----------------------------------------------------------------------------------------------------------- #
     #    Extract radiomics features of the PT image from the segmentation of the prostate made on the CT image    #
     # ----------------------------------------------------------------------------------------------------------- #
-    pt_radiomics_dataset = RadiomicsDataset(path_to_dataset=r"local_data/learning_pt_radiomics.csv")
+    pt_radiomics_dataset = RadiomicsDataset(
+        path_to_dataset=os.path.join(MANUAL_EXTRACTED_RADIOMICS_PATH, "learning_pt_radiomics.csv")
+    )
 
     pt_radiomics_dataset.extractor = RadiomicsFeatureExtractor(
-        path_to_params="local_data/features_extractor_params_PT.yaml",
+        path_to_params=PT_FEATURES_EXTRACTOR_PARAMS_PATH,
         geometryTolerance=1e-4
     )
 

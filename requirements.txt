@@ -2,7 +2,7 @@ adjustText==0.7
 bayesian-torch==0.3.0
 botorch==0.8.5
 dacite==1.8.0
-delia==1.2.1
+delia==1.2.2
 einops==0.6.0
 h5py==3.8.0
 kaleido==0.1.0
@@ -16,7 +16,7 @@ optuna-dashboard==0.8.1
 pandas==1.5.3
 plotly==5.13.0
 scikit-learn==1.2.1
-scikit-survival==0.20.0
+scikit-survival==0.21.0
 seaborn==0.12.2
 tensorboard==2.12.0
 torch==2.0.0

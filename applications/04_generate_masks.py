@@ -11,11 +11,18 @@
 import env_apps
 
 from json import dump
-from os.path import join
 
 import pandas as pd
 
-from constants import *
+from constants import (
+    CLINICAL_CATEGORICAL_FEATURES,
+    CLINICAL_CONTINUOUS_FEATURES,
+    ID,
+    LEARNING_TABLE_PATH,
+    MASKS_PATH,
+    PN_TASK,
+    SEED
+)
 from src.data.datasets import TableDataset
 from src.data.processing import Sampler
 
@@ -30,8 +37,8 @@ if __name__ == '__main__':
         dataframe=df,
         ids_column=ID,
         tasks=PN_TASK,
-        continuous_features=CONTINUOUS_FEATURES,
-        categorical_features=CATEGORICAL_FEATURES
+        continuous_features=CLINICAL_CONTINUOUS_FEATURES,
+        categorical_features=CLINICAL_CATEGORICAL_FEATURES
     )
 
     # ----------------------------------------------------------------------------------------------------------- #
@@ -48,5 +55,5 @@ if __name__ == '__main__':
     sampler.visualize_splits(masks)
 
     # Mask saving
-    with open(join(MASKS_PATH, "masks.json"), "w") as file:
+    with open(MASKS_PATH, "w") as file:
         dump(masks, file, indent=True)
