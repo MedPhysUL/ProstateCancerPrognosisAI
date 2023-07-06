@@ -249,7 +249,6 @@ class TableShapValueExplainer:
         attr_tensor = torch.tensor([])
         for features, _ in data_loader:
             features = tuple([feature.requires_grad_() for feature in features.table.values()])
-            print(features)
             attr = integrated_gradient.attribute(features, target=target)
             cat_tensor = torch.tensor([])
 
