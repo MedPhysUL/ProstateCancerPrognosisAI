@@ -41,7 +41,7 @@ class MultiTaskMode(StrEnum):
 class Predictor(TorchModel, ABC):
     """
     Abstract class for all predictors. A predictor is a model that takes as input a set of features and outputs a set of
-    predictions. The features can be either tabular or radiomics or both.
+    predictions.
     """
 
     def __init__(

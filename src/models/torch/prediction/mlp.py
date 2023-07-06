@@ -24,8 +24,7 @@ from ....tasks.base import TableTask
 
 class MLP(Predictor):
     """
-    A simple MLP model. The model can take as input either the tabular features, the radiomics features or both. The
-    model can also be used to perform table tasks on the extracted deep radiomics.
+    A simple MLP model. The model can also be used to perform table tasks.
     """
 
     def __init__(
