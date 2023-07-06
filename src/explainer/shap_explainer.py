@@ -67,6 +67,11 @@ class CaptumWrapper(torch.nn.Module):
         """
         if isinstance(tensor_tuple, tuple):
             tensor_list = list(tensor_tuple)
+            while not isinstance(tensor_list[0], torch.Tensor):
+                temp_list = tensor_list
+                tensor_list = []
+                for item in temp_list:
+                    tensor_list += [datum for datum in item]
         else:
             tensor_list = tensor_tuple.tolist()
         image = {}
@@ -177,7 +182,11 @@ class CaptumWrapper(torch.nn.Module):
         prediction_tensor : torch.Tensor
             Predictions in the form of a Tensor.
         """
-        inputs = self._convert_tensor_to_features_type(tuple([*inputs]))
+        if not isinstance(inputs, tuple):
+            inputs = self._convert_tensor_to_features_type(tuple([*inputs]))
+        else:
+            inputs = self._convert_tensor_to_features_type(inputs)
+
         predictions ={}
         outputs = self.model(inputs)
         for task in self.dataset.tasks.binary_classification_tasks:
@@ -216,7 +225,9 @@ class TableShapValueExplainer:
         """
         assert dataset.table_dataset is not None, "Shap values require a table dataset to be computed"
         self.model = CaptumWrapper(model, dataset)
+        self.old_model = model
         self.dataset = dataset
+        self.base_values = self.compute_shap_base_values()
 
     def compute_shap_values(
             self,
@@ -346,6 +357,31 @@ class TableShapValueExplainer:
         }
         return average_shap
 
+    def compute_shap_base_values(self):
+        """
+        Computes the base values for shap as the mean of the model's outputs with the training dataset.
+
+        Returns
+        -------
+        base_values : torch.Tensor
+            The base values.
+        """
+        rng_state = torch.random.get_rng_state()
+        subset = self.dataset[self.dataset.train_mask]
+        data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
+        torch.random.set_rng_state(rng_state)
+        i = 1
+        output = None
+        for features, targets in data_loader:
+            features = tuple([feature.requires_grad_() for feature in features.table.values()])
+            pred = self.model.forward(features)
+            if i == 1:
+                output = pred
+            else:
+                output = torch.cat((output, pred), dim=0)
+            i += 1
+        return torch.mean(output, dim=0)
+
     @staticmethod
     def terminate_figure(
             show: bool,
@@ -402,11 +438,11 @@ class TableShapValueExplainer:
                 feature_names=self.dataset.table_dataset.features_columns,
                 data=self.dataset.table_dataset.x
             )
-
-            shap.force_plot(shap_values[patient_id],
-                            matplotlib=True,
-                            show=False
-                            )
+            shap.force_plot(
+                shap_values[patient_id],
+                matplotlib=True,
+                show=False
+            )
             if path_to_save_folder is not None:
                 target_names = self.dataset.table_dataset.target_columns
                 path = os.path.join(
@@ -447,7 +483,8 @@ class TableShapValueExplainer:
             values = self.compute_shap_values(target=target)
             shap_values = shap.Explanation(
                 values=values,
-                base_values=0
+                feature_names=self.dataset.table_dataset.features_columns,
+                base_values=float(self.base_values[target])
             )
             shap.plots.waterfall(shap_values[patient_id], show=False)
             if path_to_save_folder is not None:
@@ -487,7 +524,7 @@ class TableShapValueExplainer:
             values = self.compute_shap_values(target=target)
             shap_values = shap.Explanation(
                 values=values,
-                base_values=0,
+                base_values=float(self.base_values[target]),
                 feature_names=self.dataset.table_dataset.features_columns,
                 data=self.dataset.table_dataset.x
             )
