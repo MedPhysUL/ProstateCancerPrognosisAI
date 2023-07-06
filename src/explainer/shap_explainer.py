@@ -45,60 +45,14 @@ class CaptumWrapper(torch.nn.Module):
         self.model = model
         self.targets_order = [task for task in dataset.tasks]
         self.table_targets_order = [task for task in dataset.tasks.table_tasks]
-        self.features_order = {'image': list(dataset[0].x.image.keys()), 'table': list(dataset[0].x.table.keys())}
+        self.features_order = {"image": list(dataset[0].x.image.keys()), "table": list(dataset[0].x.table.keys())}
 
-    @staticmethod
-    def convert_dict_to_tensor(
-            dictionary: dict
-    ) -> torch.Tensor:
-        """
-        Converts a M dimensional dictionary of (N, ) tensors into a (N, M) tensor.
-
-        Parameters
-        ----------
-        dictionary : dict
-            The dictionary to convert.
-
-        Returns
-        -------
-        tensor : torch.Tensor
-             The converted tensor.
-        """
-        tensor = []
-        print(list(dictionary.keys()))
-        for i, datum in enumerate(dictionary.values()):
-            if i == 0:
-                if isinstance(datum, torch.Tensor):
-                    tensor = datum
-                elif isinstance(datum, np.ndarray):
-                    tensor = torch.from_numpy(datum)
-                else:
-                    tensor = torch.tensor([datum])
-                tensor = torch.unsqueeze(tensor, dim=1)
-            if isinstance(datum, torch.Tensor):
-                datum = torch.unsqueeze(datum, dim=1)
-                print(datum)
-                print(datum.shape)
-                tensor = torch.cat((tensor, datum), dim=1)
-            elif isinstance(datum, np.ndarray):
-                datum = torch.unsqueeze(torch.from_numpy(datum), dim=1)
-                print(datum)
-                print(datum.shape)
-                tensor = torch.cat((tensor, datum), dim=1)
-            else:
-                datum = torch.unsqueeze(torch.tensor([datum]), dim=1)
-                print(datum)
-                print(datum.shape)
-                tensor = torch.cat((tensor, datum), dim=1)
-            print(tensor)
-        return tensor
-
-    def convert_tensor_to_features_type(
+    def _convert_tensor_to_features_type(
             self,
             tensor_tuple: TensorOrTupleOfTensorsGeneric
     ) -> FeaturesType:
         """
-        Transforms a (N, M) tensor or a tuple of M tensors of shape (N, ) into a FeaturesType.
+        Transforms a (1, M) tensor or a tuple of M tensors of shape (1, ) into a FeaturesType.
 
         Parameters
         ----------
@@ -116,19 +70,19 @@ class CaptumWrapper(torch.nn.Module):
             tensor_list = tensor_tuple.tolist()
         image = {}
         table = {}
-        for i, key in enumerate(self.features_order['image']):
+        for i, key in enumerate(self.features_order["image"]):
             image[key] = tensor_list[i]
-        for i, key in enumerate(self.features_order['table']):
-            i += len(self.features_order['image'])
+        for i, key in enumerate(self.features_order["table"]):
+            i += len(self.features_order["image"])
             table[key] = tensor_list[i]
         return FeaturesType(image=image, table=table)
 
-    def convert_tensor_to_targets_type(
+    def _convert_tensor_to_targets_type(
             self,
             tensor_tuple: TensorOrTupleOfTensorsGeneric
     ) -> TargetsType:
         """
-        Transforms a (N, M) tensor or a tuple of M tensors of shape (N, ) into a TargetsType.
+        Transforms a (1, M) tensor or a tuple of M tensors of shape (1, ) into a TargetsType.
 
         Parameters
         ----------
@@ -142,12 +96,12 @@ class CaptumWrapper(torch.nn.Module):
         """
         return {task.name: value for task, value in zip(self.targets_order, tensor_tuple)}
 
-    def convert_features_type_to_tuple_of_tensor(
+    def _convert_features_type_to_tuple_of_tensor(
             self,
             features: FeaturesType
     ) -> Tuple[torch.Tensor, ...]:
         """
-        Transforms a FeaturesType into a tuple of M tensors of shape (N, ).
+        Transforms a FeaturesType into a tuple of M tensors of shape (1, ).
 
         Parameters
         ----------
@@ -159,9 +113,9 @@ class CaptumWrapper(torch.nn.Module):
         tensor_tuple : TensorOrTupleOfTensorsGeneric
             The Tuple of tensors corresponding to the input FeaturesType
         """
-        image_list = [features.image[image_key] for image_key in self.features_order['image']]
+        image_list = [features.image[image_key] for image_key in self.features_order["image"]]
         table_list = []
-        for table_key in self.features_order['table']:
+        for table_key in self.features_order["table"]:
             datum = features.table[table_key]
             if isinstance(datum, torch.Tensor):
                 table_list.append(features.table[table_key])
@@ -171,13 +125,13 @@ class CaptumWrapper(torch.nn.Module):
                 table_list.append(torch.tensor([datum]))
         return tuple(image_list + table_list)
 
-    def convert_targets_type_to_tuple_of_tensor(
+    def _convert_targets_type_to_tuple_of_tensor(
             self,
             targets: TargetsType,
             ignore_seg_tasks: bool = False
     ) -> Tuple[torch.Tensor, ...]:
         """
-        Transforms a TargetsType into a tuple of M tensors of shape (N, ).
+        Transforms a TargetsType into a tuple of M tensors of shape (1, ).
 
         Parameters
         ----------
@@ -222,10 +176,10 @@ class CaptumWrapper(torch.nn.Module):
         prediction_tensor : torch.Tensor
             Predictions in the form of a Tensor.
         """
-        inputs = self.convert_tensor_to_features_type(tuple([*inputs]))
+        inputs = self._convert_tensor_to_features_type(tuple([*inputs]))
 
         targets_type = self.model(inputs)
-        target_tensor = self.convert_targets_type_to_tuple_of_tensor(targets_type, ignore_seg_tasks=True)
+        target_tensor = self._convert_targets_type_to_tuple_of_tensor(targets_type, ignore_seg_tasks=True)
         prediction_tensor = torch.stack(target_tensor, dim=0)
 
         return prediction_tensor
@@ -251,6 +205,7 @@ class TableShapValueExplainer:
         dataset : ProstateCancerDataset
             The dataset with which to explain the model.
         """
+        assert dataset.table_dataset is not None, "Shap values require a table dataset to be computed"
         self.model = CaptumWrapper(model, dataset)
         self.dataset = dataset
 
@@ -283,8 +238,7 @@ class TableShapValueExplainer:
 
         n = 0
         attr_tensor = torch.tensor([])
-        for features, targets in data_loader:
-            features = self.model.convert_features_type_to_tuple_of_tensor(features)
+        for features, _ in data_loader:
             features = tuple([feature.requires_grad_() for feature in features])
             attr = integrated_gradient.attribute(features, target=target)
             cat_tensor = torch.tensor([])
@@ -348,20 +302,20 @@ class TableShapValueExplainer:
                     path_to_save_folder,
                     f"{kwargs.get('filename', 'average_shap_values.pdf')}"
                 )
-            title = kwargs.get('title', "Average Feature Importances")
-            axis_title = kwargs.get('axis', "Features")
+            title = kwargs.get("title", "Average Feature Importances")
+            axis_title = kwargs.get("axis", "Features")
             x_pos = (np.arange(len(feature_names)))
 
-            arr.bar(x_pos, average_attributions[target], align='center')
+            arr.bar(x_pos, average_attributions[target], align="center")
             arr.set_xticks(x_pos, feature_names, wrap=True)
             arr.set_xlabel(axis_title)
             arr.set_title(title)
 
             if path_to_save_folder is not None:
-                features = self.dataset.table_dataset.features_columns
+                target_names = self.dataset.table_dataset.target_columns
                 path = os.path.join(
                     path_to_save_folder,
-                    f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'average_shap_plot.pdf')}"
+                    f"{kwargs.get('target', target_names[target])}_{kwargs.get('filename', 'average_shap_plot.pdf')}"
                 )
             else:
                 path = None
@@ -420,6 +374,8 @@ class TableShapValueExplainer:
         kwargs
             Kwargs to give to matplotlib.pyplot.savefig.
         """
+        if isinstance(targets, int):
+            targets = [targets]
         for target in targets:
             values = self.compute_shap_values(target=target)
             shap_values = shap.Explanation(
@@ -434,10 +390,10 @@ class TableShapValueExplainer:
                             show=False
                             )
             if path_to_save_folder is not None:
-                features = self.dataset.table_dataset.features_columns
+                target_names = self.dataset.table_dataset.target_columns
                 path = os.path.join(
                     path_to_save_folder,
-                    f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'force_plot.pdf')}"
+                    f"{kwargs.get('target', target_names[target])}_{kwargs.get('filename', 'force_plot.pdf')}"
                 )
             else:
                 path = None
@@ -467,6 +423,8 @@ class TableShapValueExplainer:
         kwargs
             Kwargs to give to matplotlib.pyplot.savefig.
         """
+        if isinstance(targets, int):
+            targets = [targets]
         for target in targets:
             values = self.compute_shap_values(target=target)
             shap_values = shap.Explanation(
@@ -475,10 +433,10 @@ class TableShapValueExplainer:
             )
             shap.plots.waterfall(shap_values[patient_id], show=False)
             if path_to_save_folder is not None:
-                features = self.dataset.table_dataset.features_columns
+                target_names = self.dataset.table_dataset.target_columns
                 path = os.path.join(
                     path_to_save_folder,
-                    f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'waterfall_plot.pdf')}"
+                    f"{kwargs.get('target', target_names[target])}_{kwargs.get('filename', 'waterfall_plot.pdf')}"
                 )
             else:
                 path = None
@@ -505,6 +463,8 @@ class TableShapValueExplainer:
         kwargs
             Kwargs to give to matplotlib.pyplot.savefig.
         """
+        if isinstance(targets, int):
+            targets = [targets]
         for target in targets:
             values = self.compute_shap_values(target=target)
             shap_values = shap.Explanation(
@@ -515,10 +475,10 @@ class TableShapValueExplainer:
             )
             shap.plots.beeswarm(shap_values, show=False)
             if path_to_save_folder is not None:
-                features = self.dataset.table_dataset.features_columns
+                target_names = self.dataset.table_dataset.target_columns
                 path = os.path.join(
                     path_to_save_folder,
-                    f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'beeswarm_plot.pdf')}"
+                    f"{kwargs.get('target', target_names[target])}_{kwargs.get('filename', 'beeswarm_plot.pdf')}"
                 )
             else:
                 path = None
@@ -545,6 +505,8 @@ class TableShapValueExplainer:
         kwargs
             Kwargs to give to matplotlib.pyplot.savefig.
         """
+        if isinstance(targets, int):
+            targets = [targets]
         for target in targets:
             values = self.compute_shap_values(target=target)
             shap_values = shap.Explanation(
@@ -555,10 +517,10 @@ class TableShapValueExplainer:
             )
             shap.plots.bar(shap_values, show=False)
             if path_to_save_folder is not None:
-                features = self.dataset.table_dataset.features_columns
+                target_names = self.dataset.table_dataset.target_columns
                 path = os.path.join(
                     path_to_save_folder,
-                    f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'bar_plot.pdf')}"
+                    f"{kwargs.get('target', target_names[target])}_{kwargs.get('filename', 'bar_plot.pdf')}"
                 )
             else:
                 path = None
@@ -585,6 +547,8 @@ class TableShapValueExplainer:
         kwargs
             Kwargs to give to matplotlib.pyplot.savefig.
         """
+        if isinstance(targets, int):
+            targets = [targets]
         for target in targets:
             values = self.compute_shap_values(target=target)
             shap_values = shap.Explanation(
@@ -595,10 +559,10 @@ class TableShapValueExplainer:
             )
             shap.plots.scatter(shap_values, show=False)
             if path_to_save_folder is not None:
-                features = self.dataset.table_dataset.features_columns
+                target_names = self.dataset.table_dataset.target_columns
                 path = os.path.join(
                     path_to_save_folder,
-                    f"{kwargs.get('target', features[target])}_{kwargs.get('filename', 'scatter_plot.pdf')}"
+                    f"{kwargs.get('target', target_names[target])}_{kwargs.get('filename', 'scatter_plot.pdf')}"
                 )
             else:
                 path = None
