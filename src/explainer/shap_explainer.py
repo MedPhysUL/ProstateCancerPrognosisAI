@@ -239,7 +239,7 @@ class TableShapValueExplainer:
         n = 0
         attr_tensor = torch.tensor([])
         for features, _ in data_loader:
-            features = tuple([feature.requires_grad_() for feature in features])
+            features = tuple([feature.requires_grad_() for feature in features.table.values()])
             attr = integrated_gradient.attribute(features, target=target)
             cat_tensor = torch.tensor([])
 
@@ -259,6 +259,7 @@ class TableShapValueExplainer:
             self,
             targets: Union[int, List[int]],
             mask: Optional[List[int]] = None,
+            absolute: bool = False,
             show: bool = True,
             path_to_save_folder: Optional[str] = None,
             **kwargs
@@ -272,6 +273,8 @@ class TableShapValueExplainer:
             The index or a list of the indexes of the desired output for which to compute the shap values.
         mask : Optional[List[int]]
             A mask to select which patients to use.
+        absolute : bool
+            Whether to compute the absolute value before computing the average. Defaults to False.
         show : bool
             Whether to show the graph
         path_to_save_folder : Optional[str]
@@ -292,10 +295,16 @@ class TableShapValueExplainer:
         for target in targets:
             fig, arr = plt.subplots()
             feature_names = self.dataset.table_dataset.features_columns
-            average_attributions = {
-                target: np.mean(self.compute_shap_values(target=target, mask=mask), axis=0)
-                for target in targets
-            }
+            if absolute:
+                average_attributions = {
+                    target: np.mean(np.abs(self.compute_shap_values(target=target, mask=mask)), axis=0)
+                    for target in targets
+                }
+            else:
+                average_attributions = {
+                    target: np.mean(self.compute_shap_values(target=target, mask=mask), axis=0)
+                    for target in targets
+                }
 
             if path_to_save_folder is not None:
                 path_to_save_folder = os.path.join(

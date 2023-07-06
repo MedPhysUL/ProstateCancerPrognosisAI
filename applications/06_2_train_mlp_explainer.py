@@ -97,9 +97,9 @@ if __name__ == '__main__':
 
     show = True
 
-    sage_explainer = TableSageValueExplainer(model=model, dataset=dataset, imputer='marginal', values=dataset.test_mask)
-    sage_explainer.plot_sage_values_by_permutation(masks[(len(masks)//3):(2*len(masks)//3)], target=0, show=show)
-    sage_explainer.plot_sage_values_by_iteration(masks[(len(masks) // 3):(2 * len(masks) // 3)], target=0, show=show)
+    # sage_explainer = TableSageValueExplainer(model=model, dataset=dataset, imputer='marginal', values=dataset.test_mask)
+    # sage_explainer.plot_sage_values_by_permutation(masks[(len(masks)//3):(2*len(masks)//3)], target=0, show=show)
+    # sage_explainer.plot_sage_values_by_iteration(masks[(len(masks) // 3):(2 * len(masks) // 3)], target=0, show=show)
 
     shap_explainer = TableShapValueExplainer(model=model, dataset=dataset)
     shap_explainer.plot_force(targets=0, patient_id=0, show=show)
@@ -107,4 +107,4 @@ if __name__ == '__main__':
     shap_explainer.plot_beeswarm(targets=0, show=show)
     shap_explainer.plot_bar(targets=0, show=show)
     shap_explainer.plot_scatter(targets=[0, 1, 2, 3], show=show)
-    print(shap_explainer.compute_average_shap_values(targets=[0, 1, 2, 3, 4], show=show))
+    print(shap_explainer.compute_average_shap_values(targets=[0, 1, 2, 3, 4], absolute=True, show=show))
