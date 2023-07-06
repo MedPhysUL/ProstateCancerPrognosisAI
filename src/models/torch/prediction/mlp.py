@@ -45,7 +45,7 @@ class MLP(Predictor):
 
         Parameters
         ----------
-        features_columns : Optional[Union[str, Sequence[str]]]
+        features_columns : Optional[Union[str, Sequence[str], Mapping[TableTask, Sequence[str]]]]
             The names of the features columns.
         multi_task_mode : Union[str, MultiTaskMode]
             Available modes are 'separated' or 'fully_shared'. If 'separated', a separate extractor model is used for
