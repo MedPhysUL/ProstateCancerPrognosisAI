@@ -43,6 +43,7 @@ class CaptumWrapper(torch.nn.Module):
         """
         super().__init__(*args, **kwargs)
         self.model = model
+        self.dataset = dataset
         self.targets_order = [task for task in dataset.tasks]
         self.table_targets_order = [task for task in dataset.tasks.table_tasks]
         self.features_order = {"image": list(dataset[0].x.image.keys()), "table": list(dataset[0].x.table.keys())}
@@ -177,10 +178,18 @@ class CaptumWrapper(torch.nn.Module):
             Predictions in the form of a Tensor.
         """
         inputs = self._convert_tensor_to_features_type(tuple([*inputs]))
-
-        targets_type = self.model(inputs)
-        target_tensor = self._convert_targets_type_to_tuple_of_tensor(targets_type, ignore_seg_tasks=True)
-        prediction_tensor = torch.stack(target_tensor, dim=0)
+        predictions ={}
+        outputs = self.model(inputs)
+        for task in self.dataset.tasks.binary_classification_tasks:
+            predictions[task.name] = torch.sigmoid(outputs[task.name])
+        for task in self.dataset.tasks.regression_tasks:
+            predictions[task.name] = outputs[task.name]
+        for task in self.dataset.tasks.survival_analysis_tasks:
+            predictions[task.name] = outputs[task.name]
+        for task in self.dataset.tasks.segmentation_tasks:
+            predictions[task.name] = torch.round(torch.sigmoid(outputs[task.name]))
+        target_tensor = self._convert_targets_type_to_tuple_of_tensor(predictions, ignore_seg_tasks=True)
+        prediction_tensor = torch.stack(target_tensor, dim=1)
 
         return prediction_tensor
 
@@ -240,6 +249,7 @@ class TableShapValueExplainer:
         attr_tensor = torch.tensor([])
         for features, _ in data_loader:
             features = tuple([feature.requires_grad_() for feature in features.table.values()])
+            print(features)
             attr = integrated_gradient.attribute(features, target=target)
             cat_tensor = torch.tensor([])
 
