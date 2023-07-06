@@ -246,10 +246,10 @@ class SageWrapper(torch.nn.Module):
         targets_type = self.model(features_type)
         target_array = self._convert_targets_type_to_ndarray(targets_type)
         predictions_array = np.stack(target_array, axis=0)
-        if not np.all(np.logical_and(predictions_array >= 0, predictions_array <= 1)):
-            prediction_tensor = torch.sigmoid(torch.from_numpy(predictions_array))
-        else:
-            prediction_tensor = torch.from_numpy(predictions_array)
+        # if not np.all(np.logical_and(predictions_array >= 0, predictions_array <= 1)):
+        #     prediction_tensor = torch.sigmoid(torch.from_numpy(predictions_array))
+        # else:
+        prediction_tensor = torch.from_numpy(predictions_array)
         return prediction_tensor[:, self.target]
 
 
@@ -318,7 +318,7 @@ class TableSageValueExplainer:
             **kwargs
     ):
         """
-        computes the sage values by permutation of feature indices.
+        Computes the sage values by permutation of feature indices.
 
         Parameters
         ----------
@@ -341,6 +341,59 @@ class TableSageValueExplainer:
         """
         self.wrapper.__init__(model=self.model, dataset=self.dataset, target=target)
         estimator = sage.PermutationEstimator(imputer=self.imputer, loss=loss, n_jobs=n_jobs, random_state=random_state)
+        sage_values = estimator(
+            SageWrapper.convert_dict_to_ndarray(self.dataset.table_dataset[mask].x),
+            SageWrapper.convert_dict_to_ndarray(self.dataset.table_dataset[mask].y)[:, target],
+            **kwargs
+        )
+        sage_values.plot(feature_names=self.dataset.table_dataset.features_columns)
+        if self.groups is not None:
+            fig = sage_values.plot(feature_names=list(self.groups.keys()), return_fig=True,  **kwargs)
+        else:
+            fig = sage_values.plot(feature_names=self.dataset.table_dataset.features_columns, return_fig=True, **kwargs)
+
+        if path_to_save_folder is not None:
+            path = os.path.join(
+                path_to_save_folder,
+                f"{kwargs.get('filename', 'permutation_sage_values.pdf')}"
+            )
+        else:
+            path = None
+
+        PredictionEvaluator.terminate_figure(fig=fig, show=show, path_to_save_folder=path)
+
+    def plot_sage_values_by_iteration(
+            self,
+            mask: List[int],
+            target: int,
+            show: bool,
+            path_to_save_folder: Optional[str] = None,
+            loss: str = "cross entropy",
+            random_state: Optional[int] = None,
+            **kwargs
+    ):
+        """
+        Computes the sage values by Iteration over subsets of feature values.
+
+        Parameters
+        ----------
+        mask : List[int]
+            The mask with which to choose the patients used for computation.
+        target : int
+            The index of the desired output.
+        show : bool
+            Whether to show the figure.
+        path_to_save_folder : Optional[str]
+            The path to the folder within which to save the graph, if no path is given then the graph is not saved.
+        loss : str
+            The loss function to use, either "mse" or "cross entropy", defaults to "cross entropy".
+        random_state : Optional[int]
+            The processes' seed, allows for repeatability.
+        kwargs
+            Kwargs to give to the call function of the estimator, the plot function and to matplotlib.pyplot.savefig.
+        """
+        self.wrapper.__init__(model=self.model, dataset=self.dataset, target=target)
+        estimator = sage.IteratedEstimator(imputer=self.imputer, loss=loss, random_state=random_state)
         sage_values = estimator(
             SageWrapper.convert_dict_to_ndarray(self.dataset.table_dataset[mask].x),
             SageWrapper.convert_dict_to_ndarray(self.dataset.table_dataset[mask].y)[:, target],
