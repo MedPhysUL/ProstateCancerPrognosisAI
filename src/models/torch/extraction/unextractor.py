@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Raphael Brodeur
 
     @Creation Date:     06/2022
-    @Last modification: 06/2023
+    @Last modification: 07/2023
 
     @Description:       This file is used to define a UNEXtractor model.
 """
@@ -15,8 +15,8 @@ from torch import cat, mean, sum, Tensor
 from torch import device as torch_device
 from torch.nn import DataParallel, Module, ModuleDict, Sequential
 
-from .base import Extractor, ExtractorOutput, ModelMode, MultiTaskMode
-from .blocks import BayesianDecoderBlock, BayesianEncoderBlock, DecoderBlock, EncoderBlock
+from .base import Extractor, ExtractorKLDivergence, ExtractorOutput, ModelMode, MultiTaskMode
+from ..blocks import BayesianDecoderBlock, BayesianEncoderBlock, DecoderBlock, EncoderBlock
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
 
 
@@ -47,10 +47,9 @@ class _UNet(Module):
 
         self.encoders = encoders
         self.decoders = decoders
-
         self.bayesian = bayesian
 
-    def _bayesian_forward(self, input_tensor: Tensor) -> ExtractorOutput:
+    def _bayesian_forward(self, input_tensor: Tensor) -> tuple[ExtractorOutput, ExtractorKLDivergence]:
         """
         Forward pass for bayesian model.
 
@@ -61,9 +60,8 @@ class _UNet(Module):
 
         Returns
         -------
-        output : ExtractorOutput
-            The output of the forward pass. It contains the deep features, the segmentation and the sum of the KL
-            divergence accumulated by all the VI operations.
+        output : tuple[ExtractorOutput, ExtractorKLDivergence]
+            The deep features and segmentations and their corresponding KL divergence.
         """
         dim = tuple(range(2, len(input_tensor.shape)))
         x = input_tensor
@@ -82,11 +80,17 @@ class _UNet(Module):
 
         features = cat(features, dim=1)
 
+        deep_features_kl = sum(cat(kl_list))
+
         for key, decoder in reversed(list(self.decoders.items())):
             x, kl = decoder(cat([layers_output[key], x], dim=1))
             kl_list.append(kl)
 
-        return ExtractorOutput(deep_features=features, segmentation=x, kl_divergence=sum(cat(kl_list)))
+        segmentation_kl = sum(cat(kl_list))
+
+        kl_divergence = ExtractorKLDivergence(deep_features=deep_features_kl, segmentation=segmentation_kl)
+
+        return ExtractorOutput(deep_features=features, segmentation=x), kl_divergence
 
     def _deterministic_forward(self, input_tensor: Tensor) -> ExtractorOutput:
         """
@@ -119,9 +123,9 @@ class _UNet(Module):
         for key, decoder in reversed(list(self.decoders.items())):
             x = decoder(cat([layers_output[key], x], dim=1))
 
-        return ExtractorOutput(deep_features=features, segmentation=x, kl_divergence=None)
+        return ExtractorOutput(deep_features=features, segmentation=x)
 
-    def forward(self, input_tensor: Tensor) -> ExtractorOutput:
+    def forward(self, input_tensor: Tensor) -> Union[ExtractorOutput, tuple[ExtractorOutput, ExtractorKLDivergence]]:
         """
         Forward pass. Applies different forward methods depending on whether the model is bayesian.
 
@@ -132,9 +136,9 @@ class _UNet(Module):
 
         Returns
         -------
-        output : ExtractorOutput
-            The output of the forward pass. It contains the deep features, the segmentation and the kl divergence if the
-            model is in bayesian mode.
+        output : Union[ExtractorOutput, tuple[ExtractorOutput, ExtractorKLDivergence]]
+            The output of the forward pass. It contains the deep features and segmentations and their respective KL
+            divergence if the model is in bayesian mode.
         """
         if self.bayesian:
             return self._bayesian_forward(input_tensor=input_tensor)
@@ -229,7 +233,8 @@ class UNEXtractor(Extractor):
             hidden_channels_fnn=hidden_channels_fnn,
             device=device,
             name=name,
-            seed=seed
+            seed=seed,
+            bayesian=bayesian
         )
 
         self.strides = strides if strides else [2] * (len(self.channels) - 1)
@@ -240,14 +245,9 @@ class UNEXtractor(Extractor):
 
         self.bayesian = bayesian
 
-    def _get_encoders_dict(self, bayesian: bool = False) -> ModuleDict:
+    def _get_encoders_dict(self) -> ModuleDict:
         """
         Returns a ModuleDict of encoder blocks to be used by the UNet in its encoding path.
-
-        Parameters
-        ----------
-        bayesian : bool
-            Whether the encoder should implement variational inference.
 
         Returns
         -------
@@ -258,7 +258,7 @@ class UNEXtractor(Extractor):
         for i, c in enumerate(self.channels):
             enc = Sequential()
 
-            if bayesian:
+            if self.bayesian:
                 conv = BayesianEncoderBlock(
                     input_channels=self.in_shape[0] if i == 0 else self.channels[i - 1],
                     output_channels=c,
@@ -290,14 +290,9 @@ class UNEXtractor(Extractor):
 
         return encoders
 
-    def _get_decoders_dict(self, bayesian: bool = False) -> ModuleDict:
+    def _get_decoders_dict(self) -> ModuleDict:
         """
         Returns a ModuleDict of decoder blocks to be used by the UNet in its decoding path.
-
-        Parameters
-        ----------
-        bayesian : bool
-            Whether the decoder should implement variational inference.
 
         Returns
         -------
@@ -310,7 +305,7 @@ class UNEXtractor(Extractor):
             if i < len(self.channels) - 1:
                 dec = Sequential()
 
-                if bayesian:
+                if self.bayesian:
                     up_conv = BayesianDecoderBlock(
                         input_channels=c + self.channels[i + 1] if i == len(self.channels) - 2 else c * 2,
                         output_channels=len(self._tasks.segmentation_tasks) if i == 0 else self.channels[i - 1],
@@ -365,7 +360,7 @@ class UNEXtractor(Extractor):
         )
 
         return _UNet(
-            encoders=self._get_encoders_dict(bayesian=self.bayesian),
-            decoders=self._get_decoders_dict(bayesian=self.bayesian),
+            encoders=self._get_encoders_dict(),
+            decoders=self._get_decoders_dict(),
             bayesian=self.bayesian
         )

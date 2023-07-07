@@ -3,7 +3,7 @@
     @Author:            Raphael Brodeur
 
     @Creation Date:     06/2022
-    @Last modification: 06/2023
+    @Last modification: 07/2023
 
     @Description:       This file contains blocks to build image processing models.
 """
@@ -15,11 +15,12 @@ from bayesian_torch.layers.variational_layers.conv_variational import (
     Conv3dReparameterization,
     ConvTranspose3dReparameterization
 )
+from bayesian_torch.layers.variational_layers.linear_variational import LinearReparameterization
 from monai.networks.blocks import ADN
 from monai.networks.layers.convutils import same_padding
 import numpy as np
 from torch import cat, sum, Tensor
-from torch.nn import Conv3d, ConvTranspose3d, Identity, Module, Sequential
+from torch.nn import Conv3d, ConvTranspose3d, Flatten, Identity, Linear, Module, Sequential
 
 
 class EncoderBlock(Module):
@@ -295,6 +296,52 @@ class DecoderBlock(Module):
 
         else:
             return y
+
+
+class FullyConnectedNet(Sequential):
+    """
+    A class that contains a fully connected layer neural network. Based on Monai.
+    """
+
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            hidden_channels: Sequence[int],
+            dropout: float = 0.0,
+            act: str = "PRELU"
+    ):
+        """
+        Builds the FCN.
+
+        Parameters
+        ----------
+        in_channels : int
+            Number of input channels.
+        out_channels : int
+            Number of output channels.
+        hidden_channels : Sequence[int]
+            Sequence of numbers of output channels of each hidden layer.
+        dropout : float
+            Dropout probability.
+        act : str
+            Activation applied after each hidden layer.
+        """
+        super().__init__()
+
+        self.add_module("flatten", Flatten())
+
+        prev_channels = in_channels
+        for i, channels in enumerate(hidden_channels):
+            hidden = Sequential()
+            hidden.add_module("linear", Linear(in_features=prev_channels, out_features=channels))
+            hidden.add_module("nda", ADN(ordering="NDA", act=act, dropout=dropout, dropout_dim=1))
+
+            self.add_module(f"hidden{i}", hidden)
+
+            prev_channels = channels
+
+        self.add_module("output", Linear(in_features=prev_channels, out_features=out_channels))
 
 
 class BayesianEncoderBlock(Module):
@@ -647,3 +694,111 @@ class BayesianDecoderBlock(Module):
 
         else:
             return x, sum(cat(kl_list))
+
+
+class BayesianFullyConnectedNet(Module):
+    """
+    A class that contains a bayesian FCN that implements variational inference.
+    """
+
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            hidden_channels: Sequence[int],
+            dropout: float = 0.0,
+            act: str = "PRELU",
+            prior_mean: float = 0.0,
+            prior_variance: float = 0.1
+    ):
+        """
+        Builds the bayesian FCN.
+
+        Parameters
+        ----------
+        in_channels : int
+            Number of input channels.
+        out_channels : int
+            Number of output channels.
+        hidden_channels : Sequence[int]
+            Sequence of numbers of output channels of each hidden layer.
+        dropout : float
+            Dropout probability.
+        act : str
+            Activation applied after each hidden layer.
+        prior_mean : float
+            Mean of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
+        prior_variance : float
+            Variance of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
+        """
+        super().__init__()
+
+        self.flatten = Flatten()
+
+        self.hidden_layers = Sequential()
+
+        prev_channels = in_channels
+        for i, channels in enumerate(hidden_channels):
+            layer = Sequential()
+
+            layer.add_module(
+                "linear",
+                LinearReparameterization(
+                    in_features=prev_channels,
+                    out_features=channels,
+                    prior_mean=prior_mean,
+                    prior_variance=prior_variance
+                )
+            )
+            layer.add_module(
+                "adn",
+                ADN(
+                    ordering="NDA",
+                    act=act,
+                    dropout=dropout,
+                    dropout_dim=1
+                )
+            )
+
+            self.hidden_layers.add_module(f"layer{i}", layer)
+
+            prev_channels = channels
+
+        self.output = LinearReparameterization(
+            in_features=prev_channels,
+            out_features=out_channels,
+            prior_mean=prior_mean,
+            prior_variance=prior_variance
+        )
+
+    def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:
+        """
+        Defines the forward method of the bayesian FCN.
+
+        Parameters
+        ----------
+        x : Tensor
+            The input Tensor.
+
+        Returns
+        -------
+        output : tuple[Tensor, Tensor]
+            A tuple containing the transformed tensor and the sum of the KL divergence of each probabilistic operation.
+        """
+        kl_list = []
+
+        x = self.flatten(x)
+
+        for layer in self.hidden_layers:
+            for name, module in layer.named_children():
+                if name == "linear":    # Module is a linear layer.
+                    x, kl = module(x)
+                    kl_list.append(kl)
+
+                else:                   # Module is a NDA layer.
+                    x = module(x)
+
+        x, kl = self.output(x)
+        kl_list.append(kl)
+
+        return x, sum(cat(kl_list))
