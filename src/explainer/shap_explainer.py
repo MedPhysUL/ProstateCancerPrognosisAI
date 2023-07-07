@@ -434,7 +434,7 @@ class TableShapValueExplainer:
             values = self.compute_shap_values(target=target)
             shap_values = shap.Explanation(
                 values=values,
-                base_values=np.zeros_like(values),
+                base_values=float(self.base_values[target]),
                 feature_names=self.dataset.table_dataset.features_columns,
                 data=self.dataset.table_dataset.x
             )
@@ -566,7 +566,7 @@ class TableShapValueExplainer:
             values = self.compute_shap_values(target=target)
             shap_values = shap.Explanation(
                 values=values,
-                base_values=np.zeros_like(values),
+                base_values=np.ones_like(values)*float(self.base_values[target]),
                 feature_names=self.dataset.table_dataset.features_columns,
                 data=self.dataset.table_dataset.x
             )
@@ -608,7 +608,7 @@ class TableShapValueExplainer:
             values = self.compute_shap_values(target=target)
             shap_values = shap.Explanation(
                 values=values,
-                base_values=np.zeros_like(values),
+                base_values=np.ones_like(values)*float(self.base_values[target]),
                 feature_names=self.dataset.table_dataset.features_columns,
                 data=self.dataset.table_dataset.x
             )
