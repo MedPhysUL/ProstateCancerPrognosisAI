@@ -408,7 +408,8 @@ class TableShapValueExplainer:
             self,
             targets: Union[int, List[int]],
             patient_id: int,
-            show: bool,
+            mask: Optional[List[int]] = None,
+            show: bool = True,
             path_to_save_folder: Optional[str] = None,
             **kwargs
     ) -> None:
@@ -421,8 +422,10 @@ class TableShapValueExplainer:
             The index or a list of the indexes of the desired output for which to compute the shap values.
         patient_id : int
             The index of the patient for whom to compute the graph.
+        mask : Optional[List[int]]
+            A mask to select which patients to use.
         show : bool
-            Whether to show the graph
+            Whether to show the graph, defaults to True.
         path_to_save_folder : Optional[str]
             The path to the folder within which to save the graph, if no path is given then the graph is not saved.
         kwargs
@@ -431,13 +434,21 @@ class TableShapValueExplainer:
         if isinstance(targets, int):
             targets = [targets]
         for target in targets:
-            values = self.compute_shap_values(target=target)
-            shap_values = shap.Explanation(
-                values=values,
-                base_values=float(self.base_values[target]),
-                feature_names=self.dataset.table_dataset.features_columns,
-                data=self.dataset.table_dataset.x
-            )
+            values = self.compute_shap_values(target=target, mask=mask)
+            if mask is not None:
+                shap_values = shap.Explanation(
+                    values=values,
+                    base_values=float(self.base_values[target]),
+                    feature_names=self.dataset.table_dataset.features_columns,
+                    data=self.dataset.table_dataset.x[mask]
+                )
+            else:
+                shap_values = shap.Explanation(
+                    values=values,
+                    base_values=float(self.base_values[target]),
+                    feature_names=self.dataset.table_dataset.features_columns,
+                    data=self.dataset.table_dataset.x
+                )
             shap.force_plot(
                 shap_values[patient_id],
                 matplotlib=True,
@@ -457,7 +468,8 @@ class TableShapValueExplainer:
             self,
             targets: Union[int, List[int]],
             patient_id: int,
-            show: bool,
+            mask: Optional[List[int]] = None,
+            show: bool = True,
             path_to_save_folder: Optional[str] = None,
             **kwargs
     ) -> None:
@@ -470,8 +482,10 @@ class TableShapValueExplainer:
             The index or a list of the indexes of the desired output for which to compute the shap values.
         patient_id : int
             The index of the patient for whom to compute the graph.
+        mask : Optional[List[int]]
+            A mask to select which patients to use.
         show : bool
-            Whether to show the graph
+            Whether to show the graph, defaults to True.
         path_to_save_folder : Optional[str]
             The path to the folder within which to save the graph, if no path is given then the graph is not saved.
         kwargs
@@ -480,7 +494,7 @@ class TableShapValueExplainer:
         if isinstance(targets, int):
             targets = [targets]
         for target in targets:
-            values = self.compute_shap_values(target=target)
+            values = self.compute_shap_values(target=target, mask=mask)
             shap_values = shap.Explanation(
                 values=values,
                 feature_names=self.dataset.table_dataset.features_columns,
@@ -500,7 +514,8 @@ class TableShapValueExplainer:
     def plot_beeswarm(
             self,
             targets: Union[int, List[int]],
-            show: bool,
+            mask: Optional[List[int]] = None,
+            show: bool = True,
             path_to_save_folder: Optional[str] = None,
             **kwargs
     ) -> None:
@@ -511,8 +526,10 @@ class TableShapValueExplainer:
         ----------
         targets : Union[int, List[int]]
             The index or a list of the indexes of the desired output for which to compute the shap values.
+        mask : Optional[List[int]]
+            A mask to select which patients to use.
         show : bool
-            Whether to show the graph
+            Whether to show the graph, defaults to True.
         path_to_save_folder : Optional[str]
             The path to the folder within which to save the graph, if no path is given then the graph is not saved.
         kwargs
@@ -521,13 +538,21 @@ class TableShapValueExplainer:
         if isinstance(targets, int):
             targets = [targets]
         for target in targets:
-            values = self.compute_shap_values(target=target)
-            shap_values = shap.Explanation(
-                values=values,
-                base_values=float(self.base_values[target]),
-                feature_names=self.dataset.table_dataset.features_columns,
-                data=self.dataset.table_dataset.x
-            )
+            values = self.compute_shap_values(target=target, mask=mask)
+            if mask is not None:
+                shap_values = shap.Explanation(
+                    values=values,
+                    base_values=float(self.base_values[target]),
+                    feature_names=self.dataset.table_dataset.features_columns,
+                    data=self.dataset.table_dataset.x[mask]
+                )
+            else:
+                shap_values = shap.Explanation(
+                    values=values,
+                    base_values=float(self.base_values[target]),
+                    feature_names=self.dataset.table_dataset.features_columns,
+                    data=self.dataset.table_dataset.x
+                )
             shap.plots.beeswarm(shap_values, show=False)
             if path_to_save_folder is not None:
                 target_names = self.dataset.table_dataset.target_columns
@@ -542,7 +567,8 @@ class TableShapValueExplainer:
     def plot_bar(
             self,
             targets: Union[int, List[int]],
-            show: bool,
+            mask: Optional[List[int]] = None,
+            show: bool = True,
             path_to_save_folder: Optional[str] = None,
             **kwargs
     ) -> None:
@@ -553,8 +579,10 @@ class TableShapValueExplainer:
         ----------
         targets : Union[int, List[int]]
             The index or a list of the indexes of the desired output for which to compute the shap values.
+        mask : Optional[List[int]]
+            A mask to select which patients to use.
         show : bool
-            Whether to show the graph
+            Whether to show the graph, defaults to True.
         path_to_save_folder : Optional[str]
             The path to the folder within which to save the graph, if no path is given then the graph is not saved.
         kwargs
@@ -563,13 +591,21 @@ class TableShapValueExplainer:
         if isinstance(targets, int):
             targets = [targets]
         for target in targets:
-            values = self.compute_shap_values(target=target)
-            shap_values = shap.Explanation(
-                values=values,
-                base_values=np.ones_like(values)*float(self.base_values[target]),
-                feature_names=self.dataset.table_dataset.features_columns,
-                data=self.dataset.table_dataset.x
-            )
+            values = self.compute_shap_values(target=target, mask=mask)
+            if mask is not None:
+                shap_values = shap.Explanation(
+                    values=values,
+                    base_values=np.ones_like(values)*float(self.base_values[target]),
+                    feature_names=self.dataset.table_dataset.features_columns,
+                    data=self.dataset.table_dataset.x[mask]
+                )
+            else:
+                shap_values = shap.Explanation(
+                    values=values,
+                    base_values=np.ones_like(values) * float(self.base_values[target]),
+                    feature_names=self.dataset.table_dataset.features_columns,
+                    data=self.dataset.table_dataset.x
+                )
             shap.plots.bar(shap_values, show=False)
             if path_to_save_folder is not None:
                 target_names = self.dataset.table_dataset.target_columns
@@ -584,7 +620,8 @@ class TableShapValueExplainer:
     def plot_scatter(
             self,
             targets: Union[int, List[int]],
-            show: bool,
+            mask: Optional[List[int]] = None,
+            show: bool = True,
             path_to_save_folder: Optional[str] = None,
             **kwargs
     ) -> None:
@@ -595,8 +632,10 @@ class TableShapValueExplainer:
         ----------
         targets : Union[int, List[int]]
             The index or a list of the indexes of the desired output for which to compute the shap values.
+        mask : Optional[List[int]]
+            A mask to select which patients to use.
         show : bool
-            Whether to show the graph
+            Whether to show the graph, defaults to True.
         path_to_save_folder : Optional[str]
             The path to the folder within which to save the graph, if no path is given then the graph is not saved.
         kwargs
@@ -605,13 +644,21 @@ class TableShapValueExplainer:
         if isinstance(targets, int):
             targets = [targets]
         for target in targets:
-            values = self.compute_shap_values(target=target)
-            shap_values = shap.Explanation(
-                values=values,
-                base_values=np.ones_like(values)*float(self.base_values[target]),
-                feature_names=self.dataset.table_dataset.features_columns,
-                data=self.dataset.table_dataset.x
-            )
+            values = self.compute_shap_values(target=target, mask=mask)
+            if mask is not None:
+                shap_values = shap.Explanation(
+                    values=values,
+                    base_values=np.ones_like(values)*float(self.base_values[target]),
+                    feature_names=self.dataset.table_dataset.features_columns,
+                    data=self.dataset.table_dataset.x[mask]
+                )
+            else:
+                shap_values = shap.Explanation(
+                    values=values,
+                    base_values=np.ones_like(values) * float(self.base_values[target]),
+                    feature_names=self.dataset.table_dataset.features_columns,
+                    data=self.dataset.table_dataset.x
+                )
             shap.plots.scatter(shap_values, show=False)
             if path_to_save_folder is not None:
                 target_names = self.dataset.table_dataset.target_columns
