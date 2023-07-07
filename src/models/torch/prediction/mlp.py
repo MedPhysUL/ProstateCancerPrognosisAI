@@ -117,6 +117,25 @@ class MLP(Predictor):
 
         return fully_connected_net.to(self.device)
 
+    def _get_in_channels(self, target_column: str) -> int:
+        """
+        Returns the number of input channels.
+
+        Parameters
+        ----------
+        target_column : str
+            The target column.
+
+        Returns
+        -------
+        in_channels : int
+            The number of input channels.
+        """
+        if isinstance(self.features_columns, Mapping):
+            return len(self.features_columns[target_column])
+        else:
+            return len(self.features_columns)
+
     def _build_predictor(self, dataset: ProstateCancerDataset) -> Union[Module, ModuleDict]:
         """
         Builds the model. This method must be called before training the model.
@@ -134,12 +153,10 @@ class MLP(Predictor):
         if self.multi_task_mode == MultiTaskMode.SEPARATED:
             predictor = ModuleDict()
             for task in self._tasks.table_tasks:
-                if isinstance(self.features_columns, Mapping):
-                    in_channels = len(self.features_columns[task.target_column])
-                else:
-                    in_channels = len(self.features_columns)
-
-                predictor[task.name] = self._build_single_predictor(in_channels=in_channels, out_channels=1)
+                predictor[task.name] = self._build_single_predictor(
+                    in_channels=self._get_in_channels(task.target_column),
+                    out_channels=1
+                )
 
             return predictor
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
