@@ -19,7 +19,6 @@ from torch.nn import DataParallel, Module, ModuleDict
 
 from .base import MultiTaskMode, Predictor
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
-from ....tasks.base import TableTask
 
 
 class MLP(Predictor):

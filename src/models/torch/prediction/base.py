@@ -20,7 +20,6 @@ from torch.nn import Module, ModuleDict
 
 from ..base import check_if_built, TorchModel
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
-from ....tasks.base import TableTask
 
 
 class MultiTaskMode(StrEnum):
