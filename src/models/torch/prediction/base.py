@@ -46,7 +46,7 @@ class Predictor(TorchModel, ABC):
 
     def __init__(
             self,
-            features_columns: Optional[Union[str, Sequence[str], Mapping[TableTask, Sequence[str]]]] = None,
+            features_columns: Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]] = None,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
@@ -58,7 +58,8 @@ class Predictor(TorchModel, ABC):
         Parameters
         ----------
         features_columns : Optional[Union[str, Sequence[str], Mapping[TableTask, Sequence[str]]]]
-            The names of the features columns.
+            The names of the features columns. If a mapping is provided, the keys must be the target columns associated
+            to the task.
         multi_task_mode : Union[str, MultiTaskMode]
             Available modes are 'separated' or 'fully_shared'. If 'separated', a separate extractor model is used for
             each task. If 'fully_shared', a fully shared extractor model is used. All layers are shared between the
@@ -83,6 +84,7 @@ class Predictor(TorchModel, ABC):
                 )
             self.multi_task_mode = MultiTaskMode.SEPARATED
 
+        self.map_from_target_col_to_task_name = None
         self.predictor = None
 
     @abstractmethod
@@ -121,9 +123,10 @@ class Predictor(TorchModel, ABC):
         if self.features_columns is None:
             self.features_columns = dataset.table_dataset.features_columns
         elif isinstance(self.features_columns, Mapping):
-            assert set(self.features_columns.keys()) == set(dataset.table_dataset.tasks), (
+            assert set(self.features_columns.keys()) == set([t.target_column for t in dataset.tasks.table_tasks]), (
                 "The features columns mapping must contain the same tasks as the dataset."
             )
+            self.map_from_target_col_to_task_name = {t.target_column: t.name for t in dataset.tasks.table_tasks}
 
         self.predictor = self._build_predictor(dataset)
 
@@ -169,8 +172,9 @@ class Predictor(TorchModel, ABC):
         """
         if isinstance(self.features_columns, Mapping):
             x_table = {}
-            for task, feature_cols in self.features_columns.items():
-                x_table[task.name] = stack([features.table[f] for f in feature_cols], 1).float()
+            for target_col, feature_cols in self.features_columns.items():
+                task_name = self.map_from_target_col_to_task_name[target_col]
+                x_table[task_name] = stack([features.table[f] for f in feature_cols], 1).float()
         else:
             x_table = stack([features.table[f] for f in self.features_columns], 1).float()
 

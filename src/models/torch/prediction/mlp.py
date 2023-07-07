@@ -135,14 +135,20 @@ class MLP(Predictor):
             if isinstance(self.features_columns, Mapping):
                 return ModuleDict(
                     {
-                        t.name: self._build_single_predictor(in_channels=len(self.features_columns[t]), out_channels=1)
+                        t.name: self._build_single_predictor(
+                            in_channels=len(self.features_columns[t.target_column]),
+                            out_channels=1
+                        )
                         for t in self._tasks.table_tasks
                     }
                 )
             else:
                 return ModuleDict(
                     {
-                        t.name: self._build_single_predictor(in_channels=len(self.features_columns), out_channels=1)
+                        t.name: self._build_single_predictor(
+                            in_channels=len(self.features_columns),
+                            out_channels=1
+                        )
                         for t in self._tasks.table_tasks
                     }
                 )
