@@ -331,7 +331,8 @@ class TableShapValueExplainer:
             x_pos = (np.arange(len(feature_names)))
 
             arr.bar(x_pos, average_attributions[target], align="center")
-            arr.set_xticks(x_pos, feature_names, wrap=True)
+            arr.set_xticks(x_pos)
+            arr.set_xticklabels(feature_names, minor=False, rotation=90)
             arr.set_xlabel(axis_title)
             arr.set_title(title)
 
