@@ -132,26 +132,14 @@ class MLP(Predictor):
             The current model.
         """
         if self.multi_task_mode == MultiTaskMode.SEPARATED:
-            if isinstance(self.features_columns, Mapping):
-                return ModuleDict(
-                    {
-                        t.name: self._build_single_predictor(
-                            in_channels=len(self.features_columns[t.target_column]),
-                            out_channels=1
-                        )
-                        for t in self._tasks.table_tasks
-                    }
-                )
-            else:
-                return ModuleDict(
-                    {
-                        t.name: self._build_single_predictor(
-                            in_channels=len(self.features_columns),
-                            out_channels=1
-                        )
-                        for t in self._tasks.table_tasks
-                    }
-                )
+            module = ModuleDict()
+            for task in self._tasks.table_tasks:
+                if isinstance(self.features_columns, Mapping):
+                    in_channels = len(self.features_columns[task.target_column])
+                else:
+                    in_channels = len(self.features_columns)
+
+                module[task.name] = self._build_single_predictor(in_channels=in_channels, out_channels=1)
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
             return self._build_single_predictor(
                 in_channels=len(self.features_columns),
