@@ -29,7 +29,7 @@ class MLP(Predictor):
 
     def __init__(
             self,
-            features_columns: Optional[Union[str, Sequence[str], Mapping[TableTask, Sequence[str]]]] = None,
+            features_columns: Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]] = None,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
             hidden_channels: Union[str, Sequence[int]] = (25, 25, 25),
             activation: Union[Tuple, str] = "PRELU",
@@ -45,7 +45,7 @@ class MLP(Predictor):
 
         Parameters
         ----------
-        features_columns : Optional[Union[str, Sequence[str], Mapping[TableTask, Sequence[str]]]]
+        features_columns : Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]]
             The names of the features columns.
         multi_task_mode : Union[str, MultiTaskMode]
             Available modes are 'separated' or 'fully_shared'. If 'separated', a separate extractor model is used for

@@ -57,7 +57,7 @@ class Predictor(TorchModel, ABC):
 
         Parameters
         ----------
-        features_columns : Optional[Union[str, Sequence[str], Mapping[TableTask, Sequence[str]]]]
+        features_columns : Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]]
             The names of the features columns. If a mapping is provided, the keys must be the target columns associated
             to the task.
         multi_task_mode : Union[str, MultiTaskMode]
