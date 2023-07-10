@@ -12,11 +12,11 @@ from __future__ import annotations
 from ast import literal_eval
 from typing import Dict, Mapping, Optional, Sequence, Tuple, Union
 
-from monai.networks.nets import FullyConnectedNet
 from torch import device as torch_device
 from torch import Tensor
 from torch.nn import DataParallel, Module, ModuleDict
 
+from ..blocks import BayesianFullyConnectedNet, FullyConnectedNet
 from .base import MultiTaskMode, Predictor
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
 
@@ -37,7 +37,8 @@ class MLP(Predictor):
             adn_ordering: str = "NDA",
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
-            seed: Optional[int] = None
+            seed: Optional[int] = None,
+            bayesian: bool = False
     ):
         """
         Initializes the model.
@@ -67,13 +68,16 @@ class MLP(Predictor):
             The name of the model. Defaults to None.
         seed : Optional[int]
             Random state used for reproducibility. Defaults to None.
+        bayesian : bool
+            Whether the model should implement variational inference.
         """
         super().__init__(
             features_columns=features_columns,
             multi_task_mode=multi_task_mode,
             device=device,
             name=name,
-            seed=seed
+            seed=seed,
+            bayesian=bayesian
         )
 
         self.hidden_channels = literal_eval(hidden_channels) if isinstance(hidden_channels, str) else hidden_channels
@@ -81,6 +85,8 @@ class MLP(Predictor):
         self.dropout = dropout
         self.bias = bias
         self.adn_ordering = adn_ordering
+
+        self.bayesian = bayesian
 
         self.predictor = None
 
@@ -104,18 +110,30 @@ class MLP(Predictor):
         predictor : Module
             A single predictor module.
         """
-        fully_connected_net = FullyConnectedNet(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            hidden_channels=self.hidden_channels,
-            dropout=self.dropout,
-            act=self.activation,
-            bias=self.bias,
-            adn_ordering=self.adn_ordering
-        )
-        fully_connected_net = DataParallel(fully_connected_net)
+        if self.bayesian:
+            fcn = BayesianFullyConnectedNet(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                hidden_channels=self.hidden_channels,
+                dropout=self.dropout,
+                act=self.activation,
+                bias=self.bias,
+                adn_ordering=self.adn_ordering
+            )
+        else:
+            fcn = FullyConnectedNet(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                hidden_channels=self.hidden_channels,
+                dropout=self.dropout,
+                act=self.activation,
+                bias=self.bias,
+                adn_ordering=self.adn_ordering
+            )
 
-        return fully_connected_net.to(self.device)
+        fcn = DataParallel(fcn)
+
+        return fcn.to(self.device)
 
     def _get_in_channels(self, target_column: str) -> int:
         """
@@ -157,18 +175,15 @@ class MLP(Predictor):
                     in_channels=self._get_in_channels(task.target_column),
                     out_channels=1
                 )
-
             return predictor
+
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
             return self._build_single_predictor(
                 in_channels=len(self.features_columns),
                 out_channels=len(self._tasks.table_tasks)
             )
 
-    def _get_prediction(
-            self,
-            table_data: Union[Tensor, Dict[str, Tensor]]
-    ) -> Dict[str, Tensor]:
+    def _get_prediction(self, table_data: Union[Tensor, Dict[str, Tensor]]) -> Union[Dict[str, Tensor], tuple]:
         """
         Returns the prediction.
 
@@ -179,16 +194,38 @@ class MLP(Predictor):
 
         Returns
         -------
-        prediction : Dict[str, Tensor]
-            The prediction.
+        prediction : Union[Dict[str, Tensor], tuple]
+            The prediction and its KL divergence (if the model is in bayesian mode).
         """
         if self.multi_task_mode == MultiTaskMode.SEPARATED:
-            if isinstance(table_data, dict):
-                return {t.name: self.predictor[t.name](table_data[t.name])[:, 0] for t in self._tasks.table_tasks}
+            if self.bayesian:
+                prediction = {}
+                kl_dict = {}
+                for task in self._tasks.table_tasks:
+                    if isinstance(table_data, dict):
+                        y, kl = self.predictor[task.name](table_data[task.name])
+                    else:
+                        y, kl = self.predictor[task.name](table_data)
+                    prediction[task.name] = y[:, 0]
+                    kl_dict[task.name] = kl
+                return prediction, kl_dict
+
             else:
-                return {t.name: self.predictor[t.name](table_data)[:, 0] for t in self._tasks.table_tasks}
+                if isinstance(table_data, dict):
+                    return {t.name: self.predictor[t.name](table_data[t.name])[:, 0] for t in self._tasks.table_tasks}
+                else:
+                    return {t.name: self.predictor[t.name](table_data)[:, 0] for t in self._tasks.table_tasks}
+
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
-            y = self.predictor(table_data)
-            return {task.name: y[:, i] for i, task in enumerate(self._tasks.table_tasks)}
+            if self.bayesian:
+                y, kl = self.predictor(table_data)
+                prediction = {task.name: y[:, i] for i, task in enumerate(self._tasks.table_tasks)}
+                kl_dict = {task.name: kl for task in self._tasks.table_tasks}
+                return prediction, kl_dict
+
+            else:
+                y = self.predictor(table_data)
+                return {task.name: y[:, i] for i, task in enumerate(self._tasks.table_tasks)}
+
         else:
             raise ValueError(f"{self.multi_task_mode} is not a valid MultiTaskMode")
