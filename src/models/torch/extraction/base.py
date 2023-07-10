@@ -5,7 +5,7 @@
     @Creation Date:     04/2022
     @Last modification: 07/2023
 
-    @Description:       This file is used to define an abstract "Extractor" model.
+    @Description:       This file is used to define an abstract 'Extractor' model.
 """
 
 from __future__ import annotations
@@ -19,8 +19,8 @@ from torch import cat, Tensor
 from torch import device as torch_device
 from torch.nn import DataParallel, Linear, Module, ModuleDict
 
-from ..blocks import BayesianFullyConnectedNet, FullyConnectedNet
 from ..base import check_if_built, TorchModel
+from ..blocks import BayesianFullyConnectedNet, FullyConnectedNet
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ....tasks import SegmentationTask
 
@@ -63,6 +63,13 @@ class ExtractorKLDivergence(NamedTuple):
     """
     This class is used to define the KL divergence of the extractor model. It contains the KL divergence associated to
     the extraction of deep features and the KL divergence associated to the segmentation of the images (optional).
+
+    Elements
+    --------
+    deep_features : Tensor
+        The KL divergence associated to the extraction of deep features.
+    segmentation : Optional[Tensor]
+        The KL divergence associated to the segmentation of the images. This is optional.
     """
     deep_features: Tensor
     segmentation: Optional[Tensor] = None
@@ -194,7 +201,8 @@ class Extractor(TorchModel, ABC):
         extractor : Module
             The extractor module. It should take as input a tensor of shape (batch_size, channels, *spatial_shape) and
             return an ExtractorOutput object. The ExtractorOutput object contains the deep features extracted from the
-            images and the segmentation of the images (optional).
+            images and the segmentation of the images (optional). If the model is in bayesian mode, the extractor module
+            should return a tuple of an ExtractorOutput object and an ExtractorKLDivergence object.
         """
         raise NotImplementedError
 
@@ -285,7 +293,8 @@ class Extractor(TorchModel, ABC):
         -------
         prediction_layer : Union[Module, ModuleDict]
             The prediction layer module. It should take as input a tensor of shape (batch_size, n_features) and return a
-            tensor of shape (batch_size, n_tasks).
+            tensor of shape (batch_size, n_tasks) or a tuple of said tensor and the KL divergence if the model is in
+            bayesian mode.
         """
         if self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
             return ModuleDict(

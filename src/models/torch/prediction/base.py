@@ -1,9 +1,9 @@
 """
     @file:              base.py
-    @Author:            Maxence Larose
+    @Author:            Maxence Larose, Raphael Brodeur
 
     @Creation Date:     04/2023
-    @Last modification: 04/2023
+    @Last modification: 07/2023
 
     @Description:       This file is used to define an abstract 'Predictor' model.
 """
@@ -24,7 +24,7 @@ from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDatase
 
 class MultiTaskMode(StrEnum):
     """
-    This class is used to define the multi-task mode of the model. It can be either 'separated' or 'fully_shared'.
+    This class is used to define the multitask mode of the model. It can be either 'separated' or 'fully_shared'.
 
     Elements
     --------
@@ -88,8 +88,8 @@ class Predictor(TorchModel, ABC):
 
         self.bayesian = bayesian
 
-        self.map_from_target_col_to_task_name = None        # TODO
-        self.predictor = None
+        self.map_from_target_col_to_task_name: Optional[Dict[str, str]] = None
+        self.predictor: Optional[Union[Module, ModuleDict]] = None
 
         self.kl_divergence: Optional[Dict[str, Tensor]] = None
 

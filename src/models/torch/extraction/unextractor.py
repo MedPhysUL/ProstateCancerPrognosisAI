@@ -353,7 +353,8 @@ class UNEXtractor(Extractor):
         extractor : Module
             The extractor module. It should take as input a tensor of shape (batch_size, channels, *spatial_shape) and
             return an ExtractorOutput object. The ExtractorOutput object contains the deep features extracted from the
-            images and the segmentation of the images (optional).
+            images and the segmentation of the images (optional). If the model is in bayesian mode, the extractor module
+            should return a tuple of an ExtractorOutput object and an ExtractorKLDivergence object.
         """
         assert len(self._tasks.segmentation_tasks) > 0, (
             "UNEXtractor requires at least one segmentation task. Found none."

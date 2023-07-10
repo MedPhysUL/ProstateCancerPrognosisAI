@@ -1,9 +1,9 @@
 """
     @file:              mlp.py
-    @Author:            Maxence Larose
+    @Author:            Maxence Larose, Raphael Brodeur
 
     @Creation Date:     04/2023
-    @Last modification: 04/2023
+    @Last modification: 07/2023
 
     @Description:       This file is used to define an 'MLP' model.
 """
@@ -16,8 +16,8 @@ from torch import device as torch_device
 from torch import Tensor
 from torch.nn import DataParallel, Module, ModuleDict
 
-from ..blocks import BayesianFullyConnectedNet, FullyConnectedNet
 from .base import MultiTaskMode, Predictor
+from ..blocks import BayesianFullyConnectedNet, FullyConnectedNet
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
 
 
