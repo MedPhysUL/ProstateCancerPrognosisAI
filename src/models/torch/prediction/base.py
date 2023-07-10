@@ -138,6 +138,30 @@ class Predictor(TorchModel, ABC):
 
         return self
 
+    def _get_input_table(self, features: FeaturesType) -> Union[Tensor, Dict[str, Tensor]]:
+        """
+        Returns the input to the predictor.
+
+        Parameters
+        ----------
+        features : FeaturesType
+            The features to use as input to the predictor.
+
+        Returns
+        -------
+        input: Union[Tensor, Dict[str, Tensor]]
+            The input to the predictor.
+        """
+        if isinstance(self.features_columns, Mapping):
+            x_table = {}
+            for target_col, feature_cols in self.features_columns.items():
+                task_name = self.map_from_target_col_to_task_name[target_col]
+                x_table[task_name] = stack([features.table[f] for f in feature_cols], 1).float()
+        else:
+            x_table = stack([features.table[f] for f in self.features_columns], 1).float()
+
+        return x_table
+
     @abstractmethod
     def _get_prediction(self, table_data: Union[Tensor, Dict[str, Tensor]]) -> Union[Dict[str, Tensor], tuple]:
         """
@@ -155,57 +179,41 @@ class Predictor(TorchModel, ABC):
         """
         raise NotImplementedError
 
-    def _bayesian_forward(self, features: FeaturesType) -> TargetsType:
+    def _bayesian_forward(self, input_table: Union[Tensor, Dict[str, Tensor]]) -> TargetsType:
         """
         Executes a bayesian forward pass.
 
         Parameters
         ----------
-        features : FeaturesType
-            Batch data items. Defaults to None.
+        input_table : Union[Tensor, Dict[str, Tensor]]
+            The input to the predictor.
 
         Returns
         -------
         predictions : TargetsType
             Predictions.
         """
-        if isinstance(self.features_columns, Mapping):
-            x_table = {}
-            for target_col, feature_cols in self.features_columns.items():
-                task_name = self.map_from_target_col_to_task_name[target_col]
-                x_table[task_name] = stack([features.table[f] for f in feature_cols], 1).float()
-        else:
-            x_table = stack([features.table[f] for f in self.features_columns], 1).float()
-
-        prediction, kl_divergence = self._get_prediction(x_table)
+        prediction, kl_divergence = self._get_prediction(input_table)
 
         self.kl_divergence = kl_divergence
 
         return prediction
 
-    def _deterministic_forward(self, features: FeaturesType) -> TargetsType:
+    def _deterministic_forward(self, input_table: Union[Tensor, Dict[str, Tensor]]) -> TargetsType:
         """
         Executes a deterministic forward pass.
 
         Parameters
         ----------
-        features : FeaturesType
-            Batch data items. Defaults to None.
+        input_table : Union[Tensor, Dict[str, Tensor]]
+            The input to the predictor.
 
         Returns
         -------
         predictions : TargetsType
             Predictions.
         """
-        if isinstance(self.features_columns, Mapping):
-            x_table = {}
-            for target_col, feature_cols in self.features_columns.items():
-                task_name = self.map_from_target_col_to_task_name[target_col]
-                x_table[task_name] = stack([features.table[f] for f in feature_cols], 1).float()
-        else:
-            x_table = stack([features.table[f] for f in self.features_columns], 1).float()
-
-        return self._get_prediction(x_table)
+        return self._get_prediction(input_table)
 
     @check_if_built
     def forward(self, features: FeaturesType) -> TargetsType:
@@ -222,7 +230,9 @@ class Predictor(TorchModel, ABC):
         predictions : TargetsType
             Predictions.
         """
+        x_table = self._get_input_table(features=features)
+
         if self.bayesian:
-            return self._bayesian_forward(features=features)
+            return self._bayesian_forward(x_table)
         else:
-            return self._deterministic_forward(features=features)
+            return self._deterministic_forward(x_table)

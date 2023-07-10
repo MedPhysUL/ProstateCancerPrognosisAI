@@ -469,14 +469,14 @@ class Extractor(TorchModel, ABC):
 
         return kl_divergence
 
-    def _bayesian_forward(self, features: FeaturesType) -> Union[ExtractorOutput, TargetsType]:
+    def _bayesian_forward(self, input_tensor: Tensor) -> Union[ExtractorOutput, TargetsType]:
         """
         Performs a variational inference forward pass through the model.
 
         Parameters
         ----------
-        features : FeaturesType
-            The input features.
+        input_tensor : Tensor
+            The input tensor.
 
         Returns
         -------
@@ -484,8 +484,7 @@ class Extractor(TorchModel, ABC):
             The output targets. If the model is in 'extraction' mode, it will return an ExtractorOutput. If the model
             is in 'prediction' mode, it will return a dictionary of tensors, one for each task.
         """
-        x_image = self._get_input_tensor(features)
-        extractor_output, extractor_kl = self.extractor(x_image)
+        extractor_output, extractor_kl = self.extractor(input_tensor)
 
         radiomics, radiomics_kl = self._get_radiomics(extractor_output.deep_features)
         output = ExtractorOutput(
@@ -520,14 +519,14 @@ class Extractor(TorchModel, ABC):
             else:
                 return tab_dict
 
-    def _deterministic_forward(self, features: FeaturesType) -> Union[ExtractorOutput, TargetsType]:
+    def _deterministic_forward(self, input_tensor: Tensor) -> Union[ExtractorOutput, TargetsType]:
         """
         Performs a deterministic forward pass through the model.
 
         Parameters
         ----------
-        features : FeaturesType
-            The input features.
+        input_tensor : Tensor
+            The input tensor.
 
         Returns
         -------
@@ -535,8 +534,7 @@ class Extractor(TorchModel, ABC):
             The output targets. If the model is in 'extraction' mode, it will return an ExtractorOutput. If the model
             is in 'prediction' mode, it will return a dictionary of tensors, one for each task.
         """
-        x_image = self._get_input_tensor(features)
-        extractor_output = self.extractor(x_image)
+        extractor_output = self.extractor(input_tensor)
 
         radiomics = self._get_radiomics(extractor_output.deep_features)
         output = ExtractorOutput(
@@ -573,8 +571,10 @@ class Extractor(TorchModel, ABC):
             The output targets. If the model is in 'extraction' mode, it will return an ExtractorOutput. If the model
             is in 'prediction' mode, it will return a dictionary of tensors, one for each task.
         """
+        x_image = self._get_input_tensor(features)
+
         if self.bayesian:
-            return self._bayesian_forward(features=features)
+            return self._bayesian_forward(x_image)
 
         else:
-            return self._deterministic_forward(features=features)
+            return self._deterministic_forward(x_image)
