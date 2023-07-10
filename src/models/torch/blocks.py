@@ -309,7 +309,9 @@ class FullyConnectedNet(Sequential):
             out_channels: int,
             hidden_channels: Sequence[int],
             dropout: float = 0.0,
-            act: str = "PRELU"
+            act: str = "PRELU",
+            bias: bool = True,
+            adn_ordering: str = "NDA"
     ):
         """
         Builds the FCN.
@@ -326,6 +328,10 @@ class FullyConnectedNet(Sequential):
             Dropout probability.
         act : str
             Activation applied after each hidden layer.
+        bias : bool
+            Whether bias is applied.
+        adn_ordering : str
+            Order of NDA block.
         """
         super().__init__()
 
@@ -334,14 +340,14 @@ class FullyConnectedNet(Sequential):
         prev_channels = in_channels
         for i, channels in enumerate(hidden_channels):
             hidden = Sequential()
-            hidden.add_module("linear", Linear(in_features=prev_channels, out_features=channels))
-            hidden.add_module("nda", ADN(ordering="NDA", act=act, dropout=dropout, dropout_dim=1))
+            hidden.add_module("linear", Linear(in_features=prev_channels, out_features=channels, bias=bias))
+            hidden.add_module("nda", ADN(ordering=adn_ordering, act=act, dropout=dropout, dropout_dim=1))
 
             self.add_module(f"hidden{i}", hidden)
 
             prev_channels = channels
 
-        self.add_module("output", Linear(in_features=prev_channels, out_features=out_channels))
+        self.add_module("output", Linear(in_features=prev_channels, out_features=out_channels, bias=bias))
 
 
 class BayesianEncoderBlock(Module):
@@ -708,6 +714,8 @@ class BayesianFullyConnectedNet(Module):
             hidden_channels: Sequence[int],
             dropout: float = 0.0,
             act: str = "PRELU",
+            bias: bool = True,
+            adn_ordering: str = "NDA",
             prior_mean: float = 0.0,
             prior_variance: float = 0.1
     ):
@@ -726,6 +734,10 @@ class BayesianFullyConnectedNet(Module):
             Dropout probability.
         act : str
             Activation applied after each hidden layer.
+        bias : bool
+            Whether bias is applied.
+        adn_ordering : str
+            Order of NDA block.
         prior_mean : float
             Mean of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
         prior_variance : float
@@ -747,13 +759,14 @@ class BayesianFullyConnectedNet(Module):
                     in_features=prev_channels,
                     out_features=channels,
                     prior_mean=prior_mean,
-                    prior_variance=prior_variance
+                    prior_variance=prior_variance,
+                    bias=bias
                 )
             )
             layer.add_module(
                 "adn",
                 ADN(
-                    ordering="NDA",
+                    ordering=adn_ordering,
                     act=act,
                     dropout=dropout,
                     dropout_dim=1
@@ -768,7 +781,8 @@ class BayesianFullyConnectedNet(Module):
             in_features=prev_channels,
             out_features=out_channels,
             prior_mean=prior_mean,
-            prior_variance=prior_variance
+            prior_variance=prior_variance,
+            bias=bias
         )
 
     def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:

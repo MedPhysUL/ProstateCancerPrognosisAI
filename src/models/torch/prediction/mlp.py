@@ -10,28 +10,26 @@
 
 from __future__ import annotations
 from ast import literal_eval
-from typing import Optional, Sequence, Tuple, Union
+from typing import Dict, Mapping, Optional, Sequence, Tuple, Union
 
 from monai.networks.nets import FullyConnectedNet
 from torch import device as torch_device
+from torch import Tensor
 from torch.nn import DataParallel, Module, ModuleDict
 
-from .base import InputMode, MultiTaskMode, Predictor
+from .base import MultiTaskMode, Predictor
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
 
 
 class MLP(Predictor):
     """
-    A simple MLP model. The model can take as input either the tabular features, the radiomics features or both. The
-    model can also be used to perform table tasks on the extracted deep radiomics.
+    A simple MLP model. The model can also be used to perform table tasks.
     """
 
     def __init__(
             self,
-            features_columns: Optional[Union[str, Sequence[str]]] = None,
-            input_mode: Union[str, InputMode] = InputMode.TABULAR,
+            features_columns: Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]] = None,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
-            n_radiomics: int = 6,
             hidden_channels: Union[str, Sequence[int]] = (25, 25, 25),
             activation: Union[Tuple, str] = "PRELU",
             dropout: Union[Tuple, str, float] = 0.0,
@@ -46,18 +44,13 @@ class MLP(Predictor):
 
         Parameters
         ----------
-        features_columns : Optional[Union[str, Sequence[str]]]
-            The names of the features columns. This parameter is only used when `input_mode` is set to 'tabular' or
-            'hybrid'.
-        input_mode : Union[str, InputMode]
-            The input mode of the model. Available modes are 'tabular', 'radiomics' and 'hybrid'. Defaults to 'tabular'.
+        features_columns : Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]]
+            The names of the features columns. If a mapping is provided, the keys must be the target columns associated
+            to the task.
         multi_task_mode : Union[str, MultiTaskMode]
             Available modes are 'separated' or 'fully_shared'. If 'separated', a separate extractor model is used for
             each task. If 'fully_shared', a fully shared extractor model is used. All layers are shared between the
             tasks.
-        n_radiomics : int
-            Number of radiomics features. Defaults to 5. This parameter is only used when `input_mode` is set to
-            'radiomics' or 'hybrid'.
         hidden_channels : Union[str, Sequence[int]]
             List with number of units in each hidden layer. Defaults to (25, 25, 25).
         activation : Union[Tuple, str]
@@ -77,9 +70,7 @@ class MLP(Predictor):
         """
         super().__init__(
             features_columns=features_columns,
-            input_mode=input_mode,
             multi_task_mode=multi_task_mode,
-            n_radiomics=n_radiomics,
             device=device,
             name=name,
             seed=seed
@@ -93,12 +84,18 @@ class MLP(Predictor):
 
         self.predictor = None
 
-    def _build_single_predictor(self, out_channels: int) -> Module:
+    def _build_single_predictor(
+            self,
+            in_channels: int,
+            out_channels: int
+    ) -> Module:
         """
         Returns a single predictor module.
 
         Parameters
         ----------
+        in_channels : int
+            Number of input channels.
         out_channels : int
             Number of output channels.
 
@@ -107,19 +104,8 @@ class MLP(Predictor):
         predictor : Module
             A single predictor module.
         """
-        if self.input_mode == InputMode.RADIOMICS:
-            input_size = self.n_radiomics
-        else:
-            table_input_size = len(self.features_columns)
-            if self.input_mode == InputMode.TABULAR:
-                input_size = table_input_size
-            elif self.input_mode == InputMode.HYBRID:
-                input_size = table_input_size + self.n_radiomics
-            else:
-                raise ValueError(f"Invalid input_mode: {self.input_mode}")
-
         fully_connected_net = FullyConnectedNet(
-            in_channels=input_size,
+            in_channels=in_channels,
             out_channels=out_channels,
             hidden_channels=self.hidden_channels,
             dropout=self.dropout,
@@ -130,6 +116,25 @@ class MLP(Predictor):
         fully_connected_net = DataParallel(fully_connected_net)
 
         return fully_connected_net.to(self.device)
+
+    def _get_in_channels(self, target_column: str) -> int:
+        """
+        Returns the number of input channels.
+
+        Parameters
+        ----------
+        target_column : str
+            The target column.
+
+        Returns
+        -------
+        in_channels : int
+            The number of input channels.
+        """
+        if isinstance(self.features_columns, Mapping):
+            return len(self.features_columns[target_column])
+        else:
+            return len(self.features_columns)
 
     def _build_predictor(self, dataset: ProstateCancerDataset) -> Union[Module, ModuleDict]:
         """
@@ -146,8 +151,44 @@ class MLP(Predictor):
             The current model.
         """
         if self.multi_task_mode == MultiTaskMode.SEPARATED:
-            return ModuleDict(
-                {task.name: self._build_single_predictor(out_channels=1) for task in self._tasks.table_tasks}
-            )
+            predictor = ModuleDict()
+            for task in self._tasks.table_tasks:
+                predictor[task.name] = self._build_single_predictor(
+                    in_channels=self._get_in_channels(task.target_column),
+                    out_channels=1
+                )
+
+            return predictor
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
-            return self._build_single_predictor(out_channels=len(self._tasks.table_tasks))
+            return self._build_single_predictor(
+                in_channels=len(self.features_columns),
+                out_channels=len(self._tasks.table_tasks)
+            )
+
+    def _get_prediction(
+            self,
+            table_data: Union[Tensor, Dict[str, Tensor]]
+    ) -> Dict[str, Tensor]:
+        """
+        Returns the prediction.
+
+        Parameters
+        ----------
+        table_data : Union[Tensor, Dict[str, Tensor]]
+            The table data.
+
+        Returns
+        -------
+        prediction : Dict[str, Tensor]
+            The prediction.
+        """
+        if self.multi_task_mode == MultiTaskMode.SEPARATED:
+            if isinstance(table_data, dict):
+                return {t.name: self.predictor[t.name](table_data[t.name])[:, 0] for t in self._tasks.table_tasks}
+            else:
+                return {t.name: self.predictor[t.name](table_data)[:, 0] for t in self._tasks.table_tasks}
+        elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
+            y = self.predictor(table_data)
+            return {task.name: y[:, i] for i, task in enumerate(self._tasks.table_tasks)}
+        else:
+            raise ValueError(f"{self.multi_task_mode} is not a valid MultiTaskMode")
