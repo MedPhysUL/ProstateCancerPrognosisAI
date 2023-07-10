@@ -178,7 +178,7 @@ if __name__ == '__main__':
         train_method_hyperparameter=train_method_hyperparameter
     )
 
-    masks = extract_masks(os.path.join(MASKS_PATH, "masks.json"), k=5, l=5)
+    masks = extract_masks(MASKS_PATH, k=5, l=5)
 
     tuner.tune(
         objective=objective,
