@@ -495,7 +495,8 @@ class TableShapValueExplainer:
             shap_values = shap.Explanation(
                 values=values,
                 feature_names=self.dataset.table_dataset.features_columns,
-                base_values=float(self.base_values[target])
+                base_values=float(self.base_values[target]),
+                data=self.dataset.table_dataset.x
             )
             shap.plots.waterfall(shap_values[patient_id], show=False)
             if path_to_save_folder is not None:
