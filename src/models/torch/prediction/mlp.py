@@ -19,18 +19,16 @@ from torch.nn import DataParallel, Module, ModuleDict
 
 from .base import MultiTaskMode, Predictor
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
-from ....tasks.base import TableTask
 
 
 class MLP(Predictor):
     """
-    A simple MLP model. The model can take as input either the tabular features, the radiomics features or both. The
-    model can also be used to perform table tasks on the extracted deep radiomics.
+    A simple MLP model. The model can also be used to perform table tasks.
     """
 
     def __init__(
             self,
-            features_columns: Optional[Union[str, Sequence[str], Mapping[TableTask, Sequence[str]]]] = None,
+            features_columns: Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]] = None,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
             hidden_channels: Union[str, Sequence[int]] = (25, 25, 25),
             activation: Union[Tuple, str] = "PRELU",
@@ -46,8 +44,9 @@ class MLP(Predictor):
 
         Parameters
         ----------
-        features_columns : Optional[Union[str, Sequence[str]]]
-            The names of the features columns.
+        features_columns : Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]]
+            The names of the features columns. If a mapping is provided, the keys must be the target columns associated
+            to the task.
         multi_task_mode : Union[str, MultiTaskMode]
             Available modes are 'separated' or 'fully_shared'. If 'separated', a separate extractor model is used for
             each task. If 'fully_shared', a fully shared extractor model is used. All layers are shared between the
@@ -118,6 +117,25 @@ class MLP(Predictor):
 
         return fully_connected_net.to(self.device)
 
+    def _get_in_channels(self, target_column: str) -> int:
+        """
+        Returns the number of input channels.
+
+        Parameters
+        ----------
+        target_column : str
+            The target column.
+
+        Returns
+        -------
+        in_channels : int
+            The number of input channels.
+        """
+        if isinstance(self.features_columns, Mapping):
+            return len(self.features_columns[target_column])
+        else:
+            return len(self.features_columns)
+
     def _build_predictor(self, dataset: ProstateCancerDataset) -> Union[Module, ModuleDict]:
         """
         Builds the model. This method must be called before training the model.
@@ -133,20 +151,14 @@ class MLP(Predictor):
             The current model.
         """
         if self.multi_task_mode == MultiTaskMode.SEPARATED:
-            if isinstance(self.features_columns, Mapping):
-                return ModuleDict(
-                    {
-                        t.name: self._build_single_predictor(in_channels=len(self.features_columns[t]), out_channels=1)
-                        for t in self._tasks.table_tasks
-                    }
+            predictor = ModuleDict()
+            for task in self._tasks.table_tasks:
+                predictor[task.name] = self._build_single_predictor(
+                    in_channels=self._get_in_channels(task.target_column),
+                    out_channels=1
                 )
-            else:
-                return ModuleDict(
-                    {
-                        t.name: self._build_single_predictor(in_channels=len(self.features_columns), out_channels=1)
-                        for t in self._tasks.table_tasks
-                    }
-                )
+
+            return predictor
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
             return self._build_single_predictor(
                 in_channels=len(self.features_columns),
