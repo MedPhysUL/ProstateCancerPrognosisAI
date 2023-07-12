@@ -14,7 +14,7 @@ from typing import Dict, List, Mapping, NamedTuple, Optional, Sequence, Tuple, U
 
 from monai.networks.nets import FullyConnectedNet
 from torch import device as torch_device
-from torch import cat, Tensor
+from torch import cat, stack, Tensor
 from torch.nn import DataParallel, Module, ModuleDict
 
 from .base import MultiTaskMode, Predictor
@@ -275,7 +275,11 @@ class SequentialNet(Predictor):
             base_input = table_data[task_name] if isinstance(table_data, dict) else table_data
             additional_inputs = [output[self.map_from_target_col_to_task_name[c]] for c in block.input_target_columns]
 
-            predictor_input = cat([base_input, *additional_inputs])
+            if additional_inputs:
+                predictor_input = cat([base_input, stack(additional_inputs, 1)], 1)
+            else:
+                predictor_input = base_input
+
             output[task_name] = self.predictor[task_name](predictor_input)[:, 0]
 
         return output
