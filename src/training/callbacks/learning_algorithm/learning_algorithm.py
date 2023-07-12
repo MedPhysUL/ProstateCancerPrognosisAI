@@ -212,7 +212,11 @@ class LearningAlgorithm(TrainingCallback):
         batch_loss : Tensor
             Tensor with loss value.
         """
-        losses = {task.name: task.criterion(pred_batch[task.name], y_batch[task.name]) for task in self.criterion.tasks}
+        if trainer.model.bayesian:
+            losses = {t.name: t.criterion(pred_batch[t.name], y_batch[t.name]) + trainer.model.kl_divergence
+                      for t in self.criterion.tasks}
+        else:
+            losses = {t.name: t.criterion(pred_batch[t.name], y_batch[t.name]) for t in self.criterion.tasks}
 
         loss_without_regularization = self.criterion(losses)
 
