@@ -63,10 +63,19 @@ class TorchModel(Model, ABC):
         """
         super().__init__(device=device, name=name, seed=seed)
 
-    def build(
-            self,
-            dataset: ProstateCancerDataset
-    ) -> TorchModel:
+    @property
+    def bayesian(self) -> bool:
+        """
+        Returns bayesian status.
+
+        Returns
+        -------
+        bayesian_status : bool
+            Whether the model is in bayesian mode.
+        """
+        return self._bayesian
+
+    def build(self, dataset: ProstateCancerDataset) -> TorchModel:
         """
         Builds the model using information contained in the dataset with which the model is going to be trained.
 
@@ -88,10 +97,7 @@ class TorchModel(Model, ABC):
 
     @check_if_built
     @abstractmethod
-    def forward(
-            self,
-            features: FeaturesType
-    ) -> TargetsType:
+    def forward(self, features: FeaturesType) -> TargetsType:
         """
         Executes the forward pass.
 

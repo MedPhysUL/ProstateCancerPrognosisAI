@@ -86,7 +86,7 @@ class Predictor(TorchModel, ABC):
                 )
             self.multi_task_mode = MultiTaskMode.SEPARATED
 
-        self.bayesian = bayesian
+        self._bayesian = bayesian
 
         self.map_from_target_col_to_task_name: Optional[Dict[str, str]] = None
         self.predictor: Optional[Union[Module, ModuleDict]] = None

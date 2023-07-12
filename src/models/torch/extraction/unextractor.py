@@ -243,7 +243,7 @@ class UNEXtractor(Extractor):
         self.norm = norm
         self.dropout_cnn = dropout_cnn
 
-        self.bayesian = bayesian
+        self._bayesian = bayesian
 
     def _get_encoders_dict(self) -> ModuleDict:
         """

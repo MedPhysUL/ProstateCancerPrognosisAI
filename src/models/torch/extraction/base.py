@@ -161,7 +161,7 @@ class Extractor(TorchModel, ABC):
         self.multi_task_mode = MultiTaskMode(multi_task_mode)
         self.n_features = n_features
         self.shape = shape
-        self.bayesian = bayesian
+        self._bayesian = bayesian
 
         if hidden_channels_fnn:
             self.hidden_channels_fnn = hidden_channels_fnn
