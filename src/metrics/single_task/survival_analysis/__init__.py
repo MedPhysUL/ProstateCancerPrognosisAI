@@ -1,3 +1,5 @@
 from .base import SurvivalAnalysisMetric
 
 from .concordance_index_censored import ConcordanceIndexCensored
+from .concordance_index_ipcw import ConcordanceIndexIPCW
+from .cumulative_dynamic_auc import CumulativeDynamicAUC
