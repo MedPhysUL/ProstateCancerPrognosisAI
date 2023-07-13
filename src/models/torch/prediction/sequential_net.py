@@ -268,6 +268,41 @@ class SequentialNet(Predictor):
 
         return predictor
 
+    def __get_predictor_input(
+            self,
+            table_data: Union[Tensor, Dict[str, Tensor]],
+            output: Dict[str, Tensor],
+            block: _Block
+    ):
+        """
+        Gets the input to the predictor.
+
+        Parameters
+        ----------
+        table_data : Union[Tensor, Dict[str, Tensor]]
+            The table data.
+        output : Dict[str, Tensor]
+            Previous prediction iteration outputs.
+        block : _Block
+            The current SequentialNet block.
+
+        Returns
+        -------
+        predictor_input
+            The input to the predictor.
+        """
+        task_name = self.map_from_target_col_to_task_name[block.target_column]
+
+        base_input = table_data[task_name] if isinstance(table_data, dict) else table_data
+        additional_inputs = [output[self.map_from_target_col_to_task_name[c]] for c in block.input_target_columns]
+
+        if additional_inputs:
+            predictor_input = cat([base_input, stack(additional_inputs, 1)], 1)
+        else:
+            predictor_input = base_input
+
+        return predictor_input
+
     def _get_prediction(self, table_data: Union[Tensor, Dict[str, Tensor]]) -> Union[Dict[str, Tensor], tuple]:
         """
         Returns the prediction.
@@ -289,14 +324,7 @@ class SequentialNet(Predictor):
             for block in self._blocks:
                 task_name = self.map_from_target_col_to_task_name[block.target_column]
 
-                base_input = table_data[task_name] if isinstance(table_data, dict) else table_data
-                additional_inputs = [output[self.map_from_target_col_to_task_name[c]] for c in
-                                     block.input_target_columns]
-
-                if additional_inputs:
-                    predictor_input = cat([base_input, stack(additional_inputs, 1)], 1)
-                else:
-                    predictor_input = base_input
+                predictor_input = self.__get_predictor_input(table_data=table_data, block=block, output=output)
 
                 y, kl = self.predictor[task_name](predictor_input)
                 output[task_name] = y[:, 0]
@@ -308,33 +336,8 @@ class SequentialNet(Predictor):
             for block in self._blocks:
                 task_name = self.map_from_target_col_to_task_name[block.target_column]
 
-                base_input = table_data[task_name] if isinstance(table_data, dict) else table_data
-                additional_inputs = [output[self.map_from_target_col_to_task_name[c]] for c in block.input_target_columns]
-
-                if additional_inputs:
-                    predictor_input = cat([base_input, stack(additional_inputs, 1)], 1)
-                else:
-                    predictor_input = base_input
+                predictor_input = self.__get_predictor_input(table_data=table_data, block=block, output=output)
 
                 output[task_name] = self.predictor[task_name](predictor_input)[:, 0]
 
             return output
-
-
-
-
-        # output = {}
-        # for block in self._blocks:
-        #     task_name = self.map_from_target_col_to_task_name[block.target_column]
-        #
-        #     base_input = table_data[task_name] if isinstance(table_data, dict) else table_data
-        #     additional_inputs = [output[self.map_from_target_col_to_task_name[c]] for c in block.input_target_columns]
-        #
-        #     if additional_inputs:
-        #         predictor_input = cat([base_input, stack(additional_inputs, 1)], 1)
-        #     else:
-        #         predictor_input = base_input
-        #
-        #     output[task_name] = self.predictor[task_name](predictor_input)[:, 0]
-        #
-        # return output
