@@ -12,12 +12,12 @@ from __future__ import annotations
 from ast import literal_eval
 from typing import Dict, List, Mapping, NamedTuple, Optional, Sequence, Tuple, Union
 
-from monai.networks.nets import FullyConnectedNet
 from torch import device as torch_device
 from torch import cat, stack, Tensor
 from torch.nn import DataParallel, Module, ModuleDict
 
 from .base import MultiTaskMode, Predictor
+from ..blocks import BayesianFullyConnectedNet, FullyConnectedNet
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
 
 
@@ -54,7 +54,8 @@ class SequentialNet(Predictor):
             adn_ordering: str = "NDA",
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
-            seed: Optional[int] = None
+            seed: Optional[int] = None,
+            bayesian: bool = False
     ):
         """
         Initializes the model.
@@ -84,13 +85,16 @@ class SequentialNet(Predictor):
             The name of the model. Defaults to None.
         seed : Optional[int]
             Random state used for reproducibility. Defaults to None.
+        bayesian : bool
+            Whether the model should implement variational inference.
         """
         super().__init__(
             features_columns=features_columns,
             multi_task_mode=MultiTaskMode.SEPARATED,
             device=device,
             name=name,
-            seed=seed
+            seed=seed,
+            bayesian=bayesian
         )
 
         self.sequence = sequence
@@ -151,15 +155,26 @@ class SequentialNet(Predictor):
         predictor : Module
             A single predictor module.
         """
-        fully_connected_net = FullyConnectedNet(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            hidden_channels=hidden_channels,
-            dropout=dropout,
-            act=self.activation,
-            bias=self.bias,
-            adn_ordering=self.adn_ordering
-        )
+        if self.bayesian:
+            fully_connected_net = BayesianFullyConnectedNet(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                hidden_channels=hidden_channels,
+                dropout=dropout,
+                act=self.activation,
+                bias=self.bias,
+                adn_ordering=self.adn_ordering
+            )
+        else:
+            fully_connected_net = FullyConnectedNet(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                hidden_channels=hidden_channels,
+                dropout=dropout,
+                act=self.activation,
+                bias=self.bias,
+                adn_ordering=self.adn_ordering
+            )
         fully_connected_net = DataParallel(fully_connected_net)
 
         return fully_connected_net.to(self.device)
@@ -251,10 +266,42 @@ class SequentialNet(Predictor):
 
         return predictor
 
-    def _get_prediction(
+    def __get_predictor_input(
             self,
-            table_data: Union[Tensor, Dict[str, Tensor]]
-    ) -> Dict[str, Tensor]:
+            table_data: Union[Tensor, Dict[str, Tensor]],
+            output: Dict[str, Tensor],
+            block: _Block
+    ):
+        """
+        Gets the input to the predictor.
+
+        Parameters
+        ----------
+        table_data : Union[Tensor, Dict[str, Tensor]]
+            The table data.
+        output : Dict[str, Tensor]
+            Previous prediction iteration outputs.
+        block : _Block
+            The current SequentialNet block.
+
+        Returns
+        -------
+        predictor_input
+            The input to the predictor.
+        """
+        task_name = self.map_from_target_col_to_task_name[block.target_column]
+
+        base_input = table_data[task_name] if isinstance(table_data, dict) else table_data
+        additional_inputs = [output[self.map_from_target_col_to_task_name[c]] for c in block.input_target_columns]
+
+        if additional_inputs:
+            predictor_input = cat([base_input, stack(additional_inputs, 1)], 1)
+        else:
+            predictor_input = base_input
+
+        return predictor_input
+
+    def _get_prediction(self, table_data: Union[Tensor, Dict[str, Tensor]]) -> Union[Dict[str, Tensor], tuple]:
         """
         Returns the prediction.
 
@@ -265,21 +312,30 @@ class SequentialNet(Predictor):
 
         Returns
         -------
-        prediction : Dict[str, Tensor]
-            The prediction.
+        prediction : Union[Dict[str, Tensor], tuple]
+            The prediction and its KL divergence (if the model is in bayesian mode).
         """
         output = {}
-        for block in self._blocks:
-            task_name = self.map_from_target_col_to_task_name[block.target_column]
 
-            base_input = table_data[task_name] if isinstance(table_data, dict) else table_data
-            additional_inputs = [output[self.map_from_target_col_to_task_name[c]] for c in block.input_target_columns]
+        if self.bayesian:
+            kl_divergence = {}
+            for block in self._blocks:
+                task_name = self.map_from_target_col_to_task_name[block.target_column]
 
-            if additional_inputs:
-                predictor_input = cat([base_input, stack(additional_inputs, 1)], 1)
-            else:
-                predictor_input = base_input
+                predictor_input = self.__get_predictor_input(table_data=table_data, block=block, output=output)
 
-            output[task_name] = self.predictor[task_name](predictor_input)[:, 0]
+                y, kl = self.predictor[task_name](predictor_input)
+                output[task_name] = y[:, 0]
+                kl_divergence[task_name] = kl
 
-        return output
+            return output, kl_divergence
+
+        else:
+            for block in self._blocks:
+                task_name = self.map_from_target_col_to_task_name[block.target_column]
+
+                predictor_input = self.__get_predictor_input(table_data=table_data, block=block, output=output)
+
+                output[task_name] = self.predictor[task_name](predictor_input)[:, 0]
+
+            return output
