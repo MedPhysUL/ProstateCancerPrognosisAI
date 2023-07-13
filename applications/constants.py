@@ -12,7 +12,14 @@ import os
 
 from src.losses.single_task import BCEWithLogitsLoss, DiceLoss, NegativePartialLogLikelihood
 from src.metrics.single_task import (
-    AUC, BinaryBalancedAccuracy, ConcordanceIndexCensored, DiceMetric, Sensitivity, Specificity
+    AUC,
+    BinaryBalancedAccuracy,
+    ConcordanceIndexCensored,
+    ConcordanceIndexIPCW,
+    CumulativeDynamicAUC,
+    DiceMetric,
+    Sensitivity,
+    Specificity
 )
 from src.tasks import BinaryClassificationTask, SegmentationTask, SurvivalAnalysisTask
 from src.data.datasets import Feature
@@ -102,31 +109,36 @@ BCR_TASK = SurvivalAnalysisTask(
     event_indicator_column=BCR,
     event_time_column=BCR_TIME,
     criterion=NegativePartialLogLikelihood(),
-    hps_tuning_metric=ConcordanceIndexCensored()
+    hps_tuning_metric=ConcordanceIndexCensored(),
+    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()]
 )
 CRPC_TASK = SurvivalAnalysisTask(
     event_indicator_column=CRPC,
     event_time_column=CRPC_TIME,
     criterion=NegativePartialLogLikelihood(),
-    hps_tuning_metric=ConcordanceIndexCensored()
+    hps_tuning_metric=ConcordanceIndexCensored(),
+    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()]
 )
 DEATH_TASK = SurvivalAnalysisTask(
     event_indicator_column=DEATH,
     event_time_column=DEATH_TIME,
     criterion=NegativePartialLogLikelihood(),
-    hps_tuning_metric=ConcordanceIndexCensored()
+    hps_tuning_metric=ConcordanceIndexCensored(),
+    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()]
 )
 HTX_TASK = SurvivalAnalysisTask(
     event_indicator_column=HTX,
     event_time_column=HTX_TIME,
     criterion=NegativePartialLogLikelihood(),
-    hps_tuning_metric=ConcordanceIndexCensored()
+    hps_tuning_metric=ConcordanceIndexCensored(),
+    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()]
 )
 METASTASIS_TASK = SurvivalAnalysisTask(
     event_indicator_column=METASTASIS,
     event_time_column=METASTASIS_TIME,
     criterion=NegativePartialLogLikelihood(),
-    hps_tuning_metric=ConcordanceIndexCensored()
+    hps_tuning_metric=ConcordanceIndexCensored(),
+    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()]
 )
 PN_TASK = BinaryClassificationTask(
     target_column=PN,
