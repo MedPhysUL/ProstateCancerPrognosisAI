@@ -151,7 +151,7 @@ class SurvivalAnalysisMetric(SingleTaskMetric, ABC):
         Returns
         -------
         structured_array : np.ndarray
-            (N,) structured array with event indicator and event time.
+            (N, 2) structured array with event indicator and event time.
         """
         structured_array = np.empty(shape=(len(event_indicator),), dtype=[('event', bool), ('time', float)])
         structured_array['event'] = event_indicator.astype(bool)
