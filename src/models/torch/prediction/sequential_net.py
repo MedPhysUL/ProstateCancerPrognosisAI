@@ -17,7 +17,7 @@ from torch import cat, stack, Tensor
 from torch.nn import DataParallel, Module, ModuleDict
 
 from .base import MultiTaskMode, Predictor
-from ..blocks import FullyConnectedNet
+from ..blocks import BayesianFullyConnectedNet, FullyConnectedNet
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
 
 
@@ -54,7 +54,8 @@ class SequentialNet(Predictor):
             adn_ordering: str = "NDA",
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
-            seed: Optional[int] = None
+            seed: Optional[int] = None,
+            bayesian: bool = False
     ):
         """
         Initializes the model.
@@ -84,13 +85,16 @@ class SequentialNet(Predictor):
             The name of the model. Defaults to None.
         seed : Optional[int]
             Random state used for reproducibility. Defaults to None.
+        bayesian : bool
+            Whether the model should implement variational inference.
         """
         super().__init__(
             features_columns=features_columns,
             multi_task_mode=MultiTaskMode.SEPARATED,
             device=device,
             name=name,
-            seed=seed
+            seed=seed,
+            bayesian=bayesian
         )
 
         self.sequence = sequence
@@ -99,6 +103,8 @@ class SequentialNet(Predictor):
         self.dropout = dropout
         self.bias = bias
         self.adn_ordering = adn_ordering
+
+        self._bayesian = bayesian
 
         self._blocks: Optional[List[_Block]] = None
         self.predictor = None
@@ -151,15 +157,26 @@ class SequentialNet(Predictor):
         predictor : Module
             A single predictor module.
         """
-        fully_connected_net = FullyConnectedNet(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            hidden_channels=hidden_channels,
-            dropout=dropout,
-            act=self.activation,
-            bias=self.bias,
-            adn_ordering=self.adn_ordering
-        )
+        if self.bayesian:
+            fully_connected_net = BayesianFullyConnectedNet(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                hidden_channels=hidden_channels,
+                dropout=dropout,
+                act=self.activation,
+                bias=self.bias,
+                adn_ordering=self.adn_ordering
+            )
+        else:
+            fully_connected_net = FullyConnectedNet(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                hidden_channels=hidden_channels,
+                dropout=dropout,
+                act=self.activation,
+                bias=self.bias,
+                adn_ordering=self.adn_ordering
+            )
         fully_connected_net = DataParallel(fully_connected_net)
 
         return fully_connected_net.to(self.device)
