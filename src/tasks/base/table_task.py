@@ -45,7 +45,8 @@ class TableTask(Task, ABC):
                 BinaryClassificationMetric,
                 RegressionMetric,
                 SurvivalAnalysisMetric
-            ]] = None
+            ]] = None,
+            temperature: float = 1e-7
     ):
         """
         Sets protected attributes.
@@ -70,13 +71,16 @@ class TableTask(Task, ABC):
             A list of metrics to evaluate the trained models.
         hps_tuning_metric : Optional[Union[BinaryClassificationMetric, RegressionMetric, SurvivalAnalysisMetric]]
             A metric used for Optuna hyperparameters optimization.
+        temperature : float
+            The coefficient by which the KL divergence is multiplied when the loss is being computed.
         """
         super().__init__(
             hps_tuning_metric=hps_tuning_metric,
             name=name,
             criterion=criterion,
             early_stopping_metric=early_stopping_metric,
-            evaluation_metrics=evaluation_metrics
+            evaluation_metrics=evaluation_metrics,
+            temperature=temperature
         )
         self._target_column = target_column
 

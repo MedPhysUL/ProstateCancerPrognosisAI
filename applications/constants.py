@@ -73,38 +73,44 @@ BCR_TASK = SurvivalAnalysisTask(
     event_indicator_column=BCR,
     event_time_column=BCR_TIME,
     criterion=NegativePartialLogLikelihood(),
-    hps_tuning_metric=ConcordanceIndexCensored()
+    hps_tuning_metric=ConcordanceIndexCensored(),
+    temperature=...
 )
 CRPC_TASK = SurvivalAnalysisTask(
     event_indicator_column=CRPC,
     event_time_column=CRPC_TIME,
     criterion=NegativePartialLogLikelihood(),
-    hps_tuning_metric=ConcordanceIndexCensored()
+    hps_tuning_metric=ConcordanceIndexCensored(),
+    temperature=...
 )
 DEATH_TASK = SurvivalAnalysisTask(
     event_indicator_column=DEATH,
     event_time_column=DEATH_TIME,
     criterion=NegativePartialLogLikelihood(),
-    hps_tuning_metric=ConcordanceIndexCensored()
+    hps_tuning_metric=ConcordanceIndexCensored(),
+    temperature=...
 )
 HTX_TASK = SurvivalAnalysisTask(
     event_indicator_column=HTX,
     event_time_column=HTX_TIME,
     criterion=NegativePartialLogLikelihood(),
-    hps_tuning_metric=ConcordanceIndexCensored()
+    hps_tuning_metric=ConcordanceIndexCensored(),
+    temperature=...
 )
 METASTASIS_TASK = SurvivalAnalysisTask(
     event_indicator_column=METASTASIS,
     event_time_column=METASTASIS_TIME,
     criterion=NegativePartialLogLikelihood(),
-    hps_tuning_metric=ConcordanceIndexCensored()
+    hps_tuning_metric=ConcordanceIndexCensored(),
+    temperature=...
 )
 PN_TASK = BinaryClassificationTask(
     target_column=PN,
     decision_threshold_metric=BinaryBalancedAccuracy(),
     hps_tuning_metric=AUC(),
     evaluation_metrics=[Sensitivity(), Specificity()],
-    criterion=BCEWithLogitsLoss()
+    criterion=BCEWithLogitsLoss(),
+    temperature=...
 )
 
 PREDICTOR_CLIP_GRAD_MAX_NORM_DICT = {BCR: 3.0, CRPC: 3.0, DEATH: 1.0, HTX: 3.0, METASTASIS: 2.0, PN: 3.0}

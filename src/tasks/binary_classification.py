@@ -39,6 +39,7 @@ class BinaryClassificationTask(TableTask):
             ] = None,
             hps_tuning_metric: Optional[BinaryClassificationMetric] = None,
             name: Optional[str] = None,
+            temperature: float = 1e-7
     ):
         """
         Sets protected attributes.
@@ -65,6 +66,8 @@ class BinaryClassificationTask(TableTask):
             A metric used for Optuna hyperparameters optimization.
         name : Optional[str]
             The name of the task.
+        temperature : float
+            The coefficient by which the KL divergence is multiplied when the loss is being computed.
         """
         name = name if name else f"{self.__class__.__name__}('target_column'={repr(target_column)})"
 
@@ -74,7 +77,8 @@ class BinaryClassificationTask(TableTask):
             target_column=target_column,
             criterion=criterion,
             early_stopping_metric=early_stopping_metric,
-            evaluation_metrics=evaluation_metrics
+            evaluation_metrics=evaluation_metrics,
+            temperature=temperature
         )
 
         self._decision_threshold_metric = decision_threshold_metric

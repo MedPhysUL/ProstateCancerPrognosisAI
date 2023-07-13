@@ -33,7 +33,8 @@ class Task(ABC):
                 Union[SingleTaskMetric, Iterable[SingleTaskMetric], SingleTaskMetricList]
             ] = None,
             hps_tuning_metric: Optional[SingleTaskMetric] = None,
-            name: str = None
+            name: str = None,
+            temperature: float = 1e-7
     ):
         """
         Sets protected attributes.
@@ -50,6 +51,8 @@ class Task(ABC):
             A metric used for Optuna hyperparameters optimization.
         name : str
             The name of the task.
+        temperature : float
+            The coefficient by which the KL divergence is multiplied when the loss is being computed.
         """
         self._name = name
 
@@ -57,6 +60,19 @@ class Task(ABC):
         self._early_stopping_metric = early_stopping_metric
         self._evaluation_metrics = SingleTaskMetricList(evaluation_metrics)
         self._hps_tuning_metric = hps_tuning_metric
+        self._temperature = temperature
+
+    @property
+    def temperature(self) -> float:
+        """
+        Returns the KL divergence temperature coefficient.
+
+        Returns
+        -------
+        temperature : float
+            The coefficient by which the KL divergence is multiplied when the loss is being computed.
+        """
+        return self._temperature
 
     @property
     def criterion(self) -> Optional[SingleTaskLoss]:

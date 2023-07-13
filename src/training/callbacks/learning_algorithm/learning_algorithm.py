@@ -213,8 +213,11 @@ class LearningAlgorithm(TrainingCallback):
             Tensor with loss value.
         """
         if trainer.model.bayesian:
-            losses = {t.name: t.criterion(pred_batch[t.name], y_batch[t.name]) + 1e-7 * trainer.model.kl_divergence
-                      for t in self.criterion.tasks}
+            kl_divergence = trainer.model.kl_divergence
+            losses = {
+                t.name: t.criterion(pred_batch[t.name], y_batch[t.name]) + t.temperature * kl_divergence[t.name]
+                for t in self.criterion.tasks
+            }
         else:
             losses = {t.name: t.criterion(pred_batch[t.name], y_batch[t.name]) for t in self.criterion.tasks}
 
