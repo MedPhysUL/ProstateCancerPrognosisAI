@@ -283,17 +283,58 @@ class SequentialNet(Predictor):
             The prediction and its KL divergence (if the model is in bayesian mode).
         """
         output = {}
-        for block in self._blocks:
-            task_name = self.map_from_target_col_to_task_name[block.target_column]
 
-            base_input = table_data[task_name] if isinstance(table_data, dict) else table_data
-            additional_inputs = [output[self.map_from_target_col_to_task_name[c]] for c in block.input_target_columns]
+        if self.bayesian:
+            kl_divergence = {}
+            for block in self._blocks:
+                task_name = self.map_from_target_col_to_task_name[block.target_column]
 
-            if additional_inputs:
-                predictor_input = cat([base_input, stack(additional_inputs, 1)], 1)
-            else:
-                predictor_input = base_input
+                base_input = table_data[task_name] if isinstance(table_data, dict) else table_data
+                additional_inputs = [output[self.map_from_target_col_to_task_name[c]] for c in
+                                     block.input_target_columns]
 
-            output[task_name] = self.predictor[task_name](predictor_input)[:, 0]
+                if additional_inputs:
+                    predictor_input = cat([base_input, stack(additional_inputs, 1)], 1)
+                else:
+                    predictor_input = base_input
 
-        return output
+                y, kl = self.predictor[task_name](predictor_input)
+                output[task_name] = y[:, 0]
+                kl_divergence[task_name] = kl
+
+            return output, kl_divergence
+
+        else:
+            for block in self._blocks:
+                task_name = self.map_from_target_col_to_task_name[block.target_column]
+
+                base_input = table_data[task_name] if isinstance(table_data, dict) else table_data
+                additional_inputs = [output[self.map_from_target_col_to_task_name[c]] for c in block.input_target_columns]
+
+                if additional_inputs:
+                    predictor_input = cat([base_input, stack(additional_inputs, 1)], 1)
+                else:
+                    predictor_input = base_input
+
+                output[task_name] = self.predictor[task_name](predictor_input)[:, 0]
+
+            return output
+
+
+
+
+        # output = {}
+        # for block in self._blocks:
+        #     task_name = self.map_from_target_col_to_task_name[block.target_column]
+        #
+        #     base_input = table_data[task_name] if isinstance(table_data, dict) else table_data
+        #     additional_inputs = [output[self.map_from_target_col_to_task_name[c]] for c in block.input_target_columns]
+        #
+        #     if additional_inputs:
+        #         predictor_input = cat([base_input, stack(additional_inputs, 1)], 1)
+        #     else:
+        #         predictor_input = base_input
+        #
+        #     output[task_name] = self.predictor[task_name](predictor_input)[:, 0]
+        #
+        # return output
