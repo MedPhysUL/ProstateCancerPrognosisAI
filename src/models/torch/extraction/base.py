@@ -151,7 +151,7 @@ class Extractor(TorchModel, ABC):
         bayesian : bool
             Whether the model implements variational inference.
         """
-        super().__init__(device=device, name=name, seed=seed)
+        super().__init__(device=device, name=name, seed=seed, bayesian=bayesian)
 
         self.activation = activation
         self.channels: Sequence[int] = literal_eval(channels) if isinstance(channels, str) else channels
@@ -161,7 +161,6 @@ class Extractor(TorchModel, ABC):
         self.multi_task_mode = MultiTaskMode(multi_task_mode)
         self.n_features = n_features
         self.shape = shape
-        self._bayesian = bayesian
 
         if hidden_channels_fnn:
             self.hidden_channels_fnn = hidden_channels_fnn

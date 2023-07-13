@@ -73,7 +73,7 @@ class Predictor(TorchModel, ABC):
         bayesian : bool
             Whether the model implements variational inference.
         """
-        super().__init__(device=device, name=name, seed=seed)
+        super().__init__(device=device, name=name, seed=seed, bayesian=bayesian)
 
         self.features_columns = [features_columns] if isinstance(features_columns, str) else features_columns
         self.multi_task_mode = MultiTaskMode(multi_task_mode)
@@ -85,8 +85,6 @@ class Predictor(TorchModel, ABC):
                     "The multi-task mode is automatically set to 'separated'."
                 )
             self.multi_task_mode = MultiTaskMode.SEPARATED
-
-        self._bayesian = bayesian
 
         self.map_from_target_col_to_task_name: Optional[Dict[str, str]] = None
         self.predictor: Optional[Union[Module, ModuleDict]] = None

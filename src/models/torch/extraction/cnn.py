@@ -223,8 +223,6 @@ class CNN(Extractor):
         self.norm = norm
         self.dropout_cnn = dropout_cnn
 
-        self._bayesian = bayesian
-
     def __get_layer(
             self,
             in_channels: int,

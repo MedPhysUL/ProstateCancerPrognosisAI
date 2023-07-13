@@ -243,8 +243,6 @@ class UNEXtractor(Extractor):
         self.norm = norm
         self.dropout_cnn = dropout_cnn
 
-        self._bayesian = bayesian
-
     def _get_encoders_dict(self) -> ModuleDict:
         """
         Returns a ModuleDict of encoder blocks to be used by the UNet in its encoding path.

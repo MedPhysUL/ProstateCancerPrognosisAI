@@ -104,8 +104,6 @@ class SequentialNet(Predictor):
         self.bias = bias
         self.adn_ordering = adn_ordering
 
-        self._bayesian = bayesian
-
         self._blocks: Optional[List[_Block]] = None
         self.predictor = None
 

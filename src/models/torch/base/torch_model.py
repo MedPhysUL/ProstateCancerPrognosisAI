@@ -47,7 +47,8 @@ class TorchModel(Model, ABC):
             self,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
-            seed: Optional[int] = None
+            seed: Optional[int] = None,
+            bayesian: bool = False
     ) -> None:
         """
         Sets the protected attributes and creates an embedding block if required.
@@ -62,6 +63,8 @@ class TorchModel(Model, ABC):
             Random state used for reproducibility.
         """
         super().__init__(device=device, name=name, seed=seed)
+
+        self._bayesian = bayesian
 
     @property
     def bayesian(self) -> bool:

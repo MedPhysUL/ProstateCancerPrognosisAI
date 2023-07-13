@@ -86,8 +86,6 @@ class MLP(Predictor):
         self.bias = bias
         self.adn_ordering = adn_ordering
 
-        self._bayesian = bayesian
-
         self.predictor = None
 
     def _build_single_predictor(
