@@ -519,7 +519,7 @@ class PredictionEvaluator:
             prediction = {}
             fig, arr = plt.subplots()
             preds = self.slice_patient_dictionary(self.predictions_dict, patient_indexes=mask, separate_patients=True)
-            for prediction_element in preds:
+            for prediction_element in preds: # possible access of equivalent data in self.predictions?
                 if prediction.get(task.name, None) is not None:
                     prediction[task.name] = np.concatenate((prediction.get(task.name), prediction_element[task.name]))
                 else:

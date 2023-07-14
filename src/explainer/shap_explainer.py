@@ -3,7 +3,7 @@
     @Author:            Felix Desroches
 
     @Creation Date:     06/2023
-    @Last modification: 06/2023
+    @Last modification: 07/2023
 
     @Description:       This file contains a class used to analyse and explain how a model works using shapley values.
 """
