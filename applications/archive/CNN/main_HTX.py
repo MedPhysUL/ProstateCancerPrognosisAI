@@ -96,7 +96,6 @@ if __name__ == '__main__':
         constructor=CNN,
         parameters={
                     "image_keys": ["CT", "PT"],
-                    "model_mode": "prediction",
                     "channels": FixedHyperparameter(name="channels", value=(64, 128, 256, 512, 1024)),
                     "kernel_size": FixedHyperparameter(name="kernel_size", value=3),
                     "num_res_units": FixedHyperparameter(name="num_res_units", value=2),
