@@ -118,13 +118,15 @@ if __name__ == '__main__':
                 "tasks": [task, PROSTATE_SEGMENTATION_TASK],
                 "weights": CategoricalHyperparameter(
                     name="weights",
-                    choices=["(0.25, 0.75)", "(0.333, 0.667)", "(0.5, 0.5)", "(0.667, 0.333)", "(0.75, 0.25)"]
+                    choices=[
+                        "(0.25, 0.75)", "(0.333, 0.667)", "(0.5, 0.5)", "(0.667, 0.333)", "(0.75, 0.25)", "(1, 0)"
+                    ]
                 )
             }
         ),
         optimizer=OptimizerHyperparameter(
             constructor=Adam,
-            model_params_getter=lambda model: model.extractor.parameters(),
+            model_params_getter=lambda model: model.parameters(),
             parameters={
                 "lr": FloatHyperparameter(
                     name="lr",
@@ -149,7 +151,7 @@ if __name__ == '__main__':
         ),
         regularizer=RegularizerHyperparameter(
             constructor=L2Regularizer,
-            model_params_getter=lambda model: model.extractor.named_parameters(),
+            model_params_getter=lambda model: model.named_parameters(),
             parameters={"lambda_": FloatHyperparameter(name="alpha", low=1e-4, high=1e-2, log=True)}
         )
     )

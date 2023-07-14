@@ -111,7 +111,7 @@ if __name__ == '__main__':
         ),
         optimizer=OptimizerHyperparameter(
             constructor=Adam,
-            model_params_getter=lambda model: model.extractor.parameters(),
+            model_params_getter=lambda model: model.parameters(),
             parameters={
                 "lr": FloatHyperparameter(name="lr", low=1e-5, high=5e-4, log=True),
                 "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-3, high=1e-1, log=True)
@@ -128,7 +128,7 @@ if __name__ == '__main__':
         ),
         regularizer=RegularizerHyperparameter(
             constructor=L2Regularizer,
-            model_params_getter=lambda model: model.extractor.named_parameters(),
+            model_params_getter=lambda model: model.named_parameters(),
             parameters={"lambda_": FloatHyperparameter(name="alpha", low=1e-4, high=1e-2, log=True)}
         )
     )
