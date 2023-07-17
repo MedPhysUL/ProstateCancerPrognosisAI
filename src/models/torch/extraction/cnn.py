@@ -15,7 +15,7 @@ from torch import cat, mean, stack, sum, Tensor
 from torch import device as torch_device
 from torch.nn import DataParallel, Module, Sequential
 
-from .base import Extractor, ExtractorKLDivergence, ExtractorOutput, ModelMode, MultiTaskMode
+from .base import Extractor, ExtractorKLDivergence, ExtractorOutput, MultiTaskMode
 from ..blocks import BayesianEncoderBlock, EncoderBlock
 from ....data.datasets.prostate_cancer import ProstateCancerDataset
 
@@ -135,7 +135,6 @@ class CNN(Extractor):
     def __init__(
             self,
             image_keys: Union[str, List[str]],
-            model_mode: Union[str, ModelMode] = ModelMode.PREDICTION,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
             shape: Sequence[int] = (128, 128, 128),
             n_features: int = 6,
@@ -160,9 +159,6 @@ class CNN(Extractor):
         ----------
         image_keys : Union[str, List[str]]
             Sequence of images keys to extract deep radiomics from.
-        model_mode : Union[str, ModelMode]
-            Available modes are 'extraction' or 'prediction'. If 'extraction', the function will extract deep radiomics
-            from input images. If 'prediction', the function will perform predictions using extracted radiomics.
         multi_task_mode : Union[str, MultiTaskMode]
             Available modes are 'partly_shared' or 'fully_shared'. If 'partly_shared', a separate extractor model will
             be used for each task. If 'fully_shared', a fully shared extractor model will be used. All layers will be
@@ -203,7 +199,6 @@ class CNN(Extractor):
         """
         super().__init__(
             image_keys=image_keys,
-            model_mode=model_mode,
             multi_task_mode=multi_task_mode,
             shape=shape,
             n_features=n_features,

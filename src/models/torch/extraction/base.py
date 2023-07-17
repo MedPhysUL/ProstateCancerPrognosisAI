@@ -25,23 +25,6 @@ from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDatase
 from ....tasks import SegmentationTask
 
 
-class ModelMode(StrEnum):
-    """
-    This class is used to define the mode of the model. It can be either extraction or prediction. If 'extraction', the
-    model will extract deep radiomics from the images. If 'prediction', the model will perform predictions using the
-    extracted deep radiomics.
-
-    Elements
-    --------
-    EXTRACTION : str
-        Extraction mode.
-    PREDICTION : str
-        Prediction mode.
-    """
-    EXTRACTION = auto()
-    PREDICTION = auto()
-
-
 class MultiTaskMode(StrEnum):
     """
     This class is used to define the multitask mode of the model. It can be either partly shared, fully shared.
@@ -100,7 +83,6 @@ class Extractor(TorchModel, ABC):
     def __init__(
             self,
             image_keys: Union[str, List[str]],
-            model_mode: Union[str, ModelMode] = ModelMode.PREDICTION,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
             shape: Sequence[int] = (128, 128, 128),
             n_features: int = 6,
@@ -120,9 +102,6 @@ class Extractor(TorchModel, ABC):
         ----------
         image_keys : Union[str, List[str]]
             Sequence of images keys to extract deep radiomics from.
-        model_mode : Union[str, ModelMode]
-            Available modes are 'extraction' or 'prediction'. If 'extraction', the function will extract deep radiomics
-            from input images. If 'prediction', the function will perform predictions using extracted radiomics.
         multi_task_mode : Union[str, MultiTaskMode]
             Available modes are 'partly_shared' or 'fully_shared'. If 'partly_shared', a separate extractor model will
             be used for each task. If 'fully_shared', a fully shared extractor model will be used. All layers will be
@@ -157,7 +136,6 @@ class Extractor(TorchModel, ABC):
         self.channels: Sequence[int] = literal_eval(channels) if isinstance(channels, str) else channels
         self.dropout_fnn = dropout_fnn
         self.image_keys = image_keys if isinstance(image_keys, Sequence) else [image_keys]
-        self.model_mode = ModelMode(model_mode)
         self.multi_task_mode = MultiTaskMode(multi_task_mode)
         self.n_features = n_features
         self.shape = shape
@@ -329,8 +307,7 @@ class Extractor(TorchModel, ABC):
         self.extractor = self._build_deep_features_extractor(dataset)
         self.linear_module = self._build_linear_module()
 
-        if self.model_mode == ModelMode.PREDICTION:
-            self.prediction_layer = self._build_prediction_layer()
+        self.prediction_layer = self._build_prediction_layer()
 
         return self
 
@@ -491,32 +468,21 @@ class Extractor(TorchModel, ABC):
             segmentation=extractor_output.segmentation
         )
 
-        if self.model_mode == ModelMode.EXTRACTION:
-            kl_divergence = self.__get_kl_dict(
-                extractor_kl=extractor_kl,
-                radiomics_kl=radiomics_kl,
-                prediction_kl=None
-            )
-            self.kl_divergence = kl_divergence
-            return output
+        tab_dict, prediction_kl = self._get_prediction(radiomics)
 
-        elif self.model_mode == ModelMode.PREDICTION:
-            tab_dict, prediction_kl = self._get_prediction(radiomics)
+        kl_divergence = self.__get_kl_dict(
+            extractor_kl=extractor_kl,
+            radiomics_kl=radiomics_kl,
+            prediction_kl=prediction_kl
+        )
+        self.kl_divergence = kl_divergence
 
-            kl_divergence = self.__get_kl_dict(
-                extractor_kl=extractor_kl,
-                radiomics_kl=radiomics_kl,
-                prediction_kl=prediction_kl
-            )
-            self.kl_divergence = kl_divergence
-
-            seg = output.segmentation
-
-            if seg is not None:
-                seg_dict = {task.name: seg[:, i, None] for i, task in enumerate(self._tasks.segmentation_tasks)}
-                return tab_dict | seg_dict
-            else:
-                return tab_dict
+        seg = output.segmentation
+        if seg is not None:
+            seg_dict = {task.name: seg[:, i, None] for i, task in enumerate(self._tasks.segmentation_tasks)}
+            return tab_dict | seg_dict
+        else:
+            return tab_dict
 
     def _deterministic_forward(self, input_tensor: Tensor) -> Union[ExtractorOutput, TargetsType]:
         """
@@ -541,18 +507,13 @@ class Extractor(TorchModel, ABC):
             segmentation=extractor_output.segmentation
         )
 
-        if self.model_mode == ModelMode.EXTRACTION:
-            return output
-        elif self.model_mode == ModelMode.PREDICTION:
-            tab_dict = self._get_prediction(radiomics)
-
-            seg = output.segmentation
-
-            if seg is not None:
-                seg_dict = {task.name: seg[:, i, None] for i, task in enumerate(self._tasks.segmentation_tasks)}
-                return tab_dict | seg_dict
-            else:
-                return tab_dict
+        tab_dict = self._get_prediction(radiomics)
+        seg = output.segmentation
+        if seg is not None:
+            seg_dict = {task.name: seg[:, i, None] for i, task in enumerate(self._tasks.segmentation_tasks)}
+            return tab_dict | seg_dict
+        else:
+            return tab_dict
 
     @check_if_built
     def forward(self, features: FeaturesType) -> Union[ExtractorOutput, TargetsType]:
