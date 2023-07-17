@@ -117,9 +117,7 @@ if __name__ == '__main__':
                 "tasks": [task, PROSTATE_SEGMENTATION_TASK],
                 "weights": CategoricalHyperparameter(
                     name="weights",
-                    choices=[
-                        "(0.25, 0.75)", "(0.333, 0.667)", "(0.5, 0.5)", "(0.667, 0.333)", "(0.75, 0.25)", "(1, 0)"
-                    ]
+                    choices=["(0.25, 0.75)", "(0.333, 0.667)", "(0.5, 0.5)", "(0.667, 0.333)", "(0.75, 0.25)"]
                 )
             }
         ),
