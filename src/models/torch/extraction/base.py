@@ -3,7 +3,7 @@
     @Author:            Maxence Larose
 
     @Creation Date:     04/2022
-    @Last modification: 04/2023
+    @Last modification: 07/2023
 
     @Description:       This file is used to define an abstract 'Extractor' model.
 """
@@ -14,18 +14,20 @@ from ast import literal_eval
 from enum import auto, StrEnum
 from typing import Dict, List, Optional, NamedTuple, Sequence, Union
 
-from monai.networks.nets import FullyConnectedNet
+from bayesian_torch.layers.variational_layers.linear_variational import LinearReparameterization
 from torch import cat, Tensor
 from torch import device as torch_device
 from torch.nn import DataParallel, Linear, Module, ModuleDict
 
 from ..base import check_if_built, TorchModel
+from ..blocks import BayesianFullyConnectedNet, FullyConnectedNet
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
+from ....tasks import SegmentationTask
 
 
 class MultiTaskMode(StrEnum):
     """
-    This class is used to define the multi-task mode of the model. It can be either partly shared, fully shared.
+    This class is used to define the multitask mode of the model. It can be either partly shared, fully shared.
 
     Elements
     --------
@@ -38,6 +40,22 @@ class MultiTaskMode(StrEnum):
     """
     PARTLY_SHARED = auto()
     FULLY_SHARED = auto()
+
+
+class ExtractorKLDivergence(NamedTuple):
+    """
+    This class is used to define the KL divergence of the extractor model. It contains the KL divergence associated to
+    the extraction of deep features and the KL divergence associated to the segmentation of the images (optional).
+
+    Elements
+    --------
+    deep_features : Tensor
+        The KL divergence associated to the extraction of deep features.
+    segmentation : Optional[Tensor]
+        The KL divergence associated to the segmentation of the images. This is optional.
+    """
+    deep_features: Tensor
+    segmentation: Optional[Tensor] = None
 
 
 class ExtractorOutput(NamedTuple):
@@ -74,7 +92,8 @@ class Extractor(TorchModel, ABC):
             hidden_channels_fnn: Optional[Sequence[int]] = None,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
-            seed: Optional[int] = None
+            seed: Optional[int] = None,
+            bayesian: bool = False
     ):
         """
         Initializes the model.
@@ -108,8 +127,10 @@ class Extractor(TorchModel, ABC):
             The name of the model.
         seed : Optional[int]
             Random state used for reproducibility.
+        bayesian : bool
+            Whether the model implements variational inference.
         """
-        super().__init__(device=device, name=name, seed=seed)
+        super().__init__(device=device, name=name, seed=seed, bayesian=bayesian)
 
         self.activation = activation
         self.channels: Sequence[int] = literal_eval(channels) if isinstance(channels, str) else channels
@@ -124,9 +145,11 @@ class Extractor(TorchModel, ABC):
         else:
             self.hidden_channels_fnn = (int(sum(self.channels)/4), int(sum(self.channels)/16))
 
-        self.extractor = None
-        self.linear_module = None
-        self.prediction_layer = None
+        self.extractor: Optional[Module] = None
+        self.linear_module: Optional[Union[Module, ModuleDict]] = None
+        self.prediction_layer: Optional[Union[Module, ModuleDict]] = None
+
+        self.kl_divergence: Optional[Dict[str, Tensor]] = None
 
     @property
     def in_shape(self) -> Sequence[int]:
@@ -155,11 +178,12 @@ class Extractor(TorchModel, ABC):
         extractor : Module
             The extractor module. It should take as input a tensor of shape (batch_size, channels, *spatial_shape) and
             return an ExtractorOutput object. The ExtractorOutput object contains the deep features extracted from the
-            images and the segmentation of the images (optional).
+            images and the segmentation of the images (optional). If the model is in bayesian mode, the extractor module
+            should return a tuple of an ExtractorOutput object and an ExtractorKLDivergence object.
         """
         raise NotImplementedError
 
-    def _get_single_linear_module(self):
+    def _get_single_linear_module(self) -> Module:
         """
         Returns a single linear module.
 
@@ -168,16 +192,27 @@ class Extractor(TorchModel, ABC):
         linear_module : Module
             The linear module.
         """
-        linear_module = FullyConnectedNet(
-            in_channels=sum(self.channels),
-            out_channels=self.n_features,
-            hidden_channels=self.hidden_channels_fnn,
-            dropout=self.dropout_fnn,
-            act=self.activation
-        )
+        if self.bayesian:
+            linear_module = BayesianFullyConnectedNet(
+                in_channels=sum(self.channels),
+                out_channels=self.n_features,
+                hidden_channels=self.hidden_channels_fnn,
+                dropout=self.dropout_fnn,
+                act=self.activation
+            )
+
+        else:
+            linear_module = FullyConnectedNet(
+                in_channels=sum(self.channels),
+                out_channels=self.n_features,
+                hidden_channels=self.hidden_channels_fnn,
+                dropout=self.dropout_fnn,
+                act=self.activation
+            )
+
         return DataParallel(linear_module).to(self.device)
 
-    def _build_linear_module(self):
+    def _build_linear_module(self) -> Union[Module, ModuleDict]:
         """
         Returns the linear module. If the model is in extraction mode, the linear module will be a single module. If the
         model is in prediction mode, the linear module will be a ModuleDict containing a separate module for each task.
@@ -194,6 +229,39 @@ class Extractor(TorchModel, ABC):
         else:
             return self._get_single_linear_module()
 
+    def _get_single_prediction_layer(
+            self,
+            in_features: int,
+            out_features: int
+    ) -> Module:
+        """
+        Returns a single linear module.
+
+        Parameters
+        ----------
+        in_features : int
+            Number of input features.
+        out_features : int
+            Number of output features.
+
+        Returns
+        -------
+        single_prediction_layer : Module
+            The Linear Module used for prediction.
+        """
+        if self.bayesian:
+            return DataParallel(
+                LinearReparameterization(
+                    in_features=in_features,
+                    out_features=out_features,
+                    prior_mean=0.0,
+                    prior_variance=0.1
+                )
+            ).to(self.device)
+
+        else:
+            return DataParallel(Linear(in_features=in_features, out_features=out_features)).to(self.device)
+
     def _build_prediction_layer(self) -> Union[Module, ModuleDict]:
         """
         Returns the prediction layer module.
@@ -202,17 +270,21 @@ class Extractor(TorchModel, ABC):
         -------
         prediction_layer : Union[Module, ModuleDict]
             The prediction layer module. It should take as input a tensor of shape (batch_size, n_features) and return a
-            tensor of shape (batch_size, n_tasks).
+            tensor of shape (batch_size, n_tasks) or a tuple of said tensor and the KL divergence if the model is in
+            bayesian mode.
         """
         if self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
-            return ModuleDict({
-                task.name: DataParallel(Linear(in_features=self.n_features, out_features=1)).to(self.device)
-                for task in self._tasks.table_tasks
-            })
+            return ModuleDict(
+                {task.name: self._get_single_prediction_layer(in_features=self.n_features, out_features=1)
+                 for task in self._tasks.table_tasks}
+            )
+
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
-            return DataParallel(
-                Linear(in_features=self.n_features, out_features=len(self._tasks.table_tasks))
-            ).to(self.device)
+            return self._get_single_prediction_layer(
+                in_features=self.n_features,
+                out_features=len(self._tasks.table_tasks)
+            )
+
         else:
             raise ValueError(f"{self.multi_task_mode} is not a valid MultiTaskMode")
 
@@ -254,7 +326,7 @@ class Extractor(TorchModel, ABC):
         """
         return cat([features.image[k] for k in self.image_keys], 1)
 
-    def _get_radiomics(self, deep_features: Tensor) -> Union[Tensor, Dict[str, Tensor]]:
+    def _get_radiomics(self, deep_features: Tensor) -> Union[Tensor, Dict[str, Tensor], tuple]:
         """
         Returns the reduced deep features, i.e. the radiomics.
 
@@ -265,20 +337,35 @@ class Extractor(TorchModel, ABC):
 
         Returns
         -------
-        reduced_features : Union[Tensor, Dict[str, Tensor]]
-            The reduced deep features.
+        reduced_features : Union[Tensor, Dict[str, Tensor], tuple]
+            The reduced deep features. If the model is in bayesian mode, a tuple of the reduced deep features and their
+            respective KL divergence is returned.
         """
         if self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
-            reduced_deep_features = {}
-            for task in self._tasks.table_tasks:
-                reduced_deep_features[task.name] = self.linear_module[task.name](deep_features)
-            return reduced_deep_features
+            if self.bayesian:
+                reduced_deep_features = {}
+                radiomics_kl = {}
+                for t in self._tasks.table_tasks:
+                    reduced_deep_features[t.name], radiomics_kl[t.name] = self.linear_module[t.name](deep_features)
+
+                return reduced_deep_features, radiomics_kl
+
+            else:
+                return {task.name: self.linear_module[task.name](deep_features) for task in self._tasks.table_tasks}
+
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
-            return self.linear_module(deep_features)
+            if self.bayesian:
+                reduced_deep_features, kl = self.linear_module(deep_features)
+                radiomics_kl = {task.name: kl for task in self._tasks.table_tasks}
+                return reduced_deep_features, radiomics_kl
+
+            else:
+                return self.linear_module(deep_features)
+
         else:
             raise ValueError(f"{self.multi_task_mode} is not a valid MultiTaskMode")
 
-    def _get_prediction(self, radiomics: Union[Tensor, Dict[str, Tensor]]) -> Dict[str, Tensor]:
+    def _get_prediction(self, radiomics: Union[Tensor, Dict[str, Tensor]]) -> Union[Dict[str, Tensor], tuple]:
         """
         Returns the prediction.
 
@@ -289,17 +376,35 @@ class Extractor(TorchModel, ABC):
 
         Returns
         -------
-        prediction : Dict[str, Tensor]
-            The prediction.
+        prediction : Union[Dict[str, Tensor], tuple]
+            The prediction. If the model is in bayesian mode, a tuple of the prediction and its respective KL divergence
+            is returned.
         """
         if self.multi_task_mode == MultiTaskMode.PARTLY_SHARED:
-            prediction = {}
-            for task in self._tasks.table_tasks:
-                prediction[task.name] = self.prediction_layer[task.name](radiomics[task.name])[:, 0]
-            return prediction
+            if self.bayesian:
+                prediction = {}
+                prediction_kl = {}
+                for task in self._tasks.table_tasks:
+                    y, kl = self.prediction_layer[task.name](radiomics[task.name])
+                    prediction[task.name] = y[:, 0]
+                    prediction_kl[task.name] = kl
+
+                return prediction, prediction_kl
+
+            else:
+                return {t.name: self.prediction_layer[t.name](radiomics[t.name])[:, 0] for t in self._tasks.table_tasks}
+
         elif self.multi_task_mode == MultiTaskMode.FULLY_SHARED:
-            y = self.prediction_layer(radiomics)
-            return {task.name: y[:, i] for i, task in enumerate(self._tasks.table_tasks)}
+            if self.bayesian:
+                y, kl = self.prediction_layer(radiomics)
+                prediction = {task.name: y[:, i] for i, task in enumerate(self._tasks.table_tasks)}
+                prediction_kl = {task.name: kl for task in self._tasks.table_tasks}
+                return prediction, prediction_kl
+
+            else:
+                y = self.prediction_layer(radiomics)
+                return {task.name: y[:, i] for i, task in enumerate(self._tasks.table_tasks)}
+
         else:
             raise ValueError(f"{self.multi_task_mode} is not a valid MultiTaskMode")
 
@@ -322,18 +427,123 @@ class Extractor(TorchModel, ABC):
             The extracted radiomics features.
         """
         x_image = self._get_input_tensor(features)
-        extractor_output = self.extractor(x_image)
 
-        radiomics = self._get_radiomics(extractor_output.deep_features)
+        if self.bayesian:
+            extractor_output, _ = self.extractor(x_image)
+            radiomics, _ = self._get_radiomics(extractor_output.deep_features)
+        else:
+            extractor_output = self.extractor(x_image)
+            radiomics = self._get_radiomics(extractor_output.deep_features)
+
         return ExtractorOutput(deep_features=radiomics, segmentation=extractor_output.segmentation)
 
-    @check_if_built
-    def forward(
+    def __get_kl_dict(
             self,
-            features: FeaturesType
-    ) -> Union[ExtractorOutput, TargetsType]:
+            extractor_kl: ExtractorKLDivergence,
+            radiomics_kl: Dict[str, Tensor],
+            prediction_kl: Optional[Dict[str, Tensor]] = None
+    ) -> Dict[str, Tensor]:
         """
-        Performs a forward pass through the model.
+        Loops through the tasks and creates a dictionary of the KL divergence per task.
+
+        Parameters
+        ----------
+        extractor_kl : ExtractorKLDivergence
+            The KL divergence of the extraction process.
+        radiomics_kl : Dict[str, Tensor]
+            The KL divergence associated to getting the radiomics.
+        prediction_kl : Optional[Dict[str, Tensor]]
+            The KL divergence of the prediction process. If the model is in extraction mode then prediction_kl is None.
+
+        Returns
+        -------
+        kl_divergence : Dict[str, Tensor]
+            The KL divergence of each task.
+        """
+        kl_divergence = {}
+        for t in self._tasks:
+            if isinstance(t, SegmentationTask):
+                kl_divergence[t.name] = extractor_kl.segmentation
+
+            else:
+                if prediction_kl is not None:   # Prediction mode.
+                    kl_divergence[t.name] = extractor_kl.deep_features + radiomics_kl[t.name] + prediction_kl[t.name]
+                else:                           # Extraction mode.
+                    kl_divergence[t.name] = extractor_kl.deep_features + radiomics_kl[t.name]
+
+        return kl_divergence
+
+    def _bayesian_forward(self, input_tensor: Tensor) -> Union[ExtractorOutput, TargetsType]:
+        """
+        Performs a variational inference forward pass through the model.
+
+        Parameters
+        ----------
+        input_tensor : Tensor
+            The input tensor.
+
+        Returns
+        -------
+        targets : Union[ExtractorOutput, TargetsType]
+            The output targets. If the model is in 'extraction' mode, it will return an ExtractorOutput. If the model
+            is in 'prediction' mode, it will return a dictionary of tensors, one for each task.
+        """
+        extractor_output, extractor_kl = self.extractor(input_tensor)
+
+        radiomics, radiomics_kl = self._get_radiomics(extractor_output.deep_features)
+        output = ExtractorOutput(
+            deep_features=radiomics,
+            segmentation=extractor_output.segmentation
+        )
+
+        tab_dict, prediction_kl = self._get_prediction(radiomics)
+
+        kl_divergence = self.__get_kl_dict(
+            extractor_kl=extractor_kl,
+            radiomics_kl=radiomics_kl,
+            prediction_kl=prediction_kl
+        )
+        self.kl_divergence = kl_divergence
+
+        seg = output.segmentation
+        if seg is not None:
+            seg_dict = {task.name: seg[:, i, None] for i, task in enumerate(self._tasks.segmentation_tasks)}
+            return tab_dict | seg_dict
+        else:
+            return tab_dict
+
+    def _deterministic_forward(self, input_tensor: Tensor) -> Union[ExtractorOutput, TargetsType]:
+        """
+        Performs a deterministic forward pass through the model.
+
+        Parameters
+        ----------
+        input_tensor : Tensor
+            The input tensor.
+
+        Returns
+        -------
+        targets : Union[ExtractorOutput, TargetsType]
+            The output targets. If the model is in 'extraction' mode, it will return an ExtractorOutput. If the model
+            is in 'prediction' mode, it will return a dictionary of tensors, one for each task.
+        """
+        extractor_output = self.extractor(input_tensor)
+
+        radiomics = self._get_radiomics(extractor_output.deep_features)
+        output = ExtractorOutput(deep_features=radiomics, segmentation=extractor_output.segmentation)
+
+        tab_dict = self._get_prediction(radiomics)
+        seg = output.segmentation
+        if seg is not None:
+            seg_dict = {task.name: seg[:, i, None] for i, task in enumerate(self._tasks.segmentation_tasks)}
+            return tab_dict | seg_dict
+        else:
+            return tab_dict
+
+    @check_if_built
+    def forward(self, features: FeaturesType) -> Union[ExtractorOutput, TargetsType]:
+        """
+        Performs a forward pass through the model. Applies different methods depending on whether the model is bayesian.
 
         Parameters
         ----------
@@ -346,12 +556,10 @@ class Extractor(TorchModel, ABC):
             The output targets. If the model is in 'extraction' mode, it will return an ExtractorOutput. If the model
             is in 'prediction' mode, it will return a dictionary of tensors, one for each task.
         """
-        output = self.extract_radiomics(features=features)
+        x_image = self._get_input_tensor(features)
 
-        tab_dict = self._get_prediction(output.deep_features)
-        seg = output.segmentation
-        if seg is not None:
-            seg_dict = {task.name: seg[:, i, None] for i, task in enumerate(self._tasks.segmentation_tasks)}
-            return tab_dict | seg_dict
+        if self.bayesian:
+            return self._bayesian_forward(x_image)
+
         else:
-            return tab_dict
+            return self._deterministic_forward(x_image)

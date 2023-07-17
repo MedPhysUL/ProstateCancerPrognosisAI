@@ -47,7 +47,8 @@ class TorchModel(Model, ABC):
             self,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
-            seed: Optional[int] = None
+            seed: Optional[int] = None,
+            bayesian: bool = False
     ) -> None:
         """
         Sets the protected attributes and creates an embedding block if required.
@@ -63,10 +64,21 @@ class TorchModel(Model, ABC):
         """
         super().__init__(device=device, name=name, seed=seed)
 
-    def build(
-            self,
-            dataset: ProstateCancerDataset
-    ) -> TorchModel:
+        self._bayesian = bayesian
+
+    @property
+    def bayesian(self) -> bool:
+        """
+        Returns bayesian status.
+
+        Returns
+        -------
+        bayesian_status : bool
+            Whether the model is in bayesian mode.
+        """
+        return self._bayesian
+
+    def build(self, dataset: ProstateCancerDataset) -> TorchModel:
         """
         Builds the model using information contained in the dataset with which the model is going to be trained.
 
@@ -88,10 +100,7 @@ class TorchModel(Model, ABC):
 
     @check_if_built
     @abstractmethod
-    def forward(
-            self,
-            features: FeaturesType
-    ) -> TargetsType:
+    def forward(self, features: FeaturesType) -> TargetsType:
         """
         Executes the forward pass.
 

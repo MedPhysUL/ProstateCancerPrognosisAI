@@ -1,9 +1,9 @@
 """
     @file:              base.py
-    @Author:            Maxence Larose
+    @Author:            Maxence Larose, Raphael Brodeur
 
     @Creation Date:     04/2023
-    @Last modification: 04/2023
+    @Last modification: 07/2023
 
     @Description:       This file is used to define an abstract 'Predictor' model.
 """
@@ -24,7 +24,7 @@ from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDatase
 
 class MultiTaskMode(StrEnum):
     """
-    This class is used to define the multi-task mode of the model. It can be either 'separated' or 'fully_shared'.
+    This class is used to define the multitask mode of the model. It can be either 'separated' or 'fully_shared'.
 
     Elements
     --------
@@ -49,7 +49,8 @@ class Predictor(TorchModel, ABC):
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
-            seed: Optional[int] = None
+            seed: Optional[int] = None,
+            bayesian: bool = False
     ):
         """
         Initializes the model.
@@ -69,8 +70,10 @@ class Predictor(TorchModel, ABC):
             The name of the model. Defaults to None.
         seed : Optional[int]
             Random state used for reproducibility. Defaults to None.
+        bayesian : bool
+            Whether the model implements variational inference.
         """
-        super().__init__(device=device, name=name, seed=seed)
+        super().__init__(device=device, name=name, seed=seed, bayesian=bayesian)
 
         self.features_columns = [features_columns] if isinstance(features_columns, str) else features_columns
         self.multi_task_mode = MultiTaskMode(multi_task_mode)
@@ -83,11 +86,13 @@ class Predictor(TorchModel, ABC):
                 )
             self.multi_task_mode = MultiTaskMode.SEPARATED
 
-        self.map_from_target_col_to_task_name = None
-        self.predictor = None
+        self.map_from_target_col_to_task_name: Optional[Dict[str, str]] = None
+        self.predictor: Optional[Union[Module, ModuleDict]] = None
+
+        self.kl_divergence: Optional[Dict[str, Tensor]] = None
 
     @abstractmethod
-    def _build_predictor(self, dataset) -> Union[Module, ModuleDict]:
+    def _build_predictor(self, dataset: ProstateCancerDataset) -> Union[Module, ModuleDict]:
         """
         Returns the predictor module.
 
@@ -131,11 +136,32 @@ class Predictor(TorchModel, ABC):
 
         return self
 
+    def _get_input_table(self, features: FeaturesType) -> Union[Tensor, Dict[str, Tensor]]:
+        """
+        Returns the input to the predictor.
+
+        Parameters
+        ----------
+        features : FeaturesType
+            The features to use as input to the predictor.
+
+        Returns
+        -------
+        input: Union[Tensor, Dict[str, Tensor]]
+            The input to the predictor.
+        """
+        if isinstance(self.features_columns, Mapping):
+            x_table = {}
+            for target_col, feature_cols in self.features_columns.items():
+                task_name = self.map_from_target_col_to_task_name[target_col]
+                x_table[task_name] = stack([features.table[f] for f in feature_cols], 1).float()
+        else:
+            x_table = stack([features.table[f] for f in self.features_columns], 1).float()
+
+        return x_table
+
     @abstractmethod
-    def _get_prediction(
-            self,
-            table_data: Union[Tensor, Dict[str, Tensor]]
-    ) -> Dict[str, Tensor]:
+    def _get_prediction(self, table_data: Union[Tensor, Dict[str, Tensor]]) -> Union[Dict[str, Tensor], tuple]:
         """
         Returns the prediction.
 
@@ -146,18 +172,51 @@ class Predictor(TorchModel, ABC):
 
         Returns
         -------
-        prediction : Dict[str, Tensor]
-            The prediction.
+        prediction : Union[Dict[str, Tensor], tuple]
+            The prediction and its KL divergence (if the model is in bayesian mode).
         """
         raise NotImplementedError
 
-    @check_if_built
-    def forward(
-            self,
-            features: FeaturesType
-    ) -> TargetsType:
+    def _bayesian_forward(self, input_table: Union[Tensor, Dict[str, Tensor]]) -> TargetsType:
         """
-        Executes the forward pass.
+        Executes a bayesian forward pass.
+
+        Parameters
+        ----------
+        input_table : Union[Tensor, Dict[str, Tensor]]
+            The input to the predictor.
+
+        Returns
+        -------
+        predictions : TargetsType
+            Predictions.
+        """
+        prediction, kl_divergence = self._get_prediction(input_table)
+
+        self.kl_divergence = kl_divergence
+
+        return prediction
+
+    def _deterministic_forward(self, input_table: Union[Tensor, Dict[str, Tensor]]) -> TargetsType:
+        """
+        Executes a deterministic forward pass.
+
+        Parameters
+        ----------
+        input_table : Union[Tensor, Dict[str, Tensor]]
+            The input to the predictor.
+
+        Returns
+        -------
+        predictions : TargetsType
+            Predictions.
+        """
+        return self._get_prediction(input_table)
+
+    @check_if_built
+    def forward(self, features: FeaturesType) -> TargetsType:
+        """
+        Executes the forward pass. Implements different methods depending on whether the model is in bayesian mode.
 
         Parameters
         ----------
@@ -169,12 +228,9 @@ class Predictor(TorchModel, ABC):
         predictions : TargetsType
             Predictions.
         """
-        if isinstance(self.features_columns, Mapping):
-            x_table = {}
-            for target_col, feature_cols in self.features_columns.items():
-                task_name = self.map_from_target_col_to_task_name[target_col]
-                x_table[task_name] = stack([features.table[f] for f in feature_cols], 1).float()
-        else:
-            x_table = stack([features.table[f] for f in self.features_columns], 1).float()
+        x_table = self._get_input_table(features=features)
 
-        return self._get_prediction(x_table)
+        if self.bayesian:
+            return self._bayesian_forward(x_table)
+        else:
+            return self._deterministic_forward(x_table)
