@@ -158,11 +158,13 @@ class SurvshapWrapper:
         predictions = [model.predict(feature) for feature in features]
         for prediction_element in predictions:
             if prediction.get(self.task.name, None) is not None:
-                if prediction_element[self.task.name].get_device != -1:
+                if (isinstance(prediction_element[self.task.name], torch.Tensor)
+                        and prediction_element[self.task.name].get_device != -1):
                     to_cat = prediction_element[self.task.name].cpu()
                 else:
                     to_cat = prediction_element[self.task.name]
-                if prediction.get(self.task.name).get_device != -1:
+                if (isinstance(prediction.get(self.task.name), torch.Tensor)
+                        and prediction.get(self.task.name).get_device != -1):
                     prediction[self.task.name] = np.concatenate((prediction.get(self.task.name).cpu(), to_cat))
                 else:
                     prediction[self.task.name] = np.concatenate((prediction.get(self.task.name), to_cat))
