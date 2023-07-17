@@ -158,7 +158,9 @@ class SurvshapWrapper:
         predictions = [model.predict(feature) for feature in features]
         for prediction_element in predictions:
             if prediction.get(self.task.name, None) is not None:
-                prediction[self.task.name] = np.concatenate((prediction.get(self.task.name), prediction_element[self.task.name]))
+                prediction[self.task.name] = torch.cat(
+                    (prediction.get(self.task.name), prediction_element[self.task.name])
+                )
             else:
                 prediction[self.task.name] = (prediction_element[self.task.name])
         return self.function(prediction[self.task.name])
