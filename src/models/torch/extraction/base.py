@@ -409,6 +409,35 @@ class Extractor(TorchModel, ABC):
         else:
             raise ValueError(f"{self.multi_task_mode} is not a valid MultiTaskMode")
 
+    @check_if_built
+    def extract_radiomics(
+            self,
+            features: FeaturesType
+    ) -> ExtractorOutput:
+        """
+        Extracts the radiomics features from the input features.
+
+        Parameters
+        ----------
+        features : FeaturesType
+            The input features.
+
+        Returns
+        -------
+        radiomics : ExtractorOutput
+            The extracted radiomics features.
+        """
+        x_image = self._get_input_tensor(features)
+
+        if self.bayesian:
+            extractor_output, _ = self.extractor(x_image)
+            radiomics, _ = self._get_radiomics(extractor_output.deep_features)
+        else:
+            extractor_output = self.extractor(x_image)
+            radiomics = self._get_radiomics(extractor_output.deep_features)
+
+        return ExtractorOutput(deep_features=radiomics, segmentation=extractor_output.segmentation)
+
     def __get_kl_dict(
             self,
             extractor_kl: ExtractorKLDivergence,
