@@ -11,7 +11,7 @@
 from __future__ import annotations
 from typing import List, Optional, Sequence, Union
 
-from torch import cat, mean, sum, Tensor
+from torch import cat, mean, stack, sum, Tensor
 from torch import device as torch_device
 from torch.nn import DataParallel, Module, ModuleDict, Sequential
 
@@ -80,13 +80,13 @@ class _UNet(Module):
 
         features = cat(features, dim=1)
 
-        deep_features_kl = sum(cat(kl_list))
+        deep_features_kl = sum(stack(kl_list))
 
         for key, decoder in reversed(list(self.decoders.items())):
             x, kl = decoder(cat([layers_output[key], x], dim=1))
             kl_list.append(kl)
 
-        segmentation_kl = sum(cat(kl_list))
+        segmentation_kl = sum(stack(kl_list))
 
         kl_divergence = ExtractorKLDivergence(deep_features=deep_features_kl, segmentation=segmentation_kl)
 

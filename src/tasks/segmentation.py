@@ -77,7 +77,6 @@ class SegmentationTask(Task):
             evaluation_metrics=evaluation_metrics,
             temperature=temperature
         )
-        self.temperature = temperature
         self._validate_metrics_type(type_=SegmentationMetric)
         self._validate_criterion_type(type_=SegmentationLoss)
 

@@ -11,7 +11,7 @@
 from __future__ import annotations
 from typing import List, Optional, Sequence, Union
 
-from torch import cat, mean, sum, Tensor
+from torch import cat, mean, stack, sum, Tensor
 from torch import device as torch_device
 from torch.nn import DataParallel, Module, Sequential
 
@@ -73,7 +73,7 @@ class _Encoder(Module):
 
         features = cat(features, dim=1)
 
-        kl_divergence = ExtractorKLDivergence(deep_features=sum(cat(kl_list)), segmentation=None)
+        kl_divergence = ExtractorKLDivergence(deep_features=sum(stack(kl_list)), segmentation=None)
 
         return ExtractorOutput(deep_features=features, segmentation=None), kl_divergence
 

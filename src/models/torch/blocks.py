@@ -19,7 +19,7 @@ from bayesian_torch.layers.variational_layers.linear_variational import LinearRe
 from monai.networks.blocks import ADN
 from monai.networks.layers.convutils import same_padding
 import numpy as np
-from torch import cat, sum, Tensor
+from torch import stack, sum, Tensor
 from torch.nn import Conv3d, ConvTranspose3d, Flatten, Identity, Linear, Module, Sequential
 
 
@@ -524,10 +524,10 @@ class BayesianEncoderBlock(Module):
             y_res, kl = self.residual(x)
             kl_list.append(kl)
 
-            return y + y_res, sum(cat(kl_list))
+            return y + y_res, sum(stack(kl_list))
 
         else:
-            return y, sum(cat(kl_list))
+            return y, sum(stack(kl_list))
 
 
 class BayesianDecoderBlock(Module):
@@ -696,10 +696,10 @@ class BayesianDecoderBlock(Module):
                 else:                           # Module is a NDA layer
                     x = module(x)
 
-            return x + res, sum(cat(kl_list))
+            return x + res, sum(stack(kl_list))
 
         else:
-            return x, sum(cat(kl_list))
+            return x, sum(stack(kl_list))
 
 
 class BayesianFullyConnectedNet(Module):
@@ -815,4 +815,4 @@ class BayesianFullyConnectedNet(Module):
         x, kl = self.output(x)
         kl_list.append(kl)
 
-        return x, sum(cat(kl_list))
+        return x, sum(stack(kl_list))
