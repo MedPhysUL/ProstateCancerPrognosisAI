@@ -170,7 +170,11 @@ class SurvshapWrapper:
                     prediction[self.task.name] = np.concatenate((prediction.get(self.task.name), to_cat))
             else:
                 prediction[self.task.name] = (prediction_element[self.task.name])
-        return self.function(prediction[self.task.name])
+        if (isinstance(prediction[self.task.name], torch.Tensor)
+                and prediction[self.task.name].get_device != -1):
+            return self.function(prediction[self.task.name].cpu())
+        else:
+            return self.function(prediction[self.task.name])
 
 
 class TableSurvshapExplainer:
