@@ -306,7 +306,6 @@ class Extractor(TorchModel, ABC):
 
         self.extractor = self._build_deep_features_extractor(dataset)
         self.linear_module = self._build_linear_module()
-
         self.prediction_layer = self._build_prediction_layer()
 
         return self
@@ -531,10 +530,7 @@ class Extractor(TorchModel, ABC):
         extractor_output = self.extractor(input_tensor)
 
         radiomics = self._get_radiomics(extractor_output.deep_features)
-        output = ExtractorOutput(
-            deep_features=radiomics,
-            segmentation=extractor_output.segmentation
-        )
+        output = ExtractorOutput(deep_features=radiomics, segmentation=extractor_output.segmentation)
 
         tab_dict = self._get_prediction(radiomics)
         seg = output.segmentation

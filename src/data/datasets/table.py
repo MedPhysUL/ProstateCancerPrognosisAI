@@ -605,6 +605,7 @@ class TableDataset(Dataset):
 
         self._set_features()
         self._set_scaling_factors()
+        self._set_censoring_distributions()
 
     def _get_current_train_stats(self) -> Tuple[Optional[pd.Series], Optional[pd.Series]]:
         """
@@ -714,3 +715,11 @@ class TableDataset(Dataset):
 
             if task.criterion:
                 task.criterion.update_scaling_factor(y_train=self.y[task.name][self.train_mask])
+
+    def _set_censoring_distributions(self):
+        """
+        Sets the censoring distributions of all survival tasks.
+        """
+        for task in self.tasks.survival_analysis_tasks:
+            for metric in task.metrics:
+                metric.update_censoring_distribution(y_train=self.y[task.name][self.train_mask])

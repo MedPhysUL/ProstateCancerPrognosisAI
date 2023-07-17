@@ -12,7 +12,14 @@ import os
 
 from src.losses.single_task import BCEWithLogitsLoss, DiceLoss, NegativePartialLogLikelihood
 from src.metrics.single_task import (
-    AUC, BinaryBalancedAccuracy, ConcordanceIndexCensored, DiceMetric, Sensitivity, Specificity
+    AUC,
+    BinaryBalancedAccuracy,
+    ConcordanceIndexCensored,
+    ConcordanceIndexIPCW,
+    CumulativeDynamicAUC,
+    DiceMetric,
+    Sensitivity,
+    Specificity
 )
 from src.tasks import BinaryClassificationTask, SegmentationTask, SurvivalAnalysisTask
 from src.data.datasets import Feature
@@ -47,6 +54,8 @@ _AUTOMATIC_RADIOMICS_PATH = os.path.join(_RADIOMICS_PATH, "automatic")
 AUTOMATIC_EXTRACTED_RADIOMICS_PATH = os.path.join(_AUTOMATIC_RADIOMICS_PATH, "extracted")
 AUTOMATIC_FILTERED_RADIOMICS_PATH = os.path.join(_AUTOMATIC_RADIOMICS_PATH, "filtered")
 AUTOMATIC_RADIOMICS_MODELS_PATH = os.path.join(_AUTOMATIC_RADIOMICS_PATH, "models")
+_DEEP_RADIOMICS_PATH = os.path.join(_RADIOMICS_PATH, "deep")
+DEEP_FILTERED_RADIOMICS_PATH = os.path.join(_DEEP_RADIOMICS_PATH, "filtered")
 _MANUAL_RADIOMICS_PATH = os.path.join(_RADIOMICS_PATH, "manual")
 MANUAL_EXTRACTED_RADIOMICS_PATH = os.path.join(_MANUAL_RADIOMICS_PATH, "extracted")
 MANUAL_FILTERED_RADIOMICS_PATH = os.path.join(_MANUAL_RADIOMICS_PATH, "filtered")
@@ -103,6 +112,7 @@ BCR_TASK = SurvivalAnalysisTask(
     event_time_column=BCR_TIME,
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
+    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()],
     temperature=1e-7
 )
 CRPC_TASK = SurvivalAnalysisTask(
@@ -110,6 +120,7 @@ CRPC_TASK = SurvivalAnalysisTask(
     event_time_column=CRPC_TIME,
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
+    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()],
     temperature=1e-7
 )
 DEATH_TASK = SurvivalAnalysisTask(
@@ -117,6 +128,7 @@ DEATH_TASK = SurvivalAnalysisTask(
     event_time_column=DEATH_TIME,
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
+    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()],
     temperature=1e-7
 )
 HTX_TASK = SurvivalAnalysisTask(
@@ -124,6 +136,7 @@ HTX_TASK = SurvivalAnalysisTask(
     event_time_column=HTX_TIME,
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
+    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()],
     temperature=1e-7
 )
 METASTASIS_TASK = SurvivalAnalysisTask(
@@ -131,6 +144,7 @@ METASTASIS_TASK = SurvivalAnalysisTask(
     event_time_column=METASTASIS_TIME,
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
+    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()],
     temperature=1e-7
 )
 PN_TASK = BinaryClassificationTask(

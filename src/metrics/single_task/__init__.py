@@ -6,6 +6,6 @@ from .binary_classification import (
     Specificity
 )
 from .segmentation import DiceMetric
-from .survival_analysis import ConcordanceIndexCensored
+from .survival_analysis import ConcordanceIndexCensored, ConcordanceIndexIPCW, CumulativeDynamicAUC
 
 from .containers import SingleTaskMetricList

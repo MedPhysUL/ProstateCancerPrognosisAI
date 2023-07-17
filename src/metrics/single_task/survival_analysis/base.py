@@ -46,6 +46,9 @@ class SurvivalAnalysisMetric(SingleTaskMetric, ABC):
         """
         super().__init__(direction=direction, name=name, reduction=reduction, n_digits=n_digits)
 
+        self._training_event_indicator = None
+        self._training_event_time = None
+
         self.get_idx_of_nonmissing_targets = get_idx_of_nonmissing_survival_analysis_targets
 
     def __call__(
@@ -130,3 +133,45 @@ class SurvivalAnalysisMetric(SingleTaskMetric, ABC):
         """
         raise NotImplementedError
 
+    @staticmethod
+    def _get_structured_array(
+            event_indicator: np.ndarray,
+            event_time: np.ndarray
+    ) -> np.ndarray:
+        """
+        Returns a structured array with event indicator and event time.
+
+        Parameters
+        ----------
+        event_indicator : np.ndarray
+            (N,) array with event indicator.
+        event_time : np.ndarray
+            (N,) array with event time.
+
+        Returns
+        -------
+        structured_array : np.ndarray
+            (N, 2) structured array with event indicator and event time.
+        """
+        structured_array = np.empty(shape=(len(event_indicator),), dtype=[('event', bool), ('time', float)])
+        structured_array['event'] = event_indicator.astype(bool)
+        structured_array['time'] = event_time
+
+        return structured_array
+
+    def update_censoring_distribution(self, y_train: Union[np.array, Tensor]):
+        """
+        Updates the censoring distribution.
+
+        Parameters
+        ----------
+        y_train : Union[np.array, Tensor]
+            (N, 2) tensor or array containing the event indicator and event time.
+        """
+        y_train = y_train[self.get_idx_of_nonmissing_targets(y_train)]
+        self._training_event_indicator = y_train[:, 0]
+        self._training_event_time = y_train[:, 1]
+
+        if is_tensor(y_train):
+            self._training_event_indicator = self._training_event_indicator.numpy()
+            self._training_event_time = self._training_event_time.numpy()

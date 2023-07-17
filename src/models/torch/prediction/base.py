@@ -130,8 +130,8 @@ class Predictor(TorchModel, ABC):
             assert set(self.features_columns.keys()) == set([t.target_column for t in dataset.tasks.table_tasks]), (
                 "The features columns mapping must contain the same tasks as the dataset."
             )
-            self.map_from_target_col_to_task_name = {t.target_column: t.name for t in dataset.tasks.table_tasks}
 
+        self.map_from_target_col_to_task_name = {t.target_column: t.name for t in dataset.tasks.table_tasks}
         self.predictor = self._build_predictor(dataset)
 
         return self
