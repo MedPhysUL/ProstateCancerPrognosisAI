@@ -1,6 +1,6 @@
 """
     @file:              sequential_net.py
-    @Author:            Maxence Larose
+    @Author:            Maxence Larose, Raphael Brodeur
 
     @Creation Date:     07/2023
     @Last modification: 07/2023

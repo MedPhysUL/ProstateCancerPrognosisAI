@@ -173,7 +173,8 @@ class CNN(Extractor):
             Sequence of integers stating the output channels of each convolutional layer. Can also be given as a string
             containing the sequence.
         strides : Optional[Sequence[int]]
-            Sequence of integers stating the stride (downscale factor) of each convolutional layer. Default to 2.
+            Sequence of integers stating the stride (downscale factor) of each convolutional layer. Has to be the length
+            of channels - 1. Defaults to 2.
         kernel_size : Union[Sequence[int], int]
             Integer or sequence of integers stating size of convolutional kernels.
         num_res_units : int

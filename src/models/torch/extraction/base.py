@@ -1,6 +1,6 @@
 """
     @file:              base.py
-    @Author:            Maxence Larose
+    @Author:            Maxence Larose, Raphael Brodeur
 
     @Creation Date:     04/2022
     @Last modification: 07/2023
