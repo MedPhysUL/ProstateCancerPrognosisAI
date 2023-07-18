@@ -18,7 +18,7 @@ import numpy as np
 from torch import stack, sum, Tensor
 from torch.nn import Conv3d, ConvTranspose3d, Flatten, Identity, Linear, Module, Sequential
 
-from .bt_blocks import BayesianConv3D, BayesianConvTranspose3D, BayesianLinear
+from .bnn import BayesianConv3D, BayesianConvTranspose3D, BayesianLinear
 
 
 class EncoderBlock(Module):
