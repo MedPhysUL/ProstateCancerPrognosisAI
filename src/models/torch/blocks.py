@@ -11,16 +11,14 @@
 from typing import Sequence, Union
 
 import torch
-from bayesian_torch.layers.variational_layers.conv_variational import (
-    Conv3dReparameterization,
-    ConvTranspose3dReparameterization
-)
-from bayesian_torch.layers.variational_layers.linear_variational import LinearReparameterization
+
 from monai.networks.blocks import ADN
 from monai.networks.layers.convutils import same_padding
 import numpy as np
 from torch import stack, sum, Tensor
 from torch.nn import Conv3d, ConvTranspose3d, Flatten, Identity, Linear, Module, Sequential
+
+from .bt_blocks import BayesianConv3D, BayesianConvTranspose3D, BayesianLinear
 
 
 class EncoderBlock(Module):
@@ -369,7 +367,8 @@ class BayesianEncoderBlock(Module):
             prior_mean: float = 0.0,
             prior_variance: float = 0.1,
             posterior_mu_init: float = 0.0,
-            posterior_rho_init: float = -3.0
+            posterior_rho_init: float = -3.0,
+            standard_deviation: float = 0.1
     ):
         """
         Builds the operations used by the bayesian encoder block. Implements variational inference for
@@ -403,6 +402,8 @@ class BayesianEncoderBlock(Module):
         posterior_rho_init : float
             Initial value of the trainable rho parameter representing the sigma (standard deviation) of the Gaussian
             approximate of the posterior distribution.
+        standard_deviation : float
+            Standard deviation of the Gaussian distribution used to sample the weights.
         """
         super().__init__()
 
@@ -415,7 +416,7 @@ class BayesianEncoderBlock(Module):
 
         self.conv.add_module(
             f"conv{i}",
-            Conv3dReparameterization(
+            BayesianConv3D(
                 in_channels=input_channels,
                 out_channels=output_channels,
                 kernel_size=kernel_size,
@@ -424,7 +425,8 @@ class BayesianEncoderBlock(Module):
                 prior_mean=prior_mean,
                 prior_variance=prior_variance,
                 posterior_mu_init=posterior_mu_init,
-                posterior_rho_init=posterior_rho_init
+                posterior_rho_init=posterior_rho_init,
+                standard_deviation=standard_deviation
             )
         )
 
@@ -449,7 +451,7 @@ class BayesianEncoderBlock(Module):
 
                 self.conv.add_module(
                     f"conv{i}",
-                    Conv3dReparameterization(
+                    BayesianConv3D(
                         in_channels=output_channels,
                         out_channels=output_channels,
                         kernel_size=kernel_size,
@@ -458,7 +460,8 @@ class BayesianEncoderBlock(Module):
                         prior_mean=prior_mean,
                         prior_variance=prior_variance,
                         posterior_mu_init=posterior_mu_init,
-                        posterior_rho_init=posterior_rho_init
+                        posterior_rho_init=posterior_rho_init,
+                        standard_deviation=standard_deviation
                     )
                 )
 
@@ -483,7 +486,7 @@ class BayesianEncoderBlock(Module):
                 res_kernel_size = 1
                 res_padding = 0
 
-            self.residual = Conv3dReparameterization(
+            self.residual = BayesianConv3D(
                 in_channels=input_channels,
                 out_channels=output_channels,
                 kernel_size=res_kernel_size,
@@ -492,7 +495,8 @@ class BayesianEncoderBlock(Module):
                 prior_mean=prior_mean,
                 prior_variance=prior_variance,
                 posterior_mu_init=posterior_mu_init,
-                posterior_rho_init=posterior_rho_init
+                posterior_rho_init=posterior_rho_init,
+                standard_deviation=standard_deviation
             )
 
     def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:
@@ -550,6 +554,7 @@ class BayesianDecoderBlock(Module):
             prior_variance: float = 0.1,
             posterior_mu_init: float = 0.0,
             posterior_rho_init: float = -3.0,
+            standard_deviation: float = 0.1
     ):
         """
         Builds the operations used by the bayesian encoder block. Implements variational inference for
@@ -585,6 +590,8 @@ class BayesianDecoderBlock(Module):
         posterior_rho_init : float
             Initial value of the trainable rho parameter representing the sigma (standard deviation) of the Gaussian
             approximate of the posterior distribution.
+        standard_deviation : float
+            Standard deviation of the Gaussian distribution used to sample the weights.
         """
         super().__init__()
 
@@ -597,7 +604,7 @@ class BayesianDecoderBlock(Module):
 
         self.up_conv.add_module(
             "conv_up",
-            ConvTranspose3dReparameterization(
+            BayesianConvTranspose3D(
                 in_channels=input_channels,
                 out_channels=output_channels,
                 kernel_size=kernel_size,
@@ -610,7 +617,8 @@ class BayesianDecoderBlock(Module):
                 prior_mean=prior_mean,
                 prior_variance=prior_variance,
                 posterior_mu_init=posterior_mu_init,
-                posterior_rho_init=posterior_rho_init
+                posterior_rho_init=posterior_rho_init,
+                standard_deviation=standard_deviation
             )
         )
 
@@ -634,7 +642,7 @@ class BayesianDecoderBlock(Module):
 
             self.conv.add_module(
                 'conv',
-                Conv3dReparameterization(
+                BayesianConv3D(
                     in_channels=output_channels,
                     out_channels=output_channels,
                     kernel_size=kernel_size,
@@ -643,7 +651,8 @@ class BayesianDecoderBlock(Module):
                     prior_mean=prior_mean,
                     prior_variance=prior_variance,
                     posterior_mu_init=posterior_mu_init,
-                    posterior_rho_init=posterior_rho_init
+                    posterior_rho_init=posterior_rho_init,
+                    standard_deviation=standard_deviation
                 )
             )
 
@@ -717,7 +726,8 @@ class BayesianFullyConnectedNet(Module):
             bias: bool = True,
             adn_ordering: str = "NDA",
             prior_mean: float = 0.0,
-            prior_variance: float = 0.1
+            prior_variance: float = 0.1,
+            standard_deviation: float = 0.1
     ):
         """
         Builds the bayesian FCN.
@@ -742,6 +752,8 @@ class BayesianFullyConnectedNet(Module):
             Mean of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
         prior_variance : float
             Variance of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
+        standard_deviation : float
+            Standard deviation of the Gaussian distribution used to sample the weights.
         """
         super().__init__()
 
@@ -755,12 +767,13 @@ class BayesianFullyConnectedNet(Module):
 
             layer.add_module(
                 "linear",
-                LinearReparameterization(
+                BayesianLinear(
                     in_features=prev_channels,
                     out_features=channels,
                     prior_mean=prior_mean,
                     prior_variance=prior_variance,
-                    bias=bias
+                    bias=bias,
+                    standard_deviation=standard_deviation
                 )
             )
             layer.add_module(
@@ -777,12 +790,13 @@ class BayesianFullyConnectedNet(Module):
 
             prev_channels = channels
 
-        self.output = LinearReparameterization(
+        self.output = BayesianLinear(
             in_features=prev_channels,
             out_features=out_channels,
             prior_mean=prior_mean,
             prior_variance=prior_variance,
-            bias=bias
+            bias=bias,
+            standard_deviation=standard_deviation
         )
 
     def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:
