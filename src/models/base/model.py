@@ -108,7 +108,8 @@ class Model(Module, ABC):
     @check_if_built
     def fit_breslow_estimators(
             self,
-            dataset: ProstateCancerDataset
+            dataset: ProstateCancerDataset,
+            n_samples: int = 10
     ) -> None:
         """
         Fit all survival analysis tasks' breslow estimators given the training dataset. It is recommended to train the
@@ -118,9 +119,11 @@ class Model(Module, ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
         """
         if dataset.table_dataset:
-            predictions = self.predict_on_dataset(dataset, dataset.train_mask)
+            predictions = self.predict_on_dataset(dataset=dataset, mask=dataset.train_mask, n_samples=n_samples)
             targets = dataset.table_dataset[dataset.train_mask].y
 
             for task in dataset.tasks.survival_analysis_tasks:
@@ -136,7 +139,8 @@ class Model(Module, ABC):
     @abstractmethod
     def fix_thresholds_to_optimal_values(
             self,
-            dataset: ProstateCancerDataset
+            dataset: ProstateCancerDataset,
+            n_samples: int = 10
     ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
@@ -145,6 +149,8 @@ class Model(Module, ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
         """
         raise NotImplementedError
 
@@ -174,7 +180,8 @@ class Model(Module, ABC):
     def predict(
             self,
             features: FeaturesType,
-            probability: bool = True
+            probability: bool = True,
+            n_samples: int = 10
     ) -> TargetsType:
         """
         Returns predictions for all samples in a particular batch, particularly :
@@ -191,6 +198,8 @@ class Model(Module, ABC):
         probability : bool
             Whether to return probability predictions or class predictions for binary classification task predictions.
             Doesn't affect regression, survival and segmentation tasks predictions.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
 
         Returns
         -------
@@ -205,7 +214,8 @@ class Model(Module, ABC):
             self,
             dataset: ProstateCancerDataset,
             mask: List[int],
-            probability: bool = True
+            probability: bool = True,
+            n_samples: int = 10
     ) -> TargetsType:
         """
         Returns predictions for all samples in a particular subset of the dataset, determined using the 'mask'
@@ -226,6 +236,8 @@ class Model(Module, ABC):
         probability : bool
             Whether to return probability predictions or class predictions for binary classification task predictions.
             Doesn't affect regression, survival and segmentation tasks predictions.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
 
         Returns
         -------
@@ -239,7 +251,8 @@ class Model(Module, ABC):
     def compute_score(
             self,
             features: FeaturesType,
-            targets: TargetsType
+            targets: TargetsType,
+            n_samples: int = 10
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns the scores for all samples in a particular batch.
@@ -250,6 +263,8 @@ class Model(Module, ABC):
             Batch data items.
         targets : TargetsType
             Batch data items.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
 
         Returns
         -------
@@ -263,7 +278,8 @@ class Model(Module, ABC):
     def compute_score_on_dataset(
             self,
             dataset: ProstateCancerDataset,
-            mask: List[int]
+            mask: List[int],
+            n_samples: int = 10
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns the score of all samples in a particular subset of the dataset, determined using a mask parameter.
@@ -274,6 +290,8 @@ class Model(Module, ABC):
             A prostate cancer dataset.
         mask : List[int]
             A list of dataset idx for which we want to obtain the mean score.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
 
         Returns
         -------

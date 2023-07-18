@@ -33,6 +33,7 @@ class ModelEvaluator(PredictionEvaluator):
             self,
             model: Model,
             dataset: ProstateCancerDataset,
+            n_samples: int = 10
     ) -> None:
         """
         Sets the required values for the computation of the different metrics.
@@ -43,12 +44,14 @@ class ModelEvaluator(PredictionEvaluator):
             The model with which the predictions will be made.
         dataset : ProstateCancerDataset
             The dataset to input to the model.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
         """
         self.dataset = dataset
         self.model = model
 
         super().__init__(
-            predictions=self.model.predict_on_dataset(dataset=self.dataset),
+            predictions=self.model.predict_on_dataset(dataset=self.dataset, n_samples=n_samples),
             targets=self.dataset.table_dataset.y,
             tasks=self.dataset.tasks,
             breslow_mask=self.dataset.train_mask,
@@ -59,7 +62,8 @@ class ModelEvaluator(PredictionEvaluator):
     def compute_score_on_dataset(
             model: Model,
             dataset: ProstateCancerDataset,
-            mask: Optional[List[int]] = None
+            mask: Optional[List[int]] = None,
+            n_samples: int = 10
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns the score of all samples in a particular subset of the dataset, determined using the mask parameter
@@ -74,6 +78,8 @@ class ModelEvaluator(PredictionEvaluator):
         mask : Optional[List[int]]
             Mask to use when selecting the patients with which the metrics are computed. If no mask is given, all
             patients are used.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
 
         Returns
         -------
@@ -95,7 +101,7 @@ class ModelEvaluator(PredictionEvaluator):
         for features, targets in data_loader:
             features, targets = batch_to_device(features, device), batch_to_device(targets, device)
 
-            predictions = model.predict(features=features)
+            predictions = model.predict(features=features, n_samples=n_samples)
 
             for task in seg_tasks:
                 for metric in task.unique_metrics:
@@ -126,7 +132,8 @@ class ModelEvaluator(PredictionEvaluator):
     def fix_thresholds_to_optimal_values_with_dataset(
             model: Model,
             dataset: ProstateCancerDataset,
-            mask: Optional[List[int]] = None
+            mask: Optional[List[int]] = None,
+            n_samples: int = 10
     ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
@@ -139,6 +146,8 @@ class ModelEvaluator(PredictionEvaluator):
             The dataset to input to the model.
         mask : Optional[List[int]]
             Mask used to specify which patients to use when optimizing the thresholds. Uses train mask by default.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
         """
         if mask is None:
             mask = dataset.train_mask
@@ -156,7 +165,7 @@ class ModelEvaluator(PredictionEvaluator):
         for features, targets in data_loader:
             features, targets = batch_to_device(features, device), batch_to_device(targets, device)
 
-            predictions = model.predict(features)
+            predictions = model.predict(features=features, n_samples=n_samples)
 
             for task in binary_classification_tasks:
                 outputs_dict[task.name].predictions.append(predictions[task.name].item())

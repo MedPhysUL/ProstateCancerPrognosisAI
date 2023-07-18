@@ -139,7 +139,8 @@ class TorchModel(Model, ABC):
     @no_grad()
     def fix_thresholds_to_optimal_values(
             self,
-            dataset: ProstateCancerDataset
+            dataset: ProstateCancerDataset,
+            n_samples: int = 10
     ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
@@ -148,8 +149,10 @@ class TorchModel(Model, ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
         """
-        ModelEvaluator.fix_thresholds_to_optimal_values_with_dataset(model=self, dataset=dataset)
+        ModelEvaluator.fix_thresholds_to_optimal_values_with_dataset(model=self, dataset=dataset, n_samples=n_samples)
 
     @check_if_built
     @evaluation_function
@@ -157,7 +160,8 @@ class TorchModel(Model, ABC):
     def predict(
             self,
             features: FeaturesType,
-            probability: bool = True
+            probability: bool = True,
+            n_samples: int = 10
     ) -> TargetsType:
         """
         Returns predictions for all samples in a particular batch, particularly :
@@ -174,6 +178,8 @@ class TorchModel(Model, ABC):
         probability : bool
             Whether to return probability predictions or class predictions for binary classification task predictions.
             Doesn't affect regression, survival and segmentation tasks predictions.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
 
         Returns
         -------
@@ -182,7 +188,7 @@ class TorchModel(Model, ABC):
         """
         predictions = {}
         features = batch_to_device(features, self.device)
-        outputs = self(features)
+        outputs = stack([self(features) for _ in range(n_samples)]).mean(dim=0) if self.bayesian else self(features)
 
         for task in self._tasks.binary_classification_tasks:
             if probability:
@@ -204,7 +210,8 @@ class TorchModel(Model, ABC):
             self,
             dataset: ProstateCancerDataset,
             mask: Optional[List[int]] = None,
-            probability: bool = True
+            probability: bool = True,
+            n_samples: int = 10
     ) -> Optional[TargetsType]:
         """
         Returns predictions for all samples in a particular subset of the dataset, determined using the 'mask'
@@ -226,6 +233,8 @@ class TorchModel(Model, ABC):
         probability : bool
             Whether to return probability predictions or class predictions for binary classification task predictions.
             Doesn't affect regression, survival and segmentation tasks predictions.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
 
         Returns
         -------
@@ -239,7 +248,7 @@ class TorchModel(Model, ABC):
 
         predictions = {task.name: [] for task in dataset.tasks}
         for features, _ in data_loader:
-            pred = self.predict(features=features, probability=probability)
+            pred = self.predict(features=features, probability=probability, n_samples=n_samples)
 
             for task in dataset.tasks.table_tasks:
                 predictions[task.name].append(pred[task.name])
@@ -254,7 +263,8 @@ class TorchModel(Model, ABC):
     def compute_score(
             self,
             features: FeaturesType,
-            targets: TargetsType
+            targets: TargetsType,
+            n_samples: int = 10
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns the scores for all samples in a particular batch.
@@ -265,13 +275,15 @@ class TorchModel(Model, ABC):
             Batch data items.
         targets : TargetsType
             Batch data items.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
 
         Returns
         -------
         scores : Dict[str, Dict[str, float]]
             Score for each task and each metric.
         """
-        pred = self.predict(features=features)
+        pred = self.predict(features=features, n_samples=n_samples)
 
         scores = {}
         for task in self._tasks:
@@ -286,7 +298,8 @@ class TorchModel(Model, ABC):
     def compute_score_on_dataset(
             self,
             dataset: ProstateCancerDataset,
-            mask: List[int]
+            mask: List[int],
+            n_samples: int = 10
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns the score of all samples in a particular subset of the dataset, determined using a mask parameter.
@@ -297,10 +310,12 @@ class TorchModel(Model, ABC):
             A prostate cancer dataset.
         mask : List[int]
             A list of dataset idx for which we want to obtain the mean score.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
 
         Returns
         -------
         scores : Dict[str, Dict[str, float]]
             Score for each task and each metric.
         """
-        return ModelEvaluator.compute_score_on_dataset(model=self, dataset=dataset, mask=mask)
+        return ModelEvaluator.compute_score_on_dataset(model=self, dataset=dataset, mask=mask, n_samples=n_samples)
