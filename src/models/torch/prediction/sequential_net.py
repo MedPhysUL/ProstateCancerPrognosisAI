@@ -98,7 +98,14 @@ class SequentialNet(Predictor):
         )
 
         self.sequence = sequence
-        self.hidden_channels = literal_eval(hidden_channels) if isinstance(hidden_channels, str) else hidden_channels
+
+        if isinstance(hidden_channels, Mapping):
+            self.hidden_channels = {t: literal_eval(c) if isinstance(c, str) else c for t, c in hidden_channels.items()}
+        elif isinstance(hidden_channels, str):
+            self.hidden_channels = literal_eval(hidden_channels)
+        else:
+            self.hidden_channels = hidden_channels
+
         self.activation = activation
         self.dropout = dropout
         self.bias = bias
