@@ -1,16 +1,16 @@
 """
     @file:              base.py
-    @Author:            Maxence Larose
+    @Author:            Maxence Larose, Raphael Brodeur
 
     @Creation Date:     03/2022
-    @Last modification: 04/2023
+    @Last modification: 07/2023
 
     @Description:       This file is used to define an abstract 'Segmentor' model.
 """
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Optional, Sequence, Union
+from typing import Dict, Optional, Sequence, Union
 
 from torch import cat, Tensor
 from torch import device as torch_device
@@ -31,7 +31,8 @@ class Segmentor(TorchModel, ABC):
             image_keys: Union[str, Sequence[str]],
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
-            seed: Optional[int] = None
+            seed: Optional[int] = None,
+            bayesian: bool = False
     ):
         """
         Initializes the model.
@@ -47,13 +48,15 @@ class Segmentor(TorchModel, ABC):
         seed : Optional[int]
             Random state used for reproducibility.
         """
-        super().__init__(device=device, name=name, seed=seed)
+        super().__init__(device=device, name=name, seed=seed, bayesian=bayesian)
 
         self.image_keys = [image_keys] if isinstance(image_keys, str) else image_keys
-        self.segmentor = None
+        self.segmentor: Optional[Module] = None
+
+        self.kl_divergence: Optional[Dict[str, Tensor]] = None
 
     @abstractmethod
-    def _build_segmentor(self, dataset) -> Module:
+    def _build_segmentor(self, dataset: ProstateCancerDataset) -> Module:
         """
         Returns the segmentor module.
 
@@ -90,10 +93,7 @@ class Segmentor(TorchModel, ABC):
         return self
 
     @check_if_built
-    def forward(
-            self,
-            features: FeaturesType
-    ) -> Union[Tensor, TargetsType]:
+    def forward(self, features: FeaturesType) -> Union[Tensor, TargetsType]:
         """
         Performs a forward pass.
 
@@ -104,8 +104,18 @@ class Segmentor(TorchModel, ABC):
 
         Returns
         -------
-        targets : Union[Tensor, TargetsType]
+        segmentations : Union[Tensor, TargetsType]
             The targets of the forward pass.
         """
-        segmentation = self.segmentor(cat([features.image[k] for k in self.image_keys], 1))
-        return {task.name: segmentation[:, i, None] for i, task in enumerate(self._tasks.segmentation_tasks)}
+        if self.bayesian:
+            y, kl = self.segmentor(cat([features.image[k] for k in self.image_keys], 1))
+
+            kl_divergence = {task.name: kl for task in self._tasks.segmentation_tasks}
+            self.kl_divergence = kl_divergence
+
+        else:
+            y = self.segmentor(cat([features.image[k] for k in self.image_keys], 1))
+
+        segmentations = {task.name: y[:, i, None] for i, task in enumerate(self._tasks.segmentation_tasks)}
+
+        return segmentations

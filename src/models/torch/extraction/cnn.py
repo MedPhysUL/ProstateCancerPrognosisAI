@@ -173,7 +173,8 @@ class CNN(Extractor):
             Sequence of integers stating the output channels of each convolutional layer. Can also be given as a string
             containing the sequence.
         strides : Optional[Sequence[int]]
-            Sequence of integers stating the stride (downscale factor) of each convolutional layer. Default to 2.
+            Sequence of integers stating the stride (downscale factor) of each convolutional layer. Has to be the length
+            of channels - 1. Defaults to 2.
         kernel_size : Union[Sequence[int], int]
             Integer or sequence of integers stating size of convolutional kernels.
         num_res_units : int
@@ -281,10 +282,7 @@ class CNN(Extractor):
                 out_channels=c,
                 strides=1 if i == len(self.channels) - 1 else self.strides[i],
             )
-            conv_sequence.add_module(
-                name="conv_%i" % i,
-                module=DataParallel(layer).to(self.device)
-            )
+            conv_sequence.add_module(name="conv_%i" % i, module=layer)
 
         return conv_sequence
 
@@ -307,4 +305,6 @@ class CNN(Extractor):
         """
         conv_sequence = self._get_conv_sequence()
 
-        return _Encoder(conv_sequence=conv_sequence, bayesian=self.bayesian)
+        cnn = _Encoder(conv_sequence=conv_sequence, bayesian=self.bayesian)
+
+        return DataParallel(cnn).to(self.device)

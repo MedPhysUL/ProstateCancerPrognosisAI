@@ -193,7 +193,8 @@ class UNEXtractor(Extractor):
             Sequence of integers stating the output channels of each convolutional layer. Can also be given as a string
             containing the sequence.
         strides : Optional[Sequence[int]]
-            Sequence of integers stating the stride (downscale factor) of each convolutional layer. Default to 2.
+            Sequence of integers stating the stride (downscale factor) of each convolutional layer. Has to be the length
+            of channels - 1. Defaults to 2.
         kernel_size : Union[int, Sequence[int]]
             Integer or sequence of integers stating size of convolutional kernels.
         num_res_units : int
@@ -274,10 +275,7 @@ class UNEXtractor(Extractor):
                     dropout=self.dropout_cnn
                 )
 
-            enc.add_module(
-                name=f"conv{i}",
-                module=DataParallel(conv).to(self.device)
-            )
+            enc.add_module(name=f"conv{i}", module=conv)
 
             encoders["bottom" if i == len(self.channels) - 1 else f"layer{i}"] = enc
 
@@ -323,10 +321,7 @@ class UNEXtractor(Extractor):
                         is_top=True if i == 0 else False
                     )
 
-                dec.add_module(
-                    name=f"up_conv{i}",
-                    module=DataParallel(up_conv).to(self.device)
-                )
+                dec.add_module(name=f"up_conv{i}", module=up_conv)
 
                 decoders[f"layer{i}"] = dec
 
@@ -353,8 +348,10 @@ class UNEXtractor(Extractor):
             "UNEXtractor requires at least one segmentation task. Found none."
         )
 
-        return _UNet(
+        unet = _UNet(
             encoders=self._get_encoders_dict(),
             decoders=self._get_decoders_dict(),
             bayesian=self.bayesian
         )
+
+        return DataParallel(unet).to(self.device)
