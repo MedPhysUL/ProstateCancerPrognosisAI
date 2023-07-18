@@ -188,7 +188,13 @@ class TorchModel(Model, ABC):
         """
         predictions = {}
         features = batch_to_device(features, self.device)
-        outputs = stack([self(features) for _ in range(n_samples)]).mean(dim=0) if self.bayesian else self(features)
+
+        if self.bayesian:
+            multi_outputs = [self(features) for _ in range(n_samples)]
+            keys = list(multi_outputs[0].keys())
+            outputs = {k: stack([output[k] for output in multi_outputs], dim=0).mean(dim=0) for k in keys}
+        else:
+            outputs = self(features)
 
         for task in self._tasks.binary_classification_tasks:
             if probability:
