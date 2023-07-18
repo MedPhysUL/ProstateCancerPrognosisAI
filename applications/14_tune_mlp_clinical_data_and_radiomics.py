@@ -186,14 +186,14 @@ if __name__ == '__main__':
             # checkpoint=CheckpointHyperparameter(save_freq=20)
         )
 
-        train_methode_hyperparameter = TrainMethodHyperparameter(
+        train_method_hyperparameter = TrainMethodHyperparameter(
             model=model_hyperparameter,
             learning_algorithms=learning_algorithm_hyperparameter
         )
 
         objective = TorchObjective(
             trainer_hyperparameter=trainer_hyperparameter,
-            train_method_hyperparameter=train_methode_hyperparameter
+            train_method_hyperparameter=train_method_hyperparameter
         )
 
         masks = extract_masks(MASKS_PATH, k=5, l=5)
