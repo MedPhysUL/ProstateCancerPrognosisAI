@@ -282,10 +282,7 @@ class CNN(Extractor):
                 out_channels=c,
                 strides=1 if i == len(self.channels) - 1 else self.strides[i],
             )
-            conv_sequence.add_module(
-                name="conv_%i" % i,
-                module=DataParallel(layer).to(self.device)
-            )
+            conv_sequence.add_module(name="conv_%i" % i, module=layer)
 
         return conv_sequence
 
@@ -308,4 +305,6 @@ class CNN(Extractor):
         """
         conv_sequence = self._get_conv_sequence()
 
-        return _Encoder(conv_sequence=conv_sequence, bayesian=self.bayesian)
+        cnn = _Encoder(conv_sequence=conv_sequence, bayesian=self.bayesian)
+
+        return DataParallel(cnn).to(self.device)

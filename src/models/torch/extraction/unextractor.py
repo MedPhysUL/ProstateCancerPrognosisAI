@@ -275,10 +275,7 @@ class UNEXtractor(Extractor):
                     dropout=self.dropout_cnn
                 )
 
-            enc.add_module(
-                name=f"conv{i}",
-                module=DataParallel(conv).to(self.device)
-            )
+            enc.add_module(name=f"conv{i}", module=conv)
 
             encoders["bottom" if i == len(self.channels) - 1 else f"layer{i}"] = enc
 
@@ -324,10 +321,7 @@ class UNEXtractor(Extractor):
                         is_top=True if i == 0 else False
                     )
 
-                dec.add_module(
-                    name=f"up_conv{i}",
-                    module=DataParallel(up_conv).to(self.device)
-                )
+                dec.add_module(name=f"up_conv{i}", module=up_conv)
 
                 decoders[f"layer{i}"] = dec
 
@@ -354,8 +348,10 @@ class UNEXtractor(Extractor):
             "UNEXtractor requires at least one segmentation task. Found none."
         )
 
-        return _UNet(
+        unet = _UNet(
             encoders=self._get_encoders_dict(),
             decoders=self._get_decoders_dict(),
             bayesian=self.bayesian
         )
+
+        return DataParallel(unet).to(self.device)

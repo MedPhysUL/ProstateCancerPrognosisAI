@@ -128,10 +128,7 @@ class _UNet(Module):
                     dropout=self.dropout
                 )
 
-            enc.add_module(
-                name=f"conv{i}",
-                module=DataParallel(conv).to(self.device)
-            )
+            enc.add_module(name=f"conv{i}", module=conv)
 
             encoders["bottom" if i == len(self.channels) - 1 else f"layer{i}"] = enc
 
@@ -177,10 +174,7 @@ class _UNet(Module):
                         is_top=True if i == 0 else False
                     )
 
-                dec.add_module(
-                    name=f"up_conv{i}",
-                    module=DataParallel(up_conv).to(self.device)
-                )
+                dec.add_module(name=f"up_conv{i}", module=up_conv)
 
                 decoders[f"layer{i}"] = dec
 
@@ -369,6 +363,4 @@ class Unet(Segmentor):
             bayesian=self.bayesian
         )
 
-        unet = DataParallel(unet)   # TODO -- UNET DANS DATAPARALLEL ?! JE METTAIS LE DATAPARALLEL A CHAQUE MODULE MOI
-
-        return unet.to(self.device)
+        return DataParallel(unet).to(self.device)
