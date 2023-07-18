@@ -129,9 +129,7 @@ class MLP(Predictor):
                 adn_ordering=self.adn_ordering
             )
 
-        fcn = DataParallel(fcn)
-
-        return fcn.to(self.device)
+        return DataParallel(fcn).to(self.device)
 
     def _get_in_channels(self, target_column: str) -> int:
         """

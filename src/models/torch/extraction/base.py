@@ -1,6 +1,6 @@
 """
     @file:              base.py
-    @Author:            Maxence Larose
+    @Author:            Maxence Larose, Raphael Brodeur
 
     @Creation Date:     04/2022
     @Last modification: 07/2023
@@ -250,17 +250,16 @@ class Extractor(TorchModel, ABC):
             The Linear Module used for prediction.
         """
         if self.bayesian:
-            return DataParallel(
-                LinearReparameterization(
-                    in_features=in_features,
-                    out_features=out_features,
-                    prior_mean=0.0,
-                    prior_variance=0.1
-                )
-            ).to(self.device)
-
+            linear = LinearReparameterization(
+                in_features=in_features,
+                out_features=out_features,
+                prior_mean=0.0,
+                prior_variance=0.1
+            )
         else:
-            return DataParallel(Linear(in_features=in_features, out_features=out_features)).to(self.device)
+            linear = Linear(in_features=in_features, out_features=out_features)
+
+        return DataParallel(linear).to(self.device)
 
     def _build_prediction_layer(self) -> Union[Module, ModuleDict]:
         """

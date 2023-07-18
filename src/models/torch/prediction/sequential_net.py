@@ -1,6 +1,6 @@
 """
     @file:              sequential_net.py
-    @Author:            Maxence Larose
+    @Author:            Maxence Larose, Raphael Brodeur
 
     @Creation Date:     07/2023
     @Last modification: 07/2023
@@ -175,9 +175,8 @@ class SequentialNet(Predictor):
                 bias=self.bias,
                 adn_ordering=self.adn_ordering
             )
-        fully_connected_net = DataParallel(fully_connected_net)
 
-        return fully_connected_net.to(self.device)
+        return DataParallel(fully_connected_net).to(self.device)
 
     def _get_dropout(self, target_column: str) -> float:
         """
