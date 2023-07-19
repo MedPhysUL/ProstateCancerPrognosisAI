@@ -54,6 +54,10 @@ _AUTOMATIC_RADIOMICS_PATH = os.path.join(_RADIOMICS_PATH, "automatic")
 AUTOMATIC_EXTRACTED_RADIOMICS_PATH = os.path.join(_AUTOMATIC_RADIOMICS_PATH, "extracted")
 AUTOMATIC_FILTERED_RADIOMICS_PATH = os.path.join(_AUTOMATIC_RADIOMICS_PATH, "filtered")
 AUTOMATIC_RADIOMICS_MODELS_PATH = os.path.join(_AUTOMATIC_RADIOMICS_PATH, "models")
+_AUTOMATIC_BAYESIAN_RADIOMICS_PATH = os.path.join(_RADIOMICS_PATH, "automatic_bayesian")
+AUTOMATIC_BAYESIAN_EXTRACTED_RADIOMICS_PATH = os.path.join(_AUTOMATIC_RADIOMICS_PATH, "extracted")
+AUTOMATIC_BAYESIAN_FILTERED_RADIOMICS_PATH = os.path.join(_AUTOMATIC_RADIOMICS_PATH, "filtered")
+AUTOMATIC_BAYESIAN_RADIOMICS_MODELS_PATH = os.path.join(_AUTOMATIC_RADIOMICS_PATH, "models")
 _DEEP_RADIOMICS_PATH = os.path.join(_RADIOMICS_PATH, "deep")
 DEEP_FILTERED_RADIOMICS_PATH = os.path.join(_DEEP_RADIOMICS_PATH, "filtered")
 _MANUAL_RADIOMICS_PATH = os.path.join(_RADIOMICS_PATH, "manual")
@@ -113,7 +117,7 @@ BCR_TASK = SurvivalAnalysisTask(
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
     evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()],
-    temperature=1e-7
+    temperature=1e-2
 )
 CRPC_TASK = SurvivalAnalysisTask(
     event_indicator_column=CRPC,
@@ -121,7 +125,7 @@ CRPC_TASK = SurvivalAnalysisTask(
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
     evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()],
-    temperature=1e-7
+    temperature=1e-2
 )
 DEATH_TASK = SurvivalAnalysisTask(
     event_indicator_column=DEATH,
@@ -129,7 +133,7 @@ DEATH_TASK = SurvivalAnalysisTask(
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
     evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()],
-    temperature=1e-7
+    temperature=1e-2
 )
 HTX_TASK = SurvivalAnalysisTask(
     event_indicator_column=HTX,
@@ -137,7 +141,7 @@ HTX_TASK = SurvivalAnalysisTask(
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
     evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()],
-    temperature=1e-7
+    temperature=1e-2
 )
 METASTASIS_TASK = SurvivalAnalysisTask(
     event_indicator_column=METASTASIS,
@@ -145,7 +149,7 @@ METASTASIS_TASK = SurvivalAnalysisTask(
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
     evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()],
-    temperature=1e-7
+    temperature=1e-2
 )
 PN_TASK = BinaryClassificationTask(
     target_column=PN,
@@ -153,7 +157,7 @@ PN_TASK = BinaryClassificationTask(
     hps_tuning_metric=AUC(),
     evaluation_metrics=[Sensitivity(), Specificity()],
     criterion=BCEWithLogitsLoss(),
-    temperature=1e-7
+    temperature=1e-2
 )
 
 PREDICTOR_CLIP_GRAD_MAX_NORM_DICT = {BCR: 3.0, CRPC: 3.0, DEATH: 1.0, HTX: 3.0, METASTASIS: 2.0, PN: 3.0}
@@ -173,7 +177,7 @@ PROSTATE_SEGMENTATION_TASK = SegmentationTask(
     evaluation_metrics=DiceMetric(),
     organ="Prostate",
     modality="CT",
-    temperature=1e-7
+    temperature=1e-2
 )
 
 IMAGE_TASKS = [PROSTATE_SEGMENTATION_TASK]
