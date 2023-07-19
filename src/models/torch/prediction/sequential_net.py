@@ -55,7 +55,12 @@ class SequentialNet(Predictor):
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None,
-            bayesian: bool = False
+            bayesian: bool = False,
+            prior_mean: float = 0.0,
+            prior_variance: float = 0.1,
+            posterior_mu_init: float = 0.0,
+            posterior_rho_init: float = -3.0,
+            standard_deviation: float = 0.1
     ):
         """
         Initializes the model.
@@ -87,6 +92,18 @@ class SequentialNet(Predictor):
             Random state used for reproducibility. Defaults to None.
         bayesian : bool
             Whether the model should implement variational inference.
+        prior_mean : float
+            Mean of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
+        prior_variance : float
+            Prior variance used to calculate KL divergence.
+        posterior_mu_init : float
+            Initial value of the trainable mu parameter representing the mean of the Gaussian approximate of the
+            posterior distribution.
+        posterior_rho_init : float
+            Rho parameter for reparametrization for the initial posterior distribution.
+        standard_deviation : float
+            Standard deviation of the gaussian distribution used to sample the initial posterior mu and initial
+            posterior rho for the gaussian distribution from which the initial weights are sampled.
         """
         super().__init__(
             features_columns=features_columns,
@@ -110,6 +127,12 @@ class SequentialNet(Predictor):
         self.dropout = dropout
         self.bias = bias
         self.adn_ordering = adn_ordering
+
+        self.prior_mean = prior_mean
+        self.prior_variance = prior_variance
+        self.posterior_mu_init = posterior_mu_init
+        self.posterior_rho_init = posterior_rho_init
+        self.standard_deviation = standard_deviation
 
         self._blocks: Optional[List[_Block]] = None
         self.predictor = None
@@ -170,7 +193,12 @@ class SequentialNet(Predictor):
                 dropout=dropout,
                 act=self.activation,
                 bias=self.bias,
-                adn_ordering=self.adn_ordering
+                adn_ordering=self.adn_ordering,
+                prior_mean=self.prior_mean,
+                prior_variance=self.prior_variance,
+                posterior_mu_init=self.posterior_mu_init,
+                posterior_rho_init=self.posterior_rho_init,
+                standard_deviation=self.standard_deviation
             )
         else:
             fully_connected_net = FullyConnectedNet(
