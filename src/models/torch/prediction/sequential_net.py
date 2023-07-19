@@ -13,7 +13,7 @@ from ast import literal_eval
 from typing import Dict, List, Mapping, NamedTuple, Optional, Sequence, Tuple, Union
 
 from torch import device as torch_device
-from torch import cat, stack, Tensor
+from torch import cat, stack, sum, Tensor
 from torch.nn import DataParallel, Module, ModuleDict
 
 from .base import MultiTaskMode, Predictor
@@ -41,7 +41,7 @@ class SequentialNet(Predictor):
     A SequentialNet model. The model can also be used to perform table tasks.
     """
 
-    _ADDITIONAL_INPUTS_PER_BLOCKS = {0: [], 1: [0], 2: [0], 3: [1], 4: [3], 5: [2, 4]}
+    _ADDITIONAL_INPUTS_PER_BLOCKS = {0: [], 1: [0], 2: [0], 3: [0, 1], 4: [0, 1, 3], 5: [0, 1, 2, 3, 4]}
 
     def __init__(
             self,
@@ -335,6 +335,33 @@ class SequentialNet(Predictor):
 
         return predictor_input
 
+    def _get_kl_divergence(
+            self,
+            base_kl: Tensor,
+            block: _Block,
+            kl_divergence: Dict[str, Tensor]
+    ) -> Tensor:
+        """
+        Returns the KL divergence.
+
+        Parameters
+        ----------
+        base_kl : Tensor
+            The base KL divergence.
+        block : _Block
+            The current SequentialNet block.
+        kl_divergence : Dict[str, Tensor]
+            Previous prediction iteration KL divergences.
+
+        Returns
+        -------
+        kl_divergence : Tensor
+            The KL divergence.
+        """
+        kl_list = [kl_divergence[self.map_from_target_col_to_task_name[c]] for c in block.input_target_columns]
+
+        return sum(stack([base_kl, *kl_list]))
+
     def _get_prediction(self, table_data: Union[Tensor, Dict[str, Tensor]]) -> Union[Dict[str, Tensor], tuple]:
         """
         Returns the prediction.
@@ -360,7 +387,7 @@ class SequentialNet(Predictor):
 
                 y, kl = self.predictor[task_name](predictor_input)
                 output[task_name] = y[:, 0]
-                kl_divergence[task_name] = kl
+                kl_divergence[task_name] = self._get_kl_divergence(base_kl=kl, block=block, kl_divergence=kl_divergence)
 
             return output, kl_divergence
 
