@@ -348,6 +348,50 @@ class FullyConnectedNet(Sequential):
         self.add_module("output", Linear(in_features=prev_channels, out_features=out_channels, bias=bias))
 
 
+class SingleLayerLinear(Module):
+    """
+    A class that defines a single linear layer of a Fully Connected Network.
+    """
+
+    def __init__(
+            self,
+            in_features: int,
+            out_features: int,
+            bias: bool = True
+    ):
+        """
+        Initializes the block.
+
+        Parameters
+        ----------
+        in_features : int
+            Number of input features.
+        out_features : int
+            Number of output features.
+        bias : bool
+            Whether a bias is applied.
+        """
+        super().__init__()
+
+        self.linear = Linear(in_features=in_features, out_features=out_features, bias=bias)
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Forward pass.
+
+        Parameters
+        ----------
+        x : Tensor
+            The input tensor.
+
+        Returns
+        -------
+        output : Tensor
+            The output tensor.
+        """
+        return self.linear(x)
+
+
 class BayesianEncoderBlock(Module):
     """
     A class that contains a bayesian encoder block used for segmentation models. It implements variational inference for
@@ -403,7 +447,8 @@ class BayesianEncoderBlock(Module):
             Initial value of the trainable rho parameter representing the sigma (standard deviation) of the Gaussian
             approximate of the posterior distribution.
         standard_deviation : float
-            Standard deviation of the Gaussian distribution used to sample the weights.
+            Standard deviation of the gaussian distribution used to sample the initial posterior mu and initial
+            posterior rho of the gaussian distribution from which the initial weights are sampled.
         """
         super().__init__()
 
@@ -591,7 +636,8 @@ class BayesianDecoderBlock(Module):
             Initial value of the trainable rho parameter representing the sigma (standard deviation) of the Gaussian
             approximate of the posterior distribution.
         standard_deviation : float
-            Standard deviation of the Gaussian distribution used to sample the weights.
+            Standard deviation of the gaussian distribution used to sample the initial posterior mu and initial
+            posterior rho of the gaussian distribution from which the initial weights are sampled.
         """
         super().__init__()
 
@@ -727,6 +773,8 @@ class BayesianFullyConnectedNet(Module):
             adn_ordering: str = "NDA",
             prior_mean: float = 0.0,
             prior_variance: float = 0.1,
+            posterior_mu_init: float = 0.0,
+            posterior_rho_init: float = -3.0,
             standard_deviation: float = 0.1
     ):
         """
@@ -752,8 +800,15 @@ class BayesianFullyConnectedNet(Module):
             Mean of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
         prior_variance : float
             Variance of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
+        posterior_mu_init : float
+            Initial value of the trainable mu parameter representing the mean of the Gaussian approximate of the
+            posterior distribution.
+        posterior_rho_init : float
+            Initial value of the trainable rho parameter representing the sigma (standard deviation) of the Gaussian
+            approximate of the posterior distribution.
         standard_deviation : float
-            Standard deviation of the Gaussian distribution used to sample the weights.
+            Standard deviation of the gaussian distribution used to sample the initial posterior mu and initial
+            posterior rho of the gaussian distribution from which the initial weights are sampled.
         """
         super().__init__()
 
@@ -772,6 +827,8 @@ class BayesianFullyConnectedNet(Module):
                     out_features=channels,
                     prior_mean=prior_mean,
                     prior_variance=prior_variance,
+                    posterior_mu_init=posterior_mu_init,
+                    posterior_rho_init=posterior_rho_init,
                     bias=bias,
                     standard_deviation=standard_deviation
                 )
@@ -830,3 +887,72 @@ class BayesianFullyConnectedNet(Module):
         kl_list.append(kl)
 
         return x, sum(stack(kl_list))
+
+
+class BayesianSingleLayerLinear(Module):
+    """
+    A class that defines a bayesian single linear layer of a Fully Connected Network.
+    """
+
+    def __init__(
+            self,
+            in_features: int,
+            out_features: int,
+            bias: bool = True,
+            prior_mean: float = 0.0,
+            prior_variance: float = 0.1,
+            posterior_mu_init: float = 0.0,
+            posterior_rho_init: float = -3.0,
+            standard_deviation: float = 0.1
+    ):
+        """
+        Initializes the block.
+
+        Parameters
+        ----------
+        in_features : int
+            Number of input features.
+        out_features : int
+            Number of output features.
+        bias : bool
+            Whether a bias is applied.
+        prior_mean : float
+            Prior mean used to calculate KL divergence.
+        prior_variance : float
+            Prior variance used to calculate KL divergence.
+        posterior_mu_init : float
+            Mu parameter of initial posterior distribution.
+        posterior_rho_init : float
+            Rho parameter for reparametrization for the initial posterior distribution.
+        standard_deviation : float
+            Standard deviation of the gaussian distribution used to sample the initial posterior mu and initial
+            posterior rho of the gaussian distribution from which the initial weights are sampled.
+        """
+        super().__init__()
+
+        self.linear = BayesianLinear(
+            in_features=in_features,
+            out_features=out_features,
+            bias=bias,
+            prior_mean=prior_mean,
+            prior_variance=prior_variance,
+            posterior_mu_init=posterior_mu_init,
+            posterior_rho_init=posterior_rho_init,
+            standard_deviation=standard_deviation
+        )
+
+    def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:
+        """
+        Defines the forward method.
+
+        Parameters
+        ----------
+        x : Tensor
+            The input Tensor.
+
+        Returns
+        -------
+        output : tuple[Tensor, Tensor]
+            A tuple containing the transformed tensor and the KL divergence.
+        """
+        return self.linear(x)

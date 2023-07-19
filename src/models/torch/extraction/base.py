@@ -14,13 +14,12 @@ from ast import literal_eval
 from enum import auto, StrEnum
 from typing import Dict, List, Optional, NamedTuple, Sequence, Union
 
-from bayesian_torch.layers.variational_layers.linear_variational import LinearReparameterization
 from torch import cat, Tensor
 from torch import device as torch_device
 from torch.nn import DataParallel, Linear, Module, ModuleDict
 
 from ..base import check_if_built, TorchModel
-from ..blocks import BayesianFullyConnectedNet, FullyConnectedNet
+from ..blocks import BayesianFullyConnectedNet, BayesianSingleLayerLinear, FullyConnectedNet, SingleLayerLinear
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ....tasks import SegmentationTask
 
@@ -93,7 +92,12 @@ class Extractor(TorchModel, ABC):
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None,
-            bayesian: bool = False
+            bayesian: bool = False,
+            prior_mean: float = 0.0,
+            prior_variance: float = 0.1,
+            posterior_mu_init: float = 0.0,
+            posterior_rho_init: float = -3.0,
+            standard_deviation: float = 0.1
     ):
         """
         Initializes the model.
@@ -129,6 +133,18 @@ class Extractor(TorchModel, ABC):
             Random state used for reproducibility.
         bayesian : bool
             Whether the model implements variational inference.
+        prior_mean : float
+            Mean of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
+        prior_variance : float
+            Prior variance used to calculate KL divergence.
+        posterior_mu_init : float
+            Initial value of the trainable mu parameter representing the mean of the Gaussian approximate of the
+            posterior distribution.
+        posterior_rho_init : float
+            Rho parameter for reparametrization for the initial posterior distribution.
+        standard_deviation : float
+            Standard deviation of the gaussian distribution used to sample the initial posterior mu and initial
+            posterior rho for the gaussian distribution from which the initial weights are sampled.
         """
         super().__init__(device=device, name=name, seed=seed, bayesian=bayesian)
 
@@ -144,6 +160,12 @@ class Extractor(TorchModel, ABC):
             self.hidden_channels_fnn = hidden_channels_fnn
         else:
             self.hidden_channels_fnn = (int(sum(self.channels)/4), int(sum(self.channels)/16))
+
+        self.prior_mean = prior_mean
+        self.prior_variance = prior_variance
+        self.posterior_mu_init = posterior_mu_init
+        self.posterior_rho_init = posterior_rho_init
+        self.standard_deviation = standard_deviation
 
         self.extractor: Optional[Module] = None
         self.linear_module: Optional[Union[Module, ModuleDict]] = None
@@ -198,7 +220,12 @@ class Extractor(TorchModel, ABC):
                 out_channels=self.n_features,
                 hidden_channels=self.hidden_channels_fnn,
                 dropout=self.dropout_fnn,
-                act=self.activation
+                act=self.activation,
+                prior_mean=self.prior_mean,
+                prior_variance=self.prior_variance,
+                posterior_mu_init=self.posterior_mu_init,
+                posterior_rho_init=self.posterior_rho_init,
+                standard_deviation=self.standard_deviation
             )
 
         else:
@@ -250,14 +277,17 @@ class Extractor(TorchModel, ABC):
             The Linear Module used for prediction.
         """
         if self.bayesian:
-            linear = LinearReparameterization(
+            linear = BayesianSingleLayerLinear(
                 in_features=in_features,
                 out_features=out_features,
-                prior_mean=0.0,
-                prior_variance=0.1
+                prior_mean=self.prior_mean,
+                prior_variance=self.prior_variance,
+                posterior_mu_init=self.posterior_mu_init,
+                posterior_rho_init=self.posterior_rho_init,
+                standard_deviation=self.standard_deviation
             )
         else:
-            linear = Linear(in_features=in_features, out_features=out_features)
+            linear = SingleLayerLinear(in_features=in_features, out_features=out_features)
 
         return DataParallel(linear).to(self.device)
 

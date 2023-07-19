@@ -150,7 +150,12 @@ class CNN(Extractor):
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None,
-            bayesian: bool = False
+            bayesian: bool = False,
+            prior_mean: float = 0.0,
+            prior_variance: float = 0.1,
+            posterior_mu_init: float = 0.0,
+            posterior_rho_init: float = -3.0,
+            standard_deviation: float = 0.1
     ):
         """
         Initializes the model.
@@ -197,6 +202,18 @@ class CNN(Extractor):
             Random state used for reproducibility.
         bayesian : bool
             Whether the model implements variational inference.
+        prior_mean : float
+            Mean of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
+        prior_variance : float
+            Prior variance used to calculate KL divergence.
+        posterior_mu_init : float
+            Initial value of the trainable mu parameter representing the mean of the Gaussian approximate of the
+            posterior distribution.
+        posterior_rho_init : float
+            Rho parameter for reparametrization for the initial posterior distribution.
+        standard_deviation : float
+            Standard deviation of the gaussian distribution used to sample the initial posterior mu and initial
+            posterior rho for the gaussian distribution from which the initial weights are sampled.
         """
         super().__init__(
             image_keys=image_keys,
@@ -210,7 +227,12 @@ class CNN(Extractor):
             device=device,
             name=name,
             seed=seed,
-            bayesian=bayesian
+            bayesian=bayesian,
+            prior_mean=prior_mean,
+            prior_variance=prior_variance,
+            posterior_mu_init=posterior_mu_init,
+            posterior_rho_init=posterior_rho_init,
+            standard_deviation=standard_deviation
         )
 
         self.strides = strides if strides else [2] * (len(self.channels) - 1)
@@ -218,6 +240,12 @@ class CNN(Extractor):
         self.num_res_units = num_res_units
         self.norm = norm
         self.dropout_cnn = dropout_cnn
+
+        self.prior_mean = prior_mean
+        self.prior_variance = prior_variance
+        self.posterior_mu_init = posterior_mu_init
+        self.posterior_rho_init = posterior_rho_init
+        self.standard_deviation = standard_deviation
 
     def __get_layer(
             self,
@@ -251,7 +279,12 @@ class CNN(Extractor):
                 stride=strides,
                 act=self.activation,
                 norm=self.norm,
-                dropout=self.dropout_cnn
+                dropout=self.dropout_cnn,
+                prior_mean=self.prior_mean,
+                prior_variance=self.prior_variance,
+                posterior_mu_init=self.posterior_mu_init,
+                posterior_rho_init=self.posterior_rho_init,
+                standard_deviation=self.standard_deviation
             )
 
         else:

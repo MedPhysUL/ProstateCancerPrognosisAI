@@ -29,11 +29,11 @@ class BayesianConv3D(Conv3dReparameterization):
             prior_variance: float,
             posterior_mu_init: float,
             posterior_rho_init: float,
-            stride=1,
-            padding=0,
-            dilation=1,
-            groups=1,
-            bias=True,
+            stride: int = 1,
+            padding: int = 0,
+            dilation: int = 1,
+            groups: int = 1,
+            bias: bool = True,
             standard_deviation: float = 0.1
     ):
         """
@@ -46,7 +46,7 @@ class BayesianConv3D(Conv3dReparameterization):
         out_channels : int
             Number of channels produced by the convolution.
         kernel_size : int
-            Size of the convolving kernel.
+            Size of the convolution kernel.
         prior_mean : float
             Mean of the prior arbitrary distribution to be used on the complexity cost.
         prior_variance : float
@@ -66,7 +66,8 @@ class BayesianConv3D(Conv3dReparameterization):
         bias : bool
             If set to False, the layer will not learn an additive bias. Default: True.
         standard_deviation : float
-            Standard deviation of the gaussian distribution used to initialize the weights.
+            Standard deviation of the gaussian distribution used to sample the initial posterior mu and initial
+            posterior rho of the gaussian distribution from which the initial weights are sampled.
         """
         self.standard_deviation = standard_deviation
 
@@ -110,19 +111,19 @@ class BayesianConvTranspose3D(ConvTranspose3dReparameterization):
 
     def __init__(
             self,
-            in_channels,
-            out_channels,
-            kernel_size,
-            stride=1,
-            padding=0,
-            dilation=1,
-            groups=1,
-            output_padding=0,
-            prior_mean=0,
-            prior_variance=1,
-            posterior_mu_init=0,
-            posterior_rho_init=-3.0,
-            bias=True,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            stride: int = 1,
+            padding: int = 0,
+            dilation: int = 1,
+            groups: int = 1,
+            output_padding: int = 0,
+            prior_mean: float = 0.0,
+            prior_variance: float = 1.0,
+            posterior_mu_init: float = 0.0,
+            posterior_rho_init: float = -3.0,
+            bias: bool = True,
             standard_deviation: float = 0.1
     ):
         """
@@ -156,8 +157,10 @@ class BayesianConvTranspose3D(ConvTranspose3dReparameterization):
             Init trainable rho parameter representing the sigma of the approximate posterior through softplus function.
         bias : bool
             If set to False, the layer will not learn an additive bias. Default: True.
+            If set to False, the layer will not learn an additive bias. Default: True.
         standard_deviation : float
-            Standard deviation of the gaussian distribution used to initialize the weights.
+            Standard deviation of the gaussian distribution used to sample the initial posterior mu and initial
+            posterior rho of the gaussian distribution from which the initial weights are sampled.
         """
         self.standard_deviation = standard_deviation
 
@@ -201,13 +204,13 @@ class BayesianLinear(LinearReparameterization):
 
     def __init__(
             self,
-            in_features,
-            out_features,
-            prior_mean=0,
-            prior_variance=1,
-            posterior_mu_init=0,
-            posterior_rho_init=-3.0,
-            bias=True,
+            in_features: int,
+            out_features: int,
+            prior_mean: float = 0.0,
+            prior_variance: float = 1.0,
+            posterior_mu_init: float = 0.0,
+            posterior_rho_init: float = -3.0,
+            bias: bool = True,
             standard_deviation: float = 0.1
     ):
         """
@@ -228,8 +231,10 @@ class BayesianLinear(LinearReparameterization):
             Init trainable rho parameter representing the sigma of the approximate posterior through softplus function.
         bias: bool
             If set to False, the layer will not learn an additive bias. Default: True.
+            If set to False, the layer will not learn an additive bias. Default: True.
         standard_deviation : float
-            Standard deviation of the gaussian distribution used to initialize the weights.
+            Standard deviation of the gaussian distribution used to sample the initial posterior mu and initial
+            posterior rho of the gaussian distribution from which the initial weights are sampled.
         """
         self.standard_deviation = standard_deviation
 
