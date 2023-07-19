@@ -114,6 +114,9 @@ class _UNet(Module):
         self.posterior_rho_init = posterior_rho_init
         self.standard_deviation = standard_deviation
 
+        self.encoders = self._get_encoder_path()
+        self.decoders = self._get_decoder_path()
+
     def _get_encoder_path(self) -> ModuleDict:
         """
         Returns a ModuleDict of encoder blocks to be used by the UNet in its encoder (down) path.
