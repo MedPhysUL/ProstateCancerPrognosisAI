@@ -515,15 +515,13 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
+        prediction = self.slice_patient_dictionary(
+            patient_dict=self.predictions_dict,
+            patient_indexes=mask
+        )
+
         for task in self.tasks.survival_analysis_tasks:
-            prediction = {}
             fig, arr = plt.subplots()
-            preds = self.slice_patient_dictionary(self.predictions_dict, patient_indexes=mask, separate_patients=True)
-            for prediction_element in preds: # possible access of equivalent data in self.predictions?
-                if prediction.get(task.name, None) is not None:
-                    prediction[task.name] = np.concatenate((prediction.get(task.name), prediction_element[task.name]))
-                else:
-                    prediction[task.name] = (prediction_element[task.name])
             for chf_func in task.breslow_estimator.get_cumulative_hazard_function(prediction[task.name]):
                 arr.step(chf_func.x, chf_func(chf_func.x), where="post")
             arr.set_xlabel(kwargs.get("xlabel", f"Time"))
@@ -561,15 +559,13 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
+        prediction = self.slice_patient_dictionary(
+            patient_dict=self.predictions_dict,
+            patient_indexes=mask
+        )
+
         for task in self.tasks.survival_analysis_tasks:
-            prediction = {}
             fig, arr = plt.subplots()
-            preds = self.slice_patient_dictionary(self.predictions_dict, patient_indexes=mask, separate_patients=True)
-            for prediction_element in preds:
-                if prediction.get(task.name, None) is not None:
-                    prediction[task.name] = np.concatenate((prediction.get(task.name), prediction_element[task.name]))
-                else:
-                    prediction[task.name] = (prediction_element[task.name])
             for survival_func in task.breslow_estimator.get_survival_function(prediction[task.name]):
                 arr.step(survival_func.x, survival_func(survival_func.x), where="post")
             arr.set_xlabel(kwargs.get("xlabel", f"Time"))

@@ -13,7 +13,9 @@ import os
 from typing import List, Optional, Union, Tuple, NamedTuple
 import pandas
 import survshap
+from sksurv.functions import StepFunction
 from survshap.model_explanations.plot import model_plot_mean_abs_shap_values, model_plot_shap_lines_for_all_individuals, model_plot_shap_lines_for_variables
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -35,7 +37,20 @@ class SurvshapTuple(NamedTuple):
     y: float
 
 
-class SurvshapWrapper:
+class StepFunctionWrapper(StepFunction):
+
+    def __init__(self, step_func):
+        super().__init__(x=step_func.x, y=step_func.y, a=step_func.a, b=step_func.b)
+
+    def __call__(self, *args, **kwargs):
+        old_return = super().__call__(*args, **kwargs)
+        if isinstance(old_return, np.ndarray):
+            return old_return
+        elif isinstance(old_return, torch.Tensor):
+            return super().__call__(*args, **kwargs).numpy()
+
+
+class DataFrameWrapper:
     """
     Wrapper to create a way to compute the cumulative hazard functions and survival functions using pandas DataFrames.
     """
@@ -133,10 +148,52 @@ class SurvshapWrapper:
             i += 1
         return pandas.DataFrame(concatenated, columns=self.table_order)
 
+    def _convert_ndarray_to_features_type(
+            self,
+            initial_array: np.ndarray,
+            individual_patients: bool = False
+    ) -> Union[FeaturesType, List[FeaturesType]]:
+        """
+        Converts a pandas DataFrame to a FeaturesType object.
+
+        Parameters
+        ----------
+        initial_array : np.ndarray
+            The dataframe to convert.
+        individual_patients : bool
+            Whether to separate the converted DataFrame into a list of individual FeaturesType for individual patients,
+            defaults to false.
+
+        Returns
+        -------
+        features_type  : Union[List[FeaturesType], FeaturesType]
+            The converted array.
+        """
+        if not individual_patients:
+            table_data = {}
+            if initial_array.ndim == 2:
+                for feature in self.table_order:
+                    table_data[feature] = torch.unsqueeze(
+                        torch.tensor(initial_array[:, self.table_order.index(feature)]),
+                        -1
+                    )
+            elif initial_array.ndim == 1:
+                for feature in self.table_order:
+                    table_data[feature] = torch.unsqueeze(
+                        torch.tensor(initial_array[self.table_order.index(feature)]),
+                        -1
+                    )
+            return FeaturesType({}, table_data)
+        else:
+            patients_list = []
+            for i in range(initial_array.shape[0]):
+                patients_list.append(self._convert_ndarray_to_features_type(initial_array[i, :]))
+            return patients_list
+
     def __call__(
             self,
             model: Model,
-            data: pandas.DataFrame
+            data: Union[pandas.DataFrame, np.ndarray]
     ) -> np.ndarray:
         """
         Computes the desired stepfunctions.
@@ -145,15 +202,18 @@ class SurvshapWrapper:
         ----------
         model : Model
             The model with which to compute the predictions and for which to determine the SurvSHAP values.
-        data : pandas.DataFrame
-            The modified data with which to commpute the predictions in the form of a DataFrame.
+        data : Union[pandas.DataFrame, np.ndarray]
+            The modified data with which to compute the predictions in the form of a DataFrame.
 
         Returns
         -------
         function : np.ndarray
             The computed cumulative hazard or survival function.
         """
-        features = self._convert_data_frame_to_features_type(data, True)
+        if isinstance(data, np.ndarray):
+            features = self._convert_ndarray_to_features_type(data, True)
+        else:
+            features = self._convert_data_frame_to_features_type(data, True)
         prediction = {}
         predictions = [model.predict(feature) for feature in features]
         for prediction_element in predictions:
@@ -172,9 +232,9 @@ class SurvshapWrapper:
                 prediction[self.task.name] = (prediction_element[self.task.name])
         if (isinstance(prediction[self.task.name], torch.Tensor)
                 and prediction[self.task.name].get_device != -1):
-            return self.function(prediction[self.task.name].cpu())
+            return np.array([StepFunctionWrapper(i) for i in self.function(prediction[self.task.name].cpu())])
         else:
-            return self.function(prediction[self.task.name])
+            return np.array([StepFunctionWrapper(i) for i in self.function(prediction[self.task.name])])
 
 
 class TableSurvshapExplainer:
@@ -185,7 +245,8 @@ class TableSurvshapExplainer:
     def __init__(
             self,
             model: Model,
-            dataset: ProstateCancerDataset
+            dataset: ProstateCancerDataset,
+            same_fitting: bool = False
     ) -> None:
         """
         Sets up the required attributes.
@@ -196,10 +257,15 @@ class TableSurvshapExplainer:
             The model to explain.
         dataset : ProstateCancerDataset
             The dataset to use to compute the SurvSHAP values
+        same_fitting : bool
+            Whether to reuse the same fitting for all graphs, defaults to False.
         """
+        self.survshap_explanation = None
         self.model = model
         self.dataset = dataset
         self.predictions_dict = {k: to_numpy(v) for k, v in self.model.predict_on_dataset(dataset=self.dataset).items()}
+        self.same_fitting = same_fitting
+        self.fitted = False
 
     @staticmethod
     def _get_structured_array(
@@ -250,25 +316,60 @@ class TableSurvshapExplainer:
         """
         assert function == "chf" or function == "sf", "Only the survival function ('sf') and cumulative hazard " \
                                                       "function ('chz') are implemented."
-        if function == "chf":
-            wrapper = SurvshapWrapper(task.breslow_estimator.get_cumulative_hazard_function, self.dataset, task)
-        elif function == "sf":
-            wrapper = SurvshapWrapper(task.breslow_estimator.get_survival_function, self.dataset, task)
-        else:
-            wrapper = None
-        explainer = survshap.SurvivalModelExplainer(self.model,
-                                                    pandas.DataFrame(
-                                                        to_numpy(self.dataset.table_dataset.x),
-                                                        columns=self.dataset.table_dataset.features_columns
-                                                    ),
-                                                    self._get_structured_array(to_numpy(
-                                                        self.dataset.table_dataset.y[task.name][:, 0]),
-                                                        to_numpy(self.dataset.table_dataset.y[task.name][:, 1])),
-                                                    predict_cumulative_hazard_function=wrapper)
-        survshap_explanation = survshap.ModelSurvSHAP(function_type=function, random_state=11121)
-        survshap_explanation.fit(explainer)
-
-        return survshap_explanation
+        if not self.fitted:
+            if function == "chf":
+                wrapper = DataFrameWrapper(task.breslow_estimator.get_cumulative_hazard_function, self.dataset, task)
+                explainer = survshap.SurvivalModelExplainer(model=self.model,
+                                                            data=pandas.DataFrame(
+                                                                to_numpy(self.dataset.table_dataset.x),
+                                                                columns=self.dataset.table_dataset.features_columns
+                                                            ),
+                                                            y=self._get_structured_array(to_numpy(
+                                                                self.dataset.table_dataset.y[task.name][:, 0]),
+                                                                to_numpy(self.dataset.table_dataset.y[task.name][:, 1])),
+                                                            predict_cumulative_hazard_function=wrapper)
+            elif function == "sf":
+                wrapper = DataFrameWrapper(task.breslow_estimator.get_survival_function, self.dataset, task)
+                explainer = survshap.SurvivalModelExplainer(model=self.model,
+                                                            data=pandas.DataFrame(
+                                                                to_numpy(self.dataset.table_dataset.x),
+                                                                columns=self.dataset.table_dataset.features_columns
+                                                            ),
+                                                            y=self._get_structured_array(to_numpy(
+                                                                self.dataset.table_dataset.y[task.name][:, 0]),
+                                                                to_numpy(self.dataset.table_dataset.y[task.name][:, 1])),
+                                                            predict_survival_function=wrapper)
+            else:
+                explainer = None
+            survshap_explanation = survshap.ModelSurvSHAP(calculation_method='shap', function_type=function, random_state=11121)
+            survshap_explanation.fit(explainer)
+            self.survshap_explanation = survshap_explanation
+            # print(survshap_explanation.full_result)
+            # print(survshap_explanation.result)
+            # colors = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(survshap_explanation.individual_explanations)))))
+            # for i, exp in enumerate(survshap_explanation.individual_explanations):
+            #     # print(i.result.loc[0].iloc[6:])
+            #     x = exp.timestamps
+            #     for j in range(len(exp.result.iloc[:, 0])):
+            #         y = [k for k in exp.result.loc[j].iloc[6:]]
+            #         plt.plot(x, y, color=colors[i])
+            # plt.show()
+            # plt.close()
+                # print(i.timestamps)
+                # print([k for k in i.result.loc[0].iloc[6:]])
+                # print([k for k in i.result.loc[1].iloc[6:]])
+                # print([k for k in i.result.loc[2].iloc[6:]])
+                # print([k for k in i.result.loc[3].iloc[6:]])
+                # print([k for k in i.result.loc[4].iloc[6:]])
+                # print([k for k in i.result.loc[5].iloc[6:]])
+                # print(i.result.loc[1].iloc[6:])
+                # print(i.result.loc[2].iloc[6:])
+                # print(i.result.loc[3].iloc[6:])
+                # print(i.result.loc[4].iloc[6:])
+                # print(i.result.loc[5].iloc[6:])
+        if self.same_fitting:
+            self.fitted = True
+        return self.survshap_explanation
 
     def plot_shap_lines_for_all_patients(
             self,
