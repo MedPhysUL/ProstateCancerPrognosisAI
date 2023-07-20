@@ -14,13 +14,16 @@ from typing import Dict, List, Optional, Union, Tuple, NamedTuple
 import pandas
 import survshap
 from sksurv.functions import StepFunction
-from survshap.model_explanations.plot import model_plot_mean_abs_shap_values, model_plot_shap_lines_for_all_individuals, model_plot_shap_lines_for_variables
+from survshap.model_explanations.plot import \
+    model_plot_mean_abs_shap_values,\
+    model_plot_shap_lines_for_all_individuals,\
+    model_plot_shap_lines_for_variables
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
+from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset
 from ..evaluation.prediction_evaluator import PredictionEvaluator
 from ..models.base.model import Model
 from ..tasks.base import Task, TableTask
@@ -262,7 +265,7 @@ class TableSurvshapExplainer:
         self.dataset = dataset
         self.predictions_dict = {k: to_numpy(v) for k, v in self.model.predict_on_dataset(dataset=self.dataset).items()}
         self.feature_order = self.dataset.table_dataset.features_columns
-        self.fitted = []
+        self.fitted = {'sf': [], 'chf': []}
 
     @staticmethod
     def _get_structured_array(
@@ -313,7 +316,7 @@ class TableSurvshapExplainer:
         """
         assert function == "chf" or function == "sf", "Only the survival function ('sf') and cumulative hazard " \
                                                       "function ('chz') are implemented."
-        if task.name not in self.fitted:
+        if task.name not in self.fitted[function]:
             if function == "chf":
                 wrapper = DataFrameWrapper(task.breslow_estimator.get_cumulative_hazard_function, self.dataset, task)
                 explainer = survshap.SurvivalModelExplainer(model=self.model,
@@ -349,37 +352,19 @@ class TableSurvshapExplainer:
             )
             survshap_explanation.fit(explainer)
             self.survshap_explanation = survshap_explanation
-            # print(survshap_explanation.full_result)
-            # print(survshap_explanation.result)
-            # colors = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(survshap_explanation.individual_explanations)))))
-            # for i, exp in enumerate(survshap_explanation.individual_explanations):
-            #     # print(i.result.loc[0].iloc[6:])
-            #     x = exp.timestamps
-            #     for j in range(len(exp.result.iloc[:, 0])):
-            #         y = [k for k in exp.result.loc[j].iloc[6:]]
-            #         plt.plot(x, y, color=colors[i])
-            # plt.show()
-            # plt.close()
-                # print(i.timestamps)
-                # print([k for k in i.result.loc[0].iloc[6:]])
-                # print([k for k in i.result.loc[1].iloc[6:]])
-                # print([k for k in i.result.loc[2].iloc[6:]])
-                # print([k for k in i.result.loc[3].iloc[6:]])
-                # print([k for k in i.result.loc[4].iloc[6:]])
-                # print([k for k in i.result.loc[5].iloc[6:]])
-                # print(i.result.loc[1].iloc[6:])
-                # print(i.result.loc[2].iloc[6:])
-                # print(i.result.loc[3].iloc[6:])
-                # print(i.result.loc[4].iloc[6:])
-                # print(i.result.loc[5].iloc[6:])
-        self.fitted += [task.name]
+
+        self.fitted[function] += [task.name]
         return self.survshap_explanation
 
     def plot_shap_lines_for_all_patients(
             self,
             feature: Union[Dict[Tuple[str], List[int]], str],
             function: str,
+            show: bool = True,
+            path_to_save_folder: Optional[str] = None,
             tasks: Optional[Union[Task, TaskList, List[Task]]] = None,
+            normalize: bool = False,
+            **kwargs
     ) -> None:
         """
         Plots the Shap values of a single feature as a function of time for all patients.
@@ -395,8 +380,15 @@ class TableSurvshapExplainer:
         function : str
             The function for which to compute the explanation, either "chf" for cumulative hazard function or "sf" for
             survival function.
+        show : bool
+            Whether to show the graph. Defaults to True.
+        path_to_save_folder : Optional[str],
+            Whether to save the graph, if so, then this value is the path to the save folder.
         tasks : Optional[Union[Task, TaskList, List[Task]]]
             The tasks for which to plot the graphs. One graph will be created for each task.
+        normalize : bool
+            Whether to normalize the values by dividing by the sum of the absolute values of all SurvSHAP(t) values for
+            a given feature at each timestamp. Defaults to False.
         """
         if tasks is None:
             tasks = self.dataset.tasks.survival_analysis_tasks
@@ -417,26 +409,59 @@ class TableSurvshapExplainer:
                 )
         else:
             for task in tasks:
+                fig, arr = plt.subplots()
                 explanation = self.compute_explanation(task=task, function=function)
-                for features, patients in feature.items():
+                for features_list, patients in feature.items():
                     if len(patients) == 0:
                         patients = [i for i in range(len(explanation.individual_explanations))]
+                    if normalize:
+                        sum_of_values = {
+                            key: np.array([0 for _ in [explanation.timestamps]]) for key in self.feature_order
+                        }
+                        for i, patient_index in enumerate(patients):
+                            exp = explanation.individual_explanations[patient_index]
+                            for feature_name in features_list:
+                                y = [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
+                                sum_of_values[feature_name] = sum_of_values.get(feature_name) + np.abs(np.array(y))
+                    else:
+                        sum_of_values = {
+                            key: np.array([1 for _ in [explanation.timestamps]]) for key in self.feature_order
+                        }
                     colors = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(patients)))))
                     for i, patient_index in enumerate(patients):
                         exp = explanation.individual_explanations[patient_index]
                         x = exp.timestamps
-                        for feature_name in features:
-                            y = [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
-                            plt.plot(x, y, color=colors[i])
-                    plt.show()
-                    plt.close()
+                        for feature_name in features_list:
+                            y = np.array(
+                                [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
+                            )/sum_of_values[feature_name]
+                            arr.plot(x, y, color=colors[i])
+                    arr.set_xlabel(kwargs.get("xlabel", f"time"))
+                    arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
+                    arr.set_title(kwargs.get(
+                        "title", f"{task.target_column}: SHAP values by patient for {function}"
+                    ))
+                    normalize_name = "normalized" if normalize else "not_normalized"
+                    if path_to_save_folder is not None:
+                        path = os.path.join(
+                            path_to_save_folder,
+                            f"{task.target_column}_{function}_"
+                            f"{normalize_name}_{kwargs.get('filename', 'SHAP_value_for_patients.pdf')}"
+                        )
+                    else:
+                        path = None
+                    PredictionEvaluator.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_shap_lines_for_features(
             self,
             features: Union[List[str], Dict[Tuple[str], List[int]]],
             function: str,
+            show: bool = True,
+            path_to_save_folder: Optional[str] = None,
             tasks: Optional[Union[Task, TaskList, List[Task]]] = None,
-            discretise: Optional[Tuple[int, List[str]]] = None
+            discretize: Optional[Tuple[int, List[str]]] = None,
+            normalize: bool = False,
+            **kwargs
     ) -> None:
         """
         Plots the Shap values of each desired feature as a function of time for all patients.
@@ -452,11 +477,18 @@ class TableSurvshapExplainer:
         function : str
             The function for which to compute the explanation, either "chf" for cumulative hazard function or "sf" for
             survival function.
+        show : bool
+            Whether to show the graph. Defaults to True.
+        path_to_save_folder : Optional[str],
+            Whether to save the graph, if so, then this value is the path to the save folder.
         tasks : Optional[Union[Task, TaskList, List[Task]]]
             The tasks for which to plot the graphs. One graph will be created for each task.
-        discretise : Optional[Tuple[int, List[str]]]
-            If descretising a feature is desired, then it is the Tuple of the number of bins and a list of the features
-            to discretise.
+        discretize : Optional[Tuple[int, List[str]]]
+            If transforming a feature into a discretized state is desired, then it is the Tuple of the number of bins
+            and a list of the features to discretize.
+        normalize : bool
+            Whether to normalize the values by dividing by the sum of the absolute values of all SurvSHAP(t) values for
+            a given feature at each timestamp. Defaults to False.
         """
         if tasks is None:
             tasks = self.dataset.tasks.survival_analysis_tasks
@@ -466,11 +498,11 @@ class TableSurvshapExplainer:
                 f"All tasks must be instances of 'TableTask'."
             )
 
-        if discretise is not None:
+        if discretize is not None:
             method = "quantile"
         else:
             method = ""
-            discretise = (5, [])
+            discretize = (5, [])
         if isinstance(features, list):
             for task in tasks:
                 explainer = self.compute_explanation(task=task, function=function)
@@ -480,33 +512,71 @@ class TableSurvshapExplainer:
                     event_inds=explainer.event_ind,
                     event_times=explainer.event_times,
                     variables=features,
-                    to_discretize=discretise[1],
+                    to_discretize=discretize[1],
                     discretization_method=method,
-                    n_bins=discretise[0],
+                    n_bins=discretize[0],
                     show=True
                 )
         else:
             for task in tasks:
+                fig, arr = plt.subplots()
                 explanation = self.compute_explanation(task=task, function=function)
                 cmap = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(self.feature_order)))))
                 color_dict = {feature: cmap[i] for i, feature in enumerate(self.feature_order)}
                 for features_list, patients in features.items():
+                    patch_list = []
                     if len(patients) == 0:
                         patients = [i for i in range(len(explanation.individual_explanations))]
+                    if normalize:
+                        sum_of_values = {
+                            key: np.array([0 for _ in [explanation.timestamps]]) for key in self.feature_order
+                        }
+                        for i, patient_index in enumerate(patients):
+                            exp = explanation.individual_explanations[patient_index]
+                            for feature_name in features_list:
+                                y = [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
+                                sum_of_values[feature_name] = sum_of_values.get(feature_name) + np.abs(np.array(y))
+                    else:
+                        sum_of_values = {
+                            key: np.array([1 for _ in [explanation.timestamps]]) for key in self.feature_order
+                        }
                     for i, patient_index in enumerate(patients):
                         exp = explanation.individual_explanations[patient_index]
                         x = exp.timestamps
                         for feature_name in features_list:
-                            y = [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
-                            plt.plot(x, y, color=color_dict[feature_name])
-                    plt.show()
-                    plt.close()
+                            y = np.array(
+                                [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
+                            )/sum_of_values[feature_name]
+                            arr.plot(x, y, color=color_dict[feature_name])
+                    for feature_name in features_list:
+                        patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
+                    arr.set_xlabel(kwargs.get("xlabel", f"time"))
+                    arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
+                    arr.set_title(kwargs.get(
+                        "title", f"{task.target_column}: SHAP values by feature for {function}"
+                    ))
+                    arr.legend(handles=patch_list)
+                    normalize_name = "normalized" if normalize else "not_normalized"
+                    if path_to_save_folder is not None:
+                        path = os.path.join(
+                            path_to_save_folder,
+                            f"{task.target_column}_{function}_{normalize_name}"
+                            f"_{kwargs.get('filename', 'SHAP_value_for_features.pdf')}"
+                        )
+                    else:
+                        path = None
+                    PredictionEvaluator.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_shap_average_of_absolute_value(
             self,
             features: Union[List[str], Dict[Tuple[str], List[int]]],
             function: str,
             tasks: Optional[Union[Task, TaskList, List[Task]]],
+            show: bool = True,
+            path_to_save_folder: Optional[str] = None,
+            normalize: bool = False,
+            **kwargs
+
     ) -> None:
         """
         Plots the average of the absolute value of each Shap value as a function of time.
@@ -524,6 +594,13 @@ class TableSurvshapExplainer:
             survival function.
         tasks : Optional[Union[Task, TaskList, List[Task]]]
             The tasks for which to plot the graphs. One graph will be created for each task.
+        show : bool
+            Whether to show the graph. Defaults to True.
+        path_to_save_folder : Optional[str],
+            Whether to save the graph, if so, then this value is the path to the save folder.
+        normalize : bool
+            Whether to normalize the values by dividing by the sum of the absolute values of all SurvSHAP(t) values for
+            a given feature at each timestamp. Defaults to False.
         """
         if tasks is None:
             tasks = self.dataset.tasks.survival_analysis_tasks
@@ -544,6 +621,7 @@ class TableSurvshapExplainer:
                 )
         else:
             for task in tasks:
+                fig, arr = plt.subplots()
                 explanation = self.compute_explanation(task=task, function=function)
                 cmap = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(self.feature_order)))))
                 color_dict = {feature: cmap[i] for i, feature in enumerate(self.feature_order)}
@@ -556,8 +634,26 @@ class TableSurvshapExplainer:
                         for feature_name in features_list:
                             y = [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
                             sum_of_values[feature_name] = sum_of_values.get(feature_name) + np.abs(np.array(y))
+                    patch_list = []
                     for feature_name in features_list:
-                        average_values = sum_of_values[feature_name]/(1+len(patients))
-                        plt.plot(explanation.timestamps, average_values, color=color_dict[feature_name])
-                    plt.show()
-                    plt.close()
+                        average_values = sum_of_values[feature_name]/(len(patients))
+                        if normalize:
+                            average_values = average_values/sum_of_values[feature_name]
+                        arr.plot(explanation.timestamps, average_values, color=color_dict[feature_name])
+                        patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
+                    arr.set_xlabel(kwargs.get("xlabel", f"time"))
+                    arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
+                    arr.set_title(kwargs.get(
+                        "title", f"{task.target_column}: Average of absolute value of SHAP values for {function}"
+                    ))
+                    arr.legend(handles=patch_list)
+                    normalize_name = "normalized" if normalize else "not_normalized"
+                    if path_to_save_folder is not None:
+                        path = os.path.join(
+                            path_to_save_folder,
+                            f"{task.target_column}_{function}_{normalize_name}"
+                            f"_{kwargs.get('filename', 'average_of_absolute_value_of_SHAP.pdf')}"
+                        )
+                    else:
+                        path = None
+                    PredictionEvaluator.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
