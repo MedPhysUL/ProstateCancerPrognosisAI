@@ -326,7 +326,9 @@ class TableSurvshapExplainer:
                                                             ),
                                                             y=self._get_structured_array(to_numpy(
                                                                 self.dataset.table_dataset.y[task.name][:, 0]),
-                                                                to_numpy(self.dataset.table_dataset.y[task.name][:, 1])),
+                                                                to_numpy(
+                                                                    self.dataset.table_dataset.y[task.name][:, 1]
+                                                                )),
                                                             predict_cumulative_hazard_function=wrapper)
             elif function == "sf":
                 wrapper = DataFrameWrapper(task.breslow_estimator.get_survival_function, self.dataset, task)
@@ -337,11 +339,17 @@ class TableSurvshapExplainer:
                                                             ),
                                                             y=self._get_structured_array(to_numpy(
                                                                 self.dataset.table_dataset.y[task.name][:, 0]),
-                                                                to_numpy(self.dataset.table_dataset.y[task.name][:, 1])),
+                                                                to_numpy(
+                                                                    self.dataset.table_dataset.y[task.name][:, 1]
+                                                                )),
                                                             predict_survival_function=wrapper)
             else:
                 explainer = None
-            survshap_explanation = survshap.ModelSurvSHAP(calculation_method='shap', function_type=function, random_state=11121)
+            survshap_explanation = survshap.ModelSurvSHAP(
+                calculation_method='shap',
+                function_type=function,
+                random_state=11121
+            )
             survshap_explanation.fit(explainer)
             self.survshap_explanation = survshap_explanation
             # print(survshap_explanation.full_result)
