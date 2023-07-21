@@ -116,48 +116,42 @@ BCR_TASK = SurvivalAnalysisTask(
     event_time_column=BCR_TIME,
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
-    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()],
-    temperature=1e-2
+    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()]
 )
 CRPC_TASK = SurvivalAnalysisTask(
     event_indicator_column=CRPC,
     event_time_column=CRPC_TIME,
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
-    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()],
-    temperature=1e-2
+    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()]
 )
 DEATH_TASK = SurvivalAnalysisTask(
     event_indicator_column=DEATH,
     event_time_column=DEATH_TIME,
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
-    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()],
-    temperature=1e-2
+    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()]
 )
 HTX_TASK = SurvivalAnalysisTask(
     event_indicator_column=HTX,
     event_time_column=HTX_TIME,
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
-    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()],
-    temperature=1e-2
+    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()]
 )
 METASTASIS_TASK = SurvivalAnalysisTask(
     event_indicator_column=METASTASIS,
     event_time_column=METASTASIS_TIME,
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
-    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()],
-    temperature=1e-2
+    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()]
 )
 PN_TASK = BinaryClassificationTask(
     target_column=PN,
     decision_threshold_metric=BinaryBalancedAccuracy(),
     hps_tuning_metric=AUC(),
     evaluation_metrics=[Sensitivity(), Specificity()],
-    criterion=BCEWithLogitsLoss(),
-    temperature=1e-2
+    criterion=BCEWithLogitsLoss()
 )
 
 PREDICTOR_CLIP_GRAD_MAX_NORM_DICT = {BCR: 3.0, CRPC: 3.0, DEATH: 1.0, HTX: 3.0, METASTASIS: 2.0, PN: 3.0}
@@ -176,8 +170,7 @@ PROSTATE_SEGMENTATION_TASK = SegmentationTask(
     criterion=DiceLoss(),
     evaluation_metrics=DiceMetric(),
     organ="Prostate",
-    modality="CT",
-    temperature=1e-4
+    modality="CT"
 )
 
 IMAGE_TASKS = [PROSTATE_SEGMENTATION_TASK]
