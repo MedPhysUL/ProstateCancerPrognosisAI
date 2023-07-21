@@ -97,7 +97,8 @@ if __name__ == '__main__':
                     name="hidden_channels",
                     choices=["(10, 10, 10)", "(20, 20, 20)", "(30, 30, 30)"]
                 ),
-                "dropout": FloatHyperparameter(name="dropout", low=0.05, high=0.25)
+                "dropout": FloatHyperparameter(name="dropout", low=0.05, high=0.25),
+                "seed": SEED
             }
         )
 
