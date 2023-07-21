@@ -10,17 +10,18 @@
 """
 
 import os
-from typing import Dict, List, Optional, Union, Tuple, NamedTuple
+from typing import Dict, List, Optional, Tuple, Union
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas
-import survshap
 from sksurv.functions import StepFunction
+import survshap
 from survshap.model_explanations.plot import \
     model_plot_mean_abs_shap_values,\
     model_plot_shap_lines_for_all_individuals,\
     model_plot_shap_lines_for_variables
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import numpy as np
 import torch
 
 from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset
@@ -32,25 +33,23 @@ from ..tasks.survival_analysis import SurvivalAnalysisTask
 from ..tools.transforms import to_numpy
 
 
-class SurvshapTuple(NamedTuple):
-    """
-    Tuple to use with the SurvSHAP library.
-    """
-    x: float
-    y: float
-
-
 class StepFunctionWrapper(StepFunction):
+    """
+    Wrapper to convert the output of a SetpFunction into numpy ndarray.
+    """
 
     def __init__(self, step_func):
         super().__init__(x=step_func.x, y=step_func.y, a=step_func.a, b=step_func.b)
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> np.ndarray:
+        """
+        Wrapper of the call function to convert the output.
+        """
         old_return = super().__call__(*args, **kwargs)
         if isinstance(old_return, np.ndarray):
             return old_return
         elif isinstance(old_return, torch.Tensor):
-            return super().__call__(*args, **kwargs).numpy()
+            return old_return.numpy()
 
 
 class DataFrameWrapper:
@@ -103,17 +102,22 @@ class DataFrameWrapper:
         """
         if not individual_patients:
             table_data = {}
+
             if data_frame.ndim == 2:
                 for feature in self.table_order:
                     table_data[feature] = torch.unsqueeze(torch.tensor(data_frame.loc[:, feature]), -1)
             elif data_frame.ndim == 1:
                 for feature in self.table_order:
                     table_data[feature] = torch.unsqueeze(torch.tensor(data_frame.loc[feature]), -1)
+
             return FeaturesType({}, table_data)
+
         else:
             patients_list = []
+
             for i in range(data_frame.shape[0]):
                 patients_list.append(self._convert_data_frame_to_features_type(data_frame.iloc[i, :]))
+
             return patients_list
 
     def _convert_features_type_to_data_frame(
@@ -131,11 +135,11 @@ class DataFrameWrapper:
         Returns
         -------
         dataframe : pandas.DataFrame
-            The converted FeaturesType
+            The converted FeaturesType.
         """
-        i = 1
         concatenated = torch.tensor([])
-        for feature in self.table_order:
+        for i, feature in enumerate(self.table_order):
+
             datum = features_type.table[feature]
             if isinstance(datum, torch.Tensor):
                 datum = to_numpy(datum)
@@ -144,11 +148,12 @@ class DataFrameWrapper:
             else:
                 datum = np.array([datum])
             datum = np.expand_dims(datum, 1)
-            if i == 1:
+
+            if i == 0:
                 concatenated = datum
             else:
                 concatenated = np.concatenate((concatenated, datum), 1)
-            i += 1
+
         return pandas.DataFrame(concatenated, columns=self.table_order)
 
     def _convert_ndarray_to_features_type(
@@ -174,6 +179,7 @@ class DataFrameWrapper:
         """
         if not individual_patients:
             table_data = {}
+
             if initial_array.ndim == 2:
                 for feature in self.table_order:
                     table_data[feature] = torch.unsqueeze(
@@ -186,11 +192,14 @@ class DataFrameWrapper:
                         torch.tensor(initial_array[self.table_order.index(feature)]),
                         -1
                     )
+
             return FeaturesType({}, table_data)
+
         else:
             patients_list = []
             for i in range(initial_array.shape[0]):
                 patients_list.append(self._convert_ndarray_to_features_type(initial_array[i, :]))
+
             return patients_list
 
     def __call__(
@@ -217,6 +226,7 @@ class DataFrameWrapper:
             features = self._convert_ndarray_to_features_type(data, True)
         else:
             features = self._convert_data_frame_to_features_type(data, True)
+
         prediction = {}
         predictions = [model.predict(feature) for feature in features]
         for prediction_element in predictions:
@@ -226,6 +236,7 @@ class DataFrameWrapper:
                     to_cat = prediction_element[self.task.name].cpu()
                 else:
                     to_cat = prediction_element[self.task.name]
+
                 if (isinstance(prediction.get(self.task.name), torch.Tensor)
                         and prediction.get(self.task.name).get_device != -1):
                     prediction[self.task.name] = np.concatenate((prediction.get(self.task.name).cpu(), to_cat))
@@ -233,10 +244,13 @@ class DataFrameWrapper:
                     prediction[self.task.name] = np.concatenate((prediction.get(self.task.name), to_cat))
             else:
                 prediction[self.task.name] = (prediction_element[self.task.name])
+
         if (isinstance(prediction[self.task.name], torch.Tensor)
                 and prediction[self.task.name].get_device != -1):
+
             return np.array([StepFunctionWrapper(i) for i in self.function(prediction[self.task.name].cpu())])
         else:
+
             return np.array([StepFunctionWrapper(i) for i in self.function(prediction[self.task.name])])
 
 
@@ -258,14 +272,13 @@ class TableSurvshapExplainer:
         model : Model
             The model to explain.
         dataset : ProstateCancerDataset
-            The dataset to use to compute the SurvSHAP values
+            The dataset to use to compute the SurvSHAP values.
         """
-        self.survshap_explanation = None
         self.model = model
         self.dataset = dataset
         self.predictions_dict = {k: to_numpy(v) for k, v in self.model.predict_on_dataset(dataset=self.dataset).items()}
         self.feature_order = self.dataset.table_dataset.features_columns
-        self.fitted = {'sf': [], 'chf': []}
+        self.fitted = {}
 
     @staticmethod
     def _get_structured_array(
@@ -316,7 +329,10 @@ class TableSurvshapExplainer:
         """
         assert function == "chf" or function == "sf", "Only the survival function ('sf') and cumulative hazard " \
                                                       "function ('chz') are implemented."
-        if task.name not in self.fitted[function]:
+
+        if self.fitted.get((function, task.name), None) is not None:
+            return self.fitted[(function, task.name)]
+        else:
             if function == "chf":
                 wrapper = DataFrameWrapper(task.breslow_estimator.get_cumulative_hazard_function, self.dataset, task)
                 explainer = survshap.SurvivalModelExplainer(model=self.model,
@@ -345,16 +361,16 @@ class TableSurvshapExplainer:
                                                             predict_survival_function=wrapper)
             else:
                 explainer = None
+
             survshap_explanation = survshap.ModelSurvSHAP(
                 calculation_method='shap',
                 function_type=function,
                 random_state=11121
             )
             survshap_explanation.fit(explainer)
-            self.survshap_explanation = survshap_explanation
+            self.fitted[(function, task.name)] = survshap_explanation
 
-        self.fitted[function] += [task.name]
-        return self.survshap_explanation
+            return survshap_explanation
 
     def plot_shap_lines_for_all_patients(
             self,
@@ -367,7 +383,8 @@ class TableSurvshapExplainer:
             **kwargs
     ) -> None:
         """
-        Plots the Shap values of a single feature as a function of time for all patients.
+        Plots the Shap values desired features as a function of time for all desired patients. Each color indicates a
+        different patient, all SurvSHAP values for a patient are the same color.
 
         Parameters
         ----------
@@ -397,6 +414,7 @@ class TableSurvshapExplainer:
             assert all(isinstance(task, TableTask) for task in tasks), (
                 f"All tasks must be instances of 'TableTask'."
             )
+
         if isinstance(feature, str):
             for task in tasks:
                 explanation = self.compute_explanation(task=task, function=function)
@@ -411,6 +429,7 @@ class TableSurvshapExplainer:
             for task in tasks:
                 fig, arr = plt.subplots()
                 explanation = self.compute_explanation(task=task, function=function)
+
                 for features_list, patients in feature.items():
                     if len(patients) == 0:
                         patients = [i for i in range(len(explanation.individual_explanations))]
@@ -418,8 +437,10 @@ class TableSurvshapExplainer:
                         sum_of_values = {
                             key: np.array([0 for _ in [explanation.timestamps]]) for key in self.feature_order
                         }
+
                         for i, patient_index in enumerate(patients):
                             exp = explanation.individual_explanations[patient_index]
+                            
                             for feature_name in features_list:
                                 y = [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
                                 sum_of_values[feature_name] = sum_of_values.get(feature_name) + np.abs(np.array(y))
@@ -428,20 +449,24 @@ class TableSurvshapExplainer:
                             key: np.array([1 for _ in [explanation.timestamps]]) for key in self.feature_order
                         }
                     colors = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(patients)))))
+
                     for i, patient_index in enumerate(patients):
                         exp = explanation.individual_explanations[patient_index]
                         x = exp.timestamps
+
                         for feature_name in features_list:
                             y = np.array(
                                 [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
                             )/sum_of_values[feature_name]
                             arr.plot(x, y, color=colors[i])
+
                     arr.set_xlabel(kwargs.get("xlabel", f"time"))
                     arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
                     arr.set_title(kwargs.get(
                         "title", f"{task.target_column}: SHAP values by patient for {function}"
                     ))
                     normalize_name = "normalized" if normalize else "not_normalized"
+
                     if path_to_save_folder is not None:
                         path = os.path.join(
                             path_to_save_folder,
@@ -450,6 +475,7 @@ class TableSurvshapExplainer:
                         )
                     else:
                         path = None
+
                     PredictionEvaluator.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_shap_lines_for_features(
@@ -503,6 +529,7 @@ class TableSurvshapExplainer:
         else:
             method = ""
             discretize = (5, [])
+
         if isinstance(features, list):
             for task in tasks:
                 explainer = self.compute_explanation(task=task, function=function)
@@ -523,16 +550,21 @@ class TableSurvshapExplainer:
                 explanation = self.compute_explanation(task=task, function=function)
                 cmap = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(self.feature_order)))))
                 color_dict = {feature: cmap[i] for i, feature in enumerate(self.feature_order)}
+
                 for features_list, patients in features.items():
                     patch_list = []
+
                     if len(patients) == 0:
                         patients = [i for i in range(len(explanation.individual_explanations))]
+
                     if normalize:
                         sum_of_values = {
                             key: np.array([0 for _ in [explanation.timestamps]]) for key in self.feature_order
                         }
+
                         for i, patient_index in enumerate(patients):
                             exp = explanation.individual_explanations[patient_index]
+
                             for feature_name in features_list:
                                 y = [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
                                 sum_of_values[feature_name] = sum_of_values.get(feature_name) + np.abs(np.array(y))
@@ -540,16 +572,20 @@ class TableSurvshapExplainer:
                         sum_of_values = {
                             key: np.array([1 for _ in [explanation.timestamps]]) for key in self.feature_order
                         }
+
                     for i, patient_index in enumerate(patients):
                         exp = explanation.individual_explanations[patient_index]
                         x = exp.timestamps
+
                         for feature_name in features_list:
                             y = np.array(
                                 [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
                             )/sum_of_values[feature_name]
                             arr.plot(x, y, color=color_dict[feature_name])
+
                     for feature_name in features_list:
                         patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
+
                     arr.set_xlabel(kwargs.get("xlabel", f"time"))
                     arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
                     arr.set_title(kwargs.get(
@@ -557,6 +593,7 @@ class TableSurvshapExplainer:
                     ))
                     arr.legend(handles=patch_list)
                     normalize_name = "normalized" if normalize else "not_normalized"
+
                     if path_to_save_folder is not None:
                         path = os.path.join(
                             path_to_save_folder,
@@ -565,6 +602,7 @@ class TableSurvshapExplainer:
                         )
                     else:
                         path = None
+
                     PredictionEvaluator.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
 
     def plot_shap_average_of_absolute_value(
@@ -609,6 +647,7 @@ class TableSurvshapExplainer:
             assert all(isinstance(task, TableTask) for task in tasks), (
                 f"All tasks must be instances of 'TableTask'."
             )
+
         if isinstance(features, list):
             for task in tasks:
                 explainer = self.compute_explanation(task=task, function=function)
@@ -625,22 +664,29 @@ class TableSurvshapExplainer:
                 explanation = self.compute_explanation(task=task, function=function)
                 cmap = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(self.feature_order)))))
                 color_dict = {feature: cmap[i] for i, feature in enumerate(self.feature_order)}
+
                 for features_list, patients in features.items():
                     if len(patients) == 0:
                         patients = [i for i in range(len(explanation.individual_explanations))]
                     sum_of_values = {key: np.array([0 for _ in [explanation.timestamps]]) for key in self.feature_order}
+
                     for i, patient_index in enumerate(patients):
                         exp = explanation.individual_explanations[patient_index]
+
                         for feature_name in features_list:
                             y = [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
                             sum_of_values[feature_name] = sum_of_values.get(feature_name) + np.abs(np.array(y))
                     patch_list = []
+
                     for feature_name in features_list:
                         average_values = sum_of_values[feature_name]/(len(patients))
+
                         if normalize:
                             average_values = average_values/sum_of_values[feature_name]
+
                         arr.plot(explanation.timestamps, average_values, color=color_dict[feature_name])
                         patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
+
                     arr.set_xlabel(kwargs.get("xlabel", f"time"))
                     arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
                     arr.set_title(kwargs.get(
@@ -648,6 +694,7 @@ class TableSurvshapExplainer:
                     ))
                     arr.legend(handles=patch_list)
                     normalize_name = "normalized" if normalize else "not_normalized"
+
                     if path_to_save_folder is not None:
                         path = os.path.join(
                             path_to_save_folder,
@@ -656,4 +703,5 @@ class TableSurvshapExplainer:
                         )
                     else:
                         path = None
+
                     PredictionEvaluator.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
