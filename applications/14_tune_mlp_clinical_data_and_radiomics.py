@@ -102,7 +102,7 @@ def get_dataframes_dictionary(
 if __name__ == '__main__':
     for task in TABLE_TASKS:
         df_dict = get_dataframes_dictionary(
-            path_to_dataframes_folder=os.path.join(AUTOMATIC_FILTERED_RADIOMICS_PATH, task.target_column),
+            path_to_dataframes_folder=os.path.join(DEEP_FILTERED_RADIOMICS_PATH, task.target_column),
             n_outer_loops=5,
             n_inner_loops=5
         )
@@ -119,7 +119,7 @@ if __name__ == '__main__':
 
         path_to_record_folder = os.path.join(
             EXPERIMENTS_PATH,
-            f"{task.target_column}(MLP - Clinical data and automatic radiomics)"
+            f"{task.target_column}(MLP - Clinical data and deep radiomics)"
         )
 
         search_algo = SearchAlgorithm(
@@ -145,7 +145,8 @@ if __name__ == '__main__':
                     name="hidden_channels",
                     choices=["(10, 10, 10)", "(20, 20, 20)", "(30, 30, 30)", "(40, 40, 40)"]
                 ),
-                "dropout": FloatHyperparameter(name="dropout", low=0.05, high=0.25)
+                "dropout": FloatHyperparameter(name="dropout", low=0.05, high=0.25),
+                "seed": SEED
             }
         )
 
