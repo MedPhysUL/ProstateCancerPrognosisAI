@@ -353,6 +353,11 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
+        assert len(self.tasks.binary_classification_tasks) > 0, "There needs to be at least one " \
+                                                                "BinaryClassificationTask to plot binary " \
+                                                                "classification task curves."
+
+
         self.plot_confusion_matrix(show, path_to_save_folder, mask=mask, **kwargs)
         self.plot_calibration_curve(show, path_to_save_folder, mask=mask, **kwargs)
         self.plot_roc_curve(show, path_to_save_folder, mask=mask, **kwargs)
@@ -380,6 +385,9 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
+        assert len(self.tasks.survival_analysis_tasks) > 0, "There needs to be at least one SurvivalAnalysisTask to " \
+                                                            "plot survival analysis task curves."
+
         self.plot_unique_times(show, path_to_save_folder, **kwargs)
         self.plot_cum_baseline_hazard(show, path_to_save_folder, **kwargs)
         self.plot_baseline_survival(show, path_to_save_folder, **kwargs)
@@ -404,6 +412,9 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
+        assert len(self.tasks.survival_analysis_tasks) > 0, "There needs to be at least one SurvivalAnalysisTask to " \
+                                                            "plot a unique times graph."
+
         for task in self.tasks.survival_analysis_tasks:
             fig, arr = plt.subplots()
             unique_times = task.breslow_estimator.unique_times_
@@ -441,6 +452,9 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
+        assert len(self.tasks.survival_analysis_tasks) > 0, "There needs to be at least one SurvivalAnalysisTask to " \
+                                                            "plot a cumulative baseline hazard graph."
+
         for task in self.tasks.survival_analysis_tasks:
             fig, arr = plt.subplots()
             cum_baseline_hazard = task.breslow_estimator.cum_baseline_hazard_
@@ -476,6 +490,9 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
+        assert len(self.tasks.survival_analysis_tasks) > 0, "There needs to be at least one SurvivalAnalysisTask to " \
+                                                            "plot a baseline survival graph."
+
         for task in self.tasks.survival_analysis_tasks:
             fig, arr = plt.subplots()
             baseline_survival = task.breslow_estimator.baseline_survival_
@@ -519,6 +536,8 @@ class PredictionEvaluator:
             patient_dict=self.predictions_dict,
             patient_indexes=mask
         )
+        assert len(self.tasks.survival_analysis_tasks) > 0, "There needs to be at least one SurvivalAnalysisTask to " \
+                                                            "plot a cumulative hazard function graph."
 
         for task in self.tasks.survival_analysis_tasks:
             fig, arr = plt.subplots()
@@ -563,6 +582,8 @@ class PredictionEvaluator:
             patient_dict=self.predictions_dict,
             patient_indexes=mask
         )
+        assert len(self.tasks.survival_analysis_tasks) > 0, "There needs to be at least one SurvivalAnalysisTask to " \
+                                                            "plot a survival function graph."
 
         for task in self.tasks.survival_analysis_tasks:
             fig, arr = plt.subplots()
@@ -646,6 +667,10 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.confusion_matrix.
         """
+        assert len(self.tasks.binary_classification_tasks) > 0, "There needs to be at least one " \
+                                                                "BinaryClassificationTask to plot a confusion matrix."
+
+        print(len(self.tasks.binary_classification_tasks))
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
             if not isinstance(threshold, int):
@@ -702,6 +727,10 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.calibration.calibration_curve.
         """
+        assert len(self.tasks.binary_classification_tasks) > 0, "There needs to be at least one " \
+                                                                "BinaryClassificationTask to plot a calibration " \
+                                                                "curve graph."
+
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
             y_true = self.slice_patient_dictionary(self.targets_dict, patient_indexes=mask)[task.name]
@@ -753,6 +782,9 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.roc_curve.
         """
+        assert len(self.tasks.binary_classification_tasks) > 0, "There needs to be at least one " \
+                                                                "BinaryClassificationTask to plot a roc curve graph."
+
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
             y_true = self.slice_patient_dictionary(self.targets_dict, patient_indexes=mask)[task.name]
@@ -801,6 +833,10 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.precision_recall_curve.
         """
+        assert len(self.tasks.binary_classification_tasks) > 0, "There needs to be at least one " \
+                                                                "BinaryClassificationTask to plot a precision " \
+                                                                "recall curve graph."
+
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
             y_true = self.slice_patient_dictionary(self.targets_dict, patient_indexes=mask)[task.name]
