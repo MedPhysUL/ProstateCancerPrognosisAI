@@ -282,6 +282,18 @@ class TableDataset(Dataset):
         return {id_: i for i, id_ in enumerate(self.ids)}
 
     @property
+    def row_idx_to_ids(self) -> Dict[int, str]:
+        """
+        Returns a dictionary mapping row indices to ids.
+
+        Returns
+        -------
+        row_idx_to_ids : Dict[str, int]
+            Dictionary mapping row indices to ids.
+        """
+        return {i: id_ for i, id_ in enumerate(self.ids)}
+
+    @property
     def imputed_dataframe(self) -> pd.DataFrame:
         """
         Returns the imputed data.

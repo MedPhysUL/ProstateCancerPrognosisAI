@@ -380,6 +380,7 @@ class TableSurvshapExplainer:
             path_to_save_folder: Optional[str] = None,
             tasks: Optional[Union[Task, TaskList, List[Task]]] = None,
             normalize: bool = False,
+            legend_length: int = 5,
             **kwargs
     ) -> None:
         """
@@ -406,6 +407,8 @@ class TableSurvshapExplainer:
         normalize : bool
             Whether to normalize the values by dividing by the sum of the absolute values of all SurvSHAP(t) values for
             a given feature at each timestamp. Defaults to False.
+        legend_length : int
+            The number of patients to show in the legend, too many can clutter and hide the graph. Defaults to 5
         """
         if tasks is None:
             tasks = self.dataset.tasks.survival_analysis_tasks
@@ -431,6 +434,8 @@ class TableSurvshapExplainer:
                 explanation = self.compute_explanation(task=task, function=function)
 
                 for features_list, patients in feature.items():
+                    patch_list = []
+
                     if len(patients) == 0:
                         patients = [i for i in range(len(explanation.individual_explanations))]
                     if normalize:
@@ -449,10 +454,13 @@ class TableSurvshapExplainer:
                             key: np.array([1 for _ in [explanation.timestamps]]) for key in self.feature_order
                         }
                     colors = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(patients)))))
+                    patient_ids_dict = self.dataset.table_dataset.row_idx_to_ids
 
                     for i, patient_index in enumerate(patients):
                         exp = explanation.individual_explanations[patient_index]
                         x = exp.timestamps
+                        if len(patch_list) < legend_length:
+                            patch_list += [mpl.patches.Patch(color=colors[i], label=patient_ids_dict[patient_index])]
 
                         for feature_name in features_list:
                             y = np.array(
@@ -467,6 +475,7 @@ class TableSurvshapExplainer:
                     arr.set_title(kwargs.get(
                         "title", f"{task.target_column}: SHAP values by patient for {function}, {normalize_name_title}"
                     ))
+                    arr.legend(handles=patch_list)
 
                     if path_to_save_folder is not None:
                         path = os.path.join(

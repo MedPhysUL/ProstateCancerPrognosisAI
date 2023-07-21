@@ -48,16 +48,16 @@ class ModelEvaluator(PredictionEvaluator):
         self.dataset = dataset
         self.model = model
 
-        if dataset.table_dataset is not None:
-            super().__init__(
-                predictions=self.model.predict_on_dataset(dataset=self.dataset),
-                targets=self.dataset.table_dataset.y,
-                tasks=self.dataset.tasks,
-                breslow_mask=self.dataset.train_mask,
-                fit_breslow_estimators=False
-            )
-        else:
-            warnings.warn("Without a table dataset, only the 'compute_score_on_dataset' method is usable")
+        assert self.dataset.table_dataset is not None, "Most methods require a table dataset to function, if the" \
+                                                       "compute_score_on_dataset method is desired, " \
+                                                       "model.compute_score_on_dataset should be used instead."
+        super().__init__(
+            predictions=self.model.predict_on_dataset(dataset=self.dataset),
+            targets=self.dataset.table_dataset.y,
+            tasks=self.dataset.tasks,
+            breslow_mask=self.dataset.train_mask,
+            fit_breslow_estimators=False
+        )
 
     @staticmethod
     def compute_score_on_dataset(
