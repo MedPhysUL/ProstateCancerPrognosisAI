@@ -93,7 +93,10 @@ if __name__ == '__main__':
 
     tuner = Tuner(
         search_algorithm=search_algo,
-        recorder=TuningRecorder(path_to_record_folder=path_to_record_folder),
+        recorder=TuningRecorder(
+            path_to_record_folder=path_to_record_folder,
+            save_inner_splits_best_models=True
+        ),
         n_trials=25,
         seed=SEED
     )
@@ -106,7 +109,8 @@ if __name__ == '__main__':
             "kernel_size": FixedHyperparameter(name="kernel_size", value=3),
             "num_res_units": FixedHyperparameter(name="num_res_units", value=2),
             "dropout_cnn": FloatHyperparameter(name="dropout_cnn", low=0.2, high=0.8),
-            "dropout_fnn": FloatHyperparameter(name="dropout_fnn", low=0.1, high=0.4)
+            "dropout_fnn": FloatHyperparameter(name="dropout_fnn", low=0.1, high=0.4),
+            "seed": SEED
         }
     )
 
