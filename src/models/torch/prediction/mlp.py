@@ -39,6 +39,7 @@ class MLP(Predictor):
             name: Optional[str] = None,
             seed: Optional[int] = None,
             bayesian: bool = False,
+            temperature: Optional[Dict[str, float]] = None,
             prior_mean: float = 0.0,
             prior_variance: float = 0.1,
             posterior_mu_init: float = 0.0,
@@ -51,8 +52,8 @@ class MLP(Predictor):
         Parameters
         ----------
         features_columns : Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]]
-            The names of the features columns. If a mapping is provided, the keys must be the target columns associated
-            to the task.
+            The names of the features columns. If a mapping is provided, the keys must be the task names and the values
+            must be the features columns for each task. If None, all columns are used as features.
         multi_task_mode : Union[str, MultiTaskMode]
             Available modes are 'separated' or 'fully_shared'. If 'separated', a separate extractor model is used for
             each task. If 'fully_shared', a fully shared extractor model is used. All layers are shared between the
@@ -75,6 +76,10 @@ class MLP(Predictor):
             Random state used for reproducibility. Defaults to None.
         bayesian : bool
             Whether the model should implement variational inference.
+        temperature : Optional[Dict[str, float]]
+            Dictionary containing the temperature for each tasks. The temperature is the coefficient by which the KL
+            divergence is multiplied when the loss is being computed. Keys are the task names and values are the
+            temperature for each task.
         prior_mean : float
             Mean of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
         prior_variance : float
@@ -94,7 +99,8 @@ class MLP(Predictor):
             device=device,
             name=name,
             seed=seed,
-            bayesian=bayesian
+            bayesian=bayesian,
+            temperature=temperature
         )
 
         self.hidden_channels = literal_eval(hidden_channels) if isinstance(hidden_channels, str) else hidden_channels
@@ -159,14 +165,14 @@ class MLP(Predictor):
 
         return DataParallel(fcn).to(self.device)
 
-    def _get_in_channels(self, target_column: str) -> int:
+    def _get_in_channels(self, task_name: str) -> int:
         """
         Returns the number of input channels.
 
         Parameters
         ----------
-        target_column : str
-            The target column.
+        task_name : str
+            The task name.
 
         Returns
         -------
@@ -174,7 +180,7 @@ class MLP(Predictor):
             The number of input channels.
         """
         if isinstance(self.features_columns, Mapping):
-            return len(self.features_columns[target_column])
+            return len(self.features_columns[task_name])
         else:
             return len(self.features_columns)
 
@@ -196,7 +202,7 @@ class MLP(Predictor):
             predictor = ModuleDict()
             for task in self._tasks.table_tasks:
                 predictor[task.name] = self._build_single_predictor(
-                    in_channels=self._get_in_channels(task.target_column),
+                    in_channels=self._get_in_channels(task.name),
                     out_channels=1
                 )
             return predictor

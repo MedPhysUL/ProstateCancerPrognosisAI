@@ -16,7 +16,7 @@ from typing import Dict, List, Optional
 
 from monai.data import DataLoader
 from torch import device as torch_device
-from torch import no_grad, random, round, sigmoid, stack
+from torch import no_grad, random, round, sigmoid, stack, Tensor
 
 from ...base import check_if_built, Model
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
@@ -48,7 +48,8 @@ class TorchModel(Model, ABC):
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None,
-            bayesian: bool = False
+            bayesian: bool = False,
+            temperature: Optional[Dict[str, Tensor]] = None
     ) -> None:
         """
         Sets the protected attributes and creates an embedding block if required.
@@ -61,10 +62,22 @@ class TorchModel(Model, ABC):
             The name of the model.
         seed : Optional[int]
             Random state used for reproducibility.
+        bayesian : bool
+            Whether the model is in bayesian mode.
+        temperature : Optional[Dict[str, Tensor]]
+            Temperature of the model.
         """
+        if bayesian:
+            assert temperature is not None, (
+                f"'TorchModel' requires that the 'temperature' argument be specified when the model is in bayesian "
+                f"mode."
+            )
+
         super().__init__(device=device, name=name, seed=seed)
 
         self._bayesian = bayesian
+        self._kl_divergence = None
+        self._temperature = temperature
 
     @property
     def bayesian(self) -> bool:
@@ -77,6 +90,30 @@ class TorchModel(Model, ABC):
             Whether the model is in bayesian mode.
         """
         return self._bayesian
+
+    @property
+    def kl_divergence(self) -> Optional[Dict[str, Tensor]]:
+        """
+        Returns the KL divergence of the model if it is in bayesian mode.
+
+        Returns
+        -------
+        kl_divergence : Optional[Dict[str, Tensor]]
+            KL divergence of the model.
+        """
+        return self._kl_divergence
+
+    @property
+    def temperature(self) -> Optional[Dict[str, Tensor]]:
+        """
+        Returns the temperature of the model if it is in bayesian mode.
+
+        Returns
+        -------
+        temperature : Optional[Dict[str, Tensor]]
+            Temperature of the model.
+        """
+        raise self._temperature
 
     def build(self, dataset: ProstateCancerDataset) -> TorchModel:
         """

@@ -50,7 +50,8 @@ class Predictor(TorchModel, ABC):
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None,
-            bayesian: bool = False
+            bayesian: bool = False,
+            temperature: Optional[Dict[str, float]] = None
     ):
         """
         Initializes the model.
@@ -58,8 +59,7 @@ class Predictor(TorchModel, ABC):
         Parameters
         ----------
         features_columns : Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]]
-            The names of the features columns. If a mapping is provided, the keys must be the target columns associated
-            to the task.
+            The names of the features columns. If a mapping is provided, the keys must be the task names.
         multi_task_mode : Union[str, MultiTaskMode]
             Available modes are 'separated' or 'fully_shared'. If 'separated', a separate extractor model is used for
             each task. If 'fully_shared', a fully shared extractor model is used. All layers are shared between the
@@ -72,8 +72,12 @@ class Predictor(TorchModel, ABC):
             Random state used for reproducibility. Defaults to None.
         bayesian : bool
             Whether the model implements variational inference.
+        temperature : Optional[Dict[str, float]]
+            Dictionary containing the temperature for each tasks. The temperature is the coefficient by which the KL
+            divergence is multiplied when the loss is being computed. Keys are the task names and values are the
+            temperature for each task.
         """
-        super().__init__(device=device, name=name, seed=seed, bayesian=bayesian)
+        super().__init__(device=device, name=name, seed=seed, bayesian=bayesian, temperature=temperature)
 
         self.features_columns = [features_columns] if isinstance(features_columns, str) else features_columns
         self.multi_task_mode = MultiTaskMode(multi_task_mode)
@@ -86,10 +90,7 @@ class Predictor(TorchModel, ABC):
                 )
             self.multi_task_mode = MultiTaskMode.SEPARATED
 
-        self.map_from_target_col_to_task_name: Optional[Dict[str, str]] = None
         self.predictor: Optional[Union[Module, ModuleDict]] = None
-
-        self.kl_divergence: Optional[Dict[str, Tensor]] = None
 
     @abstractmethod
     def _build_predictor(self, dataset: ProstateCancerDataset) -> Union[Module, ModuleDict]:
@@ -127,11 +128,10 @@ class Predictor(TorchModel, ABC):
         if self.features_columns is None:
             self.features_columns = dataset.table_dataset.features_columns
         elif isinstance(self.features_columns, Mapping):
-            assert set(self.features_columns.keys()) == set([t.target_column for t in dataset.tasks.table_tasks]), (
+            assert set(self.features_columns.keys()) == set([t.name for t in dataset.tasks.table_tasks]), (
                 "The features columns mapping must contain the same tasks as the dataset."
             )
 
-        self.map_from_target_col_to_task_name = {t.target_column: t.name for t in dataset.tasks.table_tasks}
         self.predictor = self._build_predictor(dataset)
 
         return self
@@ -152,8 +152,7 @@ class Predictor(TorchModel, ABC):
         """
         if isinstance(self.features_columns, Mapping):
             x_table = {}
-            for target_col, feature_cols in self.features_columns.items():
-                task_name = self.map_from_target_col_to_task_name[target_col]
+            for task_name, feature_cols in self.features_columns.items():
                 x_table[task_name] = stack([features.table[f] for f in feature_cols], 1).float()
         else:
             x_table = stack([features.table[f] for f in self.features_columns], 1).float()
@@ -193,7 +192,7 @@ class Predictor(TorchModel, ABC):
         """
         prediction, kl_divergence = self._get_prediction(input_table)
 
-        self.kl_divergence = kl_divergence
+        self._kl_divergence = kl_divergence
 
         return prediction
 

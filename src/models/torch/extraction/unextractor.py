@@ -9,7 +9,7 @@
 """
 
 from __future__ import annotations
-from typing import List, Optional, Sequence, Union
+from typing import Dict, List, Optional, Sequence, Union
 
 from torch import cat, mean, stack, sum, Tensor
 from torch import device as torch_device
@@ -171,6 +171,7 @@ class UNEXtractor(Extractor):
             name: Optional[str] = None,
             seed: Optional[int] = None,
             bayesian: bool = False,
+            temperature: Optional[Dict[str, float]] = None,
             prior_mean: float = 0.0,
             prior_variance: float = 0.1,
             posterior_mu_init: float = 0.0,
@@ -222,6 +223,10 @@ class UNEXtractor(Extractor):
             Random state used for reproducibility.
         bayesian : bool
             Whether the model implements variational inference.
+        temperature : Optional[Dict[str, float]]
+            Dictionary containing the temperature for each tasks. The temperature is the coefficient by which the KL
+            divergence is multiplied when the loss is being computed. Keys are the task names and values are the
+            temperature for each task.
         prior_mean : float
             Mean of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
         prior_variance : float
@@ -247,7 +252,13 @@ class UNEXtractor(Extractor):
             device=device,
             name=name,
             seed=seed,
-            bayesian=bayesian
+            bayesian=bayesian,
+            temperature=temperature,
+            prior_mean=prior_mean,
+            prior_variance=prior_variance,
+            posterior_mu_init=posterior_mu_init,
+            posterior_rho_init=posterior_rho_init,
+            standard_deviation=standard_deviation
         )
 
         self.strides = strides if strides else [2] * (len(self.channels) - 1)

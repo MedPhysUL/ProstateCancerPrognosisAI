@@ -27,13 +27,13 @@ class _Block(NamedTuple):
 
     Elements
     --------
-    input_target_columns : Sequence[str]
-        The input target columns.
-    target_column : str
-        The target column.
+    input_task_names : Sequence[str]
+        The input task names.
+    task_name : str
+        The task name.
     """
-    input_target_columns: Sequence[str]
-    target_column: str
+    input_task_names: Sequence[str]
+    task_name: str
 
 
 class SequentialNet(Predictor):
@@ -56,6 +56,7 @@ class SequentialNet(Predictor):
             name: Optional[str] = None,
             seed: Optional[int] = None,
             bayesian: bool = False,
+            temperature: Optional[Dict[str, float]] = None,
             prior_mean: float = 0.0,
             prior_variance: float = 0.1,
             posterior_mu_init: float = 0.0,
@@ -68,16 +69,14 @@ class SequentialNet(Predictor):
         Parameters
         ----------
         sequence : Dict[str, int]
-            A sequence of the target columns.
+            A sequence of the task names.
         features_columns : Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]]
-            The names of the features columns. If a mapping is provided, the keys must be the target columns associated
-            to the tasks.
+            The names of the features columns. If a mapping is provided, the keys must be the task names.
         hidden_channels : Union[str, Sequence[int], Mapping[str, Sequence[int]]]
-            List with number of units in each hidden layer. If a mapping is provided, the keys must be the target
-            columns associated to the tasks. Defaults to (25, 25, 25).
+            List with number of units in each hidden layer. If a mapping is provided, the keys must be the task names.
+            Defaults to (25, 25, 25).
         dropout : Union[float, Mapping[str, float]]
-            Probability of dropout. If a mapping is provided, the keys must be the target columns associated to the
-            tasks. Defaults to 0.0.
+            Probability of dropout. If a mapping is provided, the keys must be the task names. Defaults to 0.0.
         activation : Union[Tuple, str]
             Activation function. Defaults to "PRELU".
         bias : bool
@@ -92,6 +91,10 @@ class SequentialNet(Predictor):
             Random state used for reproducibility. Defaults to None.
         bayesian : bool
             Whether the model should implement variational inference.
+        temperature : Optional[Dict[str, float]]
+            Dictionary containing the temperature for each tasks. The temperature is the coefficient by which the KL
+            divergence is multiplied when the loss is being computed. Keys are the task names and values are the
+            temperature for each task.
         prior_mean : float
             Mean of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
         prior_variance : float
@@ -111,7 +114,8 @@ class SequentialNet(Predictor):
             device=device,
             name=name,
             seed=seed,
-            bayesian=bayesian
+            bayesian=bayesian,
+            temperature=temperature
         )
 
         self.sequence = sequence
@@ -151,11 +155,11 @@ class SequentialNet(Predictor):
         Creates the blocks of the sequence.
         """
         self._blocks = []
-        for idx, target_column in enumerate(self.sequence):
+        for idx, task_name in enumerate(self.sequence):
             self._blocks.append(
                 _Block(
-                    input_target_columns=[self.sequence[i] for i in self._ADDITIONAL_INPUTS_PER_BLOCKS[idx]],
-                    target_column=target_column
+                    input_task_names=[self.sequence[i] for i in self._ADDITIONAL_INPUTS_PER_BLOCKS[idx]],
+                    task_name=task_name
                 )
             )
 
@@ -213,14 +217,14 @@ class SequentialNet(Predictor):
 
         return DataParallel(fully_connected_net).to(self.device)
 
-    def _get_dropout(self, target_column: str) -> float:
+    def _get_dropout(self, task_name: str) -> float:
         """
         Returns the dropout.
 
         Parameters
         ----------
-        target_column : str
-            The target column.
+        task_name : str
+            The task name.
 
         Returns
         -------
@@ -228,18 +232,18 @@ class SequentialNet(Predictor):
             The dropout.
         """
         if isinstance(self.dropout, Mapping):
-            return self.dropout[target_column]
+            return self.dropout[task_name]
         else:
             return self.dropout
 
-    def _get_hidden_channels(self, target_column: str) -> Sequence[int]:
+    def _get_hidden_channels(self, task_name: str) -> Sequence[int]:
         """
         Returns the hidden channels.
 
         Parameters
         ----------
-        target_column : str
-            The target column.
+        task_name : str
+            The task name.
 
         Returns
         -------
@@ -247,18 +251,18 @@ class SequentialNet(Predictor):
             The hidden channels.
         """
         if isinstance(self.hidden_channels, Mapping):
-            return self.hidden_channels[target_column]
+            return self.hidden_channels[task_name]
         else:
             return self.hidden_channels
 
-    def _get_in_channels(self, target_column: str) -> int:
+    def _get_in_channels(self, task_name: str) -> int:
         """
         Returns the number of input channels.
 
         Parameters
         ----------
-        target_column : str
-            The target column.
+        task_name : str
+            The task name.
 
         Returns
         -------
@@ -266,11 +270,11 @@ class SequentialNet(Predictor):
             The number of input channels.
         """
         if isinstance(self.features_columns, Mapping):
-            base_length = len(self.features_columns[target_column])
+            base_length = len(self.features_columns[task_name])
         else:
             base_length = len(self.features_columns)
 
-        return base_length + len(self._ADDITIONAL_INPUTS_PER_BLOCKS[self.sequence.index(target_column)])
+        return base_length + len(self._ADDITIONAL_INPUTS_PER_BLOCKS[self.sequence.index(task_name)])
 
     def _build_predictor(self, dataset: ProstateCancerDataset) -> Union[Module, ModuleDict]:
         """
@@ -292,9 +296,9 @@ class SequentialNet(Predictor):
         predictor = ModuleDict()
         for task in self._tasks.table_tasks:
             predictor[task.name] = self._build_single_predictor(
-                dropout=self._get_dropout(task.target_column),
-                hidden_channels=self._get_hidden_channels(task.target_column),
-                in_channels=self._get_in_channels(task.target_column),
+                dropout=self._get_dropout(task.name),
+                hidden_channels=self._get_hidden_channels(task.name),
+                in_channels=self._get_in_channels(task.name),
                 out_channels=1
             )
 
@@ -323,10 +327,8 @@ class SequentialNet(Predictor):
         predictor_input
             The input to the predictor.
         """
-        task_name = self.map_from_target_col_to_task_name[block.target_column]
-
-        base_input = table_data[task_name] if isinstance(table_data, dict) else table_data
-        additional_inputs = [output[self.map_from_target_col_to_task_name[c]] for c in block.input_target_columns]
+        base_input = table_data[block.task_name] if isinstance(table_data, dict) else table_data
+        additional_inputs = [output[t] for t in block.input_task_names]
 
         if additional_inputs:
             predictor_input = cat([base_input, stack(additional_inputs, 1)], 1)
@@ -358,9 +360,7 @@ class SequentialNet(Predictor):
         kl_divergence : Tensor
             The KL divergence.
         """
-        kl_list = [kl_divergence[self.map_from_target_col_to_task_name[c]] for c in block.input_target_columns]
-
-        return sum(stack([base_kl, *kl_list]))
+        return sum(stack([base_kl, *[kl_divergence[t] for t in block.input_task_names]]))
 
     def _get_prediction(self, table_data: Union[Tensor, Dict[str, Tensor]]) -> Union[Dict[str, Tensor], tuple]:
         """
@@ -381,22 +381,18 @@ class SequentialNet(Predictor):
         if self.bayesian:
             kl_divergence = {}
             for block in self._blocks:
-                task_name = self.map_from_target_col_to_task_name[block.target_column]
-
                 predictor_input = self.__get_predictor_input(table_data=table_data, block=block, output=output)
 
-                y, kl = self.predictor[task_name](predictor_input)
-                output[task_name] = y[:, 0]
-                kl_divergence[task_name] = self._get_kl_divergence(base_kl=kl, block=block, kl_divergence=kl_divergence)
+                y, kl = self.predictor[block.task_name](predictor_input)
+                output[block.task_name] = y[:, 0]
+                kl_divergence[block.task_name] = self._get_kl_divergence(kl, block, kl_divergence)
 
             return output, kl_divergence
 
         else:
             for block in self._blocks:
-                task_name = self.map_from_target_col_to_task_name[block.target_column]
-
                 predictor_input = self.__get_predictor_input(table_data=table_data, block=block, output=output)
 
-                output[task_name] = self.predictor[task_name](predictor_input)[:, 0]
+                output[block.task_name] = self.predictor[block.task_name](predictor_input)[:, 0]
 
             return output

@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 from ast import literal_eval
-from typing import Optional, Sequence, Union
+from typing import Dict, Optional, Sequence, Union
 
 from torch import device as torch_device
 from torch import cat, stack, sum, Tensor
@@ -312,6 +312,7 @@ class Unet(Segmentor):
             name: Optional[str] = None,
             seed: Optional[int] = None,
             bayesian: bool = False,
+            temperature: Optional[Dict[str, float]] = None,
             prior_mean: float = 0.0,
             prior_variance: float = 0.1,
             posterior_mu_init: float = 0.0,
@@ -353,6 +354,10 @@ class Unet(Segmentor):
             Random state used for reproducibility.
         bayesian : bool
             Whether the model implements variational inference.
+        temperature : Optional[Dict[str, float]]
+            Dictionary containing the temperature for each tasks. The temperature is the coefficient by which the KL
+            divergence is multiplied when the loss is being computed. Keys are the task names and values are the
+            temperature for each task.
         prior_mean : float
             Mean of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
         prior_variance : float
@@ -371,7 +376,8 @@ class Unet(Segmentor):
             device=device,
             name=name,
             seed=seed,
-            bayesian=bayesian
+            bayesian=bayesian,
+            temperature=temperature
         )
 
         self.channels = literal_eval(channels) if isinstance(channels, str) else channels
