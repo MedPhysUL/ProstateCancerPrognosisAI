@@ -16,7 +16,7 @@ from typing import Dict, List, Optional, NamedTuple, Sequence, Union
 
 from torch import cat, Tensor
 from torch import device as torch_device
-from torch.nn import DataParallel, Linear, Module, ModuleDict
+from torch.nn import DataParallel, Module, ModuleDict
 
 from ..base import check_if_built, TorchModel
 from ..blocks import BayesianFullyConnectedNet, BayesianSingleLayerLinear, FullyConnectedNet, SingleLayerLinear
@@ -93,6 +93,7 @@ class Extractor(TorchModel, ABC):
             name: Optional[str] = None,
             seed: Optional[int] = None,
             bayesian: bool = False,
+            temperature: Optional[Dict[str, float]] = None,
             prior_mean: float = 0.0,
             prior_variance: float = 0.1,
             posterior_mu_init: float = 0.0,
@@ -133,6 +134,10 @@ class Extractor(TorchModel, ABC):
             Random state used for reproducibility.
         bayesian : bool
             Whether the model implements variational inference.
+        temperature : Optional[Dict[str, float]]
+            Dictionary containing the temperature for each tasks. The temperature is the coefficient by which the KL
+            divergence is multiplied when the loss is being computed. Keys are the task names and values are the
+            temperature for each task.
         prior_mean : float
             Mean of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
         prior_variance : float
@@ -146,7 +151,7 @@ class Extractor(TorchModel, ABC):
             Standard deviation of the gaussian distribution used to sample the initial posterior mu and initial
             posterior rho for the gaussian distribution from which the initial weights are sampled.
         """
-        super().__init__(device=device, name=name, seed=seed, bayesian=bayesian)
+        super().__init__(device=device, name=name, seed=seed, bayesian=bayesian, temperature=temperature)
 
         self.activation = activation
         self.channels: Sequence[int] = literal_eval(channels) if isinstance(channels, str) else channels
@@ -159,7 +164,7 @@ class Extractor(TorchModel, ABC):
         if hidden_channels_fnn:
             self.hidden_channels_fnn = hidden_channels_fnn
         else:
-            self.hidden_channels_fnn = (int(sum(self.channels)/4), int(sum(self.channels)/16))
+            self.hidden_channels_fnn = [int(sum(self.channels)/16)]
 
         self.prior_mean = prior_mean
         self.prior_variance = prior_variance
@@ -170,8 +175,6 @@ class Extractor(TorchModel, ABC):
         self.extractor: Optional[Module] = None
         self.linear_module: Optional[Union[Module, ModuleDict]] = None
         self.prediction_layer: Optional[Union[Module, ModuleDict]] = None
-
-        self.kl_divergence: Optional[Dict[str, Tensor]] = None
 
     @property
     def in_shape(self) -> Sequence[int]:
@@ -532,7 +535,7 @@ class Extractor(TorchModel, ABC):
             radiomics_kl=radiomics_kl,
             prediction_kl=prediction_kl
         )
-        self.kl_divergence = kl_divergence
+        self._kl_divergence = kl_divergence
 
         seg = output.segmentation
         if seg is not None:
