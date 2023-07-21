@@ -113,7 +113,7 @@ class TorchModel(Model, ABC):
         temperature : Optional[Dict[str, Tensor]]
             Temperature of the model.
         """
-        raise self._temperature
+        return self._temperature
 
     def build(self, dataset: ProstateCancerDataset) -> TorchModel:
         """
