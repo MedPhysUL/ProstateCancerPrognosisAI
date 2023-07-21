@@ -158,10 +158,12 @@ class Tuner:
             self.outer_loop_state.dataset = dataset
 
             self.callbacks.on_outer_loop_start(self)
-            self._exec_study(dataset, mask[Mask.INNER], objective, dataframes[idx][Split.INNER] if dataframes else None)
-            self._update_dataset(dataset, mask, dataframes[idx][Split.OUTER] if dataframes else None)
+            inner_dataframes = dataframes[idx][Split.INNER] if dataframes else None
+            self._exec_study(dataset, mask[Mask.INNER], objective, inner_dataframes)
 
+            self._update_dataset(dataset, mask, dataframes[idx][Split.OUTER] if dataframes else None)
             self._exec_best_model_evaluation(dataset, objective)
+            self._exec_inner_loops_best_models_evaluation(dataset, mask[Mask.INNER], objective, inner_dataframes)
             self.callbacks.on_outer_loop_end(self)
 
         self.callbacks.on_tuning_end(self)
@@ -226,10 +228,37 @@ class Tuner:
         self.study_state.best_trial = self._get_best_trial()
         self.callbacks.on_study_end(self)
 
+    def _exec_inner_loops_best_models_evaluation(
+            self,
+            dataset: ProstateCancerDataset,
+            masks: Dict[int, Dict[str, List[int]]],
+            objective: Objective,
+            dataframes: Optional[Dict[int, pd.DataFrame]] = None
+    ):
+        """
+        Executes the evaluation of the best models of the inner loops.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            The dataset used for the current trial.
+        masks : Dict[int, Dict[str, List[int]]]
+            Dictionary of inner loops masks, i.e a dictionary with list of idx to use as train, valid and test masks.
+        objective : Objective
+            The objective.
+        dataframes : Optional[Dict[int, pd.DataFrame]]
+            Dictionary of dataframes to use for different inner splits.
+        """
+        for idx, mask in masks.items():
+            self._update_dataset(dataset=dataset, mask=mask, dataframe=dataframes[idx] if dataframes else None)
+            self._exec_best_model_evaluation(dataset=dataset, objective=objective, outer=False, idx=idx)
+
     def _exec_best_model_evaluation(
             self,
             dataset: ProstateCancerDataset,
-            objective: Objective
+            objective: Objective,
+            outer: bool = True,
+            idx: Optional[int] = None
     ):
         """
         Executes the evaluation of the model using the best trial hyperparameters.
@@ -240,17 +269,21 @@ class Tuner:
             The dataset used for the current trial.
         objective : Objective
             The objective.
+        outer : bool
+            Whether the evaluation is performed on the outer loop or not.
+        idx : Optional[int]
+            The index of the INNER loop. None if outer is True.
         """
-        self.callbacks.on_best_model_evaluation_start(self)
+        self.callbacks.on_best_model_evaluation_start(self, outer=outer, idx=idx)
 
         model_evaluation = objective.exec_best_model_evaluation(
             best_trial=self.study_state.best_trial,
             dataset=dataset,
-            path_to_save=self.best_model_state.path_to_best_model_folder
+            path_to_save=self.best_model_state.path_to_current_model_folder
         )
         self.best_model_state.score = model_evaluation.score
         self.best_model_state.model = model_evaluation.trained_model
-        self.callbacks.on_best_model_evaluation_end(self)
+        self.callbacks.on_best_model_evaluation_end(self, outer=outer, idx=idx)
 
     def _set_seed(self):
         """
