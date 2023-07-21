@@ -440,7 +440,7 @@ class TableSurvshapExplainer:
 
                         for i, patient_index in enumerate(patients):
                             exp = explanation.individual_explanations[patient_index]
-                            
+
                             for feature_name in features_list:
                                 y = [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
                                 sum_of_values[feature_name] = sum_of_values.get(feature_name) + np.abs(np.array(y))
@@ -460,12 +460,13 @@ class TableSurvshapExplainer:
                             )/sum_of_values[feature_name]
                             arr.plot(x, y, color=colors[i])
 
+                    normalize_name = "normalized" if normalize else "not_normalized"
+                    normalize_name_title = "normalized" if normalize else "not normalized"
                     arr.set_xlabel(kwargs.get("xlabel", f"time"))
                     arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
                     arr.set_title(kwargs.get(
-                        "title", f"{task.target_column}: SHAP values by patient for {function}"
+                        "title", f"{task.target_column}: SHAP values by patient for {function}, {normalize_name_title}"
                     ))
-                    normalize_name = "normalized" if normalize else "not_normalized"
 
                     if path_to_save_folder is not None:
                         path = os.path.join(
@@ -586,13 +587,14 @@ class TableSurvshapExplainer:
                     for feature_name in features_list:
                         patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
 
+                    normalize_name = "normalized" if normalize else "not_normalized"
+                    normalize_name_title = "normalized" if normalize else "not normalized"
                     arr.set_xlabel(kwargs.get("xlabel", f"time"))
                     arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
                     arr.set_title(kwargs.get(
-                        "title", f"{task.target_column}: SHAP values by feature for {function}"
+                        "title", f"{task.target_column}: SHAP values by feature for {function}, {normalize_name_title}"
                     ))
                     arr.legend(handles=patch_list)
-                    normalize_name = "normalized" if normalize else "not_normalized"
 
                     if path_to_save_folder is not None:
                         path = os.path.join(
@@ -612,7 +614,6 @@ class TableSurvshapExplainer:
             tasks: Optional[Union[Task, TaskList, List[Task]]],
             show: bool = True,
             path_to_save_folder: Optional[str] = None,
-            normalize: bool = False,
             **kwargs
 
     ) -> None:
@@ -636,9 +637,6 @@ class TableSurvshapExplainer:
             Whether to show the graph. Defaults to True.
         path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
-        normalize : bool
-            Whether to normalize the values by dividing by the sum of the absolute values of all SurvSHAP(t) values for
-            a given feature at each timestamp. Defaults to False.
         """
         if tasks is None:
             tasks = self.dataset.tasks.survival_analysis_tasks
@@ -681,9 +679,6 @@ class TableSurvshapExplainer:
                     for feature_name in features_list:
                         average_values = sum_of_values[feature_name]/(len(patients))
 
-                        if normalize:
-                            average_values = average_values/sum_of_values[feature_name]
-
                         arr.plot(explanation.timestamps, average_values, color=color_dict[feature_name])
                         patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
 
@@ -693,12 +688,11 @@ class TableSurvshapExplainer:
                         "title", f"{task.target_column}: Average of absolute value of SHAP values for {function}"
                     ))
                     arr.legend(handles=patch_list)
-                    normalize_name = "normalized" if normalize else "not_normalized"
 
                     if path_to_save_folder is not None:
                         path = os.path.join(
                             path_to_save_folder,
-                            f"{task.target_column}_{function}_{normalize_name}"
+                            f"{task.target_column}_{function}"
                             f"_{kwargs.get('filename', 'average_of_absolute_value_of_SHAP.pdf')}"
                         )
                     else:
