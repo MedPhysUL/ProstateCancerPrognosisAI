@@ -338,7 +338,7 @@ class TableShapValueExplainer:
 
             if path_to_save_folder is not None:
                 target_names = self.dataset.table_dataset.target_columns
-                file_name = 'average_absolute_shap_plot.pdf' if absolute else 'average_shap_plot.pdf'
+                file_name = "average_absolute_shap_plot.pdf" if absolute else "average_shap_plot.pdf"
                 path = os.path.join(
                     path_to_save_folder,
                     f"{kwargs.get('target', target_names[target])}_{kwargs.get('filename', file_name)}"

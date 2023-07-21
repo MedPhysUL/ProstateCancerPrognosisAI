@@ -300,9 +300,9 @@ class TableSurvshapExplainer:
         structured_array : np.ndarray
             (N, 2) structured array with event indicator and event time.
         """
-        structured_array = np.empty(shape=(len(event_indicator),), dtype=[('event', int), ('time', float)])
-        structured_array['event'] = event_indicator.astype(bool)
-        structured_array['time'] = event_time
+        structured_array = np.empty(shape=(len(event_indicator),), dtype=[("event", int), ("time", float)])
+        structured_array["event"] = event_indicator.astype(bool)
+        structured_array["time"] = event_time
 
         return structured_array
 
@@ -363,7 +363,7 @@ class TableSurvshapExplainer:
                 explainer = None
 
             survshap_explanation = survshap.ModelSurvSHAP(
-                calculation_method='shap',
+                calculation_method="shap",
                 function_type=function,
                 random_state=11121
             )
@@ -391,7 +391,7 @@ class TableSurvshapExplainer:
         feature : Union[Dict[Tuple[str], List[int]], str]
             A dictionary with keys being a tuple of desired features for a graph and values being a list of the indexes
             of the patients to put on the graph. The number of graphs will equal the number of keys in the dictionary.
-            E.g. {['PSA', 'AGE']: [0, 1, 2, 3, 4, 4], ['GLEASON_GLOBAL', 'GLEASON_SECONDARY']: [5, 6, 7, 8, 9]} would
+            E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
             create two graphs. An empty list of patients indexes will graph all patients. If the original SurvSHAP(t)
             graphs are desired, simply input the chosen feature.
         function : str
@@ -498,7 +498,7 @@ class TableSurvshapExplainer:
         features : Union[List[str], Dict[Tuple[str], List[int]]]
             A dictionary with keys being a tuple of desired features for a graph and values being a list of the indexes
             of the patients to put on the graph. The number of graphs will equal the number of keys in the dictionary.
-            E.g. {['PSA', 'AGE']: [0, 1, 2, 3, 4, 4], ['GLEASON_GLOBAL', 'GLEASON_SECONDARY']: [5, 6, 7, 8, 9]} would
+            E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
             create two graphs. An empty list of patients indexes will graph all patients. If the original SurvSHAP(t)
             graphs are desired, simply input a list of the chosen features.
         function : str
@@ -625,7 +625,7 @@ class TableSurvshapExplainer:
         features : List[str]
             A dictionary with keys being a tuple of desired features for a graph and values being a list of the indexes
             of the patients to put on the graph. The number of graphs will equal the number of keys in the dictionary.
-            E.g. {['PSA', 'AGE']: [0, 1, 2, 3, 4, 4], ['GLEASON_GLOBAL', 'GLEASON_SECONDARY']: [5, 6, 7, 8, 9]} would
+            E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
             create two graphs. An empty list of patients indexes will graph all patients. If the original SurvSHAP(t)
             graphs are desired, simply input a list of the chosen features.
         function : str
