@@ -36,6 +36,9 @@ from src.training.callbacks.learning_algorithm import L2Regularizer, MultiTaskLo
 from src.tuning import SearchAlgorithm, TorchObjective, Tuner
 from src.tuning.callbacks import TuningRecorder
 
+from src.tuning.hyperparameters.containers import (
+    HyperparameterDict
+)
 from src.tuning.hyperparameters.optuna import (
     CategoricalHyperparameter,
     FixedHyperparameter,
@@ -98,7 +101,13 @@ if __name__ == '__main__':
                     choices=["(10, 10, 10)", "(20, 20, 20)", "(30, 30, 30)"]
                 ),
                 "dropout": FloatHyperparameter(name="dropout", low=0.0, high=0.25),
-                "bayesian": True
+                "bayesian": True,
+                "temperature": HyperparameterDict(
+                    {
+                        task.name: FloatHyperparameter(name="temperature", low=1e-3, high=1e-1, log=True)
+                    }
+                ),
+                "seed": SEED
             }
         )
 
