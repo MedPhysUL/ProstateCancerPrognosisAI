@@ -104,7 +104,7 @@ if __name__ == '__main__':
                 "bayesian": True,
                 "temperature": HyperparameterDict(
                     {
-                        task.name: FloatHyperparameter(name="temperature", low=1e-3, high=1e-1, log=True)
+                        task.name: FloatHyperparameter(name="temperature", low=1e-4, high=1e-1, log=True)
                     }
                 )
             }
