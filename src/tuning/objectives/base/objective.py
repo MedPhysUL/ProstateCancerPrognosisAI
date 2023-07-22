@@ -28,6 +28,9 @@ class Objective(ABC):
     """
 
     DATASET_KEY = "dataset"
+    MODEL_INSTANCE_KEY = "model"
+    SEED_KEY = "seed"
+    TRAIN_METHOD_PARAMS_KEY = "train"
 
     def __init__(self) -> None:
         """
@@ -131,7 +134,8 @@ class Objective(ABC):
             self,
             best_trial: FrozenTrial,
             dataset: ProstateCancerDataset,
-            path_to_save: str
+            path_to_save: str,
+            seed: int
     ) -> ModelEvaluationContainer:
         """
         Evaluates the best model.
@@ -144,6 +148,8 @@ class Objective(ABC):
             The dataset used for the current trial.
         path_to_save : str
             Path to save.
+        seed : int
+            Seed to use.
 
         Returns
         -------
@@ -151,6 +157,7 @@ class Objective(ABC):
             Model evaluation.
         """
         past_suggestion = self.hyperparameters.retrieve_past_suggestion(best_trial)
+        past_suggestion[self.TRAIN_METHOD_PARAMS_KEY][self.MODEL_INSTANCE_KEY][self.SEED_KEY] = seed
         hyperparameters = self.hyperparameters.build(past_suggestion)
         model_evaluation = self._test_hyperparameters(
             dataset=dataset,

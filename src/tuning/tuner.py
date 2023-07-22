@@ -279,7 +279,8 @@ class Tuner:
         model_evaluation = objective.exec_best_model_evaluation(
             best_trial=self.study_state.best_trial,
             dataset=dataset,
-            path_to_save=self.best_model_state.path_to_current_model_folder
+            path_to_save=self.best_model_state.path_to_current_model_folder,
+            seed=self.seed
         )
         self.best_model_state.score = model_evaluation.score
         self.best_model_state.model = model_evaluation.trained_model

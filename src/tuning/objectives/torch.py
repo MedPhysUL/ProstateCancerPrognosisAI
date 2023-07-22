@@ -102,7 +102,8 @@ class TorchObjective(Objective):
             self,
             best_trial: FrozenTrial,
             dataset: ProstateCancerDataset,
-            path_to_save: str
+            path_to_save: str,
+            seed: int
     ) -> ModelEvaluationContainer:
         """
         Evaluates the best model.
@@ -115,6 +116,8 @@ class TorchObjective(Objective):
             The dataset used for the current trial.
         path_to_save : str
             Path to save.
+        seed : int
+            Seed.
 
         Returns
         -------
@@ -122,7 +125,7 @@ class TorchObjective(Objective):
             Model evaluation.
         """
         self._set_dataset(dataset)
-        return super().exec_best_model_evaluation(best_trial, dataset, path_to_save)
+        return super().exec_best_model_evaluation(best_trial, dataset, path_to_save, seed)
 
     def _set_dataset(self, dataset: ProstateCancerDataset):
         """
