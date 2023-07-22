@@ -1,6 +1,6 @@
 """
     @file:              shap_explainer.py
-    @Author:            Felix Desroches
+    @Author:            Félix Desroches
 
     @Creation Date:     06/2023
     @Last modification: 07/2023
@@ -9,19 +9,19 @@
 """
 
 import os
-from typing import Dict, List, Optional, Union, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
-import shap
-from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 from captum.attr import IntegratedGradients
+from captum._utils.typing import TensorOrTupleOfTensorsGeneric
 import matplotlib.pyplot as plt
 from monai.data import DataLoader
 import numpy as np
+import shap
 import torch
 
 from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
-from ..evaluation.prediction_evaluator import PredictionEvaluator
 from ..models.base.model import Model
+from ..tools.plot import terminate_figure
 
 
 class CaptumWrapper(torch.nn.Module):
@@ -30,7 +30,7 @@ class CaptumWrapper(torch.nn.Module):
     outputs.
     """
 
-    def __init__(self, model: Model, dataset: ProstateCancerDataset, *args, **kwargs):
+    def __init__(self, model: Model, dataset: ProstateCancerDataset):
         """
         Creates the required variables.
 
@@ -41,11 +41,9 @@ class CaptumWrapper(torch.nn.Module):
         dataset : ProstateCancerDataset
             The dataset to transform and use as an input.
         """
-        super().__init__(*args, **kwargs)
+        super().__init__()
         self.model = model
         self.dataset = dataset
-        self.targets_order = [task for task in dataset.tasks]
-        self.table_targets_order = [task for task in dataset.tasks.table_tasks]
         self.features_order = {"image": list(dataset[0].x.image.keys()), "table": list(dataset[0].x.table.keys())}
 
     def _convert_tensor_to_features_type(
@@ -74,8 +72,7 @@ class CaptumWrapper(torch.nn.Module):
                     tensor_list += [datum for datum in item]
         else:
             tensor_list = tensor_tuple.tolist()
-        image = {}
-        table = {}
+        image, table = {}, {}
         for i, key in enumerate(self.features_order["image"]):
             image[key] = tensor_list[i]
         for i, key in enumerate(self.features_order["table"]):
@@ -100,7 +97,7 @@ class CaptumWrapper(torch.nn.Module):
         targets : TargetsType
             The TargetsType object corresponding to the input data.
         """
-        return {task.name: value for task, value in zip(self.targets_order, tensor_tuple)}
+        return {task.name: value for task, value in zip(self.dataset.tasks.tasks, tensor_tuple)}
 
     def _convert_features_type_to_tuple_of_tensor(
             self,
@@ -152,10 +149,7 @@ class CaptumWrapper(torch.nn.Module):
             The tuple of tensors corresponding to the input TargetsType
         """
         targets_list = []
-        if ignore_seg_tasks:
-            task_list = self.table_targets_order
-        else:
-            task_list = self.targets_order
+        task_list = self.dataset.tasks.table_tasks.tasks if ignore_seg_tasks else self.dataset.tasks.tasks
 
         for task in task_list:
             datum = targets[task.name]
@@ -187,7 +181,7 @@ class CaptumWrapper(torch.nn.Module):
         else:
             inputs = self._convert_tensor_to_features_type(inputs)
 
-        predictions ={}
+        predictions = {}
         outputs = self.model(inputs)
         for task in self.dataset.tasks.binary_classification_tasks:
             predictions[task.name] = torch.sigmoid(outputs[task.name])
@@ -223,7 +217,9 @@ class TableShapValueExplainer:
         dataset : ProstateCancerDataset
             The dataset with which to explain the model.
         """
-        assert dataset.table_dataset is not None, "Shap values require a table dataset to be computed"
+        assert dataset.image_dataset is None and dataset.table_dataset is not None, (
+            "SHAP values require a table dataset and cannot be computed with a model that requires an image dataset"
+        )
         self.model = CaptumWrapper(model, dataset)
         self.old_model = model
         self.dataset = dataset
@@ -255,24 +251,16 @@ class TableShapValueExplainer:
         subset = self.dataset if mask is None else self.dataset[mask]
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
         torch.random.set_rng_state(rng_state)
-
-        n = 0
-        attr_tensor = torch.tensor([])
+        cated_tensor_list_to_cat = []
         for features, _ in data_loader:
             features = tuple([feature.requires_grad_() for feature in features.table.values()])
             attr = integrated_gradient.attribute(features, target=target)
-            cat_tensor = torch.tensor([])
-
-            for i, tensor in enumerate(attr):
-                if i == 0:
-                    cat_tensor = tensor
-                else:
-                    cat_tensor = torch.cat((cat_tensor, tensor))
-            if n == 0:
-                attr_tensor = torch.unsqueeze(cat_tensor, 0)
-            else:
-                attr_tensor = torch.cat((attr_tensor, torch.unsqueeze(cat_tensor, 0)))
-            n += 1
+            tensor_list_to_cat = []
+            for tensor in attr:
+                tensor_list_to_cat.append(tensor)
+            cated_tensor = torch.cat(tensor_list_to_cat)
+            cated_tensor_list_to_cat.append(torch.unsqueeze(cated_tensor, 0))
+        attr_tensor = torch.cat(cated_tensor_list_to_cat)
         return attr_tensor.detach().numpy()
 
     def compute_average_shap_values(
@@ -346,7 +334,7 @@ class TableShapValueExplainer:
             else:
                 path = None
 
-            PredictionEvaluator.terminate_figure(fig=fig, show=show, path_to_save_folder=path)
+            terminate_figure(fig=fig, show=show, path_to_save=path, **kwargs)
 
         average_shap = {
             target: {feature_names[i]: average_attributions[target][i] for i in range(len(feature_names))}
@@ -367,39 +355,12 @@ class TableShapValueExplainer:
         subset = self.dataset[self.dataset.train_mask]
         data_loader = DataLoader(dataset=subset, batch_size=1, shuffle=False, collate_fn=None)
         torch.random.set_rng_state(rng_state)
-        i = 1
-        output = None
+        tensor_list_to_cat = []
         for features, targets in data_loader:
             features = tuple([feature.requires_grad_() for feature in features.table.values()])
             pred = self.model.forward(features)
-            if i == 1:
-                output = pred
-            else:
-                output = torch.cat((output, pred), dim=0)
-            i += 1
-        return torch.mean(output, dim=0)
-
-    @staticmethod
-    def terminate_figure(
-            show: bool,
-            path_to_save_folder: Optional[str] = None,
-            **kwargs
-    ) -> None:
-        """
-        Terminates current figure.
-
-        Parameters
-        ----------
-        path_to_save_folder : Optional[str]
-            Path to save the figure.
-        show : bool
-            Whether to show figure.
-        """
-        if path_to_save_folder is not None:
-            plt.savefig(path_to_save_folder, **kwargs)
-        if show:
-            plt.show()
-        plt.close()
+            tensor_list_to_cat.append(pred)
+        return torch.mean(torch.cat(tensor_list_to_cat, dim=0), dim=0)
 
     def plot_force(
             self,
@@ -432,25 +393,15 @@ class TableShapValueExplainer:
             targets = [targets]
         for target in targets:
             values = self.compute_shap_values(target=target, mask=mask)
-            if mask is not None:
-                shap_values = shap.Explanation(
-                    values=values,
-                    base_values=float(self.base_values[target]),
-                    feature_names=self.dataset.table_dataset.features_columns,
-                    data=self.dataset.table_dataset.x[mask]
-                )
-            else:
-                shap_values = shap.Explanation(
-                    values=values,
-                    base_values=float(self.base_values[target]),
-                    feature_names=self.dataset.table_dataset.features_columns,
-                    data=self.dataset.table_dataset.x
-                )
-            shap.force_plot(
-                shap_values[patient_id],
-                matplotlib=True,
-                show=False
+            data = self.dataset.table_dataset.x[mask] if mask is not None else self.dataset.table_dataset.x
+            shap_values = shap.Explanation(
+                values=values,
+                base_values=float(self.base_values[target]),
+                feature_names=self.dataset.table_dataset.features_columns,
+                data=data
             )
+
+            shap.force_plot(shap_values[patient_id], matplotlib=True, show=False)
             if path_to_save_folder is not None:
                 target_names = self.dataset.table_dataset.target_columns
                 path = os.path.join(
@@ -459,7 +410,7 @@ class TableShapValueExplainer:
                 )
             else:
                 path = None
-            self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
+            terminate_figure(show=show, path_to_save=path, **kwargs)
 
     def plot_waterfall(
             self,
@@ -507,7 +458,7 @@ class TableShapValueExplainer:
                 )
             else:
                 path = None
-            self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
+            terminate_figure(show=show, path_to_save=path, **kwargs)
 
     def plot_beeswarm(
             self,
@@ -537,20 +488,13 @@ class TableShapValueExplainer:
             targets = [targets]
         for target in targets:
             values = self.compute_shap_values(target=target, mask=mask)
-            if mask is not None:
-                shap_values = shap.Explanation(
-                    values=values,
-                    base_values=float(self.base_values[target]),
-                    feature_names=self.dataset.table_dataset.features_columns,
-                    data=self.dataset.table_dataset.x[mask]
-                )
-            else:
-                shap_values = shap.Explanation(
-                    values=values,
-                    base_values=float(self.base_values[target]),
-                    feature_names=self.dataset.table_dataset.features_columns,
-                    data=self.dataset.table_dataset.x
-                )
+            data = self.dataset.table_dataset.x[mask] if mask is not None else self.dataset.table_dataset.x
+            shap_values = shap.Explanation(
+                values=values,
+                base_values=float(self.base_values[target]),
+                feature_names=self.dataset.table_dataset.features_columns,
+                data=data
+            )
             shap.plots.beeswarm(shap_values, show=False)
             if path_to_save_folder is not None:
                 target_names = self.dataset.table_dataset.target_columns
@@ -560,7 +504,7 @@ class TableShapValueExplainer:
                 )
             else:
                 path = None
-            self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
+            terminate_figure(show=show, path_to_save=path, **kwargs)
 
     def plot_bar(
             self,
@@ -590,20 +534,13 @@ class TableShapValueExplainer:
             targets = [targets]
         for target in targets:
             values = self.compute_shap_values(target=target, mask=mask)
-            if mask is not None:
-                shap_values = shap.Explanation(
-                    values=values,
-                    base_values=np.ones_like(values)*float(self.base_values[target]),
-                    feature_names=self.dataset.table_dataset.features_columns,
-                    data=self.dataset.table_dataset.x[mask]
-                )
-            else:
-                shap_values = shap.Explanation(
-                    values=values,
-                    base_values=np.ones_like(values) * float(self.base_values[target]),
-                    feature_names=self.dataset.table_dataset.features_columns,
-                    data=self.dataset.table_dataset.x
-                )
+            data = self.dataset.table_dataset.x[mask] if mask is not None else self.dataset.table_dataset.x
+            shap_values = shap.Explanation(
+                values=values,
+                base_values=np.ones_like(values)*float(self.base_values[target]),
+                feature_names=self.dataset.table_dataset.features_columns,
+                data=data
+            )
             shap.plots.bar(shap_values, show=False)
             if path_to_save_folder is not None:
                 target_names = self.dataset.table_dataset.target_columns
@@ -613,7 +550,7 @@ class TableShapValueExplainer:
                 )
             else:
                 path = None
-            self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
+            terminate_figure(show=show, path_to_save=path, **kwargs)
 
     def plot_scatter(
             self,
@@ -643,20 +580,13 @@ class TableShapValueExplainer:
             targets = [targets]
         for target in targets:
             values = self.compute_shap_values(target=target, mask=mask)
-            if mask is not None:
-                shap_values = shap.Explanation(
-                    values=values,
-                    base_values=np.ones_like(values)*float(self.base_values[target]),
-                    feature_names=self.dataset.table_dataset.features_columns,
-                    data=self.dataset.table_dataset.x[mask]
-                )
-            else:
-                shap_values = shap.Explanation(
-                    values=values,
-                    base_values=np.ones_like(values) * float(self.base_values[target]),
-                    feature_names=self.dataset.table_dataset.features_columns,
-                    data=self.dataset.table_dataset.x
-                )
+            data = self.dataset.table_dataset.x[mask] if mask is not None else self.dataset.table_dataset.x
+            shap_values = shap.Explanation(
+                values=values,
+                base_values=np.ones_like(values)*float(self.base_values[target]),
+                feature_names=self.dataset.table_dataset.features_columns,
+                data=data
+            )
             shap.plots.scatter(shap_values, show=False)
             if path_to_save_folder is not None:
                 target_names = self.dataset.table_dataset.target_columns
@@ -666,4 +596,4 @@ class TableShapValueExplainer:
                 )
             else:
                 path = None
-            self.terminate_figure(show=show, path_to_save_folder=path, **kwargs)
+            terminate_figure(show=show, path_to_save=path, **kwargs)

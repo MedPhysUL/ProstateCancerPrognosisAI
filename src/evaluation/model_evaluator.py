@@ -1,9 +1,9 @@
 """
     @file:              model_evaluator.py
-    @Author:            Felix Desroches, Maxence Larose
+    @Author:            Félix Desroches, Maxence Larose
 
     @Creation Date:     06/2023
-    @Last modification: 06/2023
+    @Last modification: 07/2023
 
     @Description:       This file contains a class used to show metrics and graphs for the user to gauge the
     quality of a model.
@@ -11,7 +11,6 @@
 
 import json
 from typing import Dict, List, Optional, Union
-import warnings
 
 from monai.data import DataLoader
 import numpy as np
@@ -48,9 +47,11 @@ class ModelEvaluator(PredictionEvaluator):
         self.dataset = dataset
         self.model = model
 
-        assert self.dataset.table_dataset is not None, "Most methods require a table dataset to function, if the" \
-                                                       "compute_score_on_dataset method is desired, " \
-                                                       "model.compute_score_on_dataset should be used instead."
+        assert self.dataset.table_dataset is not None, (
+            "Most methods require a table dataset to function, if the compute_score_on_dataset method is desired, "
+            "model.compute_score_on_dataset should be used instead."
+        )
+
         super().__init__(
             predictions=self.model.predict_on_dataset(dataset=self.dataset),
             targets=self.dataset.table_dataset.y,

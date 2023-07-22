@@ -1,6 +1,6 @@
 """
     @file:              survshap_explainer.py
-    @Author:            Felix Desroches
+    @Author:            Félix Desroches
 
     @Creation Date:     07/2023
     @Last modification: 07/2023
@@ -18,24 +18,25 @@ import numpy as np
 import pandas
 from sksurv.functions import StepFunction
 import survshap
-from survshap.model_explanations.plot import \
-    model_plot_mean_abs_shap_values,\
-    model_plot_shap_lines_for_all_individuals,\
+from survshap.model_explanations.plot import (
+    model_plot_mean_abs_shap_values,
+    model_plot_shap_lines_for_all_individuals,
     model_plot_shap_lines_for_variables
+)
 import torch
 
 from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset
-from ..evaluation.prediction_evaluator import PredictionEvaluator
 from ..models.base.model import Model
 from ..tasks.base import Task, TableTask
 from ..tasks.containers import TaskList
 from ..tasks.survival_analysis import SurvivalAnalysisTask
+from ..tools.plot import terminate_figure
 from ..tools.transforms import to_numpy
 
 
 class StepFunctionWrapper(StepFunction):
     """
-    Wrapper to convert the output of a SetpFunction into numpy ndarray.
+    Wrapper to convert the output of a StepFunction into numpy ndarray.
     """
 
     def __init__(self, step_func):
@@ -77,7 +78,7 @@ class DataFrameWrapper:
         self.function = function
         self.dataset = dataset
         self.task = task
-        self.table_order = self.dataset.table_dataset.features_columns
+        self.table_features_order = self.dataset.table_dataset.features_columns
 
     def _convert_data_frame_to_features_type(
             self,
@@ -104,10 +105,10 @@ class DataFrameWrapper:
             table_data = {}
 
             if data_frame.ndim == 2:
-                for feature in self.table_order:
+                for feature in self.table_features_order:
                     table_data[feature] = torch.unsqueeze(torch.tensor(data_frame.loc[:, feature]), -1)
             elif data_frame.ndim == 1:
-                for feature in self.table_order:
+                for feature in self.table_features_order:
                     table_data[feature] = torch.unsqueeze(torch.tensor(data_frame.loc[feature]), -1)
 
             return FeaturesType({}, table_data)
@@ -138,7 +139,8 @@ class DataFrameWrapper:
             The converted FeaturesType.
         """
         concatenated = torch.tensor([])
-        for i, feature in enumerate(self.table_order):
+        array_list_to_cat = []
+        for feature in self.table_features_order:
 
             datum = features_type.table[feature]
             if isinstance(datum, torch.Tensor):
@@ -148,13 +150,9 @@ class DataFrameWrapper:
             else:
                 datum = np.array([datum])
             datum = np.expand_dims(datum, 1)
+            array_list_to_cat.append(datum)
 
-            if i == 0:
-                concatenated = datum
-            else:
-                concatenated = np.concatenate((concatenated, datum), 1)
-
-        return pandas.DataFrame(concatenated, columns=self.table_order)
+        return pandas.DataFrame(np.concatenate(array_list_to_cat, 1), columns=self.table_features_order)
 
     def _convert_ndarray_to_features_type(
             self,
@@ -181,15 +179,15 @@ class DataFrameWrapper:
             table_data = {}
 
             if initial_array.ndim == 2:
-                for feature in self.table_order:
+                for feature in self.table_features_order:
                     table_data[feature] = torch.unsqueeze(
-                        torch.tensor(initial_array[:, self.table_order.index(feature)]),
+                        torch.tensor(initial_array[:, self.table_features_order.index(feature)]),
                         -1
                     )
             elif initial_array.ndim == 1:
-                for feature in self.table_order:
+                for feature in self.table_features_order:
                     table_data[feature] = torch.unsqueeze(
-                        torch.tensor(initial_array[self.table_order.index(feature)]),
+                        torch.tensor(initial_array[self.table_features_order.index(feature)]),
                         -1
                     )
 
@@ -245,8 +243,7 @@ class DataFrameWrapper:
             else:
                 prediction[self.task.name] = (prediction_element[self.task.name])
 
-        if (isinstance(prediction[self.task.name], torch.Tensor)
-                and prediction[self.task.name].get_device != -1):
+        if isinstance(prediction[self.task.name], torch.Tensor) and prediction[self.task.name].get_device != -1:
 
             return np.array([StepFunctionWrapper(i) for i in self.function(prediction[self.task.name].cpu())])
         else:
@@ -263,6 +260,7 @@ class TableSurvshapExplainer:
             self,
             model: Model,
             dataset: ProstateCancerDataset,
+            random_state: int = 11121
     ) -> None:
         """
         Sets up the required attributes.
@@ -273,12 +271,18 @@ class TableSurvshapExplainer:
             The model to explain.
         dataset : ProstateCancerDataset
             The dataset to use to compute the SurvSHAP values.
+        random_state : int
+            A seed to set determinism. Defaults to 11121
         """
+        assert dataset.image_dataset is None and dataset.table_dataset is not None, (
+            "SurvSHAP values require a table dataset and cannot be computed with a model that requires an image dataset"
+        )
         self.model = model
         self.dataset = dataset
         self.predictions_dict = {k: to_numpy(v) for k, v in self.model.predict_on_dataset(dataset=self.dataset).items()}
         self.feature_order = self.dataset.table_dataset.features_columns
         self.fitted = {}
+        self.random_state = random_state
 
     @staticmethod
     def _get_structured_array(
@@ -327,37 +331,29 @@ class TableSurvshapExplainer:
         survshap_explanation : survshap.ModelSurvSHAP
             The computed explanation.
         """
-        assert function == "chf" or function == "sf", "Only the survival function ('sf') and cumulative hazard " \
-                                                      "function ('chz') are implemented."
+        assert function == "chf" or function == "sf", (
+            "Only the survival function ('sf') and cumulative hazard function ('chz') are implemented."
+        )
 
         if self.fitted.get((function, task.name), None) is not None:
             return self.fitted[(function, task.name)]
         else:
+            y = self._get_structured_array(
+                to_numpy(self.dataset.table_dataset.y[task.name][:, 0]),
+                to_numpy(self.dataset.table_dataset.y[task.name][:, 1])
+            )
+            data = pandas.DataFrame(to_numpy(self.dataset.table_dataset.x), columns=self.feature_order)
             if function == "chf":
                 wrapper = DataFrameWrapper(task.breslow_estimator.get_cumulative_hazard_function, self.dataset, task)
                 explainer = survshap.SurvivalModelExplainer(model=self.model,
-                                                            data=pandas.DataFrame(
-                                                                to_numpy(self.dataset.table_dataset.x),
-                                                                columns=self.feature_order
-                                                            ),
-                                                            y=self._get_structured_array(to_numpy(
-                                                                self.dataset.table_dataset.y[task.name][:, 0]),
-                                                                to_numpy(
-                                                                    self.dataset.table_dataset.y[task.name][:, 1]
-                                                                )),
+                                                            data=data,
+                                                            y=y,
                                                             predict_cumulative_hazard_function=wrapper)
             elif function == "sf":
                 wrapper = DataFrameWrapper(task.breslow_estimator.get_survival_function, self.dataset, task)
                 explainer = survshap.SurvivalModelExplainer(model=self.model,
-                                                            data=pandas.DataFrame(
-                                                                to_numpy(self.dataset.table_dataset.x),
-                                                                columns=self.feature_order
-                                                            ),
-                                                            y=self._get_structured_array(to_numpy(
-                                                                self.dataset.table_dataset.y[task.name][:, 0]),
-                                                                to_numpy(
-                                                                    self.dataset.table_dataset.y[task.name][:, 1]
-                                                                )),
+                                                            data=data,
+                                                            y=y,
                                                             predict_survival_function=wrapper)
             else:
                 explainer = None
@@ -365,7 +361,7 @@ class TableSurvshapExplainer:
             survshap_explanation = survshap.ModelSurvSHAP(
                 calculation_method="shap",
                 function_type=function,
-                random_state=11121
+                random_state=self.random_state
             )
             survshap_explanation.fit(explainer)
             self.fitted[(function, task.name)] = survshap_explanation
@@ -443,7 +439,7 @@ class TableSurvshapExplainer:
                             key: np.array([0 for _ in [explanation.timestamps]]) for key in self.feature_order
                         }
 
-                        for i, patient_index in enumerate(patients):
+                        for patient_index in patients:
                             exp = explanation.individual_explanations[patient_index]
 
                             for feature_name in features_list:
@@ -486,7 +482,7 @@ class TableSurvshapExplainer:
                     else:
                         path = None
 
-                    PredictionEvaluator.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+                    terminate_figure(path_to_save=path, show=show, fig=fig, **kwargs)
 
     def plot_shap_lines_for_features(
             self,
@@ -572,7 +568,7 @@ class TableSurvshapExplainer:
                             key: np.array([0 for _ in [explanation.timestamps]]) for key in self.feature_order
                         }
 
-                        for i, patient_index in enumerate(patients):
+                        for patient_index in patients:
                             exp = explanation.individual_explanations[patient_index]
 
                             for feature_name in features_list:
@@ -583,7 +579,7 @@ class TableSurvshapExplainer:
                             key: np.array([1 for _ in [explanation.timestamps]]) for key in self.feature_order
                         }
 
-                    for i, patient_index in enumerate(patients):
+                    for patient_index in patients:
                         exp = explanation.individual_explanations[patient_index]
                         x = exp.timestamps
 
@@ -614,7 +610,7 @@ class TableSurvshapExplainer:
                     else:
                         path = None
 
-                    PredictionEvaluator.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+                    terminate_figure(path_to_save=path, show=show, fig=fig, **kwargs)
 
     def plot_shap_average_of_absolute_value(
             self,
@@ -677,7 +673,7 @@ class TableSurvshapExplainer:
                         patients = [i for i in range(len(explanation.individual_explanations))]
                     sum_of_values = {key: np.array([0 for _ in [explanation.timestamps]]) for key in self.feature_order}
 
-                    for i, patient_index in enumerate(patients):
+                    for patient_index in patients:
                         exp = explanation.individual_explanations[patient_index]
 
                         for feature_name in features_list:
@@ -707,4 +703,4 @@ class TableSurvshapExplainer:
                     else:
                         path = None
 
-                    PredictionEvaluator.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+                    terminate_figure(path_to_save=path, show=show, fig=fig, **kwargs)

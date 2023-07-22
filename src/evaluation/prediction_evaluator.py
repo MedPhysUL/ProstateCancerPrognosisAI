@@ -1,9 +1,9 @@
 """
     @file:              prediction_evaluator.py
-    @Author:            Felix Desroches
+    @Author:            Félix Desroches
 
     @Creation Date:     06/2023
-    @Last modification: 06/2023
+    @Last modification: 07/2023
 
     @Description:       This file contains a class used to show metrics and graphs for the user to gauge the
     quality of a model.
@@ -23,6 +23,7 @@ from ..data.datasets.prostate_cancer import TargetsType
 from ..metrics.single_task.base import Direction
 from ..tasks.base import TableTask, Task
 from ..tasks.containers.list import TaskList
+from ..tools.plot import terminate_figure
 from ..tools.transforms import to_numpy
 
 
@@ -279,33 +280,6 @@ class PredictionEvaluator:
             thresholds=thresholds
         )
 
-    @staticmethod
-    def terminate_figure(
-            fig: plt.Figure,
-            show: bool,
-            path_to_save_folder: Optional[str] = None,
-            **kwargs
-    ) -> None:
-        """
-        Terminates current figure.
-
-        Parameters
-        ----------
-        path_to_save_folder : Optional[str]
-            Path to save the figure.
-        show : bool
-            Whether to show figure.
-        fig : plt.Figure
-            Current figure.
-        """
-        fig.tight_layout()
-
-        if path_to_save_folder is not None:
-            plt.savefig(path_to_save_folder, **kwargs)
-        if show:
-            plt.show()
-        plt.close(fig)
-
     def compute_score(
             self,
             path_to_save_folder: Optional[str] = None,
@@ -353,10 +327,9 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
-        assert len(self.tasks.binary_classification_tasks) > 0, "There needs to be at least one " \
-                                                                "BinaryClassificationTask to plot binary " \
-                                                                "classification task curves."
-
+        assert len(self.tasks.binary_classification_tasks) > 0, (
+            "There needs to be at least one BinaryClassificationTask to plot binary classification task curves."
+        )
 
         self.plot_confusion_matrix(show, path_to_save_folder, mask=mask, **kwargs)
         self.plot_calibration_curve(show, path_to_save_folder, mask=mask, **kwargs)
@@ -385,8 +358,9 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
-        assert len(self.tasks.survival_analysis_tasks) > 0, "There needs to be at least one SurvivalAnalysisTask to " \
-                                                            "plot survival analysis task curves."
+        assert len(self.tasks.survival_analysis_tasks) > 0, (
+            "There needs to be at least one SurvivalAnalysisTask to plot survival analysis task curves."
+        )
 
         self.plot_unique_times(show, path_to_save_folder, **kwargs)
         self.plot_cum_baseline_hazard(show, path_to_save_folder, **kwargs)
@@ -412,8 +386,9 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
-        assert len(self.tasks.survival_analysis_tasks) > 0, "There needs to be at least one SurvivalAnalysisTask to " \
-                                                            "plot a unique times graph."
+        assert len(self.tasks.survival_analysis_tasks) > 0, (
+            "There needs to be at least one SurvivalAnalysisTask to plot a unique times graph."
+        )
 
         for task in self.tasks.survival_analysis_tasks:
             fig, arr = plt.subplots()
@@ -432,7 +407,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            terminate_figure(fig=fig, show=show, path_to_save=path, **kwargs)
 
     def plot_cum_baseline_hazard(
             self,
@@ -452,8 +427,9 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
-        assert len(self.tasks.survival_analysis_tasks) > 0, "There needs to be at least one SurvivalAnalysisTask to " \
-                                                            "plot a cumulative baseline hazard graph."
+        assert len(self.tasks.survival_analysis_tasks) > 0, (
+            "There needs to be at least one SurvivalAnalysisTask to plot a cumulative baseline hazard graph."
+        )
 
         for task in self.tasks.survival_analysis_tasks:
             fig, arr = plt.subplots()
@@ -470,7 +446,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            terminate_figure(fig=fig, show=show, path_to_save=path, **kwargs)
 
     def plot_baseline_survival(
             self,
@@ -490,8 +466,9 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
-        assert len(self.tasks.survival_analysis_tasks) > 0, "There needs to be at least one SurvivalAnalysisTask to " \
-                                                            "plot a baseline survival graph."
+        assert len(self.tasks.survival_analysis_tasks) > 0, (
+            "There needs to be at least one SurvivalAnalysisTask to plot a baseline survival graph."
+        )
 
         for task in self.tasks.survival_analysis_tasks:
             fig, arr = plt.subplots()
@@ -508,7 +485,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            terminate_figure(fig=fig, show=show, path_to_save=path, **kwargs)
 
     def plot_cum_hazard_function(
             self,
@@ -536,8 +513,9 @@ class PredictionEvaluator:
             patient_dict=self.predictions_dict,
             patient_indexes=mask
         )
-        assert len(self.tasks.survival_analysis_tasks) > 0, "There needs to be at least one SurvivalAnalysisTask to " \
-                                                            "plot a cumulative hazard function graph."
+        assert len(self.tasks.survival_analysis_tasks) > 0, (
+            "There needs to be at least one SurvivalAnalysisTask to plot a cumulative hazard function graph."
+        )
 
         for task in self.tasks.survival_analysis_tasks:
             fig, arr = plt.subplots()
@@ -554,7 +532,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            terminate_figure(fig=fig, show=show, path_to_save=path, **kwargs)
 
     def plot_survival_function(
             self,
@@ -578,12 +556,10 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig.
         """
-        prediction = self.slice_patient_dictionary(
-            patient_dict=self.predictions_dict,
-            patient_indexes=mask
+        prediction = self.slice_patient_dictionary(patient_dict=self.predictions_dict, patient_indexes=mask)
+        assert len(self.tasks.survival_analysis_tasks) > 0, (
+            "There needs to be at least one SurvivalAnalysisTask to plot a survival function graph."
         )
-        assert len(self.tasks.survival_analysis_tasks) > 0, "There needs to be at least one SurvivalAnalysisTask to " \
-                                                            "plot a survival function graph."
 
         for task in self.tasks.survival_analysis_tasks:
             fig, arr = plt.subplots()
@@ -600,7 +576,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            terminate_figure(fig=fig, show=show, path_to_save=path, **kwargs)
 
     def plot_confusion_matrix(
             self,
@@ -667,8 +643,9 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.confusion_matrix.
         """
-        assert len(self.tasks.binary_classification_tasks) > 0, "There needs to be at least one " \
-                                                                "BinaryClassificationTask to plot a confusion matrix."
+        assert len(self.tasks.binary_classification_tasks) > 0, (
+            "There needs to be at least one BinaryClassificationTask to plot a confusion matrix."
+        )
 
         print(len(self.tasks.binary_classification_tasks))
         for task in self.tasks.binary_classification_tasks:
@@ -700,7 +677,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            terminate_figure(fig=fig, show=show, path_to_save=path, **kwargs)
 
     def plot_calibration_curve(
             self,
@@ -727,9 +704,9 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.calibration.calibration_curve.
         """
-        assert len(self.tasks.binary_classification_tasks) > 0, "There needs to be at least one " \
-                                                                "BinaryClassificationTask to plot a calibration " \
-                                                                "curve graph."
+        assert len(self.tasks.binary_classification_tasks) > 0, (
+            "There needs to be at least one BinaryClassificationTask to plot a calibration curve graph."
+        )
 
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
@@ -758,7 +735,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            terminate_figure(fig=fig, show=show, path_to_save=path, **kwargs)
 
     def plot_roc_curve(
             self,
@@ -782,8 +759,9 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.roc_curve.
         """
-        assert len(self.tasks.binary_classification_tasks) > 0, "There needs to be at least one " \
-                                                                "BinaryClassificationTask to plot a roc curve graph."
+        assert len(self.tasks.binary_classification_tasks) > 0, (
+            "There needs to be at least one BinaryClassificationTask to plot a roc curve graph."
+        )
 
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
@@ -809,7 +787,7 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            terminate_figure(fig=fig, show=show, path_to_save=path, **kwargs)
 
     def plot_precision_recall_curve(
             self,
@@ -833,9 +811,9 @@ class PredictionEvaluator:
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.precision_recall_curve.
         """
-        assert len(self.tasks.binary_classification_tasks) > 0, "There needs to be at least one " \
-                                                                "BinaryClassificationTask to plot a precision " \
-                                                                "recall curve graph."
+        assert len(self.tasks.binary_classification_tasks) > 0, (
+            "There needs to be at least one BinaryClassificationTask to plot a precision recall curve graph."
+        )
 
         for task in self.tasks.binary_classification_tasks:
             fig, arr = plt.subplots()
@@ -859,4 +837,4 @@ class PredictionEvaluator:
                 )
             else:
                 path = None
-            self.terminate_figure(path_to_save_folder=path, show=show, fig=fig, **kwargs)
+            terminate_figure(fig=fig, show=show, path_to_save=path, **kwargs)
