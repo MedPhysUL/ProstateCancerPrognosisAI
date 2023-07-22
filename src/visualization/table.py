@@ -21,6 +21,7 @@ from sksurv.nonparametric import kaplan_meier_estimator
 
 from ..data.datasets import TableDataset
 from ..data.processing.sampling import Mask
+from ..tools.plot import terminate_figure
 
 
 class TableViewer:
@@ -215,37 +216,6 @@ class TableViewer:
         """
         return self._target_specific_imputed_dfs[target]
 
-    @staticmethod
-    def _terminate_figure(
-            path_to_save: Optional[str] = None,
-            show: Optional[bool] = None,
-            fig: Optional[plt.Figure] = None
-    ) -> None:
-        """
-        Terminates current figure.
-
-        Parameters
-        ----------
-        path_to_save : Optional[str]
-            Path to save.
-        show : Optional[bool]
-            Whether to show figures.
-        fig : Optional[plt.Figure]
-            Current figure.
-        """
-        if fig:
-            fig.tight_layout()
-
-        if path_to_save:
-            plt.savefig(path_to_save, dpi=300)
-        if show:
-            plt.show()
-
-        if fig:
-            plt.close(fig)
-        else:
-            plt.close()
-
     def visualize_correlations(
             self,
             columns: List[str],
@@ -300,7 +270,7 @@ class TableViewer:
             axes[0, idx].set_yticklabels(corr.columns.values, rotation=0)
             axes[0, idx].set_title(f"{name} (n = {len(filtered_subset)})")
 
-        self._terminate_figure(path_to_save, show, fig)
+        terminate_figure(fig=fig, show=show, path_to_save=path_to_save)
 
     @staticmethod
     def _format_to_percentage(
@@ -401,7 +371,7 @@ class TableViewer:
                     label_names={f"{target}_0": 0, f"{target}_1": 1},
                     title=name
                 )
-        self._terminate_figure(path_to_save, show, fig)
+        terminate_figure(fig=fig, show=show, path_to_save=path_to_save)
 
     def _plot_continuous_feature_figure(
             self,
@@ -431,7 +401,7 @@ class TableViewer:
             x="Sets",
             linewidth=1,
         )
-        self._terminate_figure(path_to_save, show, fig)
+        terminate_figure(fig=fig, show=show, path_to_save=path_to_save)
 
     def visualize_global_continuous_feature(
             self,
@@ -569,7 +539,7 @@ class TableViewer:
             axes.bar_label(axes_container, labels=labels)
 
         plt.close(fig_temp)
-        self._terminate_figure(path_to_save, show, fig)
+        terminate_figure(fig=fig, show=show, path_to_save=path_to_save)
         logger.setLevel(initial_logger_level)
 
     def visualize_global_categorical_feature(
@@ -661,7 +631,7 @@ class TableViewer:
         plt.xlabel("Time")
         plt.legend()
 
-        self._terminate_figure(path_to_save, show, fig)
+        terminate_figure(fig=fig, show=show, path_to_save=path_to_save)
 
     def _plot_stratified_kaplan_meier_curve(
             self,
@@ -726,7 +696,7 @@ class TableViewer:
         plt.xlabel("Time")
         plt.legend(loc="best")
 
-        self._terminate_figure(path_to_save, show, fig)
+        terminate_figure(fig=fig, show=show, path_to_save=path_to_save)
 
     def visualize_kaplan_meier_curve(
             self,
