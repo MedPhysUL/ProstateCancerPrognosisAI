@@ -68,7 +68,7 @@ if __name__ == '__main__':
             image_keys="CT",
             num_res_units=3,
             bayesian=True,
-            temperature={PROSTATE_SEGMENTATION_TASK.name: 1e-3},
+            temperature={PROSTATE_SEGMENTATION_TASK.name: 1e-4},
             device=torch.device("cuda"),
             seed=SEED
         ).build(dataset)
