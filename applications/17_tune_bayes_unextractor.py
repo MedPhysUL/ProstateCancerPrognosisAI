@@ -135,8 +135,8 @@ if __name__ == '__main__':
                 "dropout_fnn": FloatHyperparameter(name="dropout_fnn", low=0.0, high=0.3),
                 "bayesian": True,
                 "temperature": HyperparameterDict({
-                    task.name: FloatHyperparameter(name=f"temp{task.target_column}", low=1e-3, high=1e-1, log=True),
-                    PROSTATE_SEGMENTATION_TASK.name: FixedHyperparameter(name="tempPROSTATE", value=1e-3)
+                    task.name: FloatHyperparameter(name=f"temp{task.target_column}", low=1e-4, high=1e-1, log=True),
+                    PROSTATE_SEGMENTATION_TASK.name: FixedHyperparameter(name="tempPROSTATE", value=1e-4)
                 }),
                 "standard_deviation": 0.01
             }
