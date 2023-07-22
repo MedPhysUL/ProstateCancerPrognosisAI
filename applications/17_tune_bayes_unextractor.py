@@ -138,8 +138,7 @@ if __name__ == '__main__':
                     task.name: FloatHyperparameter(name=f"temp{task.target_column}", low=1e-3, high=1e-1, log=True),
                     PROSTATE_SEGMENTATION_TASK.name: FixedHyperparameter(name="tempPROSTATE", value=1e-3)
                 }),
-                "standard_deviation": 0.01,
-                "seed": SEED
+                "standard_deviation": 0.01
             }
         )
 
