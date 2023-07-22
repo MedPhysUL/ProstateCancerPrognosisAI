@@ -145,7 +145,7 @@ class TableViewer:
         for task in self.dataset.tasks:
             original_dataframes[task.target_column] = pd.concat(
                 objs=[
-                    self.dataset.imputed_dataframe.iloc[mask].assign(Sets=name) for name, mask in
+                    self.dataset.dataframe.iloc[mask].assign(Sets=name) for name, mask in
                     self._target_specific_masks[task.target_column].items()
                 ],
                 ignore_index=True
@@ -855,7 +855,7 @@ class TableViewer:
             Path to save tables.
         """
         dataframe.to_csv(os.path.join(path_to_save, "dataframe.csv"), index=False)
-        dataframe.describe().to_csv(os.path.join(path_to_save, "description.csv"), index=False)
+        dataframe.describe().to_csv(os.path.join(path_to_save, "description.csv"), index=True)
 
     def _save_global_dataframe(
             self,
