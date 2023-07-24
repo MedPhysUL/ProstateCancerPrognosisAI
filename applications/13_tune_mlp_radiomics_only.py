@@ -139,7 +139,7 @@ if __name__ == '__main__':
             parameters={
                 "activation": FixedHyperparameter(name="activation", value="PReLU"),
                 "n_layers": IntegerHyperparameter(name="n_layers", low=1, high=3),
-                "n_neurons": IntegerHyperparameter(name="n_neurons", low=5, high=20),
+                "n_neurons": IntegerHyperparameter(name="n_neurons", low=5, high=20, step=5),
                 "dropout": FloatHyperparameter(name="dropout", low=0.05, high=0.25)
             }
         )
