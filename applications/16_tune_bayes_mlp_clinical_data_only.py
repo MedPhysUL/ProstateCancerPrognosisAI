@@ -42,7 +42,8 @@ from src.tuning.hyperparameters.containers import (
 from src.tuning.hyperparameters.optuna import (
     CategoricalHyperparameter,
     FixedHyperparameter,
-    FloatHyperparameter
+    FloatHyperparameter,
+    IntegerHyperparameter
 )
 from src.tuning.hyperparameters.torch import (
     CheckpointHyperparameter,
@@ -96,10 +97,8 @@ if __name__ == '__main__':
             constructor=MLP,
             parameters={
                 "activation": FixedHyperparameter(name="activation", value="PReLU"),
-                "hidden_channels": CategoricalHyperparameter(
-                    name="hidden_channels",
-                    choices=["(10, 10, 10)", "(20, 20, 20)", "(30, 30, 30)"]
-                ),
+                "n_layers": IntegerHyperparameter(name="n_layers", low=1, high=3),
+                "n_neurons": IntegerHyperparameter(name="n_neurons", low=5, high=20),
                 "dropout": FloatHyperparameter(name="dropout", low=0.0, high=0.25),
                 "bayesian": True,
                 "temperature": HyperparameterDict(

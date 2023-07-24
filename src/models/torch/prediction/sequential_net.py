@@ -46,8 +46,9 @@ class SequentialNet(Predictor):
     def __init__(
             self,
             sequence: Sequence[str],
+            n_layers: Union[int, Mapping[str, int]],
+            n_neurons: Union[int, Mapping[str, int]],
             features_columns: Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]] = None,
-            hidden_channels: Union[str, Sequence[int], Mapping[str, Sequence[int]]] = (25, 25, 25),
             dropout: Union[float, Mapping[str, float]] = 0.0,
             activation: Union[Tuple, str] = "PRELU",
             bias: bool = True,
@@ -70,11 +71,12 @@ class SequentialNet(Predictor):
         ----------
         sequence : Dict[str, int]
             A sequence of the task names.
+        n_layers : Union[int, Mapping[str, int]]
+            The number of layers per task. If a mapping is provided, the keys must be the task names.
+        n_neurons : Union[int, Mapping[str, int]]
+            The number of neurons per layer. If a mapping is provided, the keys must be the task names.
         features_columns : Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]]
             The names of the features columns. If a mapping is provided, the keys must be the task names.
-        hidden_channels : Union[str, Sequence[int], Mapping[str, Sequence[int]]]
-            List with number of units in each hidden layer. If a mapping is provided, the keys must be the task names.
-            Defaults to (25, 25, 25).
         dropout : Union[float, Mapping[str, float]]
             Probability of dropout. If a mapping is provided, the keys must be the task names. Defaults to 0.0.
         activation : Union[Tuple, str]
@@ -120,12 +122,17 @@ class SequentialNet(Predictor):
 
         self.sequence = sequence
 
-        if isinstance(hidden_channels, Mapping):
-            self.hidden_channels = {t: literal_eval(c) if isinstance(c, str) else c for t, c in hidden_channels.items()}
-        elif isinstance(hidden_channels, str):
-            self.hidden_channels = literal_eval(hidden_channels)
+        if isinstance(n_layers, Mapping):
+            if isinstance(n_neurons, Mapping):
+                assert set(n_layers.keys()) == set(n_neurons.keys())
+                self.hidden_channels = {t: [n_neurons[t]]*l for t, l in n_layers.items()}
+            else:
+                self.hidden_channels = {t: [n_neurons]*l for t, l in n_layers.items()}
         else:
-            self.hidden_channels = hidden_channels
+            if isinstance(n_neurons, Mapping):
+                self.hidden_channels = {t: [n]*n_layers for t, n in n_neurons.items()}
+            else:
+                self.hidden_channels = [n_neurons]*n_layers
 
         self.activation = activation
         self.dropout = dropout
