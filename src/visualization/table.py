@@ -16,6 +16,7 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.stats import chi2_contingency, mannwhitneyu
 import seaborn as sns
 from sksurv.nonparametric import kaplan_meier_estimator
 
@@ -839,8 +840,8 @@ class TableViewer:
         self._create_global_directories(path_to_save)
         self._create_target_specific_directories(path_to_save)
 
-    @staticmethod
     def _save_tables(
+            self,
             dataframe: pd.DataFrame,
             path_to_save: str
     ) -> None:
@@ -855,7 +856,390 @@ class TableViewer:
             Path to save tables.
         """
         dataframe.to_csv(os.path.join(path_to_save, "dataframe.csv"), index=False)
-        dataframe.describe().to_csv(os.path.join(path_to_save, "description.csv"), index=True)
+
+        dataframes = {
+            "dataset": dataframe,
+            "learning_set": dataframe[dataframe["Sets"].isin([Mask.TRAIN, Mask.VALID])],
+            "holdout_set": dataframe[dataframe["Sets"].isin([Mask.TEST])]
+        }
+        for name, df in dataframes.items():
+            df.describe().transpose().round(1).to_csv(
+                os.path.join(path_to_save, f"description_cont_features_{name}.csv"), index=True
+            )
+
+            frequency_table = self.get_frequency_table(df)
+            frequency_table.to_csv(os.path.join(path_to_save, f"description_cat_features_{name}.csv"), index=False)
+
+    def get_frequency_table(
+            self,
+            dataframe: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        Returns a frequency table.
+
+        Parameters
+        ----------
+        dataframe : pd.DataFrame
+            Dataframe.
+
+        Returns
+        -------
+        frequency_table : pd.DataFrame
+            Frequency table.
+        """
+        dataframes = []
+        for column_idx, column_name in enumerate(self.dataset.categorical_features_columns):
+            frequency_table = self._get_count_and_percentage_dataframe(column_name, dataframe)
+
+            frequency_table = self._get_frequency_table_with_concatenated_list(
+                frequency_table=frequency_table,
+                values=list(frequency_table.index),
+                first_column=True
+            )
+
+            number_of_levels = len(frequency_table.index)
+            variable = [""] * number_of_levels
+            variable[0] = column_name
+            frequency_table = self._get_frequency_table_with_concatenated_list(
+                frequency_table=frequency_table,
+                values=variable,
+                first_column=True
+            )
+
+            dataframes.append(frequency_table)
+
+        dataframe = pd.concat(dataframes)
+        columns = ["Variable", "Level", "n", "%"]
+        dataframe.columns = columns
+
+        return dataframe
+
+    def _save_target_specific_continuous_tables(
+            self,
+            dataframe: pd.DataFrame,
+            target: str,
+            path_to_save: str
+    ) -> None:
+        """
+        Saves dataframes in the .csv format.
+
+        Parameters
+        ----------
+        dataframe : pd.DataFrame
+            Dataframe.
+        target : str
+            Target column.
+        path_to_save : str
+            Path to save tables.
+        """
+        dataframes = {
+            "dataset": dataframe,
+            "learning_set": dataframe[dataframe["Sets"].isin([Mask.TRAIN, Mask.VALID])],
+            "holdout_set": dataframe[dataframe["Sets"].isin([Mask.TEST])]
+        }
+
+        for name, df in dataframes.items():
+            negative_df = df[df[target] == 0][[target] + self.dataset.continuous_features_columns]
+            positive_df = df[df[target] == 1][[target] + self.dataset.continuous_features_columns]
+
+            negative_stats_df = negative_df.describe().transpose().round(1).reset_index()
+            positive_stats_df = positive_df.describe().transpose().round(1).reset_index()
+
+            negative_stats_df.insert(0, "Level", 0)
+            positive_stats_df.insert(0, "Level", 1)
+
+            concat_df = pd.concat([negative_stats_df, positive_stats_df]).sort_index().set_index("index")
+
+            concat_df.index = ["" if idx % 2 != 0 else label for idx, label in enumerate(concat_df.index)]
+            concat_df.insert(0, "Variable", concat_df.index)
+
+            p_values = []
+            for idx, label in enumerate(concat_df.index):
+                if idx % 2 != 0:
+                    p_value = ""
+                else:
+                    p_value = self._get_p_value_from_mann_whitney_u_test(
+                        column_name=label,
+                        negative_outcome_dataframe=negative_df,
+                        positive_outcome_dataframe=positive_df
+                    )
+                p_values.append(p_value)
+
+            concat_df["p-value"] = p_values
+            concat_df.to_csv(os.path.join(path_to_save, f"target_description_cont_features_{name}.csv"), index=False)
+
+    @staticmethod
+    def _get_p_value_from_mann_whitney_u_test(
+            column_name: str,
+            negative_outcome_dataframe: pd.DataFrame,
+            positive_outcome_dataframe: pd.DataFrame
+    ) -> float:
+        """
+        Calculates p-value from Mann-Whitney U test.
+
+        Parameters
+        ----------
+        column_name : str
+            Column name.
+        negative_outcome_dataframe : pd.DataFrame
+            Negative outcome dataframe.
+        positive_outcome_dataframe : pd.DataFrame
+            Positive outcome dataframe.
+
+        Returns
+        -------
+        p-value : float
+            P-value.
+        """
+        _, p_value = mannwhitneyu(
+            x=negative_outcome_dataframe[column_name].dropna(),
+            y=positive_outcome_dataframe[column_name].dropna()
+        )
+
+        return p_value
+
+    def _save_target_specific_categorical_tables(
+            self,
+            dataframe: pd.DataFrame,
+            target: str,
+            path_to_save: str
+    ) -> None:
+        """
+        Saves dataframes in the .csv format.
+
+        Parameters
+        ----------
+        dataframe : pd.DataFrame
+            Dataframe.
+        target : str
+            Target column.
+        path_to_save : str
+            Path to save tables.
+        """
+        dataframes = {
+            "dataset": dataframe,
+            "learning_set": dataframe[dataframe["Sets"].isin([Mask.TRAIN, Mask.VALID])],
+            "holdout_set": dataframe[dataframe["Sets"].isin([Mask.TEST])]
+        }
+
+        for name, df in dataframes.items():
+            dataframes = []
+            for column_idx, column_name in enumerate(self.dataset.categorical_features_columns):
+                negative_df, positive_df = df[df[target] == 0], df[df[target] == 1]
+                frequency_table = self._get_count_and_percentage_dataframe(column_name, negative_df, positive_df)
+                number_of_levels = len(frequency_table.index)
+
+                p_value = [""] * number_of_levels
+                p_value[0] = str(
+                    round(
+                        self._get_p_value_from_chi2_test_on_frequency_table(
+                            column_name=column_name, negative_df=negative_df, positive_df=positive_df
+                        ),
+                        ndigits=4
+                    )
+                )
+                frequency_table = self._get_frequency_table_with_concatenated_list(
+                    frequency_table=frequency_table,
+                    values=p_value
+                )
+
+                frequency_table = self._get_frequency_table_with_concatenated_list(
+                    frequency_table=frequency_table,
+                    values=list(frequency_table.index),
+                    first_column=True
+                )
+
+                variable = [""] * number_of_levels
+                variable[0] = column_name
+                frequency_table = self._get_frequency_table_with_concatenated_list(
+                    frequency_table=frequency_table,
+                    values=variable,
+                    first_column=True
+                )
+
+                frequency_table = frequency_table[[0, 1, 2, 4, 3, 5, 6]]
+
+                dataframes.append(frequency_table)
+
+            dataframe_ = pd.concat(dataframes)
+            columns = ["Variable", "Level", "Negative n/N", "Negative %", "Positive n/N", "Positive %", "p-value"]
+            dataframe_.columns = columns
+
+            dataframe_.to_csv(os.path.join(path_to_save, f"target_description_cat_features_{name}.csv"), index=False)
+
+    def _get_count_and_percentage_dataframe(
+            self,
+            column_name: str,
+            negative_df: pd.DataFrame,
+            positive_df: Optional[pd.DataFrame] = None
+    ) -> pd.DataFrame:
+        """
+        Returns count and percentage dataframe.
+
+        Parameters
+        ----------
+        column_name : str
+            Column name.
+        negative_df : pd.DataFrame
+            Negative dataframe.
+        positive_df : Optional[pd.DataFrame]
+            Positive dataframe.
+
+        Returns
+        -------
+        count_and_percentage_dataframe : pd.DataFrame
+            Count and percentage dataframe.
+        """
+        count_and_percentage_dataframe = pd.merge(
+            left=self._get_count_dataframe(column_name, negative_df, positive_df),
+            right=self._get_percentage_dataframe(column_name, negative_df, positive_df),
+            left_index=True,
+            right_index=True
+        )
+
+        return count_and_percentage_dataframe
+
+    @staticmethod
+    def _get_count_dataframe(
+            column_name: str,
+            negative_df: pd.DataFrame,
+            positive_df: Optional[pd.DataFrame] = None
+    ) -> pd.DataFrame:
+        """
+        Returns count dataframe.
+
+        Parameters
+        ----------
+        column_name : str
+            Column name.
+        negative_df : pd.DataFrame
+            Negative dataframe.
+        positive_df : Optional[pd.DataFrame]
+            Positive dataframe.
+
+        Returns
+        -------
+        count_dataframe : pd.DataFrame
+            Count dataframe.
+        """
+        if positive_df is not None:
+            data = [negative_df[column_name].value_counts(), positive_df[column_name].value_counts()]
+
+            count_dataframe_int: pd.DataFrame(dtype=int) = pd.concat(data, axis=1).fillna(0).applymap(int)
+            count_dataframe_str: pd.DataFrame(dtype=str) = count_dataframe_int.applymap(str)
+
+            for column_idx, _ in enumerate(count_dataframe_int.columns):
+                column_sum = count_dataframe_int.iloc[:, column_idx].sum()
+                count_dataframe_str.iloc[:, column_idx] = count_dataframe_str.iloc[:, column_idx] + f"//{column_sum}"
+        else:
+            count_dataframe_int = negative_df[column_name].value_counts().fillna(0).apply(int)
+            count_dataframe_str: pd.DataFrame(dtype=str) = count_dataframe_int.apply(str)
+
+            column_sum = count_dataframe_int.sum()
+            count_dataframe_str = count_dataframe_str + f"//{column_sum}"
+
+        return count_dataframe_str
+
+    def _get_p_value_from_chi2_test_on_frequency_table(
+            self,
+            column_name: str,
+            negative_df: pd.DataFrame,
+            positive_df: pd.DataFrame
+    ) -> float:
+        """
+        Calculates p-value from chi2 test on frequency table.
+
+        Parameters
+        ----------
+        column_name : str
+            Column name.
+        negative_df : pd.DataFrame
+            Negative dataframe.
+        positive_df : pd.DataFrame
+            Positive dataframe.
+
+        Returns
+        -------
+        p-value : float
+            P-value.
+        """
+        result = pd.concat(
+            [negative_df[column_name].value_counts(), positive_df[column_name].value_counts()], axis=1
+        ).fillna(0)
+        result = result.loc[~(result == 0).all(axis=1)]
+
+        chi2, p_value, dof, expected = chi2_contingency(observed=result)
+
+        return p_value
+
+    @staticmethod
+    def _get_frequency_table_with_concatenated_list(
+            frequency_table: pd.DataFrame,
+            values: list,
+            first_column: bool = False
+    ) -> pd.DataFrame:
+        """
+        Returns frequency table with concatenated list.
+
+        Parameters
+        ----------
+        frequency_table : pd.DataFrame
+            Frequency table.
+        values : list
+            Values.
+        first_column : bool
+            If True, then values will be concatenated to the first column.
+
+        Returns
+        -------
+        frequency_table : pd.DataFrame
+            Frequency table.
+        """
+        series = pd.Series(data=values, index=frequency_table.index)
+
+        if first_column:
+            data = [series, frequency_table]
+        else:
+            data = [frequency_table, series]
+
+        frequency_table = pd.concat(data, axis=1, ignore_index=True)
+
+        return frequency_table
+
+    @staticmethod
+    def _get_percentage_dataframe(
+            column_name: str,
+            negative_df: pd.DataFrame,
+            positive_df: Optional[pd.DataFrame] = None
+    ) -> pd.DataFrame:
+        """
+        Returns percentage dataframe.
+
+        Parameters
+        ----------
+        column_name : str
+            Column name.
+        negative_df : pd.DataFrame
+            Negative dataframe.
+        positive_df : pd.DataFrame
+            Positive dataframe.
+
+        Returns
+        -------
+        percentage_dataframe : pd.DataFrame
+            Percentage dataframe.
+        """
+        if positive_df is not None:
+            data = [
+                round(negative_df[column_name].value_counts(normalize=True)*100, ndigits=1),
+                round(positive_df[column_name].value_counts(normalize=True)*100, ndigits=1)
+            ]
+
+            percentage_dataframe: pd.DataFrame(dtype=int) = pd.concat(data, axis=1).fillna(0)
+        else:
+            percentage_dataframe = round(negative_df[column_name].value_counts(normalize=True) * 100, ndigits=1)
+
+        return percentage_dataframe
 
     def _save_global_dataframe(
             self,
@@ -894,6 +1278,8 @@ class TableViewer:
             for df, path in zip([original_df, imputed_df], [self.ORIGINAL_DF_PATH, self.IMPUTED_DF_PATH]):
                 path_to_save_tables = os.path.join(path_to_save, self.TARGETS_PATH, target, self.TABLES_PATH, path)
                 self._save_tables(df, path_to_save_tables)
+                self._save_target_specific_continuous_tables(df, target, path_to_save_tables)
+                self._save_target_specific_categorical_tables(df, target, path_to_save_tables)
 
     def _save_dataframes(
             self,
