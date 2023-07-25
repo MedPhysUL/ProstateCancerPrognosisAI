@@ -249,9 +249,10 @@ class Tuner:
         dataframes : Optional[Dict[int, pd.DataFrame]]
             Dictionary of dataframes to use for different inner splits.
         """
-        for idx, mask in masks.items():
-            self._update_dataset(dataset=dataset, mask=mask, dataframe=dataframes[idx] if dataframes else None)
-            self._exec_best_model_evaluation(dataset=dataset, objective=objective, outer=False, idx=idx)
+        if self.recorder.save_inner_splits_best_models:
+            for idx, mask in masks.items():
+                self._update_dataset(dataset=dataset, mask=mask, dataframe=dataframes[idx] if dataframes else None)
+                self._exec_best_model_evaluation(dataset=dataset, objective=objective, outer=False, idx=idx)
 
     def _exec_best_model_evaluation(
             self,
