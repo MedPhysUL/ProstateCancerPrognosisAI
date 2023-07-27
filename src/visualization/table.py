@@ -9,17 +9,21 @@
 """
 
 from copy import deepcopy
+from enum import StrEnum
 import logging
 import os
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.interpolate import interp1d
 from scipy.stats import chi2_contingency, mannwhitneyu
 import seaborn as sns
 from sksurv.nonparametric import kaplan_meier_estimator
 
+from .color import Color
 from ..data.datasets import TableDataset
 from ..data.processing.sampling import Mask
 
@@ -42,7 +46,8 @@ class TableViewer:
 
     def __init__(
             self,
-            dataset: TableDataset
+            dataset: TableDataset,
+            fig_size: Tuple[int, int] = (8, 6)
     ):
         """
         Sets protected and public attributes of our table viewer.
@@ -51,8 +56,13 @@ class TableViewer:
         ----------
         dataset : TableDataset
             Dataset.
+        fig_size : Tuple[int, int]
+            Figure size.
         """
-        sns.set_style("whitegrid")
+        # sns.set_style("whitegrid")
+        matplotlib.rc('axes', edgecolor='k')
+
+        self._colors = [Color.BLUE, Color.SKIN, Color.GREEN, Color.RED, Color.PINK, Color.PURPLE]
         self.dataset = dataset
         self._target_cols = dataset.target_columns
 
@@ -63,6 +73,13 @@ class TableViewer:
         self._target_specific_masks = self._get_target_specific_masks()
         self._target_specific_original_dfs = self._get_target_specific_original_dataframes()
         self._target_specific_imputed_dfs = self._get_target_specific_imputed_dataframes()
+
+        self._legend_names = {
+            Mask.TRAIN.value: "Training set",
+            Mask.VALID.value: "Validation set",
+            Mask.TEST.value: "Test set"
+        }
+        self._fig_size = fig_size
 
     def _get_global_masks(self) -> Dict[str, List[int]]:
         """
@@ -216,6 +233,31 @@ class TableViewer:
         """
         return self._target_specific_imputed_dfs[target]
 
+    def _get_sets_dict(
+            self,
+            dataframe: pd.DataFrame
+    ):
+        """
+        Gets sets dictionary.
+
+        Parameters
+        ----------
+        dataframe : pd.DataFrame
+            Dataframe.
+
+        Returns
+        -------
+        sets_dict : Dict[str, pd.DataFrame]
+            Sets dictionary.
+        """
+        sets = {
+            "full_dataset": dataframe,
+            Mask.TRAIN: dataframe[dataframe["Sets"] == Mask.TRAIN],
+            Mask.VALID: dataframe[dataframe["Sets"] == Mask.VALID],
+            Mask.TEST: dataframe[dataframe["Sets"] == Mask.TEST]
+        }
+        return {k: v for k, v in sets.items() if not v.empty}
+
     @staticmethod
     def _terminate_figure(
             path_to_save: Optional[str] = None,
@@ -238,7 +280,7 @@ class TableViewer:
             fig.tight_layout()
 
         if path_to_save:
-            plt.savefig(path_to_save, dpi=300)
+            plt.savefig(path_to_save, dpi=300, bbox_inches='tight')
         if show:
             plt.show()
 
@@ -624,6 +666,138 @@ class TableViewer:
         dataset = self._target_specific_imputed_dfs[target] if imputed else self._target_specific_original_dfs[target]
         self._plot_categorical_feature_figure(dataset, feature, path_to_save, show)
 
+    @staticmethod
+    def _build_kaplan_meier_curve(
+            event_indicator: pd.Series,
+            event_time: pd.Series,
+            axes: plt.Axes,
+            color: str,
+            legend_label: Optional[str] = None
+    ) -> None:
+        """
+        Builds a Kaplan-Meier curve.
+
+        Parameters
+        ----------
+        event_indicator : pd.Series
+            Event indicator.
+        event_time : pd.Series
+            Event time.
+        axes : plt.Axes
+            Axes.
+        color : str
+            Color.
+        legend_label : Optional[str]
+            Legend label.
+        """
+        time, survival_probability, conf_int = kaplan_meier_estimator(event_indicator, event_time, conf_type="log-log")
+
+        if legend_label is None:
+            axes.step(time, survival_probability, where="post", color=color, lw=2)
+        else:
+            axes.step(time, survival_probability, where="post", color=color, lw=2, label=legend_label)
+
+        axes.fill_between(time, conf_int[0], conf_int[1], alpha=0.3, step="post", color=color)
+
+        censored_time = event_time[~event_indicator]
+        censored_survival_probability = interp1d(time, survival_probability, kind="previous")(censored_time)
+        axes.scatter(censored_time, censored_survival_probability, marker="|", s=100, color=color)
+
+    @staticmethod
+    def _add_details_to_kaplan_meier_curve(
+            axes: plt.Axes,
+            legend: bool = True
+    ) -> None:
+        """
+        Adds details to a Kaplan-Meier curve.
+
+        Parameters
+        ----------
+        axes : plt.Axes
+            Axes.
+        legend : bool
+            Whether to add a legend.
+        """
+        axes.minorticks_on()
+        axes.tick_params(axis="both", direction='in', color="k", which="major", labelsize=14, length=6)
+        axes.tick_params(axis="both", direction='in', color="k", which="minor", labelsize=14, length=3)
+        axes.set_ylabel(f"Survival probability", fontsize=16)
+        axes.set_xlabel("Time $[$months$]$", fontsize=16)
+        axes.set_xlim(0, None)
+        axes.set_ylim(-0.02, 1.02)
+        axes.grid(False)
+        if legend:
+            legend = axes.legend(loc="best", edgecolor="k", fontsize=16)
+
+            for line in legend.get_lines():
+                line.set_linewidth(8)
+
+    def _plot_masks_stratified_global_kaplan_meier_curve(
+            self,
+            dataset: pd.DataFrame,
+            event_indicator: str,
+            event_time: str,
+            path_to_save: Optional[str] = None,
+            show: Optional[bool] = True,
+    ) -> None:
+        """
+        Plots the global kaplan meier curve (without stratification).
+
+        Parameters
+        ----------
+        dataset : pd.DataFrame
+            Dataframe.
+        event_indicator : str
+            The name of the column containing the event indicator data.
+        event_time : str
+            The name of the column containing the event time data.
+        path_to_save : Optional[str]
+            Path to save descriptive analysis records.
+        show : Optional[bool]
+            Whether to show figures.
+        """
+        fig, axes = plt.subplots(figsize=self._fig_size)
+
+        for idx, (name, mask) in enumerate(self._global_masks.items()):
+            subset = dataset.loc[dataset["Sets"] == name]
+            event, time_exit = subset[event_indicator].astype(bool), subset[event_time]
+            self._build_kaplan_meier_curve(event, time_exit, axes, self._colors[idx], name)
+
+        self._add_details_to_kaplan_meier_curve(axes, True)
+        self._terminate_figure(path_to_save, show, fig)
+
+    def _plot_unstratified_global_kaplan_meier_curve(
+            self,
+            dataset: pd.DataFrame,
+            event_indicator: str,
+            event_time: str,
+            path_to_save: Optional[str] = None,
+            show: Optional[bool] = True,
+    ) -> None:
+        """
+        Plots the global kaplan meier curve (without stratification).
+
+        Parameters
+        ----------
+        dataset : pd.DataFrame
+            Dataframe.
+        event_indicator : str
+            The name of the column containing the event indicator data.
+        event_time : str
+            The name of the column containing the event time data.
+        path_to_save : Optional[str]
+            Path to save descriptive analysis records.
+        show : Optional[bool]
+            Whether to show figures.
+        """
+        fig, axes = plt.subplots(figsize=self._fig_size)
+
+        event, time_exit = dataset[event_indicator].astype(bool), dataset[event_time]
+        self._build_kaplan_meier_curve(event, time_exit, axes, self._colors[0])
+
+        self._add_details_to_kaplan_meier_curve(axes, False)
+        self._terminate_figure(path_to_save, show, fig)
+
     def _plot_global_kaplan_meier_curve(
             self,
             dataset: pd.DataFrame,
@@ -648,20 +822,59 @@ class TableViewer:
         show : Optional[bool]
             Whether to show figures.
         """
-        fig, axes = plt.subplots()
+        dataframes = self._get_sets_dict(dataset)
 
-        for idx, (name, mask) in enumerate(self._global_masks.items()):
-            filtered_dataset = dataset.loc[dataset["Sets"] == name]
-            time, survival_probability = kaplan_meier_estimator(
-                filtered_dataset[event_indicator].astype(bool),
-                filtered_dataset[event_time]
-            )
-            axes.step(time, survival_probability, where="post", label=name)
+        for name, df in dataframes.items():
+            path_to_folder = os.path.join(path_to_save, name)
+            os.makedirs(path_to_folder, exist_ok=True)
 
-        plt.ylabel(f"Estimated probability of {event_indicator} survival")
-        plt.xlabel("Time")
-        plt.legend()
+            path_to_fig = os.path.join(path_to_folder, "GLOBAL.png")
+            self._plot_unstratified_global_kaplan_meier_curve(df, event_indicator, event_time, path_to_fig, show)
 
+            if name == "full_dataset":
+                path_to_fig = os.path.join(path_to_folder, "GLOBAL_STRATIFIED.png")
+                self._plot_masks_stratified_global_kaplan_meier_curve(
+                    dataset, event_indicator, event_time, path_to_fig, show
+                )
+
+    def _plot_categories_stratified_kaplan_meier_curve(
+            self,
+            dataset: pd.DataFrame,
+            feature: str,
+            event_indicator: str,
+            event_time: str,
+            path_to_save: Optional[str] = None,
+            show: Optional[bool] = True
+    ):
+        """
+        Plots the stratified kaplan meier curve for each category of the feature.
+
+        Parameters
+        ----------
+        dataset : pd.DataFrame
+            Dataframe.
+        feature : str
+            The name of the column containing the feature data.
+        event_indicator : str
+            The name of the column containing the event indicator data.
+        event_time : str
+            The name of the column containing the event time data.
+        path_to_save : Optional[str]
+            Path to save descriptive analysis records.
+        show : Optional[bool]
+            Whether to show figures.
+        """
+        fig, axes = plt.subplots(figsize=self._fig_size)
+        unique = pd.unique(dataset[feature])
+        values_count = dataset[feature].value_counts(sort=False)
+        unique_categories = [category for category in unique.categories if values_count[category] >= 1]
+        for n, category in enumerate(unique_categories):
+            mask = dataset[feature] == category
+            event, time_exit = dataset[event_indicator][mask].astype(bool), dataset[event_time][mask]
+
+            self._build_kaplan_meier_curve(event, time_exit, axes, self._colors[n], category)
+
+        self._add_details_to_kaplan_meier_curve(axes, True)
         self._terminate_figure(path_to_save, show, fig)
 
     def _plot_stratified_kaplan_meier_curve(
@@ -699,35 +912,15 @@ class TableViewer:
         df_copy = deepcopy(dataset)
         df_copy[feature] = df_copy[feature].astype("category")
 
-        unique = pd.unique(df_copy[feature])
-        values_count = df_copy[feature].value_counts()
-        unique_categories = [category for category in unique.categories if values_count[category] >= 1]
+        dataframes = self._get_sets_dict(df_copy)
+        for name, df in dataframes.items():
+            path_to_folder = os.path.join(path_to_save, name)
+            os.makedirs(path_to_folder, exist_ok=True)
 
-        fig, axes = plt.subplots()
-        line_styles = ["solid", "dashed", "dotted"]
-
-        cm = plt.get_cmap('gist_rainbow')
-        axes.set_prop_cycle(color=[cm(1. * i / len(unique_categories)) for i in range(len(unique_categories))])
-        for idx, (name, mask) in enumerate(self._global_masks.items()):
-            filtered_df = df_copy.loc[dataset["Sets"] == name]
-            unique = pd.unique(filtered_df[feature])
-            values_count = filtered_df[feature].value_counts()
-            unique_categories = [category for category in unique.categories if values_count[category] >= 1]
-            for category in unique_categories:
-                mask = filtered_df[feature] == category
-                time, survival_probability = kaplan_meier_estimator(
-                    filtered_df[event_indicator][mask].astype(bool),
-                    filtered_df[event_time][mask]
-                )
-                axes.step(
-                    time, survival_probability, where="post", label=f"{name};{category}", linestyle=line_styles[idx]
-                )
-
-        plt.ylabel(f"Estimated probability of {event_indicator} survival")
-        plt.xlabel("Time")
-        plt.legend(loc="best")
-
-        self._terminate_figure(path_to_save, show, fig)
+            path_to_fig = os.path.join(path_to_folder, f"{feature}.png")
+            self._plot_categories_stratified_kaplan_meier_curve(
+                df, feature, event_indicator, event_time, path_to_fig, show
+            )
 
     def visualize_kaplan_meier_curve(
             self,
@@ -857,18 +1050,17 @@ class TableViewer:
         """
         dataframe.to_csv(os.path.join(path_to_save, "dataframe.csv"), index=False)
 
-        dataframes = {
-            "dataset": dataframe,
-            "learning_set": dataframe[dataframe["Sets"].isin([Mask.TRAIN, Mask.VALID])],
-            "holdout_set": dataframe[dataframe["Sets"].isin([Mask.TEST])]
-        }
+        dataframes = self._get_sets_dict(dataframe)
         for name, df in dataframes.items():
+            path_to_folder = os.path.join(path_to_save, name)
+            os.makedirs(path_to_folder, exist_ok=True)
+
             df.describe().transpose().round(1).to_csv(
-                os.path.join(path_to_save, f"description_cont_features_{name}.csv"), index=True
+                os.path.join(path_to_folder, f"description_cont_features.csv"), index=True
             )
 
             frequency_table = self.get_frequency_table(df)
-            frequency_table.to_csv(os.path.join(path_to_save, f"description_cat_features_{name}.csv"), index=False)
+            frequency_table.to_csv(os.path.join(path_to_folder, f"description_cat_features.csv"), index=False)
 
     def get_frequency_table(
             self,
@@ -932,11 +1124,7 @@ class TableViewer:
         path_to_save : str
             Path to save tables.
         """
-        dataframes = {
-            "dataset": dataframe,
-            "learning_set": dataframe[dataframe["Sets"].isin([Mask.TRAIN, Mask.VALID])],
-            "holdout_set": dataframe[dataframe["Sets"].isin([Mask.TEST])]
-        }
+        dataframes = self._get_sets_dict(dataframe)
 
         for name, df in dataframes.items():
             negative_df = df[df[target] == 0][[target] + self.dataset.continuous_features_columns]
@@ -966,7 +1154,11 @@ class TableViewer:
                 p_values.append(p_value)
 
             concat_df["p-value"] = p_values
-            concat_df.to_csv(os.path.join(path_to_save, f"target_description_cont_features_{name}.csv"), index=False)
+
+            path_to_folder = os.path.join(path_to_save, name)
+            os.makedirs(path_to_folder, exist_ok=True)
+
+            concat_df.to_csv(os.path.join(path_to_folder, f"target_description_cont_features.csv"), index=False)
 
     @staticmethod
     def _get_p_value_from_mann_whitney_u_test(
@@ -1016,11 +1208,7 @@ class TableViewer:
         path_to_save : str
             Path to save tables.
         """
-        dataframes = {
-            "dataset": dataframe,
-            "learning_set": dataframe[dataframe["Sets"].isin([Mask.TRAIN, Mask.VALID])],
-            "holdout_set": dataframe[dataframe["Sets"].isin([Mask.TEST])]
-        }
+        dataframes = self._get_sets_dict(dataframe)
 
         for name, df in dataframes.items():
             dataframes = []
@@ -1065,7 +1253,10 @@ class TableViewer:
             columns = ["Variable", "Level", "Negative n/N", "Negative %", "Positive n/N", "Positive %", "p-value"]
             dataframe_.columns = columns
 
-            dataframe_.to_csv(os.path.join(path_to_save, f"target_description_cat_features_{name}.csv"), index=False)
+            path_to_folder = os.path.join(path_to_save, name)
+            os.makedirs(path_to_folder, exist_ok=True)
+
+            dataframe_.to_csv(os.path.join(path_to_folder, f"target_description_cat_features.csv"), index=False)
 
     def _get_count_and_percentage_dataframe(
             self,
@@ -1123,7 +1314,10 @@ class TableViewer:
             Count dataframe.
         """
         if positive_df is not None:
-            data = [negative_df[column_name].value_counts(), positive_df[column_name].value_counts()]
+            data = [
+                negative_df[column_name].value_counts(sort=False),
+                positive_df[column_name].value_counts(sort=False)
+            ]
 
             count_dataframe_int: pd.DataFrame(dtype=int) = pd.concat(data, axis=1).fillna(0).applymap(int)
             count_dataframe_str: pd.DataFrame(dtype=str) = count_dataframe_int.applymap(str)
@@ -1132,7 +1326,7 @@ class TableViewer:
                 column_sum = count_dataframe_int.iloc[:, column_idx].sum()
                 count_dataframe_str.iloc[:, column_idx] = count_dataframe_str.iloc[:, column_idx] + f"//{column_sum}"
         else:
-            count_dataframe_int = negative_df[column_name].value_counts().fillna(0).apply(int)
+            count_dataframe_int = negative_df[column_name].value_counts(sort=False).fillna(0).apply(int)
             count_dataframe_str: pd.DataFrame(dtype=str) = count_dataframe_int.apply(str)
 
             column_sum = count_dataframe_int.sum()
@@ -1164,7 +1358,10 @@ class TableViewer:
             P-value.
         """
         result = pd.concat(
-            [negative_df[column_name].value_counts(), positive_df[column_name].value_counts()], axis=1
+            [
+                negative_df[column_name].value_counts(sort=False),
+                positive_df[column_name].value_counts(sort=False)
+            ], axis=1
         ).fillna(0)
         result = result.loc[~(result == 0).all(axis=1)]
 
@@ -1231,13 +1428,15 @@ class TableViewer:
         """
         if positive_df is not None:
             data = [
-                round(negative_df[column_name].value_counts(normalize=True)*100, ndigits=1),
-                round(positive_df[column_name].value_counts(normalize=True)*100, ndigits=1)
+                round(negative_df[column_name].value_counts(sort=False, normalize=True)*100, ndigits=1),
+                round(positive_df[column_name].value_counts(sort=False, normalize=True)*100, ndigits=1)
             ]
 
             percentage_dataframe: pd.DataFrame(dtype=int) = pd.concat(data, axis=1).fillna(0)
         else:
-            percentage_dataframe = round(negative_df[column_name].value_counts(normalize=True) * 100, ndigits=1)
+            percentage_dataframe = round(
+                negative_df[column_name].value_counts(sort=False, normalize=True) * 100, ndigits=1
+            )
 
         return percentage_dataframe
 
@@ -1413,12 +1612,10 @@ class TableViewer:
                     path_to_save, self.TARGETS_PATH, task.target_column, self.FIGURES_PATH, self.TARGET_PATH, path
                 )
                 event, time = task.event_indicator_column, task.event_time_column
-                path_to_fig = os.path.join(directory, "survival (global).png")
-                self.visualize_kaplan_meier_curve(event, time, imputed, None, path_to_fig, False)
+                self.visualize_kaplan_meier_curve(event, time, imputed, None, directory, False)
 
                 for cat_col in self.dataset.categorical_features_columns:
-                    path_to_fig = os.path.join(directory, f"survival({cat_col}).png")
-                    self.visualize_kaplan_meier_curve(event, time, imputed, cat_col, path_to_fig, False)
+                    self.visualize_kaplan_meier_curve(event, time, imputed, cat_col, directory, False)
 
     def save_descriptive_analysis(
             self,
