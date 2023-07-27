@@ -41,7 +41,7 @@ class SequentialNet(Predictor):
     A SequentialNet model. The model can also be used to perform table tasks.
     """
 
-    _ADDITIONAL_INPUTS_PER_BLOCKS = {0: [], 1: [0], 2: [0], 3: [0, 1], 4: [0, 1, 3], 5: [0, 1, 2, 3, 4]}
+    _ADDITIONAL_INPUTS_PER_BLOCKS = {0: [], 1: [0], 2: [0], 3: [1], 4: [3], 5: [2, 4]}
 
     def __init__(
             self,
