@@ -17,7 +17,7 @@ class LightColor(StrEnum):
     RED = "#FFA99C"
     PINK = "#CC87B3"
     PURPLE = "#9C99C6"
-    SKIN = "#FECFA1"
+    SAND = "#FECFA1"
 
 
 class Color(StrEnum):
@@ -26,7 +26,7 @@ class Color(StrEnum):
     RED = "#D87363"
     PINK = "#AF598F"
     PURPLE = "#716DA8"
-    SKIN = "#F1B88C"
+    SAND = "#F1B88C"
 
 
 class DarkColor(StrEnum):
@@ -35,4 +35,4 @@ class DarkColor(StrEnum):
     RED = "#9D343C"
     PINK = "#A1437E"
     PURPLE = "#4C3264"
-    SKIN = "#B39171"
+    SAND = "#B39171"
