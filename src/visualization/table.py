@@ -9,7 +9,6 @@
 """
 
 from copy import deepcopy
-from enum import StrEnum
 import logging
 import os
 from typing import Callable, Dict, List, Optional, Tuple, Union
@@ -26,6 +25,7 @@ from sksurv.nonparametric import kaplan_meier_estimator
 from .color import Color
 from ..data.datasets import TableDataset
 from ..data.processing.sampling import Mask
+from .tools import add_at_risk_counts, survival_table_from_events
 
 
 class TableViewer:
@@ -61,8 +61,10 @@ class TableViewer:
         """
         # sns.set_style("whitegrid")
         matplotlib.rc('axes', edgecolor='k')
+        matplotlib.rcParams['mathtext.fontset'] = 'cm'
+        matplotlib.rcParams['font.family'] = 'STIXGeneral'
 
-        self._colors = [Color.BLUE, Color.SKIN, Color.GREEN, Color.RED, Color.PINK, Color.PURPLE]
+        self._colors = [Color.BLUE, Color.SAND, Color.GREEN, Color.RED, Color.PINK, Color.PURPLE]
         self.dataset = dataset
         self._target_cols = dataset.target_columns
 
@@ -758,12 +760,17 @@ class TableViewer:
         """
         fig, axes = plt.subplots(figsize=self._fig_size)
 
+        survival_tables, colors = [], []
         for idx, (name, mask) in enumerate(self._global_masks.items()):
             subset = dataset.loc[dataset["Sets"] == name]
-            event, time_exit = subset[event_indicator].astype(bool), subset[event_time]
-            self._build_kaplan_meier_curve(event, time_exit, axes, self._colors[idx], name)
+            event, time = subset[event_indicator].astype(bool), subset[event_time]
+            self._build_kaplan_meier_curve(event, time, axes, self._colors[idx], name)
+
+            survival_tables.append(survival_table_from_events(time, event))
+            colors.append(self._colors[idx])
 
         self._add_details_to_kaplan_meier_curve(axes, True)
+        add_at_risk_counts(survival_tables=survival_tables, colors=colors, axes=axes, figure=fig)
         self._terminate_figure(path_to_save, show, fig)
 
     def _plot_unstratified_global_kaplan_meier_curve(
@@ -792,10 +799,12 @@ class TableViewer:
         """
         fig, axes = plt.subplots(figsize=self._fig_size)
 
-        event, time_exit = dataset[event_indicator].astype(bool), dataset[event_time]
-        self._build_kaplan_meier_curve(event, time_exit, axes, self._colors[0])
+        event, time = dataset[event_indicator].astype(bool), dataset[event_time]
+        self._build_kaplan_meier_curve(event, time, axes, self._colors[0])
+        survival_table = survival_table_from_events(time, event)
 
         self._add_details_to_kaplan_meier_curve(axes, False)
+        add_at_risk_counts(survival_tables=[survival_table], colors=[self._colors[0]], axes=axes, figure=fig)
         self._terminate_figure(path_to_save, show, fig)
 
     def _plot_global_kaplan_meier_curve(
@@ -868,13 +877,17 @@ class TableViewer:
         unique = pd.unique(dataset[feature])
         values_count = dataset[feature].value_counts(sort=False)
         unique_categories = [category for category in unique.categories if values_count[category] >= 1]
+        survival_tables, colors = [], []
         for n, category in enumerate(unique_categories):
             mask = dataset[feature] == category
-            event, time_exit = dataset[event_indicator][mask].astype(bool), dataset[event_time][mask]
+            event, time = dataset[event_indicator][mask].astype(bool), dataset[event_time][mask]
 
-            self._build_kaplan_meier_curve(event, time_exit, axes, self._colors[n], category)
+            self._build_kaplan_meier_curve(event, time, axes, self._colors[n], category)
+            survival_tables.append(survival_table_from_events(time, event))
+            colors.append(self._colors[n])
 
         self._add_details_to_kaplan_meier_curve(axes, True)
+        add_at_risk_counts(survival_tables=survival_tables, colors=colors, axes=axes, figure=fig)
         self._terminate_figure(path_to_save, show, fig)
 
     def _plot_stratified_kaplan_meier_curve(
