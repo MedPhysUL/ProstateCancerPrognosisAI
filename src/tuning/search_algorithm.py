@@ -22,6 +22,7 @@ from optuna.study import Study
 
 from .callbacks.containers import TuningCallbackList
 from ..data.datasets import ProstateCancerDataset
+from ..models.torch import ModelConfig
 from .objectives.base import Objective
 
 
@@ -101,6 +102,7 @@ class SearchAlgorithm:
             objective: Objective,
             n_trials: int = 100,
             dataframes: Optional[Dict[int, pd.DataFrame]] = None,
+            model_configs: Optional[Dict[int, Dict[str, ModelConfig]]] = None,
             study_name: str = None,
             verbose: bool = True
     ) -> Study:
@@ -121,6 +123,8 @@ class SearchAlgorithm:
             Number of sets of hyperparameters tested.
         dataframes : Optional[Dict[int, pd.DataFrame]]
             Dictionary of dataframes to use for different inner splits.
+        model_configs : Optional[Dict[int, Dict[str, ModelConfig]]]
+            Dictionary of model configs to use for different inner splits.
         study_name : str
             Study's name. If this argument is set to None, a unique name is generated automatically.
         verbose : bool
@@ -135,7 +139,10 @@ class SearchAlgorithm:
 
         set_verbosity(FATAL)
         study.optimize(
-            func=partial(objective.__call__, masks=masks, dataset=dataset, callbacks=callbacks, dataframes=dataframes),
+            func=partial(
+                objective.__call__,
+                masks=masks, dataset=dataset, callbacks=callbacks, dataframes=dataframes, model_configs=model_configs
+            ),
             n_trials=n_trials,
             gc_after_trial=True,
             show_progress_bar=verbose

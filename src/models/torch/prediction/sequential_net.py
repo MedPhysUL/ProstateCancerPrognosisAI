@@ -35,9 +35,9 @@ class _Block(NamedTuple):
     task_name: str
 
 
-class ModelSetup(NamedTuple):
+class ModelConfig(NamedTuple):
     """
-    NamedTuple for the model setup.
+    NamedTuple for the model config.
 
     Elements
     --------
@@ -64,7 +64,7 @@ class SequentialNet(Predictor):
             n_neurons: Union[int, Mapping[str, int]],
             features_columns: Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]] = None,
             dropout: Union[float, Mapping[str, float]] = 0.0,
-            setups: Optional[Mapping[str, ModelSetup]] = None,
+            configs: Optional[Mapping[str, ModelConfig]] = None,
             activation: Union[Tuple, str] = "PRELU",
             bias: bool = True,
             adn_ordering: str = "NDA",
@@ -95,8 +95,8 @@ class SequentialNet(Predictor):
             The names of the features columns. If a mapping is provided, the keys must be the task names.
         dropout : Union[float, Mapping[str, float]]
             Probability of dropout. If a mapping is provided, the keys must be the task names. Defaults to 0.0.
-        setups : Optional[Mapping[str, ModelSetup]]
-            The model setups. The keys must be the task names. Defaults to None. If None, the models are not frozen.
+        configs : Optional[Mapping[str, ModelConfig]]
+            The model configs. The keys must be the task names. Defaults to None. If None, the models are not frozen.
         activation : Union[Tuple, str]
             Activation function. Defaults to "PRELU".
         bias : bool
@@ -141,7 +141,7 @@ class SequentialNet(Predictor):
         )
 
         self.sequence = sequence
-        self.setups = setups
+        self.configs = configs
 
         if isinstance(n_layers, Mapping):
             if isinstance(n_neurons, Mapping):
@@ -331,12 +331,12 @@ class SequentialNet(Predictor):
                 out_channels=1
             )
 
-            if self.setups:
-                if task.name in self.setups.keys():
-                    setup = self.setups[task.name]
-                    if setup.pretrained_model_state:
-                        single_predictor.load_state_dict(setup.pretrained_model_state)
-                    if setup.freeze:
+            if self.configs:
+                if task.name in self.configs.keys():
+                    config = self.configs[task.name]
+                    if config.pretrained_model_state:
+                        single_predictor.load_state_dict(config.pretrained_model_state)
+                    if config.freeze:
                         for param in single_predictor.parameters():
                             param.requires_grad = False
 
