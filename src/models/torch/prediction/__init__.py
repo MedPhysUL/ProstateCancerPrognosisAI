@@ -1,2 +1,2 @@
 from .mlp import MLP
-from .sequential_net import ModelSetup, SequentialNet
+from .sequential_net import ModelConfig, SequentialNet
