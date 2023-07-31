@@ -22,7 +22,7 @@ from scipy.stats import chi2_contingency, mannwhitneyu
 import seaborn as sns
 from sksurv.nonparametric import kaplan_meier_estimator
 
-from .color import Color
+from .color import Color, DarkColor, LightColor
 from ..data.datasets import TableDataset
 from ..data.processing.sampling import Mask
 from .tools import add_at_risk_counts, survival_table_from_events
@@ -59,12 +59,11 @@ class TableViewer:
         fig_size : Tuple[int, int]
             Figure size.
         """
-        # sns.set_style("whitegrid")
+        # sns.set_style("white")
         matplotlib.rc('axes', edgecolor='k')
         matplotlib.rcParams['mathtext.fontset'] = 'cm'
         matplotlib.rcParams['font.family'] = 'STIXGeneral'
 
-        self._colors = [Color.BLUE, Color.SAND, Color.GREEN, Color.RED, Color.PINK, Color.PURPLE]
         self.dataset = dataset
         self._target_cols = dataset.target_columns
 
@@ -82,6 +81,11 @@ class TableViewer:
             Mask.TEST.value: "Test set"
         }
         self._fig_size = fig_size
+
+        self._colors = [c for c in Color]
+        self._light_colors = [c for c in LightColor]
+        self._dark_colors = [c for c in DarkColor]
+        sns.set_palette([self._light_colors[i] for i in range(len(self._global_masks))])
 
     def _get_global_masks(self) -> Dict[str, List[int]]:
         """
@@ -470,12 +474,24 @@ class TableViewer:
             Whether to show figures.
         """
         fig, axes = plt.subplots()
-        sns.boxplot(
-            data=dataframe,
+
+        df = deepcopy(dataframe)
+        axes = sns.violinplot(
+            data=df,
             y=feature,
             x="Sets",
             linewidth=1,
+            inner="quart",
+            saturation=1
         )
+
+        for i, line in enumerate(axes.get_lines()):
+            line.set_color(self._dark_colors[i // 3])
+
+        plt.setp(axes.collections, edgecolor="k")
+        axes.minorticks_on()
+        axes.tick_params(axis="both", direction='in', color="k", which="major", labelsize=14, length=6)
+        axes.tick_params(axis="both", direction='in', color="k", which="minor", labelsize=14, length=3, bottom=False)
         self._terminate_figure(path_to_save, show, fig)
 
     def visualize_global_continuous_feature(
@@ -577,7 +593,8 @@ class TableViewer:
                 ax=axes,
                 stat='percent',
                 common_norm=False,
-                shrink=0.8
+                shrink=0.8,
+                alpha=1
             )
 
             fig_temp, axes_temp = plt.subplots()
@@ -586,7 +603,8 @@ class TableViewer:
                 x=feature,
                 bins=bins,
                 hue='Sets',
-                ax=axes_temp
+                ax=axes_temp,
+                alpha=1
             )
 
         else:
@@ -598,7 +616,8 @@ class TableViewer:
                 ax=axes,
                 stat='percent',
                 common_norm=False,
-                shrink=0.8
+                shrink=0.8,
+                alpha=1
             )
 
             fig_temp, axes_temp = plt.subplots()
@@ -606,7 +625,8 @@ class TableViewer:
                 data=df_copy,
                 x=feature,
                 hue='Sets',
-                ax=axes_temp
+                ax=axes_temp,
+                alpha=1
             )
 
         for axes_container, axes_temp_container in zip(axes.containers, axes_temp.containers):
@@ -724,7 +744,7 @@ class TableViewer:
         axes.tick_params(axis="both", direction='in', color="k", which="major", labelsize=14, length=6)
         axes.tick_params(axis="both", direction='in', color="k", which="minor", labelsize=14, length=3)
         axes.set_ylabel(f"Survival probability", fontsize=16)
-        axes.set_xlabel("Time $[$months$]$", fontsize=16)
+        axes.set_xlabel("Time $($months$)$", fontsize=16)
         axes.set_xlim(0, None)
         axes.set_ylim(-0.02, 1.02)
         axes.grid(False)
