@@ -9,8 +9,7 @@
 """
 
 from __future__ import annotations
-from ast import literal_eval
-from typing import Dict, List, Mapping, NamedTuple, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Mapping, NamedTuple, Optional, Sequence, Tuple, Union
 
 from torch import device as torch_device
 from torch import cat, stack, sum, Tensor
@@ -36,6 +35,21 @@ class _Block(NamedTuple):
     task_name: str
 
 
+class ModelSetup(NamedTuple):
+    """
+    NamedTuple for the model setup.
+
+    Elements
+    --------
+    freeze : bool
+        Whether to freeze the model.
+    pretrained_model_state : Optional[Mapping[str, Any]]
+        The pretrained model state.
+    """
+    freeze: bool = False
+    pretrained_model_state: Optional[Mapping[str, Any]] = None
+
+
 class SequentialNet(Predictor):
     """
     A SequentialNet model. The model can also be used to perform table tasks.
@@ -50,6 +64,7 @@ class SequentialNet(Predictor):
             n_neurons: Union[int, Mapping[str, int]],
             features_columns: Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]] = None,
             dropout: Union[float, Mapping[str, float]] = 0.0,
+            setups: Optional[Mapping[str, ModelSetup]] = None,
             activation: Union[Tuple, str] = "PRELU",
             bias: bool = True,
             adn_ordering: str = "NDA",
@@ -62,7 +77,8 @@ class SequentialNet(Predictor):
             prior_variance: float = 0.1,
             posterior_mu_init: float = 0.0,
             posterior_rho_init: float = -3.0,
-            standard_deviation: float = 0.1
+            standard_deviation: float = 0.1,
+            n_samples: int = 10
     ):
         """
         Initializes the model.
@@ -79,6 +95,8 @@ class SequentialNet(Predictor):
             The names of the features columns. If a mapping is provided, the keys must be the task names.
         dropout : Union[float, Mapping[str, float]]
             Probability of dropout. If a mapping is provided, the keys must be the task names. Defaults to 0.0.
+        setups : Optional[Mapping[str, ModelSetup]]
+            The model setups. The keys must be the task names. Defaults to None. If None, the models are not frozen.
         activation : Union[Tuple, str]
             Activation function. Defaults to "PRELU".
         bias : bool
@@ -109,6 +127,8 @@ class SequentialNet(Predictor):
         standard_deviation : float
             Standard deviation of the gaussian distribution used to sample the initial posterior mu and initial
             posterior rho for the gaussian distribution from which the initial weights are sampled.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
         """
         super().__init__(
             features_columns=features_columns,
@@ -121,6 +141,7 @@ class SequentialNet(Predictor):
         )
 
         self.sequence = sequence
+        self.setups = setups
 
         if isinstance(n_layers, Mapping):
             if isinstance(n_neurons, Mapping):
@@ -144,6 +165,7 @@ class SequentialNet(Predictor):
         self.posterior_mu_init = posterior_mu_init
         self.posterior_rho_init = posterior_rho_init
         self.standard_deviation = standard_deviation
+        self.n_samples = n_samples
 
         self._blocks: Optional[List[_Block]] = None
         self.predictor = None
@@ -302,12 +324,25 @@ class SequentialNet(Predictor):
 
         predictor = ModuleDict()
         for task in self._tasks.table_tasks:
-            predictor[task.name] = self._build_single_predictor(
+            single_predictor = self._build_single_predictor(
                 dropout=self._get_dropout(task.name),
                 hidden_channels=self._get_hidden_channels(task.name),
                 in_channels=self._get_in_channels(task.name),
                 out_channels=1
             )
+
+            if self.setups:
+                if task.name in self.setups.keys():
+                    setup = self.setups[task.name]
+                    if setup.pretrained_model_state:
+                        single_predictor.load_state_dict(setup.pretrained_model_state)
+                    if setup.freeze:
+                        for param in single_predictor.parameters():
+                            param.requires_grad = False
+
+                        single_predictor.eval()
+
+            predictor[task.name] = single_predictor
 
         return predictor
 
@@ -390,8 +425,14 @@ class SequentialNet(Predictor):
             for block in self._blocks:
                 predictor_input = self.__get_predictor_input(table_data=table_data, block=block, output=output)
 
-                y, kl = self.predictor[block.task_name](predictor_input)
-                output[block.task_name] = y[:, 0]
+                kl_list, y_list = [], []
+                for _ in range(self.n_samples):
+                    y, kl = self.predictor[block.task_name](predictor_input)
+                    y_list.append(y[:, 0])
+                    kl_list.append(kl)
+                y, kl = stack(y_list, dim=0).mean(dim=0), stack(kl_list, dim=0).mean(dim=0)
+
+                output[block.task_name] = y
                 kl_divergence[block.task_name] = self._get_kl_divergence(kl, block, kl_divergence)
 
             return output, kl_divergence
@@ -399,7 +440,6 @@ class SequentialNet(Predictor):
         else:
             for block in self._blocks:
                 predictor_input = self.__get_predictor_input(table_data=table_data, block=block, output=output)
-
                 output[block.task_name] = self.predictor[block.task_name](predictor_input)[:, 0]
 
             return output
