@@ -19,6 +19,8 @@ class HyperparameterObject(HyperparameterDict):
     An object hyperparameter.
     """
 
+    SPECIAL_PARAMETERS = ["configs"]
+
     def __init__(
             self,
             constructor: Callable,
@@ -62,4 +64,10 @@ class HyperparameterObject(HyperparameterDict):
             Hyperparameter instance.
         """
         constructor_params = super().build(suggestion)
+
+        if any([special_parameter in suggestion for special_parameter in self.SPECIAL_PARAMETERS]):
+            for special_parameter in self.SPECIAL_PARAMETERS:
+                if special_parameter in suggestion:
+                    constructor_params[special_parameter] = suggestion[special_parameter]
+
         return self.constructor(**constructor_params)
