@@ -129,7 +129,9 @@ class Tuner:
             dataset: ProstateCancerDataset,
             masks: Dict[int, Dict[str, Union[List[int], Dict[int, Dict[str, List[int]]]]]],
             dataframes: Optional[Dict[int, Dict[str, Union[pd.DataFrame, Dict[int, pd.DataFrame]]]]] = None,
-            model_configs: Optional[Dict[int, Dict[str, Union[ModelConfig, Dict[int, ModelConfig]]]]] = None
+            model_configs: Optional[
+                Dict[int, Dict[str, Union[Dict[str, ModelConfig], Dict[int, Dict[str, ModelConfig]]]]]
+            ] = None
     ) -> None:
         """
         Performs nested subsampling validations to evaluate a model and tune the hyperparameters.
@@ -144,7 +146,7 @@ class Tuner:
             Dict with list of idx to use as train, valid and test masks.
         dataframes : Optional[Dict[int, Dict[str, Union[pd.DataFrame, Dict[int, pd.DataFrame]]]]]
             Dictionary with dataframes to use for different splits.
-        model_configs : Optional[Dict[int, Dict[str, Union[ModelConfig, Dict[int, ModelConfig]]]]]
+        model_configs : Optional[Dict[int, Dict[str, Union[Dict[str, ModelConfig], Dict[int, Dict[str, ModelConfig]]]]]]
             Dictionary with model configs to use for different splits.
         """
         assert len(dataset.tunable_tasks) > 0, (
