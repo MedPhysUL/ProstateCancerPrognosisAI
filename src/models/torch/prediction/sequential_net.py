@@ -425,12 +425,20 @@ class SequentialNet(Predictor):
             for block in self._blocks:
                 predictor_input = self.__get_predictor_input(table_data=table_data, block=block, output=output)
 
-                kl_list, y_list = [], []
-                for _ in range(self.n_samples):
+                if self.configs:
+                    if block.task_name in self.configs.keys() and self.configs[block.task_name].freeze:
+                        kl_list, y_list = [], []
+                        for _ in range(self.n_samples):
+                            y, kl = self.predictor[block.task_name](predictor_input)
+                            y_list.append(y[:, 0])
+                            kl_list.append(kl)
+                        y, kl = stack(y_list, dim=0).mean(dim=0), stack(kl_list, dim=0).mean(dim=0)
+                    else:
+                        y, kl = self.predictor[block.task_name](predictor_input)
+                        y = y[:, 0]
+                else:
                     y, kl = self.predictor[block.task_name](predictor_input)
-                    y_list.append(y[:, 0])
-                    kl_list.append(kl)
-                y, kl = stack(y_list, dim=0).mean(dim=0), stack(kl_list, dim=0).mean(dim=0)
+                    y = y[:, 0]
 
                 output[block.task_name] = y
                 kl_divergence[block.task_name] = self._get_kl_divergence(kl, block, kl_divergence)
