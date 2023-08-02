@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
     # Database
     database = PatientsDatabase(
-        path_to_database=r"C:\Users\MALAR507\Documents\GitHub\ProstateCancerPrognosisAI\applications\local_data\learning_set.h5"
+        path_to_database=r"C:\Users\Labo\Documents\GitHub\ProstateCancerPrognosisAI\applications\local_data\learning_set.h5"
     )
 
     # Dataset
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     ).to(device)
 
     # Load Best Parameters
-    net.load_state_dict(torch.load(rf"C:\Users\MALAR507\Documents\GitHub\ProstateCancerPrognosisAI\src\models\torch\segmentation\net\prostate_net\saved_parameters\{best_parameters}"))
+    net.load_state_dict(torch.load(rf"C:\Users\Labo\Documents\GitHub\ProstateCancerPrognosisAI\src\models\torch\segmentation\net\prostate_net\saved_parameters\{best_parameters}"))
     net.eval()
 
     # Show Stats
