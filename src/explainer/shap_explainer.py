@@ -19,6 +19,7 @@ import numpy as np
 import shap
 import torch
 
+from applications.constants import BLUE_TO_SAND, BLUE_TO_RED
 from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ..models.base.model import Model
 from ..tools.plot import terminate_figure
@@ -495,7 +496,7 @@ class TableShapValueExplainer:
                 feature_names=self.dataset.table_dataset.features_columns,
                 data=data
             )
-            shap.plots.beeswarm(shap_values, show=False)
+            shap.plots.beeswarm(shap_values, show=False, color=BLUE_TO_SAND)
             if path_to_save_folder is not None:
                 target_names = self.dataset.table_dataset.target_columns
                 path = os.path.join(

@@ -10,6 +10,9 @@
 
 import os
 
+from matplotlib.colors import ListedColormap
+import numpy as np
+
 from src.losses.single_task import BCEWithLogitsLoss, DiceLoss, NegativePartialLogLikelihood
 from src.metrics.single_task import (
     AUC,
@@ -177,3 +180,18 @@ PROSTATE_SEGMENTATION_TASK = SegmentationTask(
 )
 
 IMAGE_TASKS = [PROSTATE_SEGMENTATION_TASK]
+
+# COLOR MAPS
+
+BLUE_TO_SAND = ListedColormap(np.concatenate([
+    np.expand_dims(np.linspace(start=112/255, stop=241/255, num=1500), 1),
+    np.expand_dims(np.linspace(start=167/255, stop=184/255, num=1500), 1),
+    np.expand_dims(np.linspace(start=199/255, stop=140/255, num=1500), 1),
+    np.ones((1500, 1))
+], axis=1))
+BLUE_TO_RED = ListedColormap(np.concatenate([
+    np.expand_dims(np.linspace(start=112/255, stop=216/255, num=1500), 1),
+    np.expand_dims(np.linspace(start=167/255, stop=115/255, num=1500), 1),
+    np.expand_dims(np.linspace(start=199/255, stop=99/255, num=1500), 1),
+    np.ones((1500, 1))
+], axis=1))
