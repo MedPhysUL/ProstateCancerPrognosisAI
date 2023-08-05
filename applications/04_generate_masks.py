@@ -24,7 +24,7 @@ from constants import (
     SEED
 )
 from src.data.datasets import TableDataset
-from src.data.processing import Sampler
+from src.data.processing import KFoldSampler
 
 
 if __name__ == '__main__':
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                 Sampling                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
-    sampler = Sampler(
+    sampler = KFoldSampler(
         dataset=table_dataset,
         n_out_split=5,
         n_in_split=5,
