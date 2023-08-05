@@ -58,7 +58,6 @@ if __name__ == '__main__':
     )
 
     model = MLP(
-        multi_task_mode="separated",
         activation="PRELU",
         dropout=0.2,
         device=torch.device("cuda"),
