@@ -47,6 +47,9 @@ class TableViewer:
     def __init__(
             self,
             dataset: TableDataset,
+            feature_names: Optional[Dict[str, str]] = None,
+            target_names: Optional[Dict[str, str]] = None,
+            crop: Optional[Dict[str, Tuple[Tuple[Optional[float], float], Tuple[Optional[float], float]]]] = None,
             fig_size: Tuple[int, int] = (8, 6)
     ):
         """
@@ -56,6 +59,16 @@ class TableViewer:
         ----------
         dataset : TableDataset
             Dataset.
+        feature_names : Dict[str, str]
+            Dictionary of feature names. The keys are the original feature names and the values are the feature names
+            to be displayed.
+        target_names : Dict[str, str]
+            Dictionary of target names. The keys are the original target names and the values are the target names to
+            be displayed.
+        crop : Optional[Dict[str, Tuple[Tuple[Optional[float], float], Tuple[Optional[float], float]]]]
+            Dictionary of crop values. The keys are the original feature names and the values are the crop values. The
+            first value is the one associated to the original dataframe and the second value is the one associated to
+            the imputed dataframe.
         fig_size : Tuple[int, int]
             Figure size.
         """
@@ -65,6 +78,9 @@ class TableViewer:
         matplotlib.rcParams['font.family'] = 'STIXGeneral'
 
         self.dataset = dataset
+        self._feature_names = feature_names
+        self._target_names = target_names
+        self._crop = crop
         self._target_cols = dataset.target_columns
 
         self._global_masks = self._get_global_masks()
@@ -75,11 +91,16 @@ class TableViewer:
         self._target_specific_original_dfs = self._get_target_specific_original_dataframes()
         self._target_specific_imputed_dfs = self._get_target_specific_imputed_dataframes()
 
-        self._legend_names = {
+        full_legend_names = {
             Mask.TRAIN.value: "Training set",
             Mask.VALID.value: "Validation set",
             Mask.TEST.value: "Test set"
         }
+        partial_legend_names = {
+            Mask.TRAIN.value: "Learning set",
+            Mask.TEST.value: "Holdout set"
+        }
+        self._legend_names = partial_legend_names if len(self._global_masks) == 2 else full_legend_names
         self._fig_size = fig_size
 
         self._colors = [c for c in Color]
@@ -329,27 +350,33 @@ class TableViewer:
         cols = columns + ["Sets"]
         subset = self._global_imputed_df[cols] if imputed else self._global_original_df[cols]
 
-        fig, axes = plt.subplots(ncols=len(self._global_masks), squeeze=False, figsize=(18, 12))
+        dataframes = self._get_sets_dict(subset)
+        for idx, (name, df) in enumerate(dataframes.items()):
+            fig, axes = plt.subplots(figsize=self._fig_size)
+            colors = [(1, 1, 1), self._light_colors[idx]]
+            cmap = matplotlib.colors.LinearSegmentedColormap.from_list("Custom", colors, 256)
 
-        for idx, (name, mask) in enumerate(self._global_masks.items()):
-            filtered_subset = subset.loc[subset["Sets"] == name]
-            corr = filtered_subset.corr(method=method, numeric_only=True)
+            corr = df.corr(method=method, numeric_only=True)
 
             mask = np.zeros_like(corr, dtype=bool)
             mask[np.triu_indices_from(mask)] = True
             corr[mask] = np.nan
 
-            sns.heatmap(
+            heatmap = sns.heatmap(
                 corr,
-                ax=axes[0, idx],
-                cmap="Greens",
-                annot=True
+                cmap=cmap,
+                annot=True,
+                annot_kws={"size": 14, "color": "k"},
             )
-            axes[0, idx].set_xticklabels(corr.columns.values, rotation=45, ha='right', rotation_mode='anchor')
-            axes[0, idx].set_yticklabels(corr.columns.values, rotation=0)
-            axes[0, idx].set_title(f"{name} (n = {len(filtered_subset)})")
+            colorbar = heatmap.collections[0].colorbar
+            colorbar.ax.tick_params(labelsize=14)
+            colorbar.ax.set_ylabel("Pearson correlation", fontsize=16)
 
-        self._terminate_figure(path_to_save, show, fig)
+            col_values = [self._target_names[n] if n in self._target_names else n for n in corr.columns.values]
+            axes.set_xticklabels(col_values, rotation=45, ha="right", rotation_mode="anchor", fontsize=13)
+            axes.set_yticklabels(col_values, rotation=0, fontsize=13)
+
+            self._terminate_figure(os.path.join(path_to_save, f"{name}.png"), show, fig)
 
     @staticmethod
     def _format_to_percentage(
@@ -372,13 +399,14 @@ class TableViewer:
             Percentage as a string.
         """
         absolute = int(round(pct / 100. * np.sum(values)))
-        return "{:.1f}%".format(pct, absolute)
+        return "{:.1f}%\n$(n={:.0f})$".format(pct, absolute)
 
     def _update_axes_of_class_distribution_figure(
             self,
             axes: plt.axes,
             targets: np.ndarray,
             label_names: dict,
+            show_legend: bool = False,
             title: Optional[str] = None
     ) -> None:
         """
@@ -392,33 +420,45 @@ class TableViewer:
             Array of class targets.
         label_names : dict
             Dictionary with names associated to target values.
+        show_legend : bool
+            Whether to show legend.
         title : Optional[str]
             Title for the plot.
         """
         label_counts = {k: np.sum(targets == v) for k, v in label_names.items()}
 
-        labels = [f"{k} ({v})" for k, v in label_counts.items()]
-
         wedges, texts, auto_texts = axes.pie(
             label_counts.values(),
-            textprops=dict(color="w"),
+            textprops=dict(color="k"),
             startangle=90,
-            autopct=lambda pct: self._format_to_percentage(pct, list(label_counts.values()))
+            autopct=lambda pct: self._format_to_percentage(pct, list(label_counts.values())),
+            colors=self._light_colors
         )
 
-        axes.legend(
-            wedges,
-            labels,
-            title="Labels",
-            loc="lower center",
-            bbox_to_anchor=(0.5, -0.2),
-            prop={"size": 8}
-        )
+        for wedge in wedges:
+            wedge.set_edgecolor("k")
 
-        plt.setp(auto_texts, size=8, weight="bold")
+        plt.setp(auto_texts, size=14)
+        plt.setp(axes.collections, edgecolor="k")
+
+        if show_legend:
+            legend = axes.legend(
+                wedges,
+                list(label_counts.keys()),
+                fontsize=16,
+                handlelength=2.5,
+                edgecolor="k",
+                framealpha=1,
+                loc="upper right"
+            )
+
+            for p in legend.get_patches():
+                p.set_edgecolor(None)
+
+            legend.set_bbox_to_anchor((1.0, 1.0))
 
         if title is not None:
-            axes.set_title(f"{title} (n = {sum(label_counts.values())})")
+            axes.set_xlabel(f"{title}\n$(n = {sum(label_counts.values())})$", fontsize=18, labelpad=-20)
 
     def visualize_target_class_distribution(
             self,
@@ -438,7 +478,8 @@ class TableViewer:
         show : Optional[bool]
             Whether to show figures.
         """
-        fig, axes = plt.subplots(ncols=len(self._target_specific_masks[target]), squeeze=False)
+        fig, axes = plt.subplots(figsize=self._fig_size, ncols=len(self._target_specific_masks[target]), squeeze=False)
+        total = len(self._target_specific_masks[target])
         for idx, (name, mask) in enumerate(self._target_specific_masks[target].items()):
             if mask:
                 filtered_df = self._target_specific_original_dfs[target].loc[
@@ -447,8 +488,9 @@ class TableViewer:
                 self._update_axes_of_class_distribution_figure(
                     axes=axes[0, idx],
                     targets=filtered_df[target],
-                    label_names={f"{target}_0": 0, f"{target}_1": 1},
-                    title=name
+                    label_names={"Negative": 0, f"Positive": 1},
+                    title=self._legend_names[name],
+                    show_legend=idx == (total - 1)
                 )
         self._terminate_figure(path_to_save, show, fig)
 
@@ -456,6 +498,7 @@ class TableViewer:
             self,
             dataframe: pd.DataFrame,
             feature: str,
+            imputed: bool,
             path_to_save: Optional[str] = None,
             show: Optional[bool] = None
     ) -> None:
@@ -468,21 +511,28 @@ class TableViewer:
             Dataframe.
         feature : str
             The name of the column containing the continuous feature data.
+        imputed : bool
+            Whether to use imputed data.
         path_to_save : Optional[str]
             Path to save descriptive analysis records.
         show : Optional[bool]
             Whether to show figures.
         """
-        fig, axes = plt.subplots()
+        fig, axes = plt.subplots(figsize=self._fig_size)
 
         df = deepcopy(dataframe)
+        value_counts = df['Sets'].value_counts()
+        modified_legend_names = {k: f"{v}\n$(n={value_counts.get(k, 0)})$" for k, v in self._legend_names.items()}
+        df['Sets'] = df['Sets'].replace(modified_legend_names)
+
         axes = sns.violinplot(
             data=df,
             y=feature,
             x="Sets",
-            linewidth=1,
+            linewidth=1.3,
             inner="quart",
-            saturation=1
+            saturation=1,
+            cut=0
         )
 
         for i, line in enumerate(axes.get_lines()):
@@ -490,8 +540,46 @@ class TableViewer:
 
         plt.setp(axes.collections, edgecolor="k")
         axes.minorticks_on()
-        axes.tick_params(axis="both", direction='in', color="k", which="major", labelsize=14, length=6)
-        axes.tick_params(axis="both", direction='in', color="k", which="minor", labelsize=14, length=3, bottom=False)
+        axes.set_ylabel(self._feature_names[feature] if self._feature_names else feature, fontsize=18)
+        axes.tick_params(axis="y", direction='in', color="k", which="major", labelsize=16, length=6)
+        axes.tick_params(axis="y", direction='in', color="k", which="minor", labelsize=16, length=3, bottom=False)
+        axes.tick_params(axis='x', which='both', bottom=False, top=False, labelsize=18)
+        axes.xaxis.label.set_visible(False)
+
+        if self._crop:
+            if feature in self._crop.keys():
+                crop_bounds = self._crop[feature][1] if imputed else self._crop[feature][0]
+                upper_bound = crop_bounds[1]
+                axes.set_ylim(crop_bounds[0], upper_bound)
+
+                if upper_bound:
+                    unique_values = df["Sets"].unique()
+
+                    for i, v in enumerate(unique_values):
+                        sliced_df = df[df["Sets"] == v]
+                        values_higher_than_given = sliced_df[feature][sliced_df[feature] > upper_bound].sort_values()
+
+                        if not values_higher_than_given.empty:
+                            axes.annotate(
+                                "",
+                                xy=(i + 0.03, upper_bound),
+                                xytext=(i + 0.14, upper_bound*0.86),
+                                arrowprops=dict(
+                                    arrowstyle="-|>, head_width=0.3",
+                                    color="black",
+                                    linewidth=1.3,
+                                    connectionstyle="angle3,angleA=0,angleB=90"
+                                )
+                            )
+
+                            axes.annotate(
+                                f"Up to {round(values_higher_than_given.iloc[-1], 1)}",
+                                xy=(i + 0.15, upper_bound*0.85),
+                                xycoords="data",
+                                xytext=(i + 0.15, upper_bound*0.85),
+                                fontsize=16
+                            )
+
         self._terminate_figure(path_to_save, show, fig)
 
     def visualize_global_continuous_feature(
@@ -516,7 +604,7 @@ class TableViewer:
             Whether to show figures.
         """
         dataset = self._global_imputed_df if imputed else self._global_original_df
-        self._plot_continuous_feature_figure(dataset, feature, path_to_save, show)
+        self._plot_continuous_feature_figure(dataset, feature, imputed, path_to_save, show)
 
     def visualize_target_specific_continuous_features(
             self,
@@ -543,7 +631,7 @@ class TableViewer:
             Whether to show figures.
         """
         dataset = self._target_specific_imputed_dfs[target] if imputed else self._target_specific_original_dfs[target]
-        self._plot_continuous_feature_figure(dataset, feature, path_to_save, show)
+        self._plot_continuous_feature_figure(dataset, feature, imputed, path_to_save, show)
 
     def _plot_categorical_feature_figure(
             self,
@@ -573,7 +661,7 @@ class TableViewer:
         df_copy = deepcopy(dataset)
         feature_series = df_copy[feature]
 
-        fig, axes = plt.subplots()
+        fig, axes = plt.subplots(figsize=self._fig_size)
 
         feature_series_copy = deepcopy(feature_series.astype("category"))
         unique = pd.unique(feature_series_copy)
@@ -594,7 +682,8 @@ class TableViewer:
                 stat='percent',
                 common_norm=False,
                 shrink=0.8,
-                alpha=1
+                alpha=1,
+                legend=False
             )
 
             fig_temp, axes_temp = plt.subplots()
@@ -604,7 +693,8 @@ class TableViewer:
                 bins=bins,
                 hue='Sets',
                 ax=axes_temp,
-                alpha=1
+                alpha=1,
+                legend=False
             )
 
         else:
@@ -617,7 +707,8 @@ class TableViewer:
                 stat='percent',
                 common_norm=False,
                 shrink=0.8,
-                alpha=1
+                alpha=1,
+                legend=False
             )
 
             fig_temp, axes_temp = plt.subplots()
@@ -626,14 +717,26 @@ class TableViewer:
                 x=feature,
                 hue='Sets',
                 ax=axes_temp,
-                alpha=1
+                alpha=1,
+                legend=False
             )
 
         for axes_container, axes_temp_container in zip(axes.containers, axes_temp.containers):
-            labels = [f"{axes_temp_patch.get_height()}" for axes_temp_patch in axes_temp_container]
-            axes.bar_label(axes_container, labels=labels)
+            labels = [f"$n={axes_temp_patch.get_height()}$" for axes_temp_patch in axes_temp_container]
+            axes.bar_label(axes_container, labels=labels, fontsize=16)
 
         plt.close(fig_temp)
+        axes.minorticks_on()
+        axes.set_xlabel(self._feature_names[feature] if self._feature_names else feature, fontsize=18)
+        axes.set_ylabel("Percentage $($%$)$", fontsize=18)
+        axes.tick_params(axis="y", direction='in', color="k", which="major", labelsize=16, length=6)
+        axes.tick_params(axis="y", direction='in', color="k", which="minor", labelsize=16, length=3, bottom=False)
+        axes.tick_params(axis='x', which='both', bottom=False, top=False, labelsize=16)
+
+        handles = [plt.Line2D([0], [0], color=color, lw=8) for color in sns.color_palette()[:len(self._legend_names)]]
+        labels = list(self._legend_names.values())
+        axes.legend(handles=handles, labels=labels, loc="upper right", edgecolor="k", fontsize=16, handlelength=1.5)
+
         self._terminate_figure(path_to_save, show, fig)
         logger.setLevel(initial_logger_level)
 
@@ -741,15 +844,15 @@ class TableViewer:
             Whether to add a legend.
         """
         axes.minorticks_on()
-        axes.tick_params(axis="both", direction='in', color="k", which="major", labelsize=14, length=6)
-        axes.tick_params(axis="both", direction='in', color="k", which="minor", labelsize=14, length=3)
-        axes.set_ylabel(f"Survival probability", fontsize=16)
-        axes.set_xlabel("Time $($months$)$", fontsize=16)
+        axes.tick_params(axis="both", direction='in', color="k", which="major", labelsize=16, length=6)
+        axes.tick_params(axis="both", direction='in', color="k", which="minor", labelsize=16, length=3)
+        axes.set_ylabel(f"Survival probability", fontsize=18)
+        axes.set_xlabel("Time $($months$)$", fontsize=18)
         axes.set_xlim(0, None)
         axes.set_ylim(-0.02, 1.02)
         axes.grid(False)
         if legend:
-            legend = axes.legend(loc="best", edgecolor="k", fontsize=16)
+            legend = axes.legend(loc="upper right", edgecolor="k", fontsize=16, handlelength=1.5)
 
             for line in legend.get_lines():
                 line.set_linewidth(8)
@@ -784,13 +887,17 @@ class TableViewer:
         for idx, (name, mask) in enumerate(self._global_masks.items()):
             subset = dataset.loc[dataset["Sets"] == name]
             event, time = subset[event_indicator].astype(bool), subset[event_time]
-            self._build_kaplan_meier_curve(event, time, axes, self._colors[idx], name)
+            self._build_kaplan_meier_curve(event, time, axes, self._light_colors[idx], name)
 
             survival_tables.append(survival_table_from_events(time, event))
-            colors.append(self._colors[idx])
+            colors.append(self._light_colors[idx])
 
         self._add_details_to_kaplan_meier_curve(axes, True)
         add_at_risk_counts(survival_tables=survival_tables, colors=colors, axes=axes, figure=fig)
+        texts = axes.get_legend().get_texts()
+        for idx, (name, _) in enumerate(self._global_masks.items()):
+            texts[idx].set_text(self._legend_names[name])
+
         self._terminate_figure(path_to_save, show, fig)
 
     def _plot_unstratified_global_kaplan_meier_curve(
@@ -820,11 +927,11 @@ class TableViewer:
         fig, axes = plt.subplots(figsize=self._fig_size)
 
         event, time = dataset[event_indicator].astype(bool), dataset[event_time]
-        self._build_kaplan_meier_curve(event, time, axes, self._colors[0])
+        self._build_kaplan_meier_curve(event, time, axes, self._light_colors[0])
         survival_table = survival_table_from_events(time, event)
 
         self._add_details_to_kaplan_meier_curve(axes, False)
-        add_at_risk_counts(survival_tables=[survival_table], colors=[self._colors[0]], axes=axes, figure=fig)
+        add_at_risk_counts(survival_tables=[survival_table], colors=[self._light_colors[0]], axes=axes, figure=fig)
         self._terminate_figure(path_to_save, show, fig)
 
     def _plot_global_kaplan_meier_curve(
@@ -902,12 +1009,20 @@ class TableViewer:
             mask = dataset[feature] == category
             event, time = dataset[event_indicator][mask].astype(bool), dataset[event_time][mask]
 
-            self._build_kaplan_meier_curve(event, time, axes, self._colors[n], category)
+            self._build_kaplan_meier_curve(event, time, axes, self._light_colors[n], category)
             survival_tables.append(survival_table_from_events(time, event))
-            colors.append(self._colors[n])
+            colors.append(self._light_colors[n])
 
         self._add_details_to_kaplan_meier_curve(axes, True)
         add_at_risk_counts(survival_tables=survival_tables, colors=colors, axes=axes, figure=fig)
+
+        legend = axes.get_legend()
+        title = self._feature_names[feature]
+        second_word = title.split()[1]
+        title = title.replace(" ", "\n") if second_word[0].isupper() else title
+        legend.set_title(title, prop={"size": 16})
+        plt.setp(legend.get_title(), multialignment='center')
+
         self._terminate_figure(path_to_save, show, fig)
 
     def _plot_stratified_kaplan_meier_curve(
@@ -1091,6 +1206,17 @@ class TableViewer:
             df.describe().transpose().round(1).to_csv(
                 os.path.join(path_to_folder, f"description_cont_features.csv"), index=True
             )
+
+            target_df = pd.DataFrame(columns=["Target", "Mean", "Std"])
+            for task in self.dataset.tasks.survival_analysis_tasks:
+                event_column, time_column = task.event_indicator_column, task.event_time_column
+                filtered_df = df[df[event_column] == 1]
+                mean, std = filtered_df[time_column].mean(), filtered_df[time_column].std()
+                target_df = pd.concat(
+                    [target_df, pd.DataFrame({"Target": event_column, "Mean": [mean], "Std": [std]})],
+                    ignore_index=True
+                )
+            target_df.to_csv(os.path.join(path_to_folder, f"description_target.csv"), index=False)
 
             frequency_table = self.get_frequency_table(df)
             frequency_table.to_csv(os.path.join(path_to_folder, f"description_cat_features.csv"), index=False)
@@ -1541,13 +1667,11 @@ class TableViewer:
             Path to save correlations figures.
         """
         ds = self.dataset
-        sets = [("features", ds.features_columns), ["targets", ds.target_columns], ["all", ds.columns]]
         for imputed, path in [(False, self.ORIGINAL_DF_PATH), (True, self.IMPUTED_DF_PATH)]:
-            for name, columns in sets:
-                path_to_fig = os.path.join(
-                    path_to_save, self.GLOBAL_PATH, self.FIGURES_PATH, self.CORRELATIONS_PATH, path, f"{name}.png"
-                )
-                self.visualize_correlations(columns, imputed, path_to_fig, False)
+            path_to_folder = os.path.join(
+                path_to_save, self.GLOBAL_PATH, self.FIGURES_PATH, self.CORRELATIONS_PATH, path
+            )
+            self.visualize_correlations(ds.target_columns, imputed, path_to_folder, False)
 
     def _save_targets_figures(
             self,
