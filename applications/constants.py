@@ -41,6 +41,7 @@ LEARNING_SET_FOLDER_PATH = os.path.join(DATA_PATH, "Learning_set")
 LEARNING_SET_PATH = os.path.join(DATA_PATH, "learning_set.h5")
 
 MASKS_PATH = os.path.join(DATA_PATH, "masks", "masks.json")
+HOLDOUT_MASKS_PATH = os.path.join(DATA_PATH, "masks", "holdout_masks.json")
 NOMOGRAMS_PATH = os.path.join(DATA_PATH, "nomograms")
 SERIES_DESCRIPTIONS_PATH = os.path.join(DATA_PATH, "series_descriptions.json")
 
