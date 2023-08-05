@@ -575,6 +575,20 @@ class RandomSampler:
         """
         return pd.qcut(np.array(targets), 2, labels=False)
 
+    @staticmethod
+    def visualize_splits(
+            datasets: dict
+    ) -> None:
+        """
+        Details the data splits for the experiment.
+
+        Parameters
+        ----------
+        datasets : dict
+            Dict with all the masks obtained from the sampler.
+        """
+        return KFoldSampler.visualize_splits(datasets)
+
 
 # ---------------------- THE FUNCTION extract_masks BE INCLUDED IN THE STRATIFIER SAMPLER CLASS ---------------------- #
 from json import load
