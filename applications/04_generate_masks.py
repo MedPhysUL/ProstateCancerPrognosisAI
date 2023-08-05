@@ -17,6 +17,7 @@ import pandas as pd
 from constants import (
     CLINICAL_CATEGORICAL_FEATURES,
     CLINICAL_CONTINUOUS_FEATURES,
+    HOLDOUT_MASKS_PATH,
     ID,
     LEARNING_TABLE_PATH,
     MASKS_PATH,
@@ -24,7 +25,7 @@ from constants import (
     SEED
 )
 from src.data.datasets import TableDataset
-from src.data.processing import KFoldSampler
+from src.data.processing import KFoldSampler, RandomSampler
 
 
 if __name__ == '__main__':
@@ -44,16 +45,35 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------------------------------------------------- #
     #                                                 Sampling                                                    #
     # ----------------------------------------------------------------------------------------------------------- #
-    sampler = KFoldSampler(
+    kfold_sampler = KFoldSampler(
         dataset=table_dataset,
         n_out_split=5,
         n_in_split=5,
         random_state=SEED
     )
 
-    masks = sampler()
-    sampler.visualize_splits(masks)
+    masks = kfold_sampler()
+    kfold_sampler.visualize_splits(masks)
 
     # Mask saving
     with open(MASKS_PATH, "w") as file:
+        dump(masks, file, indent=True)
+
+    # ----------------------------------------------------------------------------------------------------------- #
+    #                                             Holdout sampling                                                #
+    # ----------------------------------------------------------------------------------------------------------- #
+    random_sampler = RandomSampler(
+        dataset=table_dataset,
+        n_out_split=1,
+        n_in_split=0,
+        valid_size=0.0,
+        test_size=0.2,
+        random_state=SEED
+    )
+
+    masks = random_sampler()
+    random_sampler.visualize_splits(masks)
+
+    # Mask saving
+    with open(HOLDOUT_MASKS_PATH, "w") as file:
         dump(masks, file, indent=True)
