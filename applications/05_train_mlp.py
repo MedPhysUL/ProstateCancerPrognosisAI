@@ -74,7 +74,7 @@ if __name__ == '__main__':
         criterion=MeanLoss(),
         optimizer=optimizer,
         lr_scheduler=ExponentialLR(optimizer=optimizer, gamma=0.99),
-        early_stopper=MultiTaskLossEarlyStopper(patience=10),
+        early_stopper=MultiTaskLossEarlyStopper(patience=20),
         regularizer=L2Regularizer(model.named_parameters(), lambda_=0.006)
     )
 
