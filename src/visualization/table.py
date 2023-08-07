@@ -376,7 +376,7 @@ class TableViewer:
             axes.set_xticklabels(col_values, rotation=45, ha="right", rotation_mode="anchor", fontsize=13)
             axes.set_yticklabels(col_values, rotation=0, fontsize=13)
 
-            self._terminate_figure(os.path.join(path_to_save, f"{name}.png"), show, fig)
+            self._terminate_figure(os.path.join(path_to_save, f"{name}.pdf"), show, fig)
 
     @staticmethod
     def _format_to_percentage(
@@ -849,7 +849,7 @@ class TableViewer:
         axes.set_ylabel(f"Survival probability", fontsize=18)
         axes.set_xlabel("Time $($months$)$", fontsize=18)
         axes.set_xlim(0, None)
-        axes.set_ylim(-0.02, 1.02)
+        axes.set_ylim(None, 1.02)
         axes.grid(False)
         if legend:
             legend = axes.legend(loc="upper right", edgecolor="k", fontsize=16, handlelength=1.5)
@@ -964,11 +964,11 @@ class TableViewer:
             path_to_folder = os.path.join(path_to_save, name)
             os.makedirs(path_to_folder, exist_ok=True)
 
-            path_to_fig = os.path.join(path_to_folder, "GLOBAL.png")
+            path_to_fig = os.path.join(path_to_folder, "GLOBAL.pdf")
             self._plot_unstratified_global_kaplan_meier_curve(df, event_indicator, event_time, path_to_fig, show)
 
             if name == "full_dataset":
-                path_to_fig = os.path.join(path_to_folder, "GLOBAL_STRATIFIED.png")
+                path_to_fig = os.path.join(path_to_folder, "GLOBAL_STRATIFIED.pdf")
                 self._plot_masks_stratified_global_kaplan_meier_curve(
                     dataset, event_indicator, event_time, path_to_fig, show
                 )
@@ -1065,7 +1065,7 @@ class TableViewer:
             path_to_folder = os.path.join(path_to_save, name)
             os.makedirs(path_to_folder, exist_ok=True)
 
-            path_to_fig = os.path.join(path_to_folder, f"{feature}.png")
+            path_to_fig = os.path.join(path_to_folder, f"{feature}.pdf")
             self._plot_categories_stratified_kaplan_meier_curve(
                 df, feature, event_indicator, event_time, path_to_fig, show
             )
@@ -1687,7 +1687,7 @@ class TableViewer:
         """
         for i, target in enumerate(self._target_cols):
             path = os.path.join(
-                path_to_save, self.TARGETS_PATH, target, self.FIGURES_PATH, self.TARGET_PATH, "class_distribution.png"
+                path_to_save, self.TARGETS_PATH, target, self.FIGURES_PATH, self.TARGET_PATH, "class_distribution.pdf"
             )
             self.visualize_target_class_distribution(target, path, False)
 
@@ -1706,10 +1706,10 @@ class TableViewer:
         for imputed, path in [(False, self.ORIGINAL_DF_PATH), (True, self.IMPUTED_DF_PATH)]:
             directory = os.path.join(path_to_save, self.GLOBAL_PATH, self.FIGURES_PATH, self.FEATURES_PATH, path)
             for cont_col in self.dataset.continuous_features_columns:
-                path_to_fig = os.path.join(directory, f"{cont_col}.png")
+                path_to_fig = os.path.join(directory, f"{cont_col}.pdf")
                 self.visualize_global_continuous_feature(cont_col, imputed, path_to_fig, False)
             for cat_col in self.dataset.categorical_features_columns:
-                path_to_fig = os.path.join(directory, f"{cat_col}.png")
+                path_to_fig = os.path.join(directory, f"{cat_col}.pdf")
                 self.visualize_global_categorical_feature(cat_col, imputed, path_to_fig, False)
 
     def _save_target_specific_features_figures(
@@ -1730,10 +1730,10 @@ class TableViewer:
                     path_to_save, self.TARGETS_PATH, target, self.FIGURES_PATH, self.FEATURES_PATH, path
                 )
                 for cont_col in self.dataset.continuous_features_columns:
-                    path_to_fig = os.path.join(directory, f"{cont_col}.png")
+                    path_to_fig = os.path.join(directory, f"{cont_col}.pdf")
                     self.visualize_target_specific_continuous_features(cont_col, target, imputed, path_to_fig, False)
                 for cat_col in self.dataset.categorical_features_columns:
-                    path_to_fig = os.path.join(directory, f"{cat_col}.png")
+                    path_to_fig = os.path.join(directory, f"{cat_col}.pdf")
                     self.visualize_target_specific_categorical_features(cat_col, target, imputed, path_to_fig, False)
 
     def _save_features_figures(
