@@ -116,7 +116,7 @@ class Checkpoint(TrainingCallback):
         """
         return Priority.LOW_PRIORITY
 
-    def save(self, trainer):
+    def save(self, trainer, path: Optional[str] = None):
         """
         Saves the checkpoint if the current epoch is a checkpoint epoch.
 
@@ -124,13 +124,16 @@ class Checkpoint(TrainingCallback):
         ----------
         trainer : Trainer
             The trainer.
+        path : Optional[str]
+            The path to save the checkpoint to.
         """
         self._save_checkpoint(
             epoch=trainer.epoch_state.idx,
             epoch_state=trainer.epoch_state.state_dict(),
             training_state=trainer.training_state.state_dict(),
             model_state=trainer.model.state_dict(),
-            callbacks_state=trainer.callbacks.state_dict()
+            callbacks_state=trainer.callbacks.state_dict(),
+            path=path
         )
 
     def _get_checkpoint_filename(self, epoch: int):
@@ -193,6 +196,7 @@ class Checkpoint(TrainingCallback):
             epoch_state: dict,
             model_state: dict,
             training_state: dict,
+            path: Optional[str] = None
     ) -> str:
         """
         Saves a checkpoint (model, optimizer, trainer) states at the given epoch.
@@ -209,6 +213,8 @@ class Checkpoint(TrainingCallback):
             The state dict of the model.
         training_state : dict
             The training state.
+        path : Optional[str]
+            The path to save the checkpoint to.
 
         Returns
         -------
@@ -216,17 +222,21 @@ class Checkpoint(TrainingCallback):
             The path to the saved checkpoint.
         """
         os.makedirs(self.path_to_checkpoint_folder, exist_ok=True)
-        path = self._get_path_to_checkpoint(epoch)
 
-        state = CheckpointState(
-            callbacks_state=callbacks_state,
-            epoch=epoch,
-            epoch_state=epoch_state,
-            model_state=model_state if self.save_model_state else None,
-            training_state=training_state
-        )
+        if path:
+            if self.save_model_state:
+                torch.save(model_state, path)
+        else:
+            path = self._get_path_to_checkpoint(epoch)
+            state = CheckpointState(
+                callbacks_state=callbacks_state,
+                epoch=epoch,
+                epoch_state=epoch_state,
+                model_state=model_state if self.save_model_state else None,
+                training_state=training_state
+            )
+            torch.save(asdict(state), path)
 
-        torch.save(asdict(state), path)
         return path
 
     def on_epoch_end(self, trainer, **kwargs):
@@ -255,14 +265,12 @@ class Checkpoint(TrainingCallback):
         trainer : Trainer
             The trainer.
         """
-        if trainer.is_using_early_stopping:
-            best_epoch_idx = trainer.training_state.best_epoch
-            path_to_best_checkpoint = self._get_path_to_checkpoint(best_epoch_idx)
-            if os.path.exists(path_to_best_checkpoint):
-                os.rename(
-                    path_to_best_checkpoint,
-                    self._get_path_to_checkpoint(best_epoch_idx, True)
-                )
+        best_epo_idx = trainer.training_state.best_epoch if trainer.is_using_early_stopping else trainer.epoch_state.idx
+        path_to_best_checkpoint = self._get_path_to_checkpoint(best_epo_idx)
+        if os.path.exists(path_to_best_checkpoint):
+            os.rename(path_to_best_checkpoint, self._get_path_to_checkpoint(best_epo_idx, True))
+        else:
+            self.save(trainer, self._get_path_to_checkpoint(best_epo_idx, True))
 
         path_to_save = os.path.join(self.path_to_checkpoint_folder, self.TRAINING_HISTORY_FIGURES_FOLDER_NAME)
         os.makedirs(path_to_save, exist_ok=True)
