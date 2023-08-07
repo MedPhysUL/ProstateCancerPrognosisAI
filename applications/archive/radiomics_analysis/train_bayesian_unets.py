@@ -92,7 +92,7 @@ if __name__ == '__main__':
                 save_freq=20
             ),
             exec_metrics_on_train=True,
-            n_epochs=100,
+            n_epochs=150,
             seed=SEED
         )
 
