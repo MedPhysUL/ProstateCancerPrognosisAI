@@ -370,7 +370,7 @@ class TableSurvshapExplainer:
 
     def plot_shap_lines_for_all_patients(
             self,
-            feature: Union[Dict[Tuple[str], List[int]], str],
+            feature: Union[Dict[Tuple[str, ...], List[int]], str],
             function: str,
             show: bool = True,
             path_to_save_folder: Optional[str] = None,
@@ -385,10 +385,10 @@ class TableSurvshapExplainer:
 
         Parameters
         ----------
-        feature : Union[Dict[Tuple[str], List[int]], str]
+        feature : Union[Dict[Tuple[str, ...], List[int]], str]
             A dictionary with keys being a tuple of desired features for a graph and values being a list of the indexes
             of the patients to put on the graph. The number of graphs will equal the number of keys in the dictionary.
-            E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
+            E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
             create two graphs. An empty list of patients indexes will graph all patients. If the original SurvSHAP(t)
             graphs are desired, simply input the chosen feature.
         function : str
@@ -436,7 +436,7 @@ class TableSurvshapExplainer:
                         patients = [i for i in range(len(explanation.individual_explanations))]
                     if normalize:
                         sum_of_values = {
-                            key: np.array([0 for _ in [explanation.timestamps]]) for key in self.feature_order
+                            key: np.array([0 for _ in [explanation.timestamps]]) for key in patients
                         }
 
                         for patient_index in patients:
@@ -444,10 +444,10 @@ class TableSurvshapExplainer:
 
                             for feature_name in features_list:
                                 y = [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
-                                sum_of_values[feature_name] = sum_of_values.get(feature_name) + np.abs(np.array(y))
+                                sum_of_values[patient_index] = sum_of_values.get(patient_index) + np.abs(np.array(y))
                     else:
                         sum_of_values = {
-                            key: np.array([1 for _ in [explanation.timestamps]]) for key in self.feature_order
+                            key: np.array([1 for _ in [explanation.timestamps]]) for key in patients
                         }
                     colors = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(patients)))))
                     patient_ids_dict = self.dataset.table_dataset.row_idx_to_ids
@@ -461,16 +461,12 @@ class TableSurvshapExplainer:
                         for feature_name in features_list:
                             y = np.array(
                                 [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
-                            )/sum_of_values[feature_name]
+                            )/sum_of_values[patient_index]
                             arr.plot(x, y, color=colors[i])
 
                     normalize_name = "normalized" if normalize else "not_normalized"
-                    normalize_name_title = "normalized" if normalize else "not normalized"
                     arr.set_xlabel(kwargs.get("xlabel", f"time"))
                     arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
-                    arr.set_title(kwargs.get(
-                        "title", f"{task.target_column}: SHAP values by patient for {function}, {normalize_name_title}"
-                    ))
                     arr.legend(handles=patch_list)
 
                     if path_to_save_folder is not None:
@@ -486,7 +482,7 @@ class TableSurvshapExplainer:
 
     def plot_shap_lines_for_features(
             self,
-            features: Union[List[str], Dict[Tuple[str], List[int]]],
+            features: Union[List[str], Dict[Tuple[str, ...], List[int]]],
             function: str,
             show: bool = True,
             path_to_save_folder: Optional[str] = None,
@@ -500,10 +496,10 @@ class TableSurvshapExplainer:
 
         Parameters
         ----------
-        features : Union[List[str], Dict[Tuple[str], List[int]]]
+        features : Union[List[str], Dict[Tuple[str, ...], List[int]]]
             A dictionary with keys being a tuple of desired features for a graph and values being a list of the indexes
             of the patients to put on the graph. The number of graphs will equal the number of keys in the dictionary.
-            E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
+            E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
             create two graphs. An empty list of patients indexes will graph all patients. If the original SurvSHAP(t)
             graphs are desired, simply input a list of the chosen features.
         function : str
@@ -593,12 +589,8 @@ class TableSurvshapExplainer:
                         patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
 
                     normalize_name = "normalized" if normalize else "not_normalized"
-                    normalize_name_title = "normalized" if normalize else "not normalized"
                     arr.set_xlabel(kwargs.get("xlabel", f"time"))
                     arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
-                    arr.set_title(kwargs.get(
-                        "title", f"{task.target_column}: SHAP values by feature for {function}, {normalize_name_title}"
-                    ))
                     arr.legend(handles=patch_list)
 
                     if path_to_save_folder is not None:
@@ -614,7 +606,7 @@ class TableSurvshapExplainer:
 
     def plot_shap_average_of_absolute_value(
             self,
-            features: Union[List[str], Dict[Tuple[str], List[int]]],
+            features: Union[List[str], Dict[Tuple[str, ...], List[int]]],
             function: str,
             tasks: Optional[Union[Task, TaskList, List[Task]]],
             show: bool = True,
@@ -627,10 +619,10 @@ class TableSurvshapExplainer:
 
         Parameters
         ----------
-        features : List[str]
+        features : Union[List[str], Dict[Tuple[str, ...], List[int]]]
             A dictionary with keys being a tuple of desired features for a graph and values being a list of the indexes
             of the patients to put on the graph. The number of graphs will equal the number of keys in the dictionary.
-            E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
+            E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
             create two graphs. An empty list of patients indexes will graph all patients. If the original SurvSHAP(t)
             graphs are desired, simply input a list of the chosen features.
         function : str
@@ -689,9 +681,6 @@ class TableSurvshapExplainer:
 
                     arr.set_xlabel(kwargs.get("xlabel", f"time"))
                     arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
-                    arr.set_title(kwargs.get(
-                        "title", f"{task.target_column}: Average of absolute value of SHAP values for {function}"
-                    ))
                     arr.legend(handles=patch_list)
 
                     if path_to_save_folder is not None:

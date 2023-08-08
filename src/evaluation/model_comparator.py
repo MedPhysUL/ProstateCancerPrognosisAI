@@ -24,10 +24,11 @@ from ..data.datasets.prostate_cancer import ProstateCancerDataset, TargetsType
 from ..metrics.single_task.base import Direction
 from ..models.base.model import Model
 from ..tasks.base import Task
-from ..tasks.containers.list import TaskList, SurvivalAnalysisTask
+from ..tasks.containers.list import TaskList, SurvivalAnalysisTask, BinaryClassificationTask
 from ..tools.plot import terminate_figure
 from ..tools.transforms import to_numpy
 
+from ..tools.delong_test import delong_roc_test
 from compare_concordance import compare_concordance
 
 
@@ -97,4 +98,31 @@ class ModelComparator:
                 results_2[task.name]
             )[4]
 
+        return p_values
+
+    def compute_auc_p_value(
+            self,
+            mask: Optional[List[int]] = None,
+            tasks: Optional[Union[Task, TaskList, List[Task]]] = None
+    ):
+        """
+
+        """
+        results_1 = self.model_1.predict_on_dataset(dataset=self.dataset, mask=mask)
+        results_2 = self.model_2.predict_on_dataset(dataset=self.dataset, mask=mask)
+
+        if tasks is None:
+            tasks = self.dataset.tasks.binary_classification_tasks
+        else:
+            tasks = TaskList(tasks)
+            assert all(isinstance(task, BinaryClassificationTask) for task in tasks), (
+                f"All tasks must be instances of 'BinaryClassificationTask'."
+            )
+        p_values = {}
+        for task in tasks:
+            p_values[task.name] = delong_roc_test(
+                np.expand_dims(self.dataset.table_dataset.y[task.name], 1),
+                results_1[task.name],
+                results_2[task.name]
+            )
         return p_values
