@@ -1210,10 +1210,17 @@ class TableViewer:
             target_df = pd.DataFrame(columns=["Target", "Mean", "Std"])
             for task in self.dataset.tasks.survival_analysis_tasks:
                 event_column, time_column = task.event_indicator_column, task.event_time_column
-                filtered_df = df[df[event_column] == 1]
-                mean, std = filtered_df[time_column].mean(), filtered_df[time_column].std()
+                filtered_df = df[df[event_column] == 1][time_column]
                 target_df = pd.concat(
-                    [target_df, pd.DataFrame({"Target": event_column, "Mean": [mean], "Std": [std]})],
+                    [target_df, pd.DataFrame(
+                        {
+                            "Target": event_column,
+                            "Mean": [filtered_df.mean()],
+                            "Median": [filtered_df.median()],
+                            "Min": [filtered_df.min()],
+                            "Max": [filtered_df.max()],
+                            "Std": [filtered_df.std()]})
+                     ],
                     ignore_index=True
                 )
             target_df.to_csv(os.path.join(path_to_folder, f"description_target.csv"), index=False)
