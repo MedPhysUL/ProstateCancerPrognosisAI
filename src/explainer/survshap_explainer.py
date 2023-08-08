@@ -561,7 +561,7 @@ class TableSurvshapExplainer:
 
                     if normalize:
                         sum_of_values = {
-                            key: np.array([0 for _ in [explanation.timestamps]]) for key in self.feature_order
+                            key: np.array([0 for _ in [explanation.timestamps]]) for key in patients
                         }
 
                         for patient_index in patients:
@@ -569,10 +569,10 @@ class TableSurvshapExplainer:
 
                             for feature_name in features_list:
                                 y = [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
-                                sum_of_values[feature_name] = sum_of_values.get(feature_name) + np.abs(np.array(y))
+                                sum_of_values[patient_index] = sum_of_values.get(patient_index) + np.abs(np.array(y))
                     else:
                         sum_of_values = {
-                            key: np.array([1 for _ in [explanation.timestamps]]) for key in self.feature_order
+                            key: np.array([1 for _ in [explanation.timestamps]]) for key in patient_index
                         }
 
                     for patient_index in patients:
@@ -582,7 +582,7 @@ class TableSurvshapExplainer:
                         for feature_name in features_list:
                             y = np.array(
                                 [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
-                            )/sum_of_values[feature_name]
+                            )/sum_of_values[patient_index]
                             arr.plot(x, y, color=color_dict[feature_name])
 
                     for feature_name in features_list:
