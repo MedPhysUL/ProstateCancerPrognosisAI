@@ -405,6 +405,7 @@ class TableViewer:
 
     def _update_axes_of_class_distribution_figure(
             self,
+            fig: plt.Figure,
             axes: plt.axes,
             targets: np.ndarray,
             label_names: dict,
@@ -416,6 +417,8 @@ class TableViewer:
 
         Parameters
         ----------
+        fig : plt.Figure
+            Figure.
         axes : plt.axes
             Axes.
         targets : np.ndarray
@@ -434,30 +437,30 @@ class TableViewer:
             textprops=dict(color="k"),
             startangle=90,
             autopct=lambda pct: self._format_to_percentage(pct, list(label_counts.values())),
-            colors=self._light_colors
+            colors=self._light_colors,
+            pctdistance=0.75,
+            wedgeprops=dict(width=0.5)
         )
 
         for wedge in wedges:
             wedge.set_edgecolor("k")
 
-        plt.setp(auto_texts, size=14)
+        plt.setp(auto_texts, size=11)
         plt.setp(axes.collections, edgecolor="k")
 
         if show_legend:
-            legend = axes.legend(
+            legend = fig.legend(
                 wedges,
                 list(label_counts.keys()),
-                fontsize=16,
+                fontsize=14,
                 handlelength=2.5,
                 edgecolor="k",
                 framealpha=1,
-                loc="upper right"
+                loc="center",
+                bbox_to_anchor=(0.5, 0.27)
             )
-
             for p in legend.get_patches():
                 p.set_edgecolor(None)
-
-            legend.set_bbox_to_anchor((1.0, 1.0))
 
         if title is not None:
             axes.set_xlabel(f"{title}\n$(n = {sum(label_counts.values())})$", fontsize=18, labelpad=-20)
@@ -488,6 +491,7 @@ class TableViewer:
                     self._target_specific_original_dfs[target]["Sets"] == name
                     ]
                 self._update_axes_of_class_distribution_figure(
+                    fig=fig,
                     axes=axes[0, idx],
                     targets=filtered_df[target],
                     label_names={"Negative": 0, f"Positive": 1},
