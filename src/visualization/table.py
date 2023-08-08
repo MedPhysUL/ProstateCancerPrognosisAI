@@ -17,9 +17,11 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.linalg import LinAlgError
 from scipy.interpolate import interp1d
 from scipy.stats import chi2_contingency, mannwhitneyu
 import seaborn as sns
+from sksurv.compare import compare_survival
 from sksurv.nonparametric import kaplan_meier_estimator
 
 from .color import Color, DarkColor, LightColor
@@ -857,6 +859,32 @@ class TableViewer:
             for line in legend.get_lines():
                 line.set_linewidth(8)
 
+    @staticmethod
+    def _get_structured_array(
+            event_indicator: np.ndarray,
+            event_time: np.ndarray
+    ) -> np.ndarray:
+        """
+        Returns a structured array with event indicator and event time.
+
+        Parameters
+        ----------
+        event_indicator : np.ndarray
+            (N,) array with event indicator.
+        event_time : np.ndarray
+            (N,) array with event time.
+
+        Returns
+        -------
+        structured_array : np.ndarray
+            (N, 2) structured array with event indicator and event time.
+        """
+        structured_array = np.empty(shape=(len(event_indicator),), dtype=[('event', bool), ('time', float)])
+        structured_array['event'] = event_indicator.astype(bool)
+        structured_array['time'] = event_time
+
+        return structured_array
+
     def _plot_masks_stratified_global_kaplan_meier_curve(
             self,
             dataset: pd.DataFrame,
@@ -894,6 +922,24 @@ class TableViewer:
 
         self._add_details_to_kaplan_meier_curve(axes, True)
         add_at_risk_counts(survival_tables=survival_tables, colors=colors, axes=axes, figure=fig)
+
+        try:
+            filtered_df = dataset.dropna()
+            _, p_value = compare_survival(
+                y=self._get_structured_array(
+                    event_indicator=filtered_df[event_indicator],
+                    event_time=filtered_df[event_time]
+                ),
+                group_indicator=np.array([list(self._global_masks.keys()).index(row) for row in filtered_df["Sets"]])
+            )
+
+            axes.annotate(
+                f"p-value$ = {p_value:.4f}$", xy=(0.15, 0.1), xycoords="axes fraction", textcoords="offset points",
+                xytext=(0, 10), ha='center', fontsize=16
+            )
+        except LinAlgError:
+            pass
+
         texts = axes.get_legend().get_texts()
         for idx, (name, _) in enumerate(self._global_masks.items()):
             texts[idx].set_text(self._legend_names[name])
@@ -1015,6 +1061,23 @@ class TableViewer:
 
         self._add_details_to_kaplan_meier_curve(axes, True)
         add_at_risk_counts(survival_tables=survival_tables, colors=colors, axes=axes, figure=fig)
+
+        try:
+            filtered_df = dataset.dropna()
+            _, p_value = compare_survival(
+                y=self._get_structured_array(
+                    event_indicator=filtered_df[event_indicator],
+                    event_time=filtered_df[event_time]
+                ),
+                group_indicator=np.array([unique_categories.index(row) for row in filtered_df[feature].dropna()])
+            )
+
+            axes.annotate(
+                f"p-value$ = {p_value:.4f}$", xy=(0.15, 0.1), xycoords="axes fraction", textcoords="offset points",
+                xytext=(0, 10), ha='center', fontsize=16
+            )
+        except LinAlgError:
+            pass
 
         legend = axes.get_legend()
         title = self._feature_names[feature]
