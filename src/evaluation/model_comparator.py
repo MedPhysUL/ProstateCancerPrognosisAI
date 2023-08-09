@@ -122,7 +122,7 @@ class ModelComparator:
         for task in tasks:
             p_values[task.name] = delong_roc_test(
                 np.expand_dims(self.dataset.table_dataset.y[task.name], 1),
-                results_1[task.name],
-                results_2[task.name]
+                to_numpy(torch.squeeze(results_1[task.name])),
+                to_numpy(torch.squeeze(results_2[task.name]))
             )
         return p_values

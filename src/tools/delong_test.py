@@ -28,8 +28,7 @@ def compute_midrank(x):
     T2 = np.empty(N, dtype=float)
     # Note(kazeevn) +1 is due to Python using 0-based indexing
     # instead of 1-based in the AUC formula in the paper
-    print(T, T2, type(T2[J]), type(J))
-    T2[J] = T + 1
+    T2[J] = np.expand_dims(T, 1) + 1
     return T2
 
 
@@ -72,8 +71,14 @@ def fast_delong(predictions_sorted_transposed, label_1_count):
     aucs = tz[:, :m].sum(axis=1) / m / n - float(m + 1.0) / 2.0 / n
     v01 = (tz[:, :m] - tx[:, :]) / n
     v10 = 1.0 - (tz[:, m:] - ty[:, :]) / m
+    print("v01", v01)
+    print("v10", v10)
     sx = np.cov(v01)
     sy = np.cov(v10)
+    print("sx", sx)
+    print("sy", sy)
+    print("m", m)
+    print("n", n)
     delongcov = sx / m + sy / n
     return aucs, delongcov
 
@@ -87,7 +92,10 @@ def calc_pvalue(aucs, sigma):
        log10(pvalue)
     """
     l = np.array([[1, -1]])
+    print("aucs", aucs)
+    print("sigma", sigma)
     z = np.abs(np.diff(aucs)) / np.sqrt(np.dot(np.dot(l, sigma), l.T))
+    print("z", z)
     return np.log10(2) + scipy.stats.norm.logsf(z, loc=0, scale=1) / np.log(10)
 
 

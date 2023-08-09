@@ -401,8 +401,8 @@ class TableSurvshapExplainer:
         tasks : Optional[Union[Task, TaskList, List[Task]]]
             The tasks for which to plot the graphs. One graph will be created for each task.
         normalize : bool
-            Whether to normalize the values by dividing by the sum of the absolute values of all SurvSHAP(t) values for
-            a given feature at each timestamp. Defaults to False.
+            Whether to normalize the values by dividing by the sum of the absolute value of the SurvSHAP(t) values for
+            a given patient at each timestamp. Defaults to False.
         legend_length : int
             The number of patients to show in the legend, too many can clutter and hide the graph. Defaults to 5
         """
@@ -515,8 +515,8 @@ class TableSurvshapExplainer:
             If transforming a feature into a discretized state is desired, then it is the Tuple of the number of bins
             and a list of the features to discretize.
         normalize : bool
-            Whether to normalize the values by dividing by the sum of the absolute values of all SurvSHAP(t) values for
-            a given feature at each timestamp. Defaults to False.
+            Whether to normalize the values by dividing by the sum of the absolute value of the SurvSHAP(t) values for
+            a given patient at each timestamp. Defaults to False.
         """
         if tasks is None:
             tasks = self.dataset.tasks.survival_analysis_tasks
@@ -572,7 +572,7 @@ class TableSurvshapExplainer:
                                 sum_of_values[patient_index] = sum_of_values.get(patient_index) + np.abs(np.array(y))
                     else:
                         sum_of_values = {
-                            key: np.array([1 for _ in [explanation.timestamps]]) for key in patient_index
+                            key: np.array([1 for _ in [explanation.timestamps]]) for key in patients
                         }
 
                     for patient_index in patients:
@@ -611,6 +611,7 @@ class TableSurvshapExplainer:
             tasks: Optional[Union[Task, TaskList, List[Task]]],
             show: bool = True,
             path_to_save_folder: Optional[str] = None,
+            normalize: bool = False,
             **kwargs
 
     ) -> None:
@@ -634,6 +635,9 @@ class TableSurvshapExplainer:
             Whether to show the graph. Defaults to True.
         path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
+        normalize : bool
+            Whether to normalize the values by dividing by the sum of the absolute value of the SurvSHAP(t) values for
+            a given patient at each timestamp. Defaults to False.
         """
         if tasks is None:
             tasks = self.dataset.tasks.survival_analysis_tasks
@@ -663,6 +667,7 @@ class TableSurvshapExplainer:
                 for features_list, patients in features.items():
                     if len(patients) == 0:
                         patients = [i for i in range(len(explanation.individual_explanations))]
+
                     sum_of_values = {key: np.array([0 for _ in [explanation.timestamps]]) for key in self.feature_order}
 
                     for patient_index in patients:
@@ -673,8 +678,15 @@ class TableSurvshapExplainer:
                             sum_of_values[feature_name] = sum_of_values.get(feature_name) + np.abs(np.array(y))
                     patch_list = []
 
+                    if normalize:
+                        sum_of_averages = np.array([0 for _ in [explanation.timestamps]])
+                        for feature_name in features_list:
+                            sum_of_averages = sum_of_averages + sum_of_values[feature_name]/(len(patients))
+                    else:
+                        sum_of_averages = np.array([1 for _ in [explanation.timestamps]])
+
                     for feature_name in features_list:
-                        average_values = sum_of_values[feature_name]/(len(patients))
+                        average_values = sum_of_values[feature_name]/(len(patients))/sum_of_averages
 
                         arr.plot(explanation.timestamps, average_values, color=color_dict[feature_name])
                         patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
