@@ -78,7 +78,7 @@ class SequentialNet(Predictor):
             posterior_mu_init: float = 0.0,
             posterior_rho_init: float = -3.0,
             standard_deviation: float = 0.1,
-            n_samples: int = 10
+            n_samples: int = 5
     ):
         """
         Initializes the model.
