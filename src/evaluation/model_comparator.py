@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Union, NamedTuple, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy
 import seaborn as sns
 import torch
 from sklearn.calibration import calibration_curve
@@ -24,7 +25,7 @@ from ..data.datasets.prostate_cancer import ProstateCancerDataset, TargetsType
 from ..metrics.single_task.base import Direction
 from ..models.base.model import Model
 from ..tasks.base import Task
-from ..tasks.containers.list import TaskList, SurvivalAnalysisTask, BinaryClassificationTask
+from ..tasks.containers.list import TaskList, SurvivalAnalysisTask, BinaryClassificationTask, TableTask
 from ..tools.plot import terminate_figure
 from ..tools.transforms import to_numpy
 
@@ -120,9 +121,61 @@ class ModelComparator:
             )
         p_values = {}
         for task in tasks:
-            p_values[task.name] = delong_roc_test(
+            p_values[task.name] = 10**delong_roc_test(
                 np.expand_dims(self.dataset.table_dataset.y[task.name], 1),
                 to_numpy(torch.squeeze(results_1[task.name])),
                 to_numpy(torch.squeeze(results_2[task.name]))
+            )[0, 0]
+        return p_values
+
+    def compute_variance_p_value(
+            self,
+            mask: Optional[List[int]] = None,
+            tasks: Optional[Union[Task, TaskList, List[Task]]] = None
+    ):
+        """
+
+        """
+        results_1 = self.model_1.predict_on_dataset(dataset=self.dataset, mask=mask)
+        results_2 = self.model_2.predict_on_dataset(dataset=self.dataset, mask=mask)
+
+        if tasks is None:
+            tasks = self.dataset.tasks.binary_classification_tasks
+        else:
+            tasks = TaskList(tasks)
+            assert all(isinstance(task, TableTask) for task in tasks), (
+                f"All tasks must be instances of 'TableTask'."
             )
+        p_values = {}
+        for task in tasks:
+            p_values[task.name] = scipy.stats.levene(
+                to_numpy(torch.squeeze(results_1[task.name])),
+                to_numpy(torch.squeeze(results_2[task.name]))
+            ).pvalue
+        return p_values
+
+    def compute_mean_p_value(
+            self,
+            mask: Optional[List[int]] = None,
+            tasks: Optional[Union[Task, TaskList, List[Task]]] = None
+    ):
+        """
+
+        """
+        results_1 = self.model_1.predict_on_dataset(dataset=self.dataset, mask=mask)
+        results_2 = self.model_2.predict_on_dataset(dataset=self.dataset, mask=mask)
+
+        if tasks is None:
+            tasks = self.dataset.tasks.binary_classification_tasks
+        else:
+            tasks = TaskList(tasks)
+            assert all(isinstance(task, TableTask) for task in tasks), (
+                f"All tasks must be instances of 'TableTask'."
+            )
+        p_values = {}
+        for task in tasks:
+            p_values[task.name] = scipy.stats.ttest_ind(
+                to_numpy(torch.squeeze(results_1[task.name])),
+                to_numpy(torch.squeeze(results_2[task.name]))
+            ).pvalue
         return p_values
