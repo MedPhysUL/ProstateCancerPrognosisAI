@@ -380,6 +380,42 @@ class TableViewer:
 
             self._terminate_figure(os.path.join(path_to_save, f"{name}.pdf"), show, fig)
 
+    def visualize_timeline(
+            self,
+            name: str,
+            dataframe: pd.DataFrame,
+            path_to_save: Optional[str] = None,
+            show: Optional[bool] = True
+    ) -> None:
+        """
+        Visualizes timeline.
+
+        Parameters
+        ----------
+        name : str
+            Name of the figure.
+        dataframe : pd.DataFrame
+            Dataframe.
+        path_to_save : Optional[str]
+            Path to save figures.
+        show : Optional[bool]
+            Whether to show figures.
+        """
+        fig, axes = plt.subplots(figsize=self._fig_size)
+        for idx, task in enumerate(self.dataset.tasks.survival_analysis_tasks):
+            event_column, time_column = task.event_indicator_column, task.event_time_column
+            sns.kdeplot(
+                data=dataframe[dataframe[event_column] == 1],
+                x=time_column,
+                fill=True,
+                label=self._target_names[event_column] if event_column in self._target_names else event_column,
+                color=self._light_colors[idx],
+                cut=0,
+                bw_adjust=0.8
+            )
+        axes.legend(fontsize=16)
+        self._terminate_figure(os.path.join(path_to_save, f"{name}.pdf"), show, fig)
+
     @staticmethod
     def _format_to_percentage(
             pct: float,
@@ -1200,6 +1236,8 @@ class TableViewer:
             os.makedirs(os.path.join(path, self.ORIGINAL_DF_PATH), exist_ok=True)
             os.makedirs(os.path.join(path, self.IMPUTED_DF_PATH), exist_ok=True)
 
+        os.makedirs(os.path.join(figures_path, f"{self.TARGET_PATH}s"), exist_ok=True)
+
     def _create_target_specific_directories(
             self,
             path_to_save: str
@@ -1747,6 +1785,24 @@ class TableViewer:
             )
             self.visualize_correlations(ds.target_columns, imputed, path_to_folder, False)
 
+    def _save_timeline_figures(
+            self,
+            path_to_save: str
+    ) -> None:
+        """
+        Saves timeline figures.
+
+        Parameters
+        ----------
+        path_to_save : str
+            Path to save timeline figures.
+        """
+        dataframes = self._get_sets_dict(self._global_original_df)
+
+        for name, df in dataframes.items():
+            path_to_folder = os.path.join(path_to_save, self.GLOBAL_PATH, self.FIGURES_PATH, f"{self.TARGET_PATH}s")
+            self.visualize_timeline(name, df, path_to_folder, False)
+
     def _save_targets_figures(
             self,
             path_to_save: str
@@ -1864,6 +1920,7 @@ class TableViewer:
 
         self._save_dataframes(path_to_save)
         self._save_correlation_figures(path_to_save)
+        self._save_timeline_figures(path_to_save)
         self._save_targets_figures(path_to_save)
         self._save_features_figures(path_to_save)
         self._save_kaplan_meier_figures(path_to_save)
