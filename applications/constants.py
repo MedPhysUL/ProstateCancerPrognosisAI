@@ -49,6 +49,8 @@ LEARNING_TABLE_PATH = os.path.join(DATA_PATH, "learning_table.csv")
 HOLDOUT_TABLE_PATH = os.path.join(DATA_PATH, "holdout_table.csv")
 MSKCC_LEARNING_TABLE_PATH = os.path.join(DATA_PATH, "mskcc_learning_table.csv")
 MSKCC_HOLDOUT_TABLE_PATH = os.path.join(DATA_PATH, "mskcc_holdout_table.csv")
+FINAL_TABLE_PATH = os.path.join(DATA_PATH, "final_table.csv")
+FINAL_BAYES_TABLE_PATH = os.path.join(DATA_PATH, "final_bayes_table.csv")
 
 _RADIOMICS_PATH = os.path.join(DATA_PATH, "radiomics")
 _AUTOMATIC_RADIOMICS_PATH = os.path.join(_RADIOMICS_PATH, "automatic")
@@ -70,6 +72,12 @@ MANUAL_EXTRACTED_RADIOMICS_PATH = os.path.join(_MANUAL_RADIOMICS_PATH, "extracte
 MANUAL_FILTERED_RADIOMICS_PATH = os.path.join(_MANUAL_RADIOMICS_PATH, "filtered")
 CT_FEATURES_EXTRACTOR_PARAMS_PATH = os.path.join(_RADIOMICS_PATH, "features_extractor_params_CT.yaml")
 PT_FEATURES_EXTRACTOR_PARAMS_PATH = os.path.join(_RADIOMICS_PATH, "features_extractor_params_PT.yaml")
+
+_RADIOMICS_HOLDOUT_PATH = os.path.join(DATA_PATH, "radiomics_holdout")
+AUTOMATIC_RADIOMICS_HOLDOUT_PATH = os.path.join(_RADIOMICS_HOLDOUT_PATH, "automatic")
+AUTOMATIC_BAYESIAN_RADIOMICS_HOLDOUT_PATH = os.path.join(_RADIOMICS_HOLDOUT_PATH, "automatic_bayesian")
+DEEP_RADIOMICS_HOLDOUT_PATH = os.path.join(_RADIOMICS_HOLDOUT_PATH, "deep")
+DEEP_BAYESIAN_RADIOMICS_HOLDOUT_PATH = os.path.join(_RADIOMICS_HOLDOUT_PATH, "deep_bayesian")
 
 RECORDS_PATH = os.path.join(DATA_PATH, "records")
 OUTLIERS_RECORDS_PATH = os.path.join(RECORDS_PATH, "outliers")
@@ -121,7 +129,7 @@ BCR_TASK = SurvivalAnalysisTask(
     event_time_column=BCR_TIME,
     criterion=NegativePartialLogLikelihood(),
     hps_tuning_metric=ConcordanceIndexCensored(),
-    evaluation_metrics=[ConcordanceIndexIPCW(), CumulativeDynamicAUC()]
+    evaluation_metrics=[ConcordanceIndexCensored(), ConcordanceIndexIPCW(), CumulativeDynamicAUC()]
 )
 CRPC_TASK = SurvivalAnalysisTask(
     event_indicator_column=CRPC,
