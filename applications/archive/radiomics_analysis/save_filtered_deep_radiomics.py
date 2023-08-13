@@ -70,8 +70,6 @@ if __name__ == "__main__":
 
             model = UNEXtractor(
                 image_keys=["CT", "PT"],
-                dropout_cnn=0.2,
-                dropout_fnn=0.2,
                 num_res_units=2,
                 device=torch.device("cuda"),
                 seed=SEED

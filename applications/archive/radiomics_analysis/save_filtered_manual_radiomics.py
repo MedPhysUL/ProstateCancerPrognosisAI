@@ -13,6 +13,7 @@ import env_apps
 import os
 from typing import Dict, List, Optional, Union
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -55,6 +56,10 @@ class RadiomicsDataframe:
         table_dataset : TableDataset
             The table dataset.
         """
+        matplotlib.rc('axes', edgecolor='k')
+        matplotlib.rcParams['mathtext.fontset'] = 'cm'
+        matplotlib.rcParams['font.family'] = 'STIXGeneral'
+
         self.table_dataset = table_dataset
 
     @staticmethod
@@ -342,7 +347,7 @@ class RadiomicsDataframe:
             forest: RandomForestClassifier,
             columns: List[str],
             n_features: int = 6,
-            figsize=(12, 6)
+            figsize=(8, 6)
     ):
         """
         This method plots the features importance.
@@ -369,12 +374,24 @@ class RadiomicsDataframe:
             [tree.feature_importances_ for tree in forest.estimators_], axis=0
         )[tree_importance_sorted_idx][-n_features:]
 
-        ax.barh(tree_indices[:n_features], importances[tree_importance_sorted_idx][-n_features:], height=0.7, xerr=std)
+        ax.barh(
+            tree_indices[:n_features],
+            importances[tree_importance_sorted_idx][-n_features:],
+            height=0.7,
+            xerr=std,
+            color="#9DC9E2"
+        )
+
         ax.set_yticks(tree_indices[:n_features])
         ax.set_yticklabels(columns[tree_importance_sorted_idx][-n_features:])
-        ax.set_title("Feature importances using MDI")
-        ax.set_ylabel("Mean decrease in impurity")
+        ax.set_ylabel("Radiomics", fontsize=18)
+        ax.set_xlabel("Mutual information score", fontsize=18)
         ax.set_ylim((0, len(importances[-n_features:])))
+        ax.minorticks_on()
+        ax.tick_params(axis="x", direction='in', color="k", which="major", labelsize=16, length=6)
+        ax.tick_params(axis="x", direction='in', color="k", which="minor", labelsize=16, length=3)
+        ax.tick_params(axis="y", direction='in', color="k", which="major", labelsize=16, length=0)
+        ax.tick_params(axis="y", direction='in', color="k", which="minor", labelsize=16, length=0)
         fig.tight_layout()
         plt.show()
 
