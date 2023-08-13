@@ -273,7 +273,7 @@ if __name__ == '__main__':
                     CRPC_TASK.name: 3,
                     DEATH_TASK.name: IntegerHyperparameter(
                         name="n_layers",
-                        low=1,
+                        low=0,
                         high=3
                     )
                 }

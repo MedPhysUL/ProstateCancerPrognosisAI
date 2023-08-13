@@ -25,7 +25,7 @@ from constants import (
     LEARNING_TABLE_PATH,
     MASKS_PATH,
     SEED,
-    BCR_TASK,K,
+    BCR_TASK,
     PN_TASK
 )
 from src.data.datasets import Feature
@@ -33,7 +33,7 @@ from src.data.transforms import Normalization
 from src.data.processing.sampling import extract_masks, Mask
 from src.data.datasets import ProstateCancerDataset, TableDataset
 from src.evaluation import ModelEvaluator
-from src.models.torch.prediction import MLP, SequentialNet, ModelConfig
+from src.models.torch.prediction import SequentialNet, ModelConfig
 from src.losses.multi_task import MeanLoss
 from src.training import Trainer
 from src.training.callbacks import LearningAlgorithm, Checkpoint
