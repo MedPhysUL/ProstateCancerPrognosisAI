@@ -9,24 +9,16 @@
     metrics.
 """
 
-import json
-import os
-from typing import Dict, List, Optional, Union, NamedTuple, Tuple
+from typing import Dict, List, Optional, Union
 
-import matplotlib.pyplot as plt
 import numpy as np
 import scipy
-import seaborn as sns
 import torch
-from sklearn.calibration import calibration_curve
-from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_curve
 
-from ..data.datasets.prostate_cancer import ProstateCancerDataset, TargetsType
-from ..metrics.single_task.base import Direction
+from ..data.datasets.prostate_cancer import ProstateCancerDataset
 from ..models.base.model import Model
 from ..tasks.base import Task
 from ..tasks.containers.list import TaskList, SurvivalAnalysisTask, BinaryClassificationTask, TableTask
-from ..tools.plot import terminate_figure
 from ..tools.transforms import to_numpy
 
 from ..tools.delong_test import delong_roc_test

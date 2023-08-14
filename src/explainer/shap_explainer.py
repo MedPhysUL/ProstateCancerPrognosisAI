@@ -13,13 +13,16 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from captum.attr import IntegratedGradients
 from captum._utils.typing import TensorOrTupleOfTensorsGeneric
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.transforms as transforms
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from monai.data import DataLoader
 import numpy as np
 import shap
 import torch
 
-from applications.constants import BLUE_TO_SAND, BLUE_TO_RED
+from applications.constants import *
 from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ..models.base.model import Model
 from ..tools.plot import terminate_figure
@@ -218,6 +221,10 @@ class TableShapValueExplainer:
         dataset : ProstateCancerDataset
             The dataset with which to explain the model.
         """
+        mpl.rc("axes", edgecolor="k")
+        mpl.rcParams["mathtext.fontset"] = "cm"
+        mpl.rcParams["font.family"] = "STIXGeneral"
+
         assert dataset.image_dataset is None and dataset.table_dataset is not None, (
             "SHAP values require a table dataset and cannot be computed with a model that requires an image dataset"
         )
@@ -443,14 +450,46 @@ class TableShapValueExplainer:
         if isinstance(targets, int):
             targets = [targets]
         for target in targets:
+            equivalences = {
+                AGE.column: "Age",
+                CLINICAL_STAGE.column: "Clinical stage",
+                GLEASON_GLOBAL.column: "Global Gleason",
+                GLEASON_PRIMARY.column: "Primary Gleason",
+                GLEASON_SECONDARY.column: "Secondary Gleason",
+                PSA.column: "PSA"
+            }
+            feature_names = []
+            for name in self.dataset.table_dataset.features:
+                feature_names.append(equivalences[name.column])
             values = self.compute_shap_values(target=target, mask=mask)
             shap_values = shap.Explanation(
                 values=values,
-                feature_names=self.dataset.table_dataset.features_columns,
+                feature_names=feature_names,
                 base_values=float(self.base_values[target]),
                 data=self.dataset.table_dataset.x
             )
-            shap.plots.waterfall(shap_values[patient_id], show=False)
+            fig = shap.plots.waterfall(shap_values[patient_id], show=False)
+            fig.set_size_inches(8, 6)
+            default_pos_color = ["#ff0051"]
+            default_neg_color = ["#008bfb", "3D88F4"]
+            positive_color = "#F1B88C"
+            negative_color = "#70A7C7"
+            for fc in plt.gcf().get_children():
+                for fcc in fc.get_children():
+                    if isinstance(fcc, mpl.patches.FancyArrow):
+                        if mpl.colors.to_hex(fcc.get_facecolor()) in default_neg_color:
+                            fcc.set_facecolor(negative_color)
+                        elif mpl.colors.to_hex(fcc.get_facecolor()) in default_pos_color:
+                            fcc.set_color(positive_color)
+                    elif isinstance(fcc, plt.Text):
+                        fcc.set_color("#000000")
+            plt.tight_layout()
+            arr = fig.get_axes()[0]
+            arr.minorticks_on()
+            arr.tick_params(axis="both", direction="in", color="k", which="major", labelsize=16, length=6)
+            arr.tick_params(axis="both", direction="in", color="k", which="minor", labelsize=16, length=3)
+            arr.grid(False)
+
             if path_to_save_folder is not None:
                 target_names = self.dataset.table_dataset.target_columns
                 path = os.path.join(
@@ -488,15 +527,36 @@ class TableShapValueExplainer:
         if isinstance(targets, int):
             targets = [targets]
         for target in targets:
+
             values = self.compute_shap_values(target=target, mask=mask)
             data = self.dataset.table_dataset.x[mask] if mask is not None else self.dataset.table_dataset.x
+            equivalences = {
+                AGE.column: "Age",
+                CLINICAL_STAGE.column: "Clinical stage",
+                GLEASON_GLOBAL.column: "Global Gleason",
+                GLEASON_PRIMARY.column: "Primary Gleason",
+                GLEASON_SECONDARY.column: "Secondary Gleason",
+                PSA.column: "PSA"
+            }
+            feature_names = []
+            for name in self.dataset.table_dataset.features:
+                feature_names.append(equivalences[name.column])
             shap_values = shap.Explanation(
                 values=values,
                 base_values=float(self.base_values[target]),
                 feature_names=self.dataset.table_dataset.features_columns,
                 data=data
             )
-            shap.plots.beeswarm(shap_values, show=False, color=BLUE_TO_SAND)
+            shap.plots.beeswarm(shap_values, show=False, color=BLUE_TO_SAND, plot_size=(8, 6))
+
+            plt.tight_layout()
+            arr, fig, im = plt.gca(), plt.gcf(), plt.gci()
+            arr.minorticks_on()
+            arr.tick_params(axis="both", direction='in', color="k", which="major", labelsize=16, length=6)
+            arr.tick_params(axis="both", direction='in', color="k", which="minor", labelsize=16, length=3)
+            arr.set_xlabel("SHAP value (impact on model output)", fontsize=16)
+            arr.grid(False)
+
             if path_to_save_folder is not None:
                 target_names = self.dataset.table_dataset.target_columns
                 path = os.path.join(

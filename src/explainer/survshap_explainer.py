@@ -8,7 +8,6 @@
     @Description:       This file contains a class used to analyse and explain how a model works using shapley values
     for survival tasks.
 """
-
 import os
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -25,6 +24,7 @@ from survshap.model_explanations.plot import (
 )
 import torch
 
+from applications.constants import BLUE_TO_SAND
 from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset
 from ..models.base.model import Model
 from ..tasks.base import Task, TableTask
@@ -138,7 +138,6 @@ class DataFrameWrapper:
         dataframe : pandas.DataFrame
             The converted FeaturesType.
         """
-        concatenated = torch.tensor([])
         array_list_to_cat = []
         for feature in self.table_features_order:
 
@@ -274,6 +273,9 @@ class TableSurvshapExplainer:
         random_state : int
             A seed to set determinism. Defaults to 11121
         """
+        mpl.rc("axes", edgecolor="k")
+        mpl.rcParams["mathtext.fontset"] = "cm"
+        mpl.rcParams["font.family"] = "STIXGeneral"
         assert dataset.image_dataset is None and dataset.table_dataset is not None, (
             "SurvSHAP values require a table dataset and cannot be computed with a model that requires an image dataset"
         )
@@ -295,9 +297,9 @@ class TableSurvshapExplainer:
         Parameters
         ----------
         event_indicator : np.ndarray
-            (N,) array with event indicator.
+            (N, ) array with event indicator.
         event_time : np.ndarray
-            (N,) array with event time.
+            (N, ) array with event time.
 
         Returns
         -------
@@ -370,7 +372,7 @@ class TableSurvshapExplainer:
 
     def plot_shap_lines_for_all_patients(
             self,
-            feature: Union[Dict[Tuple[str, ...], List[int]], str],
+            features: Union[Dict[Tuple[str, ...], List[int]], str],
             function: str,
             show: bool = True,
             path_to_save_folder: Optional[str] = None,
@@ -385,7 +387,7 @@ class TableSurvshapExplainer:
 
         Parameters
         ----------
-        feature : Union[Dict[Tuple[str, ...], List[int]], str]
+        features : Union[Dict[Tuple[str, ...], List[int]], str]
             A dictionary with keys being a tuple of desired features for a graph and values being a list of the indexes
             of the patients to put on the graph. The number of graphs will equal the number of keys in the dictionary.
             E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
@@ -414,7 +416,7 @@ class TableSurvshapExplainer:
                 f"All tasks must be instances of 'TableTask'."
             )
 
-        if isinstance(feature, str):
+        if isinstance(features, str):
             for task in tasks:
                 explanation = self.compute_explanation(task=task, function=function)
                 model_plot_shap_lines_for_all_individuals(
@@ -422,14 +424,15 @@ class TableSurvshapExplainer:
                     timestamps=explanation.timestamps,
                     event_inds=explanation.event_ind,
                     event_times=explanation.event_times,
-                    variable=feature
+                    variable=features
                 )
         else:
             for task in tasks:
-                fig, arr = plt.subplots()
+                fig, arr = plt.subplots(figsize=(8, 6))
+
                 explanation = self.compute_explanation(task=task, function=function)
 
-                for features_list, patients in feature.items():
+                for features_list, patients in features.items():
                     patch_list = []
 
                     if len(patients) == 0:
@@ -449,7 +452,7 @@ class TableSurvshapExplainer:
                         sum_of_values = {
                             key: np.array([1 for _ in [explanation.timestamps]]) for key in patients
                         }
-                    colors = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(patients)))))
+                    colors = list(iter(BLUE_TO_SAND(np.linspace(0, 1, len(patients)))))
                     patient_ids_dict = self.dataset.table_dataset.row_idx_to_ids
 
                     for i, patient_index in enumerate(patients):
@@ -462,12 +465,16 @@ class TableSurvshapExplainer:
                             y = np.array(
                                 [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
                             )/sum_of_values[patient_index]
-                            arr.plot(x, y, color=colors[i])
+                            arr.plot(x, y, color=colors[i], linewidth=2)
 
                     normalize_name = "normalized" if normalize else "not_normalized"
-                    arr.set_xlabel(kwargs.get("xlabel", f"time"))
-                    arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
-                    arr.legend(handles=patch_list)
+                    arr.set_xlabel(kwargs.get("xlabel", "Time $($months$)$"), fontsize=18)
+                    arr.set_ylabel(kwargs.get("ylabel", "SHAP value"), fontsize=18)
+                    arr.legend(handles=patch_list, edgecolor="k", fontsize=16, handlelength=1.5)
+                    arr.minorticks_on()
+                    arr.tick_params(axis="both", direction="in", color="k", which="major", labelsize=16, length=6)
+                    arr.tick_params(axis="both", direction="in", color="k", which="minor", labelsize=16, length=3)
+                    arr.grid(False)
 
                     if path_to_save_folder is not None:
                         path = os.path.join(
@@ -534,12 +541,12 @@ class TableSurvshapExplainer:
 
         if isinstance(features, list):
             for task in tasks:
-                explainer = self.compute_explanation(task=task, function=function)
+                explanation = self.compute_explanation(task=task, function=function)
                 model_plot_shap_lines_for_variables(
-                    full_result=explainer.full_result,
-                    timestamps=explainer.timestamps,
-                    event_inds=explainer.event_ind,
-                    event_times=explainer.event_times,
+                    full_result=explanation.full_result,
+                    timestamps=explanation.timestamps,
+                    event_inds=explanation.event_ind,
+                    event_times=explanation.event_times,
                     variables=features,
                     to_discretize=discretize[1],
                     discretization_method=method,
@@ -548,12 +555,15 @@ class TableSurvshapExplainer:
                 )
         else:
             for task in tasks:
-                fig, arr = plt.subplots()
+                fig, arr = plt.subplots(figsize=(8, 6))
+
                 explanation = self.compute_explanation(task=task, function=function)
-                cmap = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(self.feature_order)))))
-                color_dict = {feature: cmap[i] for i, feature in enumerate(self.feature_order)}
+                # cmap = list(iter(BLUE_TO_SAND(np.linspace(0, 1, len(features.keys())))))
+                # color_dict = {feature: cmap[i] for i, feature in enumerate(list(features.keys()))}
 
                 for features_list, patients in features.items():
+                    cmap = list(iter(BLUE_TO_SAND(np.linspace(0, 1, len(features_list)))))
+                    color_dict = {feature: cmap[i] for i, feature in enumerate(features_list)}
                     patch_list = []
 
                     if len(patients) == 0:
@@ -583,15 +593,19 @@ class TableSurvshapExplainer:
                             y = np.array(
                                 [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
                             )/sum_of_values[patient_index]
-                            arr.plot(x, y, color=color_dict[feature_name])
+                            arr.plot(x, y, color=color_dict[feature_name], linewidth=2)
 
                     for feature_name in features_list:
                         patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
 
                     normalize_name = "normalized" if normalize else "not_normalized"
-                    arr.set_xlabel(kwargs.get("xlabel", f"time"))
-                    arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
-                    arr.legend(handles=patch_list)
+                    arr.set_xlabel(kwargs.get("xlabel", "Time $($months$)$"), fontsize=18)
+                    arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"), fontsize=18)
+                    arr.legend(handles=patch_list, edgecolor="k", fontsize=16, handlelength=1.5)
+                    arr.minorticks_on()
+                    arr.tick_params(axis="both", direction="in", color="k", which="major", labelsize=16, length=6)
+                    arr.tick_params(axis="both", direction="in", color="k", which="minor", labelsize=16, length=3)
+                    arr.grid(False)
 
                     if path_to_save_folder is not None:
                         path = os.path.join(
@@ -649,22 +663,25 @@ class TableSurvshapExplainer:
 
         if isinstance(features, list):
             for task in tasks:
-                explainer = self.compute_explanation(task=task, function=function)
+                explanation = self.compute_explanation(task=task, function=function)
                 model_plot_mean_abs_shap_values(
-                    result=explainer.result,
-                    timestamps=explainer.timestamps,
-                    event_inds=explainer.event_ind,
-                    event_times=explainer.event_times,
+                    result=explanation.result,
+                    timestamps=explanation.timestamps,
+                    event_inds=explanation.event_ind,
+                    event_times=explanation.event_times,
                     variables=features
                 )
         else:
             for task in tasks:
-                fig, arr = plt.subplots()
+                fig, arr = plt.subplots(figsize=(8, 6))
+
                 explanation = self.compute_explanation(task=task, function=function)
-                cmap = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(self.feature_order)))))
-                color_dict = {feature: cmap[i] for i, feature in enumerate(self.feature_order)}
+                # cmap = list(iter(BLUE_TO_SAND(np.linspace(0, 1, len(features.keys())))))
+                # color_dict = {feature: cmap[i] for i, feature in enumerate(list(features.keys()))}
 
                 for features_list, patients in features.items():
+                    cmap = list(iter(BLUE_TO_SAND(np.linspace(0, 1, len(features_list)))))
+                    color_dict = {feature: cmap[i] for i, feature in enumerate(features_list)}
                     if len(patients) == 0:
                         patients = [i for i in range(len(explanation.individual_explanations))]
 
@@ -688,12 +705,16 @@ class TableSurvshapExplainer:
                     for feature_name in features_list:
                         average_values = sum_of_values[feature_name]/(len(patients))/sum_of_averages
 
-                        arr.plot(explanation.timestamps, average_values, color=color_dict[feature_name])
+                        arr.plot(explanation.timestamps, average_values, color=color_dict[feature_name], linewidth=2)
                         patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
 
-                    arr.set_xlabel(kwargs.get("xlabel", f"time"))
-                    arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
-                    arr.legend(handles=patch_list)
+                    arr.set_xlabel(kwargs.get("xlabel", "Time $($months$)$"), fontsize=18)
+                    arr.set_ylabel(kwargs.get("ylabel", "SHAP value"), fontsize=18)
+                    arr.legend(handles=patch_list, edgecolor="k", fontsize=16, handlelength=1.5)
+                    arr.minorticks_on()
+                    arr.tick_params(axis="both", direction="in", color="k", which="major", labelsize=16, length=6)
+                    arr.tick_params(axis="both", direction="in", color="k", which="minor", labelsize=16, length=3)
+                    arr.grid(False)
 
                     if path_to_save_folder is not None:
                         path = os.path.join(
