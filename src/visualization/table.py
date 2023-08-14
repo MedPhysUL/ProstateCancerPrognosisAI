@@ -401,20 +401,46 @@ class TableViewer:
         show : Optional[bool]
             Whether to show figures.
         """
-        fig, axes = plt.subplots(figsize=self._fig_size)
-        for idx, task in enumerate(self.dataset.tasks.survival_analysis_tasks):
+        plt.figure(figsize=self._fig_size)
+
+        # order = ["BCR", "METASTASIS", "HTX", "CRPC", "DEATH"]
+        # sorted_tasks = sorted(self.dataset.tasks.survival_analysis_tasks, key=lambda o: order.index(o.target_column))
+        sorted_tasks = self.dataset.tasks.survival_analysis_tasks
+        dataframes, tasks = [], []
+        for idx, task in enumerate(sorted_tasks):
             event_column, time_column = task.event_indicator_column, task.event_time_column
-            sns.kdeplot(
-                data=dataframe[dataframe[event_column] == 1],
-                x=time_column,
-                fill=True,
-                label=self._target_names[event_column] if event_column in self._target_names else event_column,
-                color=self._light_colors[idx],
-                cut=0,
-                bw_adjust=0.8
+            df = dataframe[dataframe[event_column] == 1][[time_column]]
+            df.rename(columns={time_column: "time"}, inplace=True)
+            dataframes.append(df)
+            tasks.append(task.event_indicator_column)
+        dataframe = pd.concat(dataframes, keys=tasks)
+        dataframe.reset_index(inplace=True)
+
+        g = sns.FacetGrid(dataframe, row="level_0", hue="level_0", aspect=12, height=5.0, palette=self._light_colors)
+        g.map(sns.swarmplot, "time", color="k", size=12, alpha=1.0)
+        g.map(sns.kdeplot, "time", clip_on=False, fill=True, linewidth=1.5, alpha=1, cut=0, bw_adjust=0.25)
+        g.refline(y=0, linewidth=10, linestyle="-", color=None, clip_on=False)
+
+        def label(x, color, label):
+            axes = plt.gca()
+            axes.set_facecolor("none")
+            axes.invert_yaxis()
+            label = self._target_names[label] if label in self._target_names.keys() else label
+            axes.text(
+                0, .40, label, fontweight="bold", color="k", ha="left", va="center", transform=axes.transAxes,
+                fontsize=66
             )
-        axes.legend(fontsize=16)
-        self._terminate_figure(os.path.join(path_to_save, f"{name}.pdf"), show, fig)
+            # if label == "DTH":
+            #     axes.tick_params(axis="x", color="k", which="major", labelsize=64, length=16)
+            #     axes.spines["bottom"].set_position(("axes", 0.25))
+
+        g.map(label, "time")
+        g.set_titles("")
+        g.figure.subplots_adjust(hspace=-0.25)
+        g.set(yticks=[], ylabel="")
+        g.despine(bottom=True, left=True)
+        g.set_xlabels("Time $($months$)$", fontsize=74)
+        self._terminate_figure(os.path.join(path_to_save, f"{name}.pdf"), show)
 
     @staticmethod
     def _format_to_percentage(
