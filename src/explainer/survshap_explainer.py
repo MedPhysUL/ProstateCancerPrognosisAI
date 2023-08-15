@@ -751,12 +751,26 @@ class TableSurvshapExplainer:
                         average_values = sum_of_values[feature_name]/(len(patients))/sum_of_averages
 
                         arr.plot(explanation.timestamps, average_values, color=color_dict[feature_name], linewidth=2)
-                        if feature_name in PN_TASK_FEATURES and task != PN_TASK:
-                            continue
-                        elif feature_name in BCR_TASK_FEATURES and task != BCR_TASK:
-                            continue
+                        if feature_name in PN_TASK_FEATURES:
+                            if task.name == PN_TASK.name:
+                                patch_list += [mpl.patches.Patch(
+                                    color=LEGEND_DATA[feature_name][1],
+                                    label=LEGEND_DATA[feature_name][0],
+                                    linestyle="--"
+                                )]
+                        elif feature_name in BCR_TASK_FEATURES:
+                            if task.name == BCR_TASK.name:
+                                patch_list += [mpl.patches.Patch(
+                                    color=LEGEND_DATA[feature_name][1],
+                                    label=LEGEND_DATA[feature_name][0],
+                                    linestyle="--"
+                                )]
                         else:
-                            patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
+                            patch_list += [mpl.patches.Patch(
+                                color=LEGEND_DATA[feature_name][1],
+                                label=LEGEND_DATA[feature_name][0],
+                                linestyle="-"
+                            )]
 
                     arr.set_xlabel(kwargs.get("xlabel", "Time $($months$)$"), fontsize=18)
                     arr.set_ylabel(kwargs.get("ylabel", "SHAP value"), fontsize=18)

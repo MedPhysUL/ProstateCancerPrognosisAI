@@ -247,7 +247,7 @@ LEGEND_DATA = {
     "RADIOMIC_PN_5": ("Radiomic \n PN 5", "#FFA99C"),
     "RADIOMIC_PN_6": ("Radiomic \n PN 6", "#CC87B3"),
     "RADIOMIC_BCR_1": ("Radiomic \n BCR 1", "#9C99C6"),
-    "RADIOMIC_BCR_2": ("Radiomic \n BCR 2", "#9C99C6"),
+    "RADIOMIC_BCR_2": ("Radiomic \n BCR 2", "#9DC9E2"),
     "RADIOMIC_BCR_3": ("Radiomic \n BCR 3", "#B2DAAC"),
     "RADIOMIC_BCR_4": ("Radiomic \n BCR 4", "#FECFA1"),
     "RADIOMIC_BCR_5": ("Radiomic \n BCR 5", "#FFA99C"),
