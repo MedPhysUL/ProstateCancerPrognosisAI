@@ -644,7 +644,7 @@ class TableSurvshapExplainer:
                     normalize_name = "normalized" if normalize else "not_normalized"
                     arr.set_xlabel(kwargs.get("xlabel", "Time $($months$)$"), fontsize=18)
                     arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"), fontsize=18)
-                    arr.legend(edgecolor="k", fontsize=13, handlelength=1.5, loc="upper right")
+                    arr.legend(handles=patch_list, edgecolor="k", fontsize=13, handlelength=1.5, loc="upper right")
                     arr.set_xlim(None, 190)
                     arr.minorticks_on()
                     arr.tick_params(axis="both", direction="in", color="k", which="major", labelsize=16, length=6)
