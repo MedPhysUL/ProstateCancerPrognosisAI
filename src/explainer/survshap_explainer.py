@@ -611,11 +611,11 @@ class TableSurvshapExplainer:
                                 [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
                             )/sum_of_values[patient_index]
                             if feature_name in PN_TASK_FEATURES:
-                                if isinstance(task, PN_TASK):
+                                if task == PN_TASK:
                                     arr.plot(x, y, color=LEGEND_NAMES_AND_COLORS[feature_name][1], linewidth=2,
                                          label=LEGEND_NAMES_AND_COLORS[feature_name][0], linestyle='dashed')
                             elif feature_name in BCR_TASK_FEATURES:
-                                if isinstance(task, BCR_TASK):
+                                if task == BCR_TASK:
                                     arr.plot(x, y, color=LEGEND_NAMES_AND_COLORS[feature_name][1], linewidth=2,
                                              label=LEGEND_NAMES_AND_COLORS[feature_name][0], linestyle='dashed')
                             else:
