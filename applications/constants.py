@@ -231,3 +231,26 @@ BCR_TASK_FEATURES = [
     "RADIOMIC_BCR_6"
 ]
 
+# DICT TO RENAME FEATURES
+
+LEGEND_NAMES_AND_COLORS = {
+    "AGE": ("Age", "#9DC9E2"),
+    "PSA": ("PSA", "#9C99C6"),
+    "CLINICAL_STAGE": ("Clinical \n stage", "#FECFA1"),
+    "GLEASON_GLOBAL": ("Gleason \n global", "#B2DAAC"),
+    "GLEASON_PRIMARY": ("Gleason \n primary", "#FFA99C"),
+    "GLEASON_SECONDARY": ("Gleason \n secondary", "#CC87B3"),
+    "RADIOMIC_PN_1": ("Radiomic \n PN 1", "#9C99C6"),
+    "RADIOMIC_PN_2": ("Radiomic \n PN 2", "#9DC9E2"),
+    "RADIOMIC_PN_3": ("Radiomic \n PN 3", "#B2DAAC"),
+    "RADIOMIC_PN_4": ("Radiomic \n PN 4", "#FECFA1"),
+    "RADIOMIC_PN_5": ("Radiomic \n PN 5", "#FFA99C"),
+    "RADIOMIC_PN_6": ("Radiomic \n PN 6", "#CC87B3"),
+    "RADIOMIC_BCR_1": ("Radiomic \n BCR 1", "#9C99C6"),
+    "RADIOMIC_BCR_2": ("Radiomic \n BCR 2", "#9C99C6"),
+    "RADIOMIC_BCR_3": ("Radiomic \n BCR 3", "#B2DAAC"),
+    "RADIOMIC_BCR_4": ("Radiomic \n BCR 4", "#FECFA1"),
+    "RADIOMIC_BCR_5": ("Radiomic \n BCR 5", "#FFA99C"),
+    "RADIOMIC_BCR_6": ("Radiomic \n BCR 6", "#CC87B3"),
+}
+

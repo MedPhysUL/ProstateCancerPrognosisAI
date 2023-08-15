@@ -610,20 +610,34 @@ class TableSurvshapExplainer:
                             y = np.array(
                                 [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
                             )/sum_of_values[patient_index]
-                            arr.plot(x, y, color=color_dict[feature_name], linewidth=2)
+                            if feature_name in PN_TASK_FEATURES:
+                                if isinstance(task, PN_TASK):
+                                    arr.plot(x, y, color=LEGEND_NAMES_AND_COLORS[feature_name][1], linewidth=2,
+                                         label=LEGEND_NAMES_AND_COLORS[feature_name][0], linestyle='dashed')
+                            elif feature_name in BCR_TASK_FEATURES:
+                                if isinstance(task, BCR_TASK):
+                                    arr.plot(x, y, color=LEGEND_NAMES_AND_COLORS[feature_name][1], linewidth=2,
+                                             label=LEGEND_NAMES_AND_COLORS[feature_name][0], linestyle='dashed')
+                            else:
+                                arr.plot(x, y, color=LEGEND_NAMES_AND_COLORS[feature_name][1], linewidth=2, label=LEGEND_NAMES_AND_COLORS[feature_name][0])
 
-                    for feature_name in features_list:
-                        if feature_name in PN_TASK_FEATURES and task != "PN":
-                            continue
-                        elif feature_name in BCR_TASK_FEATURES and task != "BCR":
-                            continue
-                        else:
-                            patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
+                    # for feature_name in features_list:
+                    #     if feature_name in PN_TASK_FEATURES:
+                    #         if isinstance(task, PN_TASK):
+                    #             "f"
+                    #     elif feature_name in BCR_TASK_FEATURES:
+                    #         if isinstance(task, BCR_TASK):
+                    #             "f"
+                    #     else:
+                    #         patch_list += [mpl.patches.Patch(
+                    #             color=LEGEND_NAMES_AND_COLORS[feature_name][1],
+                    #             label=LEGEND_NAMES_AND_COLORS[feature_name][0]
+                    #         )]
 
                     normalize_name = "normalized" if normalize else "not_normalized"
                     arr.set_xlabel(kwargs.get("xlabel", "Time $($months$)$"), fontsize=18)
                     arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"), fontsize=18)
-                    arr.legend(handles=patch_list, edgecolor="k", fontsize=16, handlelength=1.5, loc="upper right")
+                    arr.legend(edgecolor="k", fontsize=13, handlelength=1.5, loc="upper right")
                     arr.set_xlim(None, 190)
                     arr.minorticks_on()
                     arr.tick_params(axis="both", direction="in", color="k", which="major", labelsize=16, length=6)
@@ -730,16 +744,16 @@ class TableSurvshapExplainer:
                         average_values = sum_of_values[feature_name]/(len(patients))/sum_of_averages
 
                         arr.plot(explanation.timestamps, average_values, color=color_dict[feature_name], linewidth=2)
-                        if feature_name in PN_TASK_FEATURES and task != "PN":
+                        if feature_name in PN_TASK_FEATURES and task != PN_TASK:
                             continue
-                        elif feature_name in BCR_TASK_FEATURES and task != "BCR":
+                        elif feature_name in BCR_TASK_FEATURES and task != BCR_TASK:
                             continue
                         else:
                             patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
 
                     arr.set_xlabel(kwargs.get("xlabel", "Time $($months$)$"), fontsize=18)
                     arr.set_ylabel(kwargs.get("ylabel", "SHAP value"), fontsize=18)
-                    arr.legend(handles=patch_list, edgecolor="k", fontsize=16, handlelength=1.5, loc="upper right")
+                    arr.legend(handles=patch_list, edgecolor="k", fontsize=13, handlelength=1.5, loc="upper right")
                     arr.set_xlim(None, 190)
                     arr.minorticks_on()
                     arr.tick_params(axis="both", direction="in", color="k", which="major", labelsize=16, length=6)
