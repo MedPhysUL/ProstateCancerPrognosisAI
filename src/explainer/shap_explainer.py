@@ -486,9 +486,13 @@ class TableShapValueExplainer:
             plt.tight_layout()
             arr = fig.get_axes()[0]
             arr.minorticks_on()
+
+            arr.grid(False)
+            for ax in fig.get_axes():
+                ax.xaxis.set_tick_params(labelsize=13)
+                ax.yaxis.set_tick_params(labelsize=13)
             arr.tick_params(axis="both", direction="in", color="k", which="major", labelsize=16, length=6)
             arr.tick_params(axis="both", direction="in", color="k", which="minor", labelsize=16, length=3)
-            arr.grid(False)
 
             if path_to_save_folder is not None:
                 target_names = self.dataset.table_dataset.target_columns
@@ -544,7 +548,7 @@ class TableShapValueExplainer:
             shap_values = shap.Explanation(
                 values=values,
                 base_values=float(self.base_values[target]),
-                feature_names=self.dataset.table_dataset.features_columns,
+                feature_names=feature_names,
                 data=data
             )
             shap.plots.beeswarm(shap_values, show=False, color=BLUE_TO_SAND, plot_size=(8, 6))
@@ -556,6 +560,11 @@ class TableShapValueExplainer:
             arr.tick_params(axis="both", direction='in', color="k", which="minor", labelsize=16, length=3)
             arr.set_xlabel("SHAP value (impact on model output)", fontsize=16)
             arr.grid(False)
+            for ax in fig.get_axes():
+                ax.xaxis.set_tick_params(labelsize=16)
+                ax.yaxis.set_tick_params(labelsize=16)
+                ax.xaxis.label.set_fontsize(16)
+                ax.yaxis.label.set_fontsize(16)
 
             if path_to_save_folder is not None:
                 target_names = self.dataset.table_dataset.target_columns
