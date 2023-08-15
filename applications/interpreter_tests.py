@@ -100,11 +100,11 @@ if __name__ == '__main__':
     # history.plot(show=True)
 
     show = True
-    explainer = TableShapValueExplainer(model, dataset)
-    explainer.plot_waterfall(0, 0)
-    explainer.plot_beeswarm(0)
-    # explainer = TableSurvshapExplainer(model=trained_model, dataset=dataset)
-    # explainer.plot_shap_average_of_absolute_value(features={("PSA", "AGE"): [0, 1, 2, 3, 4, 4]}, function='sf', normalize=True, show=True, tasks=BCR_TASK, path_to_save_folder=None)
+    # explainer = TableShapValueExplainer(model, dataset)
+    # explainer.plot_waterfall(0, 0)
+    # explainer.plot_beeswarm(0)
+    explainer = TableSurvshapExplainer(model=trained_model, dataset=dataset, mask=(5, 10))
+    explainer.plot_shap_average_of_absolute_value(features={("PSA", "AGE"): [0, 1, 2, 3, 4, 4]}, function='sf', normalize=True, show=True, tasks=BCR_TASK, path_to_save_folder=None)
     # explainer.plot_shap_average_of_absolute_value(features={("PSA", "AGE"): [0, 1, 2, 3, 4, 4]}, function='sf', normalize=False, show=True, tasks=BCR_TASK, path_to_save_folder=None)
     # explainer.plot_shap_lines_for_all_patients(features={("PSA", "AGE"): [0, 1, 2, 3, 4, 4]}, function='sf', normalize=True, show=True, tasks=BCR_TASK, path_to_save_folder=None)
     # explainer.plot_shap_lines_for_features(features={("PSA", "AGE"): [0, 1, 2, 3, 4, 4]}, function='sf', normalize=True, show=True, tasks=BCR_TASK, path_to_save_folder=None)

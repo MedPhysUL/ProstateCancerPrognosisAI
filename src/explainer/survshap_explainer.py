@@ -60,7 +60,7 @@ class DataFrameWrapper:
     def __init__(
             self,
             function,
-            dataset: ProstateCancerDataset,
+            features: List[str],
             task: SurvivalAnalysisTask,
     ) -> None:
         """
@@ -70,15 +70,14 @@ class DataFrameWrapper:
         ----------
         function
             The function with which to compute the cumulative hazard or survival functions.
-        dataset : ProstateCancerDataset
+        features : List[str]
             The dataset with which to compute the SurvSHAP values.
         task : SurvivalAnalysisTask
             The task for which to compute the SurvSHAP values.
         """
         self.function = function
-        self.dataset = dataset
         self.task = task
-        self.table_features_order = self.dataset.table_dataset.features_columns
+        self.table_features_order = features
 
     def _convert_data_frame_to_features_type(
             self,
@@ -259,7 +258,8 @@ class TableSurvshapExplainer:
             self,
             model: Model,
             dataset: ProstateCancerDataset,
-            random_state: int = 11121
+            random_state: int = 11121,
+            mask: Optional[Tuple[int, int]] = None
     ) -> None:
         """
         Sets up the required attributes.
@@ -272,6 +272,9 @@ class TableSurvshapExplainer:
             The dataset to use to compute the SurvSHAP values.
         random_state : int
             A seed to set determinism. Defaults to 11121
+        mask : Optional[Tuple[int, int]]
+            A tuple of the first and last patients to limit the number of computational time required. Defaults to use
+            all patients which can be long.
         """
         mpl.rc("axes", edgecolor="k")
         mpl.rcParams["mathtext.fontset"] = "cm"
@@ -285,6 +288,7 @@ class TableSurvshapExplainer:
         self.feature_order = self.dataset.table_dataset.features_columns
         self.fitted = {}
         self.random_state = random_state
+        self.mask = mask
 
     @staticmethod
     def _get_structured_array(
@@ -344,15 +348,31 @@ class TableSurvshapExplainer:
                 to_numpy(self.dataset.table_dataset.y[task.name][:, 0]),
                 to_numpy(self.dataset.table_dataset.y[task.name][:, 1])
             )
+            print(y)
+            if self.mask is not None:
+                y = y[self.mask[0]:self.mask[1]]
             data = pandas.DataFrame(to_numpy(self.dataset.table_dataset.x), columns=self.feature_order)
+            print(data)
+            if self.mask is not None:
+                data = data.iloc[self.mask[0]:self.mask[1], :]
+            print(y)
+            print(data)
             if function == "chf":
-                wrapper = DataFrameWrapper(task.breslow_estimator.get_cumulative_hazard_function, self.dataset, task)
+                wrapper = DataFrameWrapper(
+                    task.breslow_estimator.get_cumulative_hazard_function,
+                    self.dataset.table_dataset.features_columns,
+                    task
+                )
                 explainer = survshap.SurvivalModelExplainer(model=self.model,
                                                             data=data,
                                                             y=y,
                                                             predict_cumulative_hazard_function=wrapper)
             elif function == "sf":
-                wrapper = DataFrameWrapper(task.breslow_estimator.get_survival_function, self.dataset, task)
+                wrapper = DataFrameWrapper(
+                    task.breslow_estimator.get_survival_function,
+                    self.dataset.table_dataset.features_columns,
+                    task
+                )
                 explainer = survshap.SurvivalModelExplainer(model=self.model,
                                                             data=data,
                                                             y=y,
