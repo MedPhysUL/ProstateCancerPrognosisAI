@@ -24,7 +24,7 @@ from survshap.model_explanations.plot import (
 )
 import torch
 
-from applications.constants import BLUE_TO_SAND
+from applications.constants import *
 from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset
 from ..models.base.model import Model
 from ..tasks.base import Task, TableTask
@@ -490,7 +490,8 @@ class TableSurvshapExplainer:
                     normalize_name = "normalized" if normalize else "not_normalized"
                     arr.set_xlabel(kwargs.get("xlabel", "Time $($months$)$"), fontsize=18)
                     arr.set_ylabel(kwargs.get("ylabel", "SHAP value"), fontsize=18)
-                    arr.legend(handles=patch_list, edgecolor="k", fontsize=16, handlelength=1.5)
+                    arr.legend(handles=patch_list, edgecolor="k", fontsize=16, handlelength=1.5, loc="upper right")
+                    arr.set_xlim(None, 190)
                     arr.minorticks_on()
                     arr.tick_params(axis="both", direction="in", color="k", which="major", labelsize=16, length=6)
                     arr.tick_params(axis="both", direction="in", color="k", which="minor", labelsize=16, length=3)
@@ -616,16 +617,23 @@ class TableSurvshapExplainer:
                             arr.plot(x, y, color=color_dict[feature_name], linewidth=2)
 
                     for feature_name in features_list:
-                        patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
+                        if feature_name in PN_TASK_FEATURES and task != "PN":
+                            continue
+                        elif feature_name in BCR_TASK_FEATURES and task != "BCR":
+                            continue
+                        else:
+                            patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
 
                     normalize_name = "normalized" if normalize else "not_normalized"
                     arr.set_xlabel(kwargs.get("xlabel", "Time $($months$)$"), fontsize=18)
                     arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"), fontsize=18)
-                    arr.legend(handles=patch_list, edgecolor="k", fontsize=16, handlelength=1.5)
+                    arr.legend(handles=patch_list, edgecolor="k", fontsize=16, handlelength=1.5, loc="upper right")
+                    arr.set_xlim(None, 190)
                     arr.minorticks_on()
                     arr.tick_params(axis="both", direction="in", color="k", which="major", labelsize=16, length=6)
                     arr.tick_params(axis="both", direction="in", color="k", which="minor", labelsize=16, length=3)
                     arr.grid(False)
+                    arr.set_xlim(None, 190)
 
                     if path_to_save_folder is not None:
                         path = os.path.join(
@@ -726,11 +734,17 @@ class TableSurvshapExplainer:
                         average_values = sum_of_values[feature_name]/(len(patients))/sum_of_averages
 
                         arr.plot(explanation.timestamps, average_values, color=color_dict[feature_name], linewidth=2)
-                        patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
+                        if feature_name in PN_TASK_FEATURES and task != "PN":
+                            continue
+                        elif feature_name in BCR_TASK_FEATURES and task != "BCR":
+                            continue
+                        else:
+                            patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
 
                     arr.set_xlabel(kwargs.get("xlabel", "Time $($months$)$"), fontsize=18)
                     arr.set_ylabel(kwargs.get("ylabel", "SHAP value"), fontsize=18)
-                    arr.legend(handles=patch_list, edgecolor="k", fontsize=16, handlelength=1.5)
+                    arr.legend(handles=patch_list, edgecolor="k", fontsize=16, handlelength=1.5, loc="upper right")
+                    arr.set_xlim(None, 190)
                     arr.minorticks_on()
                     arr.tick_params(axis="both", direction="in", color="k", which="major", labelsize=16, length=6)
                     arr.tick_params(axis="both", direction="in", color="k", which="minor", labelsize=16, length=3)

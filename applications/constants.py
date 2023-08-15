@@ -213,3 +213,21 @@ BLUE_TO_RED = ListedColormap(np.concatenate([
     np.ones((1500, 1))
 ], axis=1))
 
+# TASK-SPECIFIC FEATURES
+PN_TASK_FEATURES = [
+    "RADIOMIC_PN_1",
+    "RADIOMIC_PN_2",
+    "RADIOMIC_PN_3",
+    "RADIOMIC_PN_4",
+    "RADIOMIC_PN_5",
+    "RADIOMIC_PN_6"
+]
+BCR_TASK_FEATURES = [
+    "RADIOMIC_BCR_1",
+    "RADIOMIC_BCR_2",
+    "RADIOMIC_BCR_3",
+    "RADIOMIC_BCR_4",
+    "RADIOMIC_BCR_5",
+    "RADIOMIC_BCR_6"
+]
+
