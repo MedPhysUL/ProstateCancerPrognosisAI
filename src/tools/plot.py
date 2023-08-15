@@ -34,10 +34,8 @@ def terminate_figure(
     if fig is not None:
         fig.tight_layout()
 
-    kwargs['dpi'] = kwargs.get('dpi', 300)
-
     if path_to_save is not None:
-        plt.savefig(path_to_save, **kwargs)
+        plt.savefig(path_to_save, dpi=kwargs.get('dpi', 300), bbox_inches='tight')
     if show:
         plt.show()
 
