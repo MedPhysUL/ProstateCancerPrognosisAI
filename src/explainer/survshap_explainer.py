@@ -611,28 +611,31 @@ class TableSurvshapExplainer:
                                 [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
                             )/sum_of_values[patient_index]
                             if feature_name in PN_TASK_FEATURES:
-                                if task == PN_TASK:
-                                    arr.plot(x, y, color=LEGEND_NAMES_AND_COLORS[feature_name][1], linewidth=2,
-                                         label=LEGEND_NAMES_AND_COLORS[feature_name][0], linestyle='dashed')
+                                if task.name == PN_TASK.name:
+                                    arr.plot(x, y, color=LEGEND_DATA[feature_name][1], linewidth=2, linestyle='dashed')
                             elif feature_name in BCR_TASK_FEATURES:
-                                if task == BCR_TASK:
-                                    arr.plot(x, y, color=LEGEND_NAMES_AND_COLORS[feature_name][1], linewidth=2,
-                                             label=LEGEND_NAMES_AND_COLORS[feature_name][0], linestyle='dashed')
+                                if task.name == BCR_TASK.name:
+                                    arr.plot(x, y, color=LEGEND_DATA[feature_name][1], linewidth=2, linestyle='dashed')
                             else:
-                                arr.plot(x, y, color=LEGEND_NAMES_AND_COLORS[feature_name][1], linewidth=2, label=LEGEND_NAMES_AND_COLORS[feature_name][0])
+                                arr.plot(x, y, color=LEGEND_DATA[feature_name][1], linewidth=2)
 
-                    # for feature_name in features_list:
-                    #     if feature_name in PN_TASK_FEATURES:
-                    #         if isinstance(task, PN_TASK):
-                    #             "f"
-                    #     elif feature_name in BCR_TASK_FEATURES:
-                    #         if isinstance(task, BCR_TASK):
-                    #             "f"
-                    #     else:
-                    #         patch_list += [mpl.patches.Patch(
-                    #             color=LEGEND_NAMES_AND_COLORS[feature_name][1],
-                    #             label=LEGEND_NAMES_AND_COLORS[feature_name][0]
-                    #         )]
+                    for feature_name in features_list:
+                        if feature_name in PN_TASK_FEATURES:
+                            if task.name == PN_TASK.name:
+                                "f"
+                        elif feature_name in BCR_TASK_FEATURES:
+                            if task.name == BCR_TASK.name:
+                                patch_list += [mpl.patches.Patch(
+                                    color=LEGEND_DATA[feature_name][1],
+                                    label=LEGEND_DATA[feature_name][0],
+                                    linestyle="--"
+                                )]
+                        else:
+                            patch_list += [mpl.patches.Patch(
+                                color=LEGEND_DATA[feature_name][1],
+                                label=LEGEND_DATA[feature_name][0],
+                                linestyle="-"
+                            )]
 
                     normalize_name = "normalized" if normalize else "not_normalized"
                     arr.set_xlabel(kwargs.get("xlabel", "Time $($months$)$"), fontsize=18)

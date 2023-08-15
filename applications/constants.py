@@ -233,7 +233,7 @@ BCR_TASK_FEATURES = [
 
 # DICT TO RENAME FEATURES
 
-LEGEND_NAMES_AND_COLORS = {
+LEGEND_DATA = {
     "AGE": ("Age", "#9DC9E2"),
     "PSA": ("PSA", "#9C99C6"),
     "CLINICAL_STAGE": ("Clinical \n stage", "#FECFA1"),
