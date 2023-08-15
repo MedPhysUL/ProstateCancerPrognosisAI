@@ -348,15 +348,11 @@ class TableSurvshapExplainer:
                 to_numpy(self.dataset.table_dataset.y[task.name][:, 0]),
                 to_numpy(self.dataset.table_dataset.y[task.name][:, 1])
             )
-            print(y)
             if self.mask is not None:
                 y = y[self.mask[0]:self.mask[1]]
             data = pandas.DataFrame(to_numpy(self.dataset.table_dataset.x), columns=self.feature_order)
-            print(data)
             if self.mask is not None:
                 data = data.iloc[self.mask[0]:self.mask[1], :]
-            print(y)
-            print(data)
             if function == "chf":
                 wrapper = DataFrameWrapper(
                     task.breslow_estimator.get_cumulative_hazard_function,
