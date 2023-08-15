@@ -28,6 +28,7 @@ from .color import Color, DarkColor, LightColor
 from ..data.datasets import TableDataset
 from ..data.processing.sampling import Mask
 from .tools import add_at_risk_counts, survival_table_from_events
+from ..tools.plot import terminate_figure
 
 
 class TableViewer:
@@ -287,37 +288,6 @@ class TableViewer:
         }
         return {k: v for k, v in sets.items() if not v.empty}
 
-    @staticmethod
-    def _terminate_figure(
-            path_to_save: Optional[str] = None,
-            show: Optional[bool] = None,
-            fig: Optional[plt.Figure] = None
-    ) -> None:
-        """
-        Terminates current figure.
-
-        Parameters
-        ----------
-        path_to_save : Optional[str]
-            Path to save.
-        show : Optional[bool]
-            Whether to show figures.
-        fig : Optional[plt.Figure]
-            Current figure.
-        """
-        if fig:
-            fig.tight_layout()
-
-        if path_to_save:
-            plt.savefig(path_to_save, dpi=300, bbox_inches='tight')
-        if show:
-            plt.show()
-
-        if fig:
-            plt.close(fig)
-        else:
-            plt.close()
-
     def visualize_correlations(
             self,
             columns: List[str],
@@ -378,7 +348,7 @@ class TableViewer:
             axes.set_xticklabels(col_values, rotation=45, ha="right", rotation_mode="anchor", fontsize=13)
             axes.set_yticklabels(col_values, rotation=0, fontsize=13)
 
-            self._terminate_figure(os.path.join(path_to_save, f"{name}.pdf"), show, fig)
+            terminate_figure(path_to_save=os.path.join(path_to_save, f"{name}.pdf"), show=show, fig=fig)
 
     def visualize_timeline(
             self,
@@ -440,7 +410,7 @@ class TableViewer:
         g.set(yticks=[], ylabel="")
         g.despine(bottom=True, left=True)
         g.set_xlabels("Time $($months$)$", fontsize=74)
-        self._terminate_figure(os.path.join(path_to_save, f"{name}.pdf"), show)
+        terminate_figure(path_to_save=os.path.join(path_to_save, f"{name}.pdf"), show=show)
 
     @staticmethod
     def _format_to_percentage(
@@ -560,7 +530,7 @@ class TableViewer:
                     title=self._legend_names[name],
                     show_legend=idx == (total - 1)
                 )
-        self._terminate_figure(path_to_save, show, fig)
+        terminate_figure(fig=fig, show=show, path_to_save=path_to_save)
 
     def _plot_continuous_feature_figure(
             self,
@@ -648,7 +618,7 @@ class TableViewer:
                                 fontsize=16
                             )
 
-        self._terminate_figure(path_to_save, show, fig)
+        terminate_figure(fig=fig, show=show, path_to_save=path_to_save)
 
     def visualize_global_continuous_feature(
             self,
@@ -804,8 +774,8 @@ class TableViewer:
         handles = [plt.Line2D([0], [0], color=color, lw=8) for color in sns.color_palette()[:len(self._legend_names)]]
         labels = list(self._legend_names.values())
         axes.legend(handles=handles, labels=labels, loc="upper right", edgecolor="k", fontsize=16, handlelength=1.5)
+        terminate_figure(fig=fig, show=show, path_to_save=path_to_save)
 
-        self._terminate_figure(path_to_save, show, fig)
         logger.setLevel(initial_logger_level)
 
     def visualize_global_categorical_feature(
@@ -1010,7 +980,7 @@ class TableViewer:
         for idx, (name, _) in enumerate(self._global_masks.items()):
             texts[idx].set_text(self._legend_names[name])
 
-        self._terminate_figure(path_to_save, show, fig)
+        terminate_figure(path_to_save=path_to_save, show=show, fig=fig)
 
     def _plot_unstratified_global_kaplan_meier_curve(
             self,
@@ -1044,7 +1014,7 @@ class TableViewer:
 
         self._add_details_to_kaplan_meier_curve(axes, False)
         add_at_risk_counts(survival_tables=[survival_table], colors=[self._light_colors[0]], axes=axes, figure=fig)
-        self._terminate_figure(path_to_save, show, fig)
+        terminate_figure(path_to_save=path_to_save, show=show, fig=fig)
 
     def _plot_global_kaplan_meier_curve(
             self,
@@ -1152,7 +1122,7 @@ class TableViewer:
         legend.set_title(title, prop={"size": 16})
         plt.setp(legend.get_title(), multialignment='center')
 
-        self._terminate_figure(path_to_save, show, fig)
+        terminate_figure(fig=fig, show=show, path_to_save=path_to_save)
 
     def _plot_stratified_kaplan_meier_curve(
             self,

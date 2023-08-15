@@ -1,9 +1,9 @@
 """
     @file:              model_evaluator.py
-    @Author:            Felix Desroches, Maxence Larose
+    @Author:            Félix Desroches, Maxence Larose
 
     @Creation Date:     06/2023
-    @Last modification: 06/2023
+    @Last modification: 07/2023
 
     @Description:       This file contains a class used to show metrics and graphs for the user to gauge the
     quality of a model.
@@ -49,6 +49,11 @@ class ModelEvaluator(PredictionEvaluator):
         """
         self.dataset = dataset
         self.model = model
+
+        assert self.dataset.table_dataset is not None, (
+            "Most methods require a table dataset to function, if the compute_score_on_dataset method is desired, "
+            "model.compute_score_on_dataset should be used instead."
+        )
 
         super().__init__(
             predictions=self.model.predict_on_dataset(dataset=self.dataset, n_samples=n_samples),
@@ -212,6 +217,7 @@ class ModelEvaluator(PredictionEvaluator):
             show: bool,
             path_to_save_folder: Optional[str] = None,
             threshold: Optional[Union[int, List[int], slice]] = None,
+            mask: Optional[List[int]] = None,
             **kwargs
     ) -> None:
         """
@@ -227,6 +233,9 @@ class ModelEvaluator(PredictionEvaluator):
             Either the threshold or a mask describing the patients to use when optimising the threshold to use when
             computing binary classification from continuous probability. If no values are given, then the threshold is
             computed using all patients.
+        mask : Optional[List[int]]
+            A mask to select which patients to use. If a subset was given, then the patient's ID refers to the position
+            within the subset and not the original dataset. If no mask is given, all patients are used.
         kwargs
             These arguments will be passed on to matplotlib.pyplot.savefig and sklearn.metrics.confusion_matrix.
         """
@@ -237,5 +246,6 @@ class ModelEvaluator(PredictionEvaluator):
             show=show,
             path_to_save_folder=path_to_save_folder,
             threshold=threshold,
+            mask=mask,
             **kwargs
         )
