@@ -622,7 +622,11 @@ class TableSurvshapExplainer:
                     for feature_name in features_list:
                         if feature_name in PN_TASK_FEATURES:
                             if task.name == PN_TASK.name:
-                                "f"
+                                patch_list += [mpl.patches.Patch(
+                                    color=LEGEND_DATA[feature_name][1],
+                                    label=LEGEND_DATA[feature_name][0],
+                                    linestyle="--"
+                                )]
                         elif feature_name in BCR_TASK_FEATURES:
                             if task.name == BCR_TASK.name:
                                 patch_list += [mpl.patches.Patch(
