@@ -27,7 +27,11 @@ from constants import (
     ID,
     SEED,
     BCR_TASK,
-    PN_TASK
+    CRPC_TASK,
+    PN_TASK,
+    METASTASIS_TASK,
+    HTX_TASK,
+    DEATH_TASK
 )
 from src.data.datasets import Feature
 from src.data.transforms import Normalization
@@ -66,7 +70,7 @@ if __name__ == '__main__':
     table_dataset = TableDataset(
         dataframe=df,
         ids_column=ID,
-        tasks=[PN_TASK, BCR_TASK],
+        tasks=[PN_TASK, BCR_TASK, METASTASIS_TASK, HTX_TASK, CRPC_TASK, DEATH_TASK],
         continuous_features=CLINICAL_CONTINUOUS_FEATURES + RADIOMICS,
         categorical_features=CLINICAL_CATEGORICAL_FEATURES
     )
@@ -82,10 +86,14 @@ if __name__ == '__main__':
     )
 
     models = {
-        PN_TASK.name: "PN(BayesSeqNet - Clinical data and automatic radiomics)"
+        PN_TASK.name: "PN(BayesSeqNet - Clinical data and automatic radiomics)",
+        BCR_TASK.name: "BCR(BayesSeqNet - Clinical data and deep radiomics)",
+        METASTASIS_TASK.name: "METASTASIS(BayesSeqNet - Clinical data only)",
+        HTX_TASK.name: "HTX(BayesSeqNet - Clinical data only)",
+        CRPC_TASK.name: "CRPC(BayesSeqNet - Clinical data only)"
     }
     configs = {}
-    for task in [PN_TASK]:
+    for task in [PN_TASK, BCR_TASK, METASTASIS_TASK, HTX_TASK, CRPC_TASK]:
         state = torch.load(
             os.path.join(
                 EXPERIMENTS_PATH,
@@ -111,22 +119,34 @@ if __name__ == '__main__':
     cont_features = [c.column for c in CLINICAL_CONTINUOUS_FEATURES]
     cat_features = [c.column for c in CLINICAL_CATEGORICAL_FEATURES]
     model = SequentialNet(
-        sequence=[PN_TASK.name, BCR_TASK.name],
-        n_layers={PN_TASK.name: 2, BCR_TASK.name: 1},
-        n_neurons={PN_TASK.name: 10, BCR_TASK.name: 20},
+        sequence=[PN_TASK.name, BCR_TASK.name, METASTASIS_TASK.name, HTX_TASK.name, CRPC_TASK.name, DEATH_TASK.name],
+        n_layers={PN_TASK.name: 2, BCR_TASK.name: 1, METASTASIS_TASK.name: 0, HTX_TASK.name: 2, CRPC_TASK.name: 1, DEATH_TASK.name: 2},
+        n_neurons={PN_TASK.name: 10, BCR_TASK.name: 15, METASTASIS_TASK.name: 0, HTX_TASK.name: 10, CRPC_TASK.name: 10, DEATH_TASK.name: 10},
         features_columns={
             PN_TASK.name: cont_features + [c.column for c in PN_RADIOMICS] + cat_features,
-            BCR_TASK.name: cont_features + [c.column for c in BCR_RADIOMICS] + cat_features
+            BCR_TASK.name: cont_features + [c.column for c in BCR_RADIOMICS] + cat_features,
+            METASTASIS_TASK.name: cont_features + cat_features,
+            HTX_TASK.name: cont_features + cat_features,
+            CRPC_TASK.name: cont_features + cat_features,
+            DEATH_TASK.name: cont_features + cat_features
         },
         configs=configs,
         dropout={
             PN_TASK.name: 0.05,
-            BCR_TASK.name: 0.15
+            BCR_TASK.name: 0.10,
+            METASTASIS_TASK.name: 0.05,
+            HTX_TASK.name: 0.15,
+            CRPC_TASK.name: 0.05,
+            DEATH_TASK.name: 0.05
         },
         bayesian=True,
         temperature={
             PN_TASK.name: 0.0001,
-            BCR_TASK.name: 0.0001
+            BCR_TASK.name: 0.001,
+            METASTASIS_TASK.name: 0.0001,
+            HTX_TASK.name: 0.0001,
+            CRPC_TASK.name: 0.0001,
+            DEATH_TASK.name: 0.0001
         },
         device=torch.device("cuda"),
         seed=SEED
@@ -135,21 +155,21 @@ if __name__ == '__main__':
     optimizer = Adam(
         params=model.parameters(),
         lr=0.001,
-        weight_decay=0.001
+        weight_decay=0.0005
     )
 
     learning_algorithm = LearningAlgorithm(
-        criterion=MeanLoss(tasks=BCR_TASK),
+        criterion=MeanLoss(tasks=DEATH_TASK),
         optimizer=optimizer,
+        clip_grad_max_norm=2.0,
         lr_scheduler=ExponentialLR(optimizer=optimizer, gamma=0.99),
-        clip_grad_max_norm=3.0,
         early_stopper=MultiTaskLossEarlyStopper(patience=20),
         regularizer=L2Regularizer(model.named_parameters(), lambda_=0.001)
     )
 
     trainer = Trainer(
         batch_size=16,
-        # checkpoint=Checkpoint(),
+        checkpoint=Checkpoint(),
         exec_metrics_on_train=True,
         n_epochs=100,
         seed=SEED
