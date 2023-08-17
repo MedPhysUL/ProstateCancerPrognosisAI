@@ -24,8 +24,9 @@ from ..data.datasets.prostate_cancer import TargetsType
 from ..metrics.single_task.base import Direction
 from ..tasks.base import TableTask, Task
 from ..tasks.containers.list import TaskList
-from ..tools.plot import terminate_figure
+from ..tools.plot import add_details_to_kaplan_meier_curve, terminate_figure
 from ..tools.transforms import to_numpy
+from ..visualization.color import LightColor
 
 
 class Output(NamedTuple):
@@ -76,6 +77,7 @@ class PredictionEvaluator:
         mpl.rc('axes', edgecolor='k')
         mpl.rcParams['mathtext.fontset'] = 'cm'
         mpl.rcParams['font.family'] = 'STIXGeneral'
+        self._light_colors = [c for c in LightColor]
 
         self.predictions_dict = {k: to_numpy(v) for k, v in predictions.items()}
         self.targets_dict = {k: to_numpy(v) for k, v in targets.items()}
@@ -589,28 +591,24 @@ class PredictionEvaluator:
             "There needs to be at least one SurvivalAnalysisTask to plot a survival function graph."
         )
 
-        for task in self.tasks.survival_analysis_tasks:
-            fig, arr = plt.subplots()
+        fig, arr = plt.subplots()
+        for idx, task in enumerate(self.tasks.survival_analysis_tasks):
             for survival_func in task.breslow_estimator.get_survival_function(prediction[task.name]):
-                arr.step(survival_func.x, survival_func(survival_func.x), where="post")
-            arr.set_xlabel(kwargs.get("xlabel", f"Time"), fontsize=18)
-            arr.set_ylabel(kwargs.get("ylabel", f"Probability"), fontsize=18)
-            arr.set_title(kwargs.get("title", f"{task.target_column}: Survival Function"))
-            arr.minorticks_on()
-            arr.tick_params(axis="both", direction='in', color="k", which="major", labelsize=16, length=6)
-            arr.tick_params(axis="both", direction='in', color="k", which="minor", labelsize=16, length=3)
-            arr.set_xlim(0, None)
-            arr.set_ylim(None, 1.02)
-            arr.grid(False)
-
-            if path_to_save_folder is not None:
-                path = os.path.join(
-                    path_to_save_folder,
-                    f"{task.target_column}_{kwargs.get('filename', 'survival_function.pdf')}"
+                arr.step(
+                    survival_func.x, survival_func(survival_func.x),
+                    where="post", color=self._light_colors[idx], label=task.target_column, lw=2
                 )
-            else:
-                path = None
-            terminate_figure(fig=fig, show=show, path_to_save=path, **kwargs)
+
+        add_details_to_kaplan_meier_curve(arr)
+        if path_to_save_folder is not None:
+            path = os.path.join(
+                path_to_save_folder,
+                f"{kwargs.get('filename', 'survival_function.png')}"
+            )
+        else:
+            path = None
+
+        terminate_figure(fig=fig, show=show, path_to_save=path, **kwargs)
 
     def plot_confusion_matrix(
             self,

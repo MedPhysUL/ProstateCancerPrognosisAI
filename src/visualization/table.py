@@ -28,7 +28,7 @@ from .color import Color, DarkColor, LightColor
 from ..data.datasets import TableDataset
 from ..data.processing.sampling import Mask
 from .tools import add_at_risk_counts, survival_table_from_events
-from ..tools.plot import terminate_figure
+from ..tools.plot import add_details_to_kaplan_meier_curve, terminate_figure
 
 
 class TableViewer:
@@ -348,7 +348,7 @@ class TableViewer:
             axes.set_xticklabels(col_values, rotation=45, ha="right", rotation_mode="anchor", fontsize=13)
             axes.set_yticklabels(col_values, rotation=0, fontsize=13)
 
-            terminate_figure(path_to_save=os.path.join(path_to_save, f"{name}.pdf"), show=show, fig=fig)
+            terminate_figure(path_to_save=os.path.join(path_to_save, f"{name}.png"), show=show, fig=fig)
 
     def visualize_timeline(
             self,
@@ -410,7 +410,7 @@ class TableViewer:
         g.set(yticks=[], ylabel="")
         g.despine(bottom=True, left=True)
         g.set_xlabels("Time $($months$)$", fontsize=74)
-        terminate_figure(path_to_save=os.path.join(path_to_save, f"{name}.pdf"), show=show)
+        terminate_figure(path_to_save=os.path.join(path_to_save, f"{name}.png"), show=show)
 
     @staticmethod
     def _format_to_percentage(
@@ -867,35 +867,6 @@ class TableViewer:
         axes.scatter(censored_time, censored_survival_probability, marker="|", s=100, color=color)
 
     @staticmethod
-    def _add_details_to_kaplan_meier_curve(
-            axes: plt.Axes,
-            legend: bool = True
-    ) -> None:
-        """
-        Adds details to a Kaplan-Meier curve.
-
-        Parameters
-        ----------
-        axes : plt.Axes
-            Axes.
-        legend : bool
-            Whether to add a legend.
-        """
-        axes.minorticks_on()
-        axes.tick_params(axis="both", direction='in', color="k", which="major", labelsize=16, length=6)
-        axes.tick_params(axis="both", direction='in', color="k", which="minor", labelsize=16, length=3)
-        axes.set_ylabel(f"Survival probability", fontsize=18)
-        axes.set_xlabel("Time $($months$)$", fontsize=18)
-        axes.set_xlim(0, None)
-        axes.set_ylim(None, 1.02)
-        axes.grid(False)
-        if legend:
-            legend = axes.legend(loc="upper right", edgecolor="k", fontsize=16, handlelength=1.5)
-
-            for line in legend.get_lines():
-                line.set_linewidth(8)
-
-    @staticmethod
     def _get_structured_array(
             event_indicator: np.ndarray,
             event_time: np.ndarray
@@ -956,7 +927,7 @@ class TableViewer:
             survival_tables.append(survival_table_from_events(time, event))
             colors.append(self._light_colors[idx])
 
-        self._add_details_to_kaplan_meier_curve(axes, True)
+        add_details_to_kaplan_meier_curve(axes, True)
         add_at_risk_counts(survival_tables=survival_tables, colors=colors, axes=axes, figure=fig)
 
         try:
@@ -1012,7 +983,7 @@ class TableViewer:
         self._build_kaplan_meier_curve(event, time, axes, self._light_colors[0])
         survival_table = survival_table_from_events(time, event)
 
-        self._add_details_to_kaplan_meier_curve(axes, False)
+        add_details_to_kaplan_meier_curve(axes, False)
         add_at_risk_counts(survival_tables=[survival_table], colors=[self._light_colors[0]], axes=axes, figure=fig)
         terminate_figure(path_to_save=path_to_save, show=show, fig=fig)
 
@@ -1046,11 +1017,11 @@ class TableViewer:
             path_to_folder = os.path.join(path_to_save, name)
             os.makedirs(path_to_folder, exist_ok=True)
 
-            path_to_fig = os.path.join(path_to_folder, "GLOBAL.pdf")
+            path_to_fig = os.path.join(path_to_folder, "GLOBAL.png")
             self._plot_unstratified_global_kaplan_meier_curve(df, event_indicator, event_time, path_to_fig, show)
 
             if name == "full_dataset":
-                path_to_fig = os.path.join(path_to_folder, "GLOBAL_STRATIFIED.pdf")
+                path_to_fig = os.path.join(path_to_folder, "GLOBAL_STRATIFIED.png")
                 self._plot_masks_stratified_global_kaplan_meier_curve(
                     dataset, event_indicator, event_time, path_to_fig, show
                 )
@@ -1095,7 +1066,7 @@ class TableViewer:
             survival_tables.append(survival_table_from_events(time, event))
             colors.append(self._light_colors[n])
 
-        self._add_details_to_kaplan_meier_curve(axes, True)
+        add_details_to_kaplan_meier_curve(axes, True)
         add_at_risk_counts(survival_tables=survival_tables, colors=colors, axes=axes, figure=fig)
 
         try:
@@ -1164,7 +1135,7 @@ class TableViewer:
             path_to_folder = os.path.join(path_to_save, name)
             os.makedirs(path_to_folder, exist_ok=True)
 
-            path_to_fig = os.path.join(path_to_folder, f"{feature}.pdf")
+            path_to_fig = os.path.join(path_to_folder, f"{feature}.png")
             self._plot_categories_stratified_kaplan_meier_curve(
                 df, feature, event_indicator, event_time, path_to_fig, show
             )
@@ -1813,7 +1784,7 @@ class TableViewer:
         """
         for i, target in enumerate(self._target_cols):
             path = os.path.join(
-                path_to_save, self.TARGETS_PATH, target, self.FIGURES_PATH, self.TARGET_PATH, "class_distribution.pdf"
+                path_to_save, self.TARGETS_PATH, target, self.FIGURES_PATH, self.TARGET_PATH, "class_distribution.png"
             )
             self.visualize_target_class_distribution(target, path, False)
 
@@ -1832,10 +1803,10 @@ class TableViewer:
         for imputed, path in [(False, self.ORIGINAL_DF_PATH), (True, self.IMPUTED_DF_PATH)]:
             directory = os.path.join(path_to_save, self.GLOBAL_PATH, self.FIGURES_PATH, self.FEATURES_PATH, path)
             for cont_col in self.dataset.continuous_features_columns:
-                path_to_fig = os.path.join(directory, f"{cont_col}.pdf")
+                path_to_fig = os.path.join(directory, f"{cont_col}.png")
                 self.visualize_global_continuous_feature(cont_col, imputed, path_to_fig, False)
             for cat_col in self.dataset.categorical_features_columns:
-                path_to_fig = os.path.join(directory, f"{cat_col}.pdf")
+                path_to_fig = os.path.join(directory, f"{cat_col}.png")
                 self.visualize_global_categorical_feature(cat_col, imputed, path_to_fig, False)
 
     def _save_target_specific_features_figures(
@@ -1856,10 +1827,10 @@ class TableViewer:
                     path_to_save, self.TARGETS_PATH, target, self.FIGURES_PATH, self.FEATURES_PATH, path
                 )
                 for cont_col in self.dataset.continuous_features_columns:
-                    path_to_fig = os.path.join(directory, f"{cont_col}.pdf")
+                    path_to_fig = os.path.join(directory, f"{cont_col}.png")
                     self.visualize_target_specific_continuous_features(cont_col, target, imputed, path_to_fig, False)
                 for cat_col in self.dataset.categorical_features_columns:
-                    path_to_fig = os.path.join(directory, f"{cat_col}.pdf")
+                    path_to_fig = os.path.join(directory, f"{cat_col}.png")
                     self.visualize_target_specific_categorical_features(cat_col, target, imputed, path_to_fig, False)
 
     def _save_features_figures(
