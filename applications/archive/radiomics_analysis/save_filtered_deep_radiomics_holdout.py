@@ -63,7 +63,7 @@ if __name__ == "__main__":
 
     model = UNEXtractor(
         image_keys=["CT", "PT"],
-        num_res_units=2,
+        num_res_units=3,
         device=torch.device("cuda"),
         seed=SEED
     ).build(dataset)
