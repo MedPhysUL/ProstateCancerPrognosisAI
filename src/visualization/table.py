@@ -835,7 +835,8 @@ class TableViewer:
             event_time: pd.Series,
             axes: plt.Axes,
             color: str,
-            legend_label: Optional[str] = None
+            legend_label: Optional[str] = None,
+            conf_level: float = 0.95,
     ) -> None:
         """
         Builds a Kaplan-Meier curve.
@@ -852,8 +853,12 @@ class TableViewer:
             Color.
         legend_label : Optional[str]
             Legend label.
+        conf_level : float
+            Confidence level.
         """
-        time, survival_probability, conf_int = kaplan_meier_estimator(event_indicator, event_time, conf_type="log-log")
+        time, survival_probability, conf_int = kaplan_meier_estimator(
+            event_indicator, event_time, conf_type="log-log", conf_level=conf_level
+        )
 
         if legend_label is None:
             axes.step(time, survival_probability, where="post", color=color, lw=2)
