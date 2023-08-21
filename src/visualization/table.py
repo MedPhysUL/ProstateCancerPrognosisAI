@@ -1296,7 +1296,10 @@ class TableViewer:
                             "Median": [filtered_df.median()],
                             "Min": [filtered_df.min()],
                             "Max": [filtered_df.max()],
-                            "Std": [filtered_df.std()]})
+                            "Std": [filtered_df.std()],
+                            "Follow-up T-OBS": [df[time_column].median()],
+                            "Follow-up T-CENS": [df[df[event_column] == 0][time_column].median()]
+                        })
                      ],
                     ignore_index=True
                 )
