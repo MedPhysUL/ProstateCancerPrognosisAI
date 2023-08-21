@@ -389,7 +389,6 @@ class TableViewer:
         g = sns.FacetGrid(dataframe, row="level_0", hue="level_0", aspect=12, height=5.0, palette=self._light_colors)
         g.map(sns.swarmplot, "time", color="k", size=12, alpha=1.0)
         g.map(sns.kdeplot, "time", clip_on=False, fill=True, linewidth=1.5, alpha=1, cut=0, bw_adjust=0.25)
-        g.refline(y=0, linewidth=10, linestyle="-", color=None, clip_on=False)
 
         def label(x, color, label):
             axes = plt.gca()
@@ -397,10 +396,11 @@ class TableViewer:
             axes.invert_yaxis()
             label = self._target_names[label] if label in self._target_names.keys() else label
             axes.text(
-                0, .40, label, fontweight="bold", color="k", ha="left", va="center", transform=axes.transAxes,
+                -0.04, .40, label, fontweight="bold", color="k", ha="left", va="center", transform=axes.transAxes,
                 fontsize=66
             )
-            # if label == "DTH":
+            axes.axhline(y=0.0, xmin=-0.04, xmax=1.0, color="k", linestyle="-", linewidth=3, clip_on=False)
+            # if label == "PCSS":
             #     axes.tick_params(axis="x", color="k", which="major", labelsize=64, length=16)
             #     axes.spines["bottom"].set_position(("axes", 0.25))
 
