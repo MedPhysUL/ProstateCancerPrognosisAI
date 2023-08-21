@@ -18,7 +18,7 @@ from torch import cat, Tensor
 from torch import device as torch_device
 from torch.nn import DataParallel, Module, ModuleDict
 
-from ..base import check_if_built, TorchModel
+from ..base import check_if_built, evaluation_function, TorchModel
 from ..blocks import BayesianFullyConnectedNet, BayesianSingleLayerLinear, FullyConnectedNet, SingleLayerLinear
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
 from ....tasks import SegmentationTask
@@ -441,6 +441,7 @@ class Extractor(TorchModel, ABC):
             raise ValueError(f"{self.multi_task_mode} is not a valid MultiTaskMode")
 
     @check_if_built
+    @evaluation_function
     def extract_radiomics(
             self,
             features: FeaturesType
