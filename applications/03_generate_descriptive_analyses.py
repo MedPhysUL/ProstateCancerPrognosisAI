@@ -67,9 +67,12 @@ if __name__ == '__main__':
             PSA.column: "PSA $($ng/mL$)$"
         },
         target_names={
-            "DEATH": "DTH",
-            "METASTASIS": "MTS",
-            "PN": "LNI"
+            "DEATH": "PCSS",
+            "METASTASIS": "MFS",
+            "PN": "LNI",
+            "BCR": "BCR-FS",
+            "CRPC": "CRPC-FS",
+            "HTX": "dADT-FS",
         },
         crop={
             PSA.column: ((0, 50), (-0.8, 2.5)),
