@@ -837,6 +837,7 @@ class TableViewer:
             color: str,
             legend_label: Optional[str] = None,
             conf_level: float = 0.95,
+            last_time: float = None
     ) -> None:
         """
         Builds a Kaplan-Meier curve.
@@ -855,21 +856,37 @@ class TableViewer:
             Legend label.
         conf_level : float
             Confidence level.
+        last_time : float
+            Last time.
         """
         time, survival_probability, conf_int = kaplan_meier_estimator(
             event_indicator, event_time, conf_type="log-log", conf_level=conf_level
         )
 
-        if legend_label is None:
-            axes.step(time, survival_probability, where="post", color=color, lw=2)
+        if last_time:
+            time_to_plot = np.concatenate(([0], time, [last_time]))
+            survival_probability_to_plot = np.concatenate(([1], survival_probability, [survival_probability[-1]]))
         else:
-            axes.step(time, survival_probability, where="post", color=color, lw=2, label=legend_label)
+            time_to_plot = np.concatenate(([0], time))
+            survival_probability_to_plot = np.concatenate(([1], survival_probability))
 
-        axes.fill_between(time, conf_int[0], conf_int[1], alpha=0.3, step="post", color=color)
+        if legend_label is None:
+            axes.step(time_to_plot, survival_probability_to_plot, where="post", color=color, lw=3)
+        else:
+            axes.step(time_to_plot, survival_probability_to_plot, where="post", color=color, lw=3, label=legend_label)
+
+        if last_time:
+            time_to_fill = np.concatenate((time, [last_time]))
+            lower_conf_int = np.concatenate((conf_int[0], [conf_int[0][-1]]))
+            upper_conf_int = np.concatenate((conf_int[1], [conf_int[1][-1]]))
+        else:
+            time_to_fill, lower_conf_int, upper_conf_int = time, conf_int[0], conf_int[1]
+
+        axes.fill_between(time_to_fill, lower_conf_int, upper_conf_int, alpha=0.3, step="post", color=color)
 
         censored_time = event_time[~event_indicator]
         censored_survival_probability = interp1d(time, survival_probability, kind="previous")(censored_time)
-        axes.scatter(censored_time, censored_survival_probability, marker="|", s=100, color=color)
+        axes.scatter(censored_time, censored_survival_probability, marker="|", s=150, color=color)
 
     @staticmethod
     def _get_structured_array(
