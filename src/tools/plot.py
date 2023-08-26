@@ -65,7 +65,7 @@ def add_details_to_kaplan_meier_curve(
     axes.set_ylabel(f"Survival probability", fontsize=18)
     axes.set_xlabel("Time $($months$)$", fontsize=18)
     axes.set_xlim(0, None)
-    axes.set_ylim(None, 1.02)
+    axes.set_ylim(-0.02, 1.02)
     axes.grid(False)
     if legend:
         legend = axes.legend(loc="upper right", edgecolor="k", fontsize=16, handlelength=1.5)
