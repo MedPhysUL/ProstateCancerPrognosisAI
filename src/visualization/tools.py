@@ -176,7 +176,7 @@ def add_at_risk_counts(
 
                 tick_labels.append(f"{int(counts[n - 1][0])} ({int(counts[n - 1][1])})")
 
-            ax.set_xticklabels(tick_labels, ha="center", fontsize=14)
+            ax.set_xticklabels(tick_labels, ha="center", fontsize=13)
 
             if len(survival_tables) > 1:
                 ax.get_xticklabels()[0].set_ha("left")
