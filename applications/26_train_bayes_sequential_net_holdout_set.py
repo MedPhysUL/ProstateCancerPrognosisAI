@@ -22,7 +22,7 @@ from constants import (
     CLINICAL_CATEGORICAL_FEATURES,
     CLINICAL_CONTINUOUS_FEATURES,
     EXPERIMENTS_PATH,
-    FINAL_TABLE_PATH,
+    FINAL_BAYES_TABLE_PATH,
     HOLDOUT_MASKS_PATH,
     ID,
     SEED,
@@ -37,7 +37,6 @@ from src.data.datasets import Feature
 from src.data.transforms import Normalization
 from src.data.processing.sampling import Mask
 from src.data.datasets import ProstateCancerDataset, TableDataset
-from src.evaluation import ModelEvaluator
 from src.models.torch.prediction import SequentialNet, ModelConfig
 from src.losses.multi_task import MeanLoss
 from src.training import Trainer
@@ -47,7 +46,7 @@ from src.training.callbacks.learning_algorithm.regularizer import L2Regularizer
 
 
 if __name__ == '__main__':
-    df = pd.read_csv(FINAL_TABLE_PATH)
+    df = pd.read_csv(FINAL_BAYES_TABLE_PATH)
 
     RADIOMIC_1 = Feature(column="RADIOMIC_PN_1", transform=Normalization(), impute=False)
     RADIOMIC_2 = Feature(column="RADIOMIC_PN_2", transform=Normalization(), impute=False)
