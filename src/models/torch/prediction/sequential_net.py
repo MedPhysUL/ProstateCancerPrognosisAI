@@ -11,8 +11,9 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Mapping, NamedTuple, Optional, Sequence, Tuple, Union
 
+import numpy as np
 from torch import device as torch_device
-from torch import cat, stack, sum, Tensor
+from torch import cat, stack, sum, tensor, Tensor
 from torch.nn import DataParallel, Module, ModuleDict
 
 from .base import MultiTaskMode, Predictor
@@ -65,6 +66,7 @@ class SequentialNet(Predictor):
             features_columns: Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]] = None,
             dropout: Union[float, Mapping[str, float]] = 0.0,
             configs: Optional[Mapping[str, ModelConfig]] = None,
+            time: float = 0,
             activation: Union[Tuple, str] = "PRELU",
             bias: bool = True,
             adn_ordering: str = "NDA",
@@ -97,6 +99,8 @@ class SequentialNet(Predictor):
             Probability of dropout. If a mapping is provided, the keys must be the task names. Defaults to 0.0.
         configs : Optional[Mapping[str, ModelConfig]]
             The model configs. The keys must be the task names. Defaults to None. If None, the models are not frozen.
+        time : float
+            The time of the model. Defaults to None.
         activation : Union[Tuple, str]
             Activation function. Defaults to "PRELU".
         bias : bool
@@ -142,6 +146,7 @@ class SequentialNet(Predictor):
 
         self.sequence = sequence
         self.configs = configs
+        self.time = time
 
         if isinstance(n_layers, Mapping):
             if isinstance(n_neurons, Mapping):
@@ -168,6 +173,8 @@ class SequentialNet(Predictor):
         self.n_samples = n_samples
 
         self._blocks: Optional[List[_Block]] = None
+        self._targets: Optional[Dict[str, Tensor]] = None
+        self._ids_to_row_idx: Optional[Dict[str, int]] = None
         self.predictor = None
 
     def _validate_sequence(self):
@@ -191,6 +198,26 @@ class SequentialNet(Predictor):
                     task_name=task_name
                 )
             )
+
+    def build(self, dataset: ProstateCancerDataset) -> Predictor:
+        """
+        Builds the model. This method must be called before training the model.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            A prostate cancer dataset.
+
+        Returns
+        -------
+        model : Predictor
+            The current model.
+        """
+        if self.time > 0:
+            self._targets = dataset.table_dataset.y
+            self._ids_to_row_idx = dataset.table_dataset.ids_to_row_idx
+
+        return super().build(dataset=dataset)
 
     def _build_single_predictor(
             self,
@@ -350,7 +377,8 @@ class SequentialNet(Predictor):
             self,
             table_data: Union[Tensor, Dict[str, Tensor]],
             output: Dict[str, Tensor],
-            block: _Block
+            block: _Block,
+            ids: Tuple[str]
     ):
         """
         Gets the input to the predictor.
@@ -363,6 +391,8 @@ class SequentialNet(Predictor):
             Previous prediction iteration outputs.
         block : _Block
             The current SequentialNet block.
+        ids : Tuple[str]
+            The ids of the current batch.
 
         Returns
         -------
@@ -370,7 +400,28 @@ class SequentialNet(Predictor):
             The input to the predictor.
         """
         base_input = table_data[block.task_name] if isinstance(table_data, dict) else table_data
-        additional_inputs = [output[t] for t in block.input_task_names]
+
+        survival_tasks = [t.name for t in self._tasks.survival_analysis_tasks]
+        if self.time > 0 and block.task_name in survival_tasks:
+            indexes = [self._ids_to_row_idx[_id] for _id in ids]
+            additional_inputs = []
+            for t in block.input_task_names:
+                task_specific_output = []
+                for loop_idx, dataset_idx in enumerate(indexes):
+                    target = self._targets[t][dataset_idx]
+
+                    if isinstance(target, np.int32):
+                        task_specific_output.append(-5.0 if target == 0 else 5.0)
+                    else:
+                        event_indicator, event_time = target[0], target[1]
+                        if event_indicator == 1 and event_time <= self.time:
+                            task_specific_output.append(10.0)
+                        else:
+                            task_specific_output.append(output[t][loop_idx])
+
+                additional_inputs.append(tensor(task_specific_output, device=self.device))
+        else:
+            additional_inputs = [output[t] for t in block.input_task_names]
 
         if additional_inputs:
             predictor_input = cat([base_input, stack(additional_inputs, 1)], 1)
@@ -404,7 +455,11 @@ class SequentialNet(Predictor):
         """
         return sum(stack([base_kl, *[kl_divergence[t] for t in block.input_task_names]]))
 
-    def _get_prediction(self, table_data: Union[Tensor, Dict[str, Tensor]]) -> Union[Dict[str, Tensor], tuple]:
+    def _get_prediction(
+            self,
+            table_data: Union[Tensor, Dict[str, Tensor]],
+            ids: Tuple[str]
+    ) -> Union[Dict[str, Tensor], tuple]:
         """
         Returns the prediction.
 
@@ -412,6 +467,8 @@ class SequentialNet(Predictor):
         ----------
         table_data : Union[Tensor, Dict[str, Tensor]]
             The table data.
+        ids : Tuple[str]
+            The patient IDs.
 
         Returns
         -------
@@ -423,7 +480,7 @@ class SequentialNet(Predictor):
         if self.bayesian:
             kl_divergence = {}
             for block in self._blocks:
-                predictor_input = self.__get_predictor_input(table_data=table_data, block=block, output=output)
+                predictor_input = self.__get_predictor_input(table_data=table_data, block=block, output=output, ids=ids)
 
                 if self.configs:
                     if block.task_name in self.configs.keys() and self.configs[block.task_name].freeze:
@@ -447,7 +504,7 @@ class SequentialNet(Predictor):
 
         else:
             for block in self._blocks:
-                predictor_input = self.__get_predictor_input(table_data=table_data, block=block, output=output)
+                predictor_input = self.__get_predictor_input(table_data=table_data, block=block, output=output, ids=ids)
                 output[block.task_name] = self.predictor[block.task_name](predictor_input)[:, 0]
 
             return output

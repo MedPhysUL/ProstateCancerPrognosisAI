@@ -8,7 +8,7 @@
     @Description:       This file contains a custom torch dataset named 'ProstateCancerDataset'.
 """
 
-from typing import Dict, List, NamedTuple, Optional, TypeAlias, Union
+from typing import Dict, List, NamedTuple, Optional, Tuple, TypeAlias, Union
 
 import numpy as np
 import pandas as pd
@@ -29,9 +29,11 @@ class FeaturesType(NamedTuple):
         - image : I-dimensional dictionary containing (N, ) tensor or array where I is the number of images used as
                   features.
         - table : D-dimensional dictionary containing (N, ) tensor or array where D is the number of table features.
+        - ids : Tuple of patient ids.
     """
     image: Dict[str, Tensor] = {}
     table: Dict[str, Union[np.ndarray, Tensor]] = {}
+    ids: Optional[Union[str, Tuple[str]]] = None
 
 
 class DataType(NamedTuple):
@@ -125,7 +127,9 @@ class ProstateCancerDataset(Dataset):
             if self.table_dataset:
                 x_table, y_table = self.table_dataset[index].x, self.table_dataset[index].y
 
-            return DataType(x=FeaturesType(image=x_image, table=x_table), y=dict(**y_table, **y_image))
+            ids = self.table_dataset.row_idx_to_ids[index]
+
+            return DataType(x=FeaturesType(image=x_image, table=x_table, ids=ids), y=dict(**y_table, **y_image))
         elif isinstance(index, list):
             return Subset(dataset=self, indices=index)
         else:

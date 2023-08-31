@@ -37,7 +37,7 @@ def batch_to_device(
     if isinstance(batch, FeaturesType):
         image_features = {k: batch_to_device(v, device) for k, v in batch.image.items()}
         table_features = {k: batch_to_device(v, device) for k, v in batch.table.items()}
-        return FeaturesType(image=image_features, table=table_features)
+        return FeaturesType(image=image_features, table=table_features, ids=batch.ids)
     if isinstance(batch, dict):
         return {k: batch_to_device(v, device) for k, v in batch.items()}
     if isinstance(batch, Tensor):

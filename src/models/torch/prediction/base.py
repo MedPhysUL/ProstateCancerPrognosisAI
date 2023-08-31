@@ -11,7 +11,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from enum import auto, StrEnum
-from typing import Dict, Mapping, Optional, Sequence, Union
+from typing import Dict, Mapping, Optional, Sequence, Tuple, Union
 from warnings import warn
 
 from torch import stack, Tensor
@@ -160,7 +160,11 @@ class Predictor(TorchModel, ABC):
         return x_table
 
     @abstractmethod
-    def _get_prediction(self, table_data: Union[Tensor, Dict[str, Tensor]]) -> Union[Dict[str, Tensor], tuple]:
+    def _get_prediction(
+            self,
+            table_data: Union[Tensor, Dict[str, Tensor]],
+            ids: Tuple[str]
+    ) -> Union[Dict[str, Tensor], tuple]:
         """
         Returns the prediction.
 
@@ -168,6 +172,8 @@ class Predictor(TorchModel, ABC):
         ----------
         table_data : Union[Tensor, Dict[str, Tensor]]
             The table data.
+        ids : Tuple[str]
+            The ids of the data items.
 
         Returns
         -------
@@ -176,7 +182,7 @@ class Predictor(TorchModel, ABC):
         """
         raise NotImplementedError
 
-    def _bayesian_forward(self, input_table: Union[Tensor, Dict[str, Tensor]]) -> TargetsType:
+    def _bayesian_forward(self, input_table: Union[Tensor, Dict[str, Tensor]], ids: Tuple[str]) -> TargetsType:
         """
         Executes a bayesian forward pass.
 
@@ -184,19 +190,21 @@ class Predictor(TorchModel, ABC):
         ----------
         input_table : Union[Tensor, Dict[str, Tensor]]
             The input to the predictor.
+        ids : Tuple[str]
+            The patient IDs.
 
         Returns
         -------
         predictions : TargetsType
             Predictions.
         """
-        prediction, kl_divergence = self._get_prediction(input_table)
+        prediction, kl_divergence = self._get_prediction(input_table, ids)
 
         self._kl_divergence = kl_divergence
 
         return prediction
 
-    def _deterministic_forward(self, input_table: Union[Tensor, Dict[str, Tensor]]) -> TargetsType:
+    def _deterministic_forward(self, input_table: Union[Tensor, Dict[str, Tensor]], ids: Tuple[str]) -> TargetsType:
         """
         Executes a deterministic forward pass.
 
@@ -204,13 +212,15 @@ class Predictor(TorchModel, ABC):
         ----------
         input_table : Union[Tensor, Dict[str, Tensor]]
             The input to the predictor.
+        ids : Tuple[str]
+            The patient IDs.
 
         Returns
         -------
         predictions : TargetsType
             Predictions.
         """
-        return self._get_prediction(input_table)
+        return self._get_prediction(input_table, ids)
 
     @check_if_built
     def forward(self, features: FeaturesType) -> TargetsType:
@@ -230,6 +240,6 @@ class Predictor(TorchModel, ABC):
         x_table = self._get_input_table(features=features)
 
         if self.bayesian:
-            return self._bayesian_forward(x_table)
+            return self._bayesian_forward(x_table, features.ids)
         else:
-            return self._deterministic_forward(x_table)
+            return self._deterministic_forward(x_table, features.ids)
