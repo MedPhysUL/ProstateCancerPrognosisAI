@@ -1,6 +1,7 @@
 adjustText==0.7
 bayesian-torch==0.3.0
 botorch==0.8.5
+compare-concordance==0.0.3
 dacite==1.8.0
 delia==1.2.6
 einops==0.6.0
