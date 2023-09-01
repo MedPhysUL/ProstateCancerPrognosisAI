@@ -1,12 +1,12 @@
 """
-    @file:              prediction_evaluator.py
+    @file:              model_comparator.py
     @Author:            Félix Desroches
 
     @Creation Date:     08/2023
     @Last modification: 08/2023
 
     @Description:       This file contains a class used to compare two models and compute the p-values for different
-    metrics.
+                        metrics.
 """
 
 from typing import Dict, List, Optional, Union
