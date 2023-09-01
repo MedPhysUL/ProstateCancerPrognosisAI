@@ -882,6 +882,12 @@ class TableViewer:
         else:
             time_to_fill, lower_conf_int, upper_conf_int = time, conf_int[0], conf_int[1]
 
+        # if upper_conf_int[-2] < 0.01:
+        #     lower_conf_int[-2] = -0.1
+        #     upper_conf_int[-2] = 0.12
+        #     lower_conf_int[-1] = -0.1
+        #     upper_conf_int[-1] = 0.12
+
         axes.fill_between(time_to_fill, lower_conf_int, upper_conf_int, alpha=0.3, step="post", color=color)
 
         censored_time = event_time[~event_indicator]
@@ -954,18 +960,32 @@ class TableViewer:
 
         try:
             filtered_df = dataset.dropna()
-            _, p_value = compare_survival(
+            _, p_value, stats, covariance = compare_survival(
                 y=self._get_structured_array(
                     event_indicator=filtered_df[event_indicator],
                     event_time=filtered_df[event_time]
                 ),
-                group_indicator=np.array([list(self._global_masks.keys()).index(row) for row in filtered_df["Sets"]])
+                group_indicator=np.array([list(self._global_masks.keys()).index(row) for row in filtered_df["Sets"]]),
+                return_stats=True
             )
 
+            observed, expected = stats["observed"].tolist(), stats["expected"].tolist()
+            hazard_ratio = (observed[1] / expected[1]) / (observed[0] / expected[0])
+
+            if p_value < 0.0001:
+                annotation = f"p-value$ < 0.0001$"
+            else:
+                annotation = f"p-value$ = {p_value:.4f}$"
+
             axes.annotate(
-                f"p-value$ = {p_value:.4f}$", xy=(0.15, 0.1), xycoords="axes fraction", textcoords="offset points",
-                xytext=(0, 10), ha='center', fontsize=16
+                annotation, xy=(0.15, 0.05), xycoords="axes fraction", textcoords="offset points",
+                xytext=(0, 5), ha='center', fontsize=16
             )
+            axes.annotate(
+                f"HR$ = {hazard_ratio:.2f}$", xy=(0.1648, 0.12), xycoords="axes fraction", textcoords="offset points",
+                xytext=(0, 5), ha='center', fontsize=16
+            )
+
         except LinAlgError:
             pass
 
@@ -1093,18 +1113,116 @@ class TableViewer:
 
         try:
             filtered_df = dataset.dropna()
-            _, p_value = compare_survival(
-                y=self._get_structured_array(
-                    event_indicator=filtered_df[event_indicator],
-                    event_time=filtered_df[event_time]
-                ),
-                group_indicator=np.array([unique_categories.index(row) for row in filtered_df[feature].dropna()])
-            )
+            if len(unique_categories) == 2:
+                _, p_value, stats, covariance = compare_survival(
+                    y=self._get_structured_array(
+                        event_indicator=filtered_df[event_indicator],
+                        event_time=filtered_df[event_time]
+                    ),
+                    group_indicator=np.array([unique_categories.index(row) for row in filtered_df[feature].dropna()]),
+                    return_stats=True
+                )
 
-            axes.annotate(
-                f"p-value$ = {p_value:.4f}$", xy=(0.15, 0.1), xycoords="axes fraction", textcoords="offset points",
-                xytext=(0, 10), ha='center', fontsize=16
-            )
+                observed, expected = stats["observed"].tolist(), stats["expected"].tolist()
+
+                if p_value < 0.0001:
+                    annotation = f"p-value$ < 0.0001$"
+                else:
+                    annotation = f"p-value$ = {p_value:.4f}$"
+
+                axes.annotate(
+                    annotation, xy=(0.15, 0.05), xycoords="axes fraction", textcoords="offset points",
+                    xytext=(0, 5), ha='center', fontsize=16
+                )
+
+                if observed[0] == 0 or expected[0] == 0 or expected[1] == 0 or len(observed) != 2:
+                    pass
+                else:
+                    hazard_ratio = (observed[1] / expected[1]) / (observed[0] / expected[0])
+                    axes.annotate(
+                        f"HR$ = {hazard_ratio:.2f}$", xy=(0.162, 0.12), xycoords="axes fraction", textcoords="offset points",
+                        xytext=(0, 5), ha='center', fontsize=16
+                    )
+            elif len(unique_categories) == 3:
+                try:
+                    _, p_value_1_2, stats_1_2, covariance_1_2 = compare_survival(
+                        y=self._get_structured_array(
+                            event_indicator=filtered_df[event_indicator][filtered_df[feature].isin(unique_categories[:2])],
+                            event_time=filtered_df[event_time][filtered_df[feature].isin(unique_categories[:2])]
+                        ),
+                        group_indicator=np.array(
+                            [
+                                unique_categories.index(row) for row in filtered_df[feature].dropna()
+                                if row in unique_categories[:2]
+                            ]
+                        ),
+                        return_stats=True
+                    )
+                except ValueError:
+                    p_value_1_2, stats_1_2, covariance_1_2 = None, None, None
+
+                try:
+                    _, p_value_2_3, stats_2_3, covariance_2_3 = compare_survival(
+                        y=self._get_structured_array(
+                            event_indicator=filtered_df[event_indicator][filtered_df[feature].isin(unique_categories[1:3])],
+                            event_time=filtered_df[event_time][filtered_df[feature].isin(unique_categories[1:3])]
+                        ),
+                        group_indicator=np.array(
+                            [
+                                unique_categories.index(row) for row in filtered_df[feature].dropna()
+                                if row in unique_categories[1:3]
+                            ]
+                        ),
+                        return_stats=True
+                    )
+                except ValueError:
+                    p_value_2_3, stats_2_3, covariance_2_3 = None, None, None
+
+                for i, (p, s, c) in enumerate(
+                        [(p_value_1_2, stats_1_2, covariance_1_2), (p_value_2_3, stats_2_3, covariance_2_3)]
+                ):
+                    cat_1, cat_2 = unique_categories[i], unique_categories[i + 1]
+
+                    if p is None or s is None or c is None:
+                        axes.annotate(
+                            f"HR$_{{{cat_1}-{cat_2}}} =$ n$/$a",
+                            xy=(0.16, 0.23 if i == 0 else 0.17), xycoords="axes fraction", textcoords="offset points",
+                            xytext=(0, 5), ha='center', fontsize=16
+                        )
+                        axes.annotate(
+                            f"p-value$_{{{cat_1}-{cat_2}}} =$ n$/$a", xy=(0.132, 0.11 if i == 0 else 0.05),
+                            xycoords="axes fraction",
+                            textcoords="offset points",
+                            xytext=(0, 5), ha='center', fontsize=16
+                        )
+                        continue
+
+                    observed, expected = s["observed"].tolist(), s["expected"].tolist()
+
+                    if p < 0.0001:
+                        annotation = f"p-value$_{{{cat_1}-{cat_2}}} < 0.0001$"
+                    else:
+                        annotation = f"p-value$_{{{cat_1}-{cat_2}}} = {p:.4f}$"
+
+                    axes.annotate(
+                        annotation, xy=(0.15, 0.11 if i == 0 else 0.05), xycoords="axes fraction",
+                        textcoords="offset points", xytext=(0, 5), ha='center', fontsize=16
+                    )
+
+                    if observed[0] == 0 or expected[0] == 0 or expected[1] == 0 or len(observed) != 2:
+                        axes.annotate(
+                            f"HR$_{{{cat_1}-{cat_2}}} =$ n$/$a",
+                            xy=(0.16, 0.23 if i == 0 else 0.17), xycoords="axes fraction", textcoords="offset points",
+                            xytext=(0, 5), ha='center', fontsize=16
+                        )
+                    else:
+                        hazard_ratio = (observed[1] / expected[1]) / (observed[0] / expected[0])
+                        axes.annotate(
+                            f"HR$_{{{cat_1}-{cat_2}}} = {hazard_ratio:.2f}$",
+                            xy=(0.162, 0.23 if i == 0 else 0.17), xycoords="axes fraction", textcoords="offset points",
+                            xytext=(0, 5), ha='center', fontsize=16
+                        )
+
         except LinAlgError:
             pass
 
