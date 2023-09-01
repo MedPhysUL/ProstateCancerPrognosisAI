@@ -7,6 +7,7 @@ import os
 from typing import List, Optional, Tuple
 
 import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
 import pandas as pd
 import torch
@@ -44,32 +45,58 @@ from src.visualization.tools import survival_table_from_events, add_at_risk_coun
 
 
 def plot_roc_curve(
-        y_true: np.ndarray,
-        y_pred: Tuple[np.ndarray, np.ndarray],
+        y_true: List[np.ndarray],
+        y_pred: List[np.ndarray],
         show: bool,
         path_to_save_folder: Optional[str] = None,
         **kwargs
 ) -> None:
     fig, arr = plt.subplots(figsize=(8, 6))
-    models = ["MSKCC", "BSN"]
-    AUC = ["$0.70\pm0.07$", "$0.71\pm0.04$"]
     arr.plot([1, 0], [1, 0], color="silver", linestyle="--", lw=2)
-    for i, p in enumerate(y_pred):
+    AUC = [0.65, 0.71, 0.69, 0.72, 0.77]
+    tprs = []
+    mean_fpr = np.linspace(0, 1, 100)
+    for i, (p, t) in enumerate(zip(y_pred, y_true)):
         fpr, tpr, threshold = roc_curve(
-            y_true,
+            t,
             p,
             pos_label=kwargs.get("pos_label", None),
             sample_weight=kwargs.get("sample_weight", None),
             drop_intermediate=kwargs.get("drop_intermediate", True)
         )
-        arr.plot(fpr, tpr, color=[c for c in LightColor][i], lw=3, label=f"{models[i]} (AUC = {AUC[i]})")
+        # arr.plot(fpr, tpr, color=[c for c in LightColor][i], lw=1.5, label=f"Fold {i} (AUC = {AUC[i]})")
+
+        interp_tpr = np.interp(mean_fpr, fpr, tpr)
+        interp_tpr[0] = 0.0
+        tprs.append(interp_tpr)
+
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+    arr.plot(
+        mean_fpr,
+        mean_tpr,
+        color="k",
+        lw=3,
+        label=f"Mean  (AUC = $0.71\pm0.04$)"
+    )
+
+    std_tpr = np.std(tprs, axis=0)
+    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
+    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+    arr.fill_between(
+        mean_fpr,
+        tprs_lower,
+        tprs_upper,
+        color="grey",
+        alpha=0.18
+    )
 
     arr.set_xlabel(kwargs.get("xlabel", f"False positive rate"), fontsize=18)
     arr.set_ylabel(kwargs.get("ylabel", f"True positive rate"), fontsize=18)
     arr.minorticks_on()
     arr.tick_params(axis="both", direction='in', color="k", which="major", labelsize=16, length=6)
     arr.tick_params(axis="both", direction='in', color="k", which="minor", labelsize=16, length=3)
-    arr.legend(fontsize=16)
+    # arr.legend(fontsize=16, handleheight=5)
     arr.set_xlim(0, 1)
     arr.set_ylim(-0.02, 1.02)
     arr.grid(False)
@@ -94,6 +121,7 @@ def _plot_stratified_kaplan_meier_curve(
 ) -> None:
 
     light_colors = [c for c in LightColor]
+    c_index = {"BCR": "0.66\pm0.05", "METASTASIS": "0.70\pm0.05", "HTX": "0.71\pm0.08", "CRPC": "0.73\pm0.13"}
     for idx, task in enumerate(tasks):
         fig, axes = plt.subplots(figsize=(8, 6))
 
@@ -170,18 +198,26 @@ def _plot_stratified_kaplan_meier_curve(
             annotation = f"p-value$ = {p_value:.4f}$"
 
         axes.annotate(
-            annotation, xy=(0.15, 0.05), xycoords="axes fraction", textcoords="offset points",
-            xytext=(0, 5), ha='center', fontsize=16
+            annotation, xy=(0.16, 0.05), xycoords="axes fraction", textcoords="offset points",
+            xytext=(0, 5), ha='center', fontsize=20
         )
         axes.annotate(
-            f"HR$ = {hazard_ratio:.2f}$", xy=(0.1648, 0.12), xycoords="axes fraction", textcoords="offset points",
-            xytext=(0, 5), ha='center', fontsize=16
+            f"HR$ = {hazard_ratio:.2f}$", xy=(0.1748, 0.12), xycoords="axes fraction", textcoords="offset points",
+            xytext=(0, 5), ha='center', fontsize=20
+        )
+        axes.annotate(
+            f"C-index$ = {c_index[task.target_column]}$", xy=(0.198, 0.19), xycoords="axes fraction",
+            textcoords="offset points", xytext=(0, 5), ha='center', fontsize=20
         )
 
         terminate_figure(path_to_save=os.path.join(path_to_folder, f"{task.target_column}.png"), show=show, fig=fig)
 
 
 if __name__ == '__main__':
+    matplotlib.rc('axes', edgecolor='k')
+    matplotlib.rcParams['mathtext.fontset'] = 'cm'
+    matplotlib.rcParams['font.family'] = 'STIXGeneral'
+
     df = pd.read_csv(FINAL_BAYES_TABLE_PATH)
 
     RADIOMIC_1 = Feature(column="RADIOMIC_PN_1", transform=Normalization(), impute=False)
@@ -372,13 +408,9 @@ if __name__ == '__main__':
         models.append(model)
         datasets.append(deepcopy(dataset))
 
-    mskcc_preds = np.concatenate(mskcc_preds)
-    y_bayes_seq_net_preds = np.concatenate(y_bayes_seq_net_preds)
-    trues = np.concatenate(trues)
-
     plot_roc_curve(
         trues,
-        (mskcc_preds, y_bayes_seq_net_preds),
+        y_bayes_seq_net_preds,
         False,
         path_to_save_folder="local_data"
     )
