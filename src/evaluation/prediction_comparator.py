@@ -15,12 +15,10 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 import scipy
-import torch
 
 from ..data.datasets.prostate_cancer import TargetsType
 from ..tasks.base import Task
 from ..tasks.containers.list import TaskList
-from ..tools.transforms import to_numpy
 
 from ..tools.delong_test import delong_roc_test
 from compare_concordance import compare_concordance
@@ -78,9 +76,9 @@ class PredictionComparator:
         p_values = {}
         for task_name in self._binary_classification_task_names:
             p_values[task_name] = 10**delong_roc_test(
-                np.expand_dims(self._ground_truth[task_name], 1),
-                to_numpy(torch.squeeze(self._pred_1[task_name])),
-                to_numpy(torch.squeeze(self._pred_2[task_name]))
+                np.array(self._ground_truth[task_name]),
+                np.array(self._pred_1[task_name]),
+                np.array(self._pred_2[task_name])
             )[0, 0]
         return p_values
 
@@ -88,8 +86,8 @@ class PredictionComparator:
         p_values = {}
         for task_name in self._binary_classification_task_names + self._survival_analysis_task_names:
             p_values[task_name] = scipy.stats.levene(
-                to_numpy(torch.squeeze(self._pred_1[task_name])),
-                to_numpy(torch.squeeze(self._pred_2[task_name]))
+                self._pred_1[task_name],
+                self._pred_2[task_name]
             ).pvalue
         return p_values
 
@@ -97,7 +95,7 @@ class PredictionComparator:
         p_values = {}
         for task_name in self._binary_classification_task_names + self._survival_analysis_task_names:
             p_values[task_name] = scipy.stats.ttest_ind(
-                to_numpy(torch.squeeze(self._pred_1[task_name])),
-                to_numpy(torch.squeeze(self._pred_2[task_name]))
+                self._pred_1[task_name],
+                self._pred_2[task_name]
             ).pvalue
         return p_values
