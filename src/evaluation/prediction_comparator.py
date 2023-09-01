@@ -6,7 +6,9 @@
     @Last modification: 09/2023
 
     @Description:       This file contains a class used to compare two models and compute the p-values for different
-                        metrics.
+                        metrics. Any problems with compareC? Use the following line:
+                            gcc -shared -o compareC.so -fPIC compareC.c
+                        to compile the compareC.c file.
 """
 
 from typing import Dict, List, Optional, Union
