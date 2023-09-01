@@ -28,7 +28,7 @@ def compute_midrank(x):
     T2 = np.empty(N, dtype=float)
     # Note(kazeevn) +1 is due to Python using 0-based indexing
     # instead of 1-based in the AUC formula in the paper
-    T2[J] = np.expand_dims(T, 1) + 1
+    T2[J] = T + 1
     return T2
 
 
