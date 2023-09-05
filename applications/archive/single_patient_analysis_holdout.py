@@ -144,6 +144,8 @@ if __name__ == '__main__':
         fig, arr = plt.subplots(figsize=(8, 6))
         light_colors = [c for c in LightColor]
         survs_tasks = dataset.tasks.survival_analysis_tasks.tasks
+        arr.axvline(x=24, lw=2, ls='--', color="silver")
+        arr.axvline(x=60, lw=2, ls='--', color="silver")
         for idx, task in enumerate(survs_tasks):
             mean_survs = task.breslow_estimator.get_survival_function(np.array([pred_mean[task.name]]))
             lower_survs = task.breslow_estimator.get_survival_function(np.array([pred_lower[task.name]]))
