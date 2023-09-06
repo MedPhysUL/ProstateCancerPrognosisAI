@@ -215,7 +215,11 @@ class MLP(Predictor):
                 out_channels=len(self._tasks.table_tasks)
             )
 
-    def _get_prediction(self, table_data: Union[Tensor, Dict[str, Tensor]]) -> Union[Dict[str, Tensor], tuple]:
+    def _get_prediction(
+            self,
+            table_data: Union[Tensor, Dict[str, Tensor]],
+            ids: Tuple[str]
+    ) -> Union[Dict[str, Tensor], tuple]:
         """
         Returns the prediction.
 
@@ -223,6 +227,8 @@ class MLP(Predictor):
         ----------
         table_data : Union[Tensor, Dict[str, Tensor]]
             The table data.
+        ids : Tuple[str]
+            The patient IDs.
 
         Returns
         -------
