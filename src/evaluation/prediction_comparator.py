@@ -12,16 +12,19 @@
 """
 
 from typing import Dict, List, Optional, Union
+import warnings
 
+from compare_concordance import compare_concordance
 import numpy as np
 import scipy
 
+from ..metrics.single_task.base import SingleTaskMetric
+from ..metrics.single_task.binary_classification import BinaryClassificationMetric
+from ..metrics.single_task.survival_analysis import SurvivalAnalysisMetric
 from ..data.datasets.prostate_cancer import TargetsType
 from ..tasks.base import Task
 from ..tasks.containers.list import TaskList
-
 from ..tools.delong_test import delong_roc_test
-from compare_concordance import compare_concordance
 
 
 class PredictionComparator:
@@ -98,4 +101,44 @@ class PredictionComparator:
                 self._pred_1[task_name],
                 self._pred_2[task_name]
             ).pvalue
+        return p_values
+
+    def compute_any_metric_p_value(
+            self,
+            metric: Union[SingleTaskMetric, Dict[str, SingleTaskMetric]],
+            n_samples: int = 10_000
+    ):
+        warnings.simplefilter('ignore')
+        if isinstance(metric, dict):
+            tasks = list(metric.keys())
+        else:
+            if isinstance(metric, BinaryClassificationMetric):
+                tasks = self._binary_classification_task_names
+            elif isinstance(metric, SurvivalAnalysisMetric):
+                tasks = self._survival_analysis_task_names
+            else:
+                raise ValueError(f"Metric {metric} not supported.")
+
+        p_values = {}
+        for task_name in tasks:
+            _metric = metric[task_name] if isinstance(metric, dict) else metric
+            pred_1, pred_2 = np.array(self._pred_1[task_name]), np.array(self._pred_2[task_name])
+            ground_truth = np.array(self._ground_truth[task_name])
+            diff = _metric(pred_2, ground_truth) - _metric(pred_1, ground_truth)
+            samples = []
+            for _ in range(n_samples):
+                try:
+                    idx = np.random.choice(len(pred_1), size=len(pred_1), replace=True)
+                    metric_1_bootstrap = _metric(pred_1[idx], ground_truth[idx])
+                    metric_2_bootstrap = _metric(pred_2[idx], ground_truth[idx])
+                    samples.append(metric_2_bootstrap - metric_1_bootstrap)
+                except ValueError:
+                    pass
+
+            std = np.sqrt(np.nanvar(samples))
+            z_score = diff / std
+            p_value = 2 * (1.0 - scipy.stats.norm.cdf(np.abs(z_score)))
+
+            p_values[task_name] = p_value
+
         return p_values
