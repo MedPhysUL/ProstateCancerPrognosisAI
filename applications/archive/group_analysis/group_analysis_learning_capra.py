@@ -122,18 +122,23 @@ def _plot_stratified_kaplan_meier_curve(
         observed, expected = stats["observed"].tolist(), stats["expected"].tolist()
         hazard_ratio = (observed[1]/expected[1])/(observed[0]/expected[0])
 
+        se = np.sqrt(1/observed[1] + 1/observed[0])
+        log_hr = np.log(hazard_ratio)
+        low_ci, high_ci = np.exp(log_hr - 1.96 * se), np.exp(log_hr + 1.96 * se)
+
         if p_value < 0.0001:
             annotation = f"p-value$ < 0.0001$"
         else:
             annotation = f"p-value$ = {p_value:.4f}$"
 
         axes.annotate(
-            annotation, xy=(0.16, 0.05), xycoords="axes fraction", textcoords="offset points",
+            annotation, xy=(0.162, 0.05), xycoords="axes fraction", textcoords="offset points",
             xytext=(0, 5), ha='center', fontsize=20
         )
         axes.annotate(
-            f"HR$ = {hazard_ratio:.2f}$", xy=(0.1748, 0.12), xycoords="axes fraction", textcoords="offset points",
-            xytext=(0, 5), ha='center', fontsize=20
+            f"HR$ = {hazard_ratio:.2f}$ $(95$% CI; {low_ci:.2f}-{high_ci:.2f}$)$",
+            xy=(0.349, 0.12), xycoords="axes fraction", textcoords="offset points", xytext=(0, 5), ha='center',
+            fontsize=20
         )
         axes.annotate(
             f"C-index$ = {c_index[task.target_column]}$", xy=(0.198, 0.19), xycoords="axes fraction",
