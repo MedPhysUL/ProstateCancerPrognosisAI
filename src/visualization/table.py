@@ -972,6 +972,10 @@ class TableViewer:
             observed, expected = stats["observed"].tolist(), stats["expected"].tolist()
             hazard_ratio = (observed[1] / expected[1]) / (observed[0] / expected[0])
 
+            se = np.sqrt(1 / observed[1] + 1 / observed[0])
+            log_hr = np.log(hazard_ratio)
+            low_ci, high_ci = np.exp(log_hr - 1.96 * se), np.exp(log_hr + 1.96 * se)
+
             if p_value < 0.0001:
                 annotation = f"p-value$ < 0.0001$"
             else:
@@ -981,9 +985,25 @@ class TableViewer:
                 annotation, xy=(0.15, 0.05), xycoords="axes fraction", textcoords="offset points",
                 xytext=(0, 5), ha='center', fontsize=16
             )
+            if low_ci < 1:
+                low_ci_formatting = "2f"
+            elif low_ci < 10:
+                low_ci_formatting = "2f"
+            else:
+                low_ci_formatting = "3g"
+
+            if high_ci < 1:
+                high_ci_formatting = "2f"
+            elif high_ci < 10:
+                high_ci_formatting = "2f"
+            else:
+                high_ci_formatting = "3g"
+
             axes.annotate(
-                f"HR$ = {hazard_ratio:.2f}$", xy=(0.1648, 0.12), xycoords="axes fraction", textcoords="offset points",
-                xytext=(0, 5), ha='center', fontsize=16
+                f"HR$ = {hazard_ratio:.2f}$ $(95$% CI; "
+                f"{low_ci:.{low_ci_formatting}}-{high_ci:.{high_ci_formatting}}$)$",
+                xy=(0.292, 0.12), xycoords="axes fraction", textcoords="offset points", xytext=(0, 5), ha='center',
+                fontsize=16
             )
 
         except LinAlgError:
@@ -1139,10 +1159,32 @@ class TableViewer:
                     pass
                 else:
                     hazard_ratio = (observed[1] / expected[1]) / (observed[0] / expected[0])
+
+                    se = np.sqrt(1 / observed[1] + 1 / observed[0])
+                    log_hr = np.log(hazard_ratio)
+                    low_ci, high_ci = np.exp(log_hr - 1.96 * se), np.exp(log_hr + 1.96 * se)
+
+                    if low_ci < 1:
+                        low_ci_formatting = "2f"
+                    elif low_ci < 10:
+                        low_ci_formatting = "2f"
+                    else:
+                        low_ci_formatting = "3g"
+
+                    if high_ci < 1:
+                        high_ci_formatting = "2f"
+                    elif high_ci < 10:
+                        high_ci_formatting = "2f"
+                    else:
+                        high_ci_formatting = "3g"
+
                     axes.annotate(
-                        f"HR$ = {hazard_ratio:.2f}$", xy=(0.162, 0.12), xycoords="axes fraction", textcoords="offset points",
-                        xytext=(0, 5), ha='center', fontsize=16
+                        f"HR$ = {hazard_ratio:.2f}$ $(95$% CI; "
+                        f"{low_ci:.{low_ci_formatting}}-{high_ci:.{high_ci_formatting}}$)$",
+                        xy=(0.292, 0.12), xycoords="axes fraction", textcoords="offset points", xytext=(0, 5),
+                        ha='center', fontsize=16
                     )
+
             elif len(unique_categories) == 3:
                 try:
                     _, p_value_1_2, stats_1_2, covariance_1_2 = compare_survival(
@@ -1186,11 +1228,11 @@ class TableViewer:
                     if p is None or s is None or c is None:
                         axes.annotate(
                             f"HR$_{{{cat_1}-{cat_2}}} =$ n$/$a",
-                            xy=(0.16, 0.23 if i == 0 else 0.17), xycoords="axes fraction", textcoords="offset points",
+                            xy=(0.16, 0.26 if i == 0 else 0.19), xycoords="axes fraction", textcoords="offset points",
                             xytext=(0, 5), ha='center', fontsize=16
                         )
                         axes.annotate(
-                            f"p-value$_{{{cat_1}-{cat_2}}} =$ n$/$a", xy=(0.132, 0.11 if i == 0 else 0.05),
+                            f"p-value$_{{{cat_1}-{cat_2}}} =$ n$/$a", xy=(0.132, 0.12 if i == 0 else 0.05),
                             xycoords="axes fraction",
                             textcoords="offset points",
                             xytext=(0, 5), ha='center', fontsize=16
@@ -1205,21 +1247,44 @@ class TableViewer:
                         annotation = f"p-value$_{{{cat_1}-{cat_2}}} = {p:.4f}$"
 
                     axes.annotate(
-                        annotation, xy=(0.15, 0.11 if i == 0 else 0.05), xycoords="axes fraction",
+                        annotation, xy=(0.15, 0.12 if i == 0 else 0.05), xycoords="axes fraction",
                         textcoords="offset points", xytext=(0, 5), ha='center', fontsize=16
                     )
 
-                    if observed[0] == 0 or expected[0] == 0 or expected[1] == 0 or len(observed) != 2:
+                    if (
+                            observed[0] == 0 or observed[1] == 0 or expected[0] == 0
+                            or expected[1] == 0 or len(observed) != 2
+                    ):
                         axes.annotate(
                             f"HR$_{{{cat_1}-{cat_2}}} =$ n$/$a",
-                            xy=(0.16, 0.23 if i == 0 else 0.17), xycoords="axes fraction", textcoords="offset points",
+                            xy=(0.16, 0.26 if i == 0 else 0.19), xycoords="axes fraction", textcoords="offset points",
                             xytext=(0, 5), ha='center', fontsize=16
                         )
                     else:
                         hazard_ratio = (observed[1] / expected[1]) / (observed[0] / expected[0])
+
+                        se = np.sqrt(1 / observed[1] + 1 / observed[0])
+                        log_hr = np.log(hazard_ratio)
+                        low_ci, high_ci = np.exp(log_hr - 1.96 * se), np.exp(log_hr + 1.96 * se)
+
+                        if low_ci < 1:
+                            low_ci_formatting = "2f"
+                        elif low_ci < 10:
+                            low_ci_formatting = "2f"
+                        else:
+                            low_ci_formatting = "3g"
+
+                        if high_ci < 1:
+                            high_ci_formatting = "2f"
+                        elif high_ci < 10:
+                            high_ci_formatting = "2f"
+                        else:
+                            high_ci_formatting = "3g"
+
                         axes.annotate(
-                            f"HR$_{{{cat_1}-{cat_2}}} = {hazard_ratio:.2f}$",
-                            xy=(0.162, 0.23 if i == 0 else 0.17), xycoords="axes fraction", textcoords="offset points",
+                            f"HR$_{{{cat_1}-{cat_2}}} = {hazard_ratio:.2f}$ $(95$% CI; "
+                            f"{low_ci:.{low_ci_formatting}}-{high_ci:.{high_ci_formatting}}$)$",
+                            xy=(0.292, 0.26 if i == 0 else 0.19), xycoords="axes fraction", textcoords="offset points",
                             xytext=(0, 5), ha='center', fontsize=16
                         )
 
