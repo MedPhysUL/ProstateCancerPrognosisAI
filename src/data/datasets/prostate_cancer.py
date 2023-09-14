@@ -127,7 +127,10 @@ class ProstateCancerDataset(Dataset):
             if self.table_dataset:
                 x_table, y_table = self.table_dataset[index].x, self.table_dataset[index].y
 
-            ids = self.table_dataset.row_idx_to_ids[index]
+            if self.table_dataset:
+                ids = self.table_dataset.row_idx_to_ids[index]
+            else:
+                ids = None
 
             return DataType(x=FeaturesType(image=x_image, table=x_table, ids=ids), y=dict(**y_table, **y_image))
         elif isinstance(index, list):
