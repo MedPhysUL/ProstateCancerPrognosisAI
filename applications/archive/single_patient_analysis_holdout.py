@@ -5,6 +5,7 @@ import os
 from typing import Optional
 
 import matplotlib.pyplot as plt
+import matplotlib
 import pandas as pd
 import torch
 
@@ -35,6 +36,10 @@ import numpy as np
 
 
 if __name__ == '__main__':
+    matplotlib.rc('axes', edgecolor='k')
+    matplotlib.rcParams['mathtext.fontset'] = 'cm'
+    matplotlib.rcParams['font.family'] = 'STIXGeneral'
+
     df = pd.read_csv(FINAL_BAYES_TABLE_PATH)
 
     RADIOMIC_1 = Feature(column="RADIOMIC_PN_1", transform=Normalization(), impute=False)
