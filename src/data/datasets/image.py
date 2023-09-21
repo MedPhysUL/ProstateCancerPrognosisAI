@@ -85,7 +85,7 @@ class ImageDataset(Dataset):
         transposition : Tuple[int, int, int]
             The transposition to apply to images before applying transforms. The rendered images are in shape (Z, X, Y)
             by default.
-        **kwargs : dict
+        **kwargs
             Keywords arguments controlling images and segmentations format, and segmentations series to use.
         """
         self._tasks = TaskList(tasks)
