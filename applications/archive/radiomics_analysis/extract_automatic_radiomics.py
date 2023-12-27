@@ -80,7 +80,6 @@ if __name__ == '__main__':
 
         model = Unet(
             image_keys="CT",
-            spatial_dims=3,
             num_res_units=3,
             dropout=0.2,
             device=torch.device("cuda"),

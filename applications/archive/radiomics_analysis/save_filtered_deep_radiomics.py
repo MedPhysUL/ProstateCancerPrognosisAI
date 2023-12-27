@@ -70,8 +70,6 @@ if __name__ == "__main__":
 
             model = UNEXtractor(
                 image_keys=["CT", "PT"],
-                dropout_cnn=0.2,
-                dropout_fnn=0.2,
                 num_res_units=2,
                 device=torch.device("cuda"),
                 seed=SEED
@@ -79,7 +77,7 @@ if __name__ == "__main__":
 
             loaded_state = torch.load(
                 f"local_data/records/experiments/{task.target_column}(UNEXtractor - Deep radiomics)/outer_splits/"
-                f"split_{k}/best_model/best_model.pt"
+                f"split_{k}/best_models/outer_split/best_model.pt"
             )
 
             model.load_state_dict(loaded_state)
@@ -99,4 +97,21 @@ if __name__ == "__main__":
             path_to_inner_splits = os.path.join(outer_split_path, f"inner_splits")
             os.makedirs(path_to_inner_splits, exist_ok=True)
             for idx, inner_mask in v[Mask.INNER].items():
+                loaded_state = torch.load(
+                    f"local_data/records/experiments/{task.target_column}(UNEXtractor - Deep radiomics)/outer_splits/"
+                    f"split_{k}/best_models/inner_splits/split_{idx}/best_model.pt"
+                )
+
+                model.load_state_dict(loaded_state)
+
+                data_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False, collate_fn=None)
+                rads = []
+                for features, _ in data_loader:
+                    rads.append(model.extract_radiomics(features).deep_features.cpu().detach().numpy())
+                rads = np.array(rads)[:, 0, :]
+
+                dataframe = df.copy()
+                for i in range(6):
+                    dataframe[f"RADIOMIC_{i + 1}"] = rads[:, i]
+
                 dataframe.to_csv(os.path.join(path_to_inner_splits, f"inner_split_{idx}.csv"), index=False)

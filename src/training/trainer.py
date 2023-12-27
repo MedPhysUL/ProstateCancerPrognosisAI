@@ -443,8 +443,8 @@ class Trainer:
                 progress_bar.set_postfix(dict(**{"stop_flag": "True"}, **postfix))
                 break
 
-        self.callbacks.on_fit_end(self)
         self._exec_post_fit(dataset)
+        self.callbacks.on_fit_end(self)
         self._delete_temporary_folder()
         progress_bar.close()
 

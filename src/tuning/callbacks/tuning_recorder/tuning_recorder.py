@@ -50,11 +50,12 @@ class TuningRecorder(TuningCallback):
     STUDY_PREFIX: str = "study"
 
     # FOLDERS NAME
-    BEST_MODEL_FOLDER_NAME: str = "best_model"
+    BEST_MODELS_FOLDER_NAME: str = "best_models"
     DESCRIPTIVE_ANALYSIS_FOLDER_NAME: str = "descriptive_analysis"
     HYPERPARAMETERS_FOLDER_NAME: str = "hyperparameters"
     FIGURES_FOLDER_NAME: str = "figures"
     INNER_LOOPS_FOLDER_NAME: str = "inner_splits"
+    OUTER_LOOP_FOLDER_NAME: str = "outer_split"
     OUTER_LOOPS_FOLDER_NAME: str = "outer_splits"
     TRIALS_RECORDS_FOLDER_NAME: str = "trials"
 
@@ -76,6 +77,7 @@ class TuningRecorder(TuningCallback):
             name: Optional[str] = None,
             path_to_record_folder: str = "tuning_records",
             save_descriptive_analysis: bool = False,
+            save_inner_splits_best_models: bool = False,
             verbose: bool = False
     ):
         """
@@ -89,6 +91,8 @@ class TuningRecorder(TuningCallback):
             Path to the folder to save the records to.
         save_descriptive_analysis : bool
             Whether to save the descriptive analysis.
+        save_inner_splits_best_models : bool
+            Whether to save the best model of each inner split.
         verbose : bool
             Whether to print out the trace of the checkpoint.
         """
@@ -100,6 +104,7 @@ class TuningRecorder(TuningCallback):
         self.path_to_record_folder = path_to_record_folder
         self.path_to_trials = None
         self.save_descriptive_analysis = save_descriptive_analysis
+        self.save_inner_splits_best_models = save_inner_splits_best_models
         self.verbose = verbose
 
         self._dump = partial(dump, indent=4, sort_keys=True, cls=EnhancedJSONEncoder)
@@ -267,9 +272,14 @@ class TuningRecorder(TuningCallback):
         tuner : Tuner
             The tuner.
         """
-        self._set_path_to_best_model_folder(tuner)
+        if kwargs.get("outer", True):
+            self._set_path_to_best_models_folder(tuner)
+            self._set_path_to_current_model_folder(tuner, True)
+        else:
+            if self.save_inner_splits_best_models:
+                self._set_path_to_current_model_folder(tuner, False, kwargs.get("idx", None))
 
-    def _set_path_to_best_model_folder(self, tuner):
+    def _set_path_to_best_models_folder(self, tuner):
         """
         Sets path to best model folder.
 
@@ -278,12 +288,45 @@ class TuningRecorder(TuningCallback):
         tuner : Tuner
             The tuner.
         """
-        path_to_best_model_folder = os.path.join(
+        path_to_best_models_folder = os.path.join(
             tuner.outer_loop_state.path_to_outer_loop_folder,
-            self.BEST_MODEL_FOLDER_NAME
+            self.BEST_MODELS_FOLDER_NAME
         )
-        os.makedirs(path_to_best_model_folder, exist_ok=True)
-        tuner.best_model_state.path_to_best_model_folder = path_to_best_model_folder
+        os.makedirs(path_to_best_models_folder, exist_ok=True)
+        tuner.best_model_state.path_to_best_models_folder = path_to_best_models_folder
+
+    def _set_path_to_current_model_folder(self, tuner, outer: bool = True, idx: Optional[int] = None):
+        """
+        Sets path to current model folder. If outer is True, then the path to the outer loop folder is set. Otherwise,
+        the path to the inner loop folder is set.
+
+        Parameters
+        ----------
+        tuner : Tuner
+            The tuner.
+        outer : bool
+            If True, then the path to the outer loop folder is set. Otherwise, the path to the inner loop folder is set.
+        idx : Optional[int]
+            The index of the inner loop split.
+        """
+        if outer:
+            path_to_current_model_folder = os.path.join(
+                tuner.best_model_state.path_to_best_models_folder,
+                self.OUTER_LOOP_FOLDER_NAME
+            )
+        else:
+            path_to_best_inner_splits_model_folder = os.path.join(
+                tuner.best_model_state.path_to_best_models_folder,
+                self.INNER_LOOPS_FOLDER_NAME
+            )
+            os.makedirs(path_to_best_inner_splits_model_folder, exist_ok=True)
+            path_to_current_model_folder = os.path.join(
+                path_to_best_inner_splits_model_folder,
+                f"{self.SPLIT_PREFIX}_{idx}"
+            )
+
+        os.makedirs(path_to_current_model_folder, exist_ok=True)
+        tuner.best_model_state.path_to_current_model_folder = path_to_current_model_folder
 
     def on_best_model_evaluation_end(self, tuner, **kwargs):
         """
@@ -294,25 +337,27 @@ class TuningRecorder(TuningCallback):
         tuner : Tuner
             The tuner.
         """
-        path_to_scores = os.path.join(tuner.best_model_state.path_to_best_model_folder, self.SCORES_FILE_NAME)
-        with open(path_to_scores, "w") as file:
-            self._dump(tuner.best_model_state.score, file)
+        if kwargs.get("outer", True) or (not kwargs.get("outer", True) and self.save_inner_splits_best_models):
+            path_to_scores = os.path.join(tuner.best_model_state.path_to_current_model_folder, self.SCORES_FILE_NAME)
+            with open(path_to_scores, "w") as file:
+                self._dump(tuner.best_model_state.score, file)
 
-        if tuner.tuning_state.scores:
-            tuner.tuning_state.scores.append(tuner.best_model_state.score)
-        else:
-            tuner.tuning_state.scores = [tuner.best_model_state.score]
+            if kwargs.get("outer", True):
+                if tuner.tuning_state.scores:
+                    tuner.tuning_state.scores.append(tuner.best_model_state.score)
+                else:
+                    tuner.tuning_state.scores = [tuner.best_model_state.score]
 
-        model = tuner.best_model_state.model
-        if isinstance(model, TorchModel):
-            model_state = model.state_dict()
-            path_to_model = os.path.join(
-                tuner.best_model_state.path_to_best_model_folder,
-                self.TORCH_BEST_MODEL_FILE_NAME
-            )
-            torch.save(model_state, path_to_model)
-        else:
-            raise NotImplementedError
+            model = tuner.best_model_state.model
+            if isinstance(model, TorchModel):
+                model_state = model.state_dict()
+                path_to_model = os.path.join(
+                    tuner.best_model_state.path_to_current_model_folder,
+                    self.TORCH_BEST_MODEL_FILE_NAME
+                )
+                torch.save(model_state, path_to_model)
+            else:
+                raise NotImplementedError
 
     def on_study_end(self, tuner, **kwargs):
         """

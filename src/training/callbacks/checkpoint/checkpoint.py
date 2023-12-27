@@ -3,7 +3,7 @@
     @Author:            Maxence Larose, Mehdi Mitiche, Nicolas Raymond
 
     @Creation Date:     12/2022
-    @Last modification: 02/2023
+    @Last modification: 08/2023
 
     @Description:       This file is used to define the 'Checkpoint' callback.
 """
@@ -26,11 +26,11 @@ class Checkpoint(TrainingCallback):
 
     instance_counter = count()
 
-    BEST_MODEL_KEY: str = "best"
     CHECKPOINT_EPOCH_KEY: str = "epoch"
-    CHECKPOINT_EPOCHS_KEY: str = "epochs"
 
-    TRAINING_HISTORY_FIGURES_FOLDER_NAME = "training_history_figures"
+    EPOCHS_FOLDER_NAME: str = "epochs"
+    FIGURES_FOLDER_NAME = "figures"
+    BEST_CHECKPOINT_NAME = "best_model_checkpoint.pt"
 
     def __init__(
             self,
@@ -39,6 +39,9 @@ class Checkpoint(TrainingCallback):
             path_to_checkpoint_folder: str = "./checkpoints",
             save_freq: int = 1,
             save_model_state: bool = True,
+            save_training_history_state: bool = True,
+            save_learning_algorithms_state: bool = False,
+            save_training_state: bool = False,
             verbose: bool = False
     ):
         """
@@ -53,9 +56,17 @@ class Checkpoint(TrainingCallback):
         path_to_checkpoint_folder : str
             Path to the folder to save the checkpoints to.
         save_freq : int
-            The frequency at which to save checkpoints. If 'save_freq' <= 0, only save at the end of the training.
+            The frequency at which to save checkpoints. If 'save_freq' <= 0, only save at the end of the training. Note
+            that the epoch state is saved at every epoch, but the model, optimizer and training state is only saved at
+            the given frequency.
         save_model_state : bool
             Whether to include model state in checkpoint.
+        save_learning_algorithms_state : bool
+            Whether to include learning algorithms state in checkpoint.
+        save_training_history_state : bool
+            Whether to include training history state in checkpoint.
+        save_training_state : bool
+            Whether to include training state in checkpoint.
         verbose : bool
             Whether to print out the trace of the checkpoint.
         """
@@ -65,8 +76,13 @@ class Checkpoint(TrainingCallback):
 
         self.epoch_to_start_save = epoch_to_start_save
         self.path_to_checkpoint_folder = path_to_checkpoint_folder
+        self.path_to_training_history = os.path.join(self.path_to_checkpoint_folder, self.EPOCHS_FOLDER_NAME)
+
         self.save_freq = save_freq
+        self.save_training_history_state = save_training_history_state
+        self.save_learning_algorithms_state = save_learning_algorithms_state
         self.save_model_state = save_model_state
+        self.save_training_state = save_training_state
         self.verbose = verbose
 
     def __getitem__(self, epoch: int) -> dict:
@@ -85,8 +101,27 @@ class Checkpoint(TrainingCallback):
         """
         if os.path.exists(self._get_path_to_checkpoint(epoch)):
             checkpoint = torch.load(self._get_path_to_checkpoint(epoch))
-        elif os.path.exists(self._get_path_to_checkpoint(epoch, True)):
-            checkpoint = torch.load(self._get_path_to_checkpoint(epoch, True))
+        else:
+            raise FileNotFoundError("File not found.")
+
+        return checkpoint
+
+    def get_best_checkpoint(self, epoch: int) -> dict:
+        """
+        Loads the checkpoint at the given epoch.
+
+        Parameters
+        ----------
+        epoch : int
+            The epoch index.
+
+        Returns
+        -------
+        loaded_checkpoint : dict
+            The loaded checkpoint.
+        """
+        if os.path.exists(self._get_path_to_best_checkpoint()):
+            checkpoint = torch.load(self._get_path_to_best_checkpoint())
         else:
             raise FileNotFoundError("File not found.")
 
@@ -116,7 +151,7 @@ class Checkpoint(TrainingCallback):
         """
         return Priority.LOW_PRIORITY
 
-    def save(self, trainer):
+    def save(self, trainer, best: bool = False):
         """
         Saves the checkpoint if the current epoch is a checkpoint epoch.
 
@@ -124,14 +159,30 @@ class Checkpoint(TrainingCallback):
         ----------
         trainer : Trainer
             The trainer.
+        best : bool
+            Whether to save the checkpoint as the best model.
         """
-        self._save_checkpoint(
-            epoch=trainer.epoch_state.idx,
-            epoch_state=trainer.epoch_state.state_dict(),
-            training_state=trainer.training_state.state_dict(),
-            model_state=trainer.model.state_dict(),
-            callbacks_state=trainer.callbacks.state_dict()
-        )
+        if best:
+            self._save_checkpoint(
+                epoch=trainer.training_state.best_epoch if trainer.is_using_early_stopping else trainer.epoch_state.idx,
+                epoch_state=trainer.epoch_state.state_dict(),
+                training_state=trainer.training_state.state_dict(),
+                model_state=trainer.model.state_dict(),
+                learning_algo=None,
+                training_history=trainer.training_history.state_dict(),
+                best=True
+            )
+        else:
+            os.makedirs(self.path_to_training_history, exist_ok=True)
+
+            self._save_checkpoint(
+                epoch=trainer.epoch_state.idx,
+                epoch_state=trainer.epoch_state.state_dict(),
+                training_state=trainer.training_state.state_dict() if self.save_training_state else None,
+                model_state=trainer.model.state_dict() if self.save_model_state else None,
+                learning_algo=trainer.learning_algorithms.state_dict() if self.save_learning_algorithms_state else None,
+                training_history=trainer.training_history.state_dict() if self.save_training_history_state else None
+            )
 
     def _get_checkpoint_filename(self, epoch: int):
         """
@@ -147,25 +198,20 @@ class Checkpoint(TrainingCallback):
         checkpoint_filename : str
             The filename for the checkpoint at the given epoch.
         """
-        return f"{self.CHECKPOINT_EPOCH_KEY}-{epoch}.pth"
+        return f"{self.CHECKPOINT_EPOCH_KEY}-{epoch}.pt"
 
-    def _get_best_checkpoint_filename(self, epoch: int):
+    def _get_path_to_best_checkpoint(self) -> str:
         """
-        Generate the filename for the checkpoint at the given epoch.
-
-        Parameters
-        ----------
-        epoch : int
-            The epoch to generate the filename for.
+        Gets the path to the best model checkpoint.
 
         Returns
         -------
-        checkpoint_filename : str
-            The filename for the checkpoint at the given epoch.
+        path_to_best_checkpoint : str
+            The path to the best model checkpoint.
         """
-        return f"{self.CHECKPOINT_EPOCH_KEY}-{epoch}({self.BEST_MODEL_KEY}).pth"
+        return os.path.join(self.path_to_checkpoint_folder, self.BEST_CHECKPOINT_NAME)
 
-    def _get_path_to_checkpoint(self, epoch: int, best: bool = False) -> str:
+    def _get_path_to_checkpoint(self, epoch: int) -> str:
         """
         Generates the path to the file for the checkpoint at the given epoch.
 
@@ -173,34 +219,29 @@ class Checkpoint(TrainingCallback):
         ----------
         epoch : int
             The epoch to generate the filepath for.
-        best : bool
-            Whether the current epoch is associated to the best checkpoint.
 
         Returns
         -------
         checkpoint_filepath : str
             The filepath for the checkpoint at the given epoch.
         """
-        if best:
-            return os.path.join(self.path_to_checkpoint_folder, self._get_best_checkpoint_filename(epoch))
-        else:
-            return os.path.join(self.path_to_checkpoint_folder, self._get_checkpoint_filename(epoch))
+        return os.path.join(self.path_to_training_history, self._get_checkpoint_filename(epoch))
 
     def _save_checkpoint(
             self,
-            callbacks_state: dict,
             epoch: int,
             epoch_state: dict,
-            model_state: dict,
-            training_state: dict,
-    ) -> str:
+            model_state: Optional[dict] = None,
+            training_state: Optional[dict] = None,
+            learning_algo: Optional[dict] = None,
+            training_history: Optional[dict] = None,
+            best: bool = False
+    ):
         """
         Saves a checkpoint (model, optimizer, trainer) states at the given epoch.
 
         Parameters
         ----------
-        callbacks_state : dict
-            The state dict of all callbacks.
         epoch : int
             The epoch index.
         epoch_state : dict
@@ -209,25 +250,26 @@ class Checkpoint(TrainingCallback):
             The state dict of the model.
         training_state : dict
             The training state.
-
-        Returns
-        -------
-        path : str
-            The path to the saved checkpoint.
+        learning_algo : dict
+            The state dict of the learning algorithm.
+        training_history : dict
+            The training history.
+        best : bool
+            Whether the current epoch is associated to the best checkpoint.
         """
         os.makedirs(self.path_to_checkpoint_folder, exist_ok=True)
-        path = self._get_path_to_checkpoint(epoch)
 
         state = CheckpointState(
-            callbacks_state=callbacks_state,
             epoch=epoch,
+            learning_algorithms_state=learning_algo,
+            training_history_state=training_history,
             epoch_state=epoch_state,
-            model_state=model_state if self.save_model_state else None,
+            model_state=model_state,
             training_state=training_state
         )
 
+        path = self._get_path_to_best_checkpoint() if best else self._get_path_to_checkpoint(epoch)
         torch.save(asdict(state), path)
-        return path
 
     def on_epoch_end(self, trainer, **kwargs):
         """
@@ -242,8 +284,6 @@ class Checkpoint(TrainingCallback):
             return
         elif self.save_freq > 0 and trainer.epoch_state.idx % self.save_freq == 0:
             self.save(trainer)
-        elif trainer.epoch_state.idx >= trainer.training_state.n_epochs - 1:
-            self.save(trainer)
 
     def on_fit_end(self, trainer, **kwargs):
         """
@@ -255,16 +295,9 @@ class Checkpoint(TrainingCallback):
         trainer : Trainer
             The trainer.
         """
-        if trainer.is_using_early_stopping:
-            best_epoch_idx = trainer.training_state.best_epoch
-            path_to_best_checkpoint = self._get_path_to_checkpoint(best_epoch_idx)
-            if os.path.exists(path_to_best_checkpoint):
-                os.rename(
-                    path_to_best_checkpoint,
-                    self._get_path_to_checkpoint(best_epoch_idx, True)
-                )
+        self.save(trainer, True)
 
-        path_to_save = os.path.join(self.path_to_checkpoint_folder, self.TRAINING_HISTORY_FIGURES_FOLDER_NAME)
+        path_to_save = os.path.join(self.path_to_checkpoint_folder, self.FIGURES_FOLDER_NAME)
         os.makedirs(path_to_save, exist_ok=True)
 
         trainer.training_history.plot(

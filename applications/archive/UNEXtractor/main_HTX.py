@@ -93,7 +93,10 @@ if __name__ == '__main__':
 
     tuner = Tuner(
         search_algorithm=search_algo,
-        recorder=TuningRecorder(path_to_record_folder=path_to_record_folder),
+        recorder=TuningRecorder(
+            path_to_record_folder=path_to_record_folder,
+            save_inner_splits_best_models=True
+        ),
         n_trials=25,
         seed=SEED
     )
@@ -117,9 +120,7 @@ if __name__ == '__main__':
                 "tasks": [task, PROSTATE_SEGMENTATION_TASK],
                 "weights": CategoricalHyperparameter(
                     name="weights",
-                    choices=[
-                        "(0.25, 0.75)", "(0.333, 0.667)", "(0.5, 0.5)", "(0.667, 0.333)", "(0.75, 0.25)", "(1, 0)"
-                    ]
+                    choices=["(0.25, 0.75)", "(0.333, 0.667)", "(0.5, 0.5)", "(0.667, 0.333)", "(0.75, 0.25)"]
                 )
             }
         ),

@@ -34,10 +34,8 @@ def terminate_figure(
     if fig is not None:
         fig.tight_layout()
 
-    kwargs['dpi'] = kwargs.get('dpi', 300)
-
     if path_to_save is not None:
-        plt.savefig(path_to_save, **kwargs)
+        plt.savefig(path_to_save, dpi=kwargs.get('dpi', 300), bbox_inches='tight')
     if show:
         plt.show()
 
@@ -45,3 +43,32 @@ def terminate_figure(
         plt.close(fig)
     else:
         plt.close()
+
+
+def add_details_to_kaplan_meier_curve(
+        axes: plt.Axes,
+        legend: bool = True
+) -> None:
+    """
+    Adds details to a Kaplan-Meier curve.
+
+    Parameters
+    ----------
+    axes : plt.Axes
+        Axes.
+    legend : bool
+        Whether to add a legend.
+    """
+    axes.minorticks_on()
+    axes.tick_params(axis="both", direction='in', color="k", which="major", labelsize=16, length=6)
+    axes.tick_params(axis="both", direction='in', color="k", which="minor", labelsize=16, length=3)
+    axes.set_ylabel(f"Survival probability", fontsize=18)
+    axes.set_xlabel("Time $($months$)$", fontsize=18)
+    axes.set_xlim(0, None)
+    axes.set_ylim(-0.02, 1.02)
+    axes.grid(False)
+    if legend:
+        legend = axes.legend(loc="upper right", edgecolor="k", fontsize=16, handlelength=1.5)
+
+        for line in legend.get_lines():
+            line.set_linewidth(8)

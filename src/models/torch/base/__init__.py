@@ -1,1 +1,1 @@
-from .torch_model import check_if_built, TorchModel
+from .torch_model import check_if_built, evaluation_function, TorchModel

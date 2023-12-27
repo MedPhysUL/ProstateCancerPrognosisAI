@@ -1,2 +1,4 @@
+from .model_comparator import ModelComparator
 from .model_evaluator import ModelEvaluator
+from .prediction_comparator import PredictionComparator
 from .prediction_evaluator import PredictionEvaluator

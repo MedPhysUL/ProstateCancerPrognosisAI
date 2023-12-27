@@ -113,7 +113,10 @@ if __name__ == '__main__':
 
         tuner = Tuner(
             search_algorithm=search_algo,
-            recorder=TuningRecorder(path_to_record_folder=path_to_record_folder),
+            recorder=TuningRecorder(
+                path_to_record_folder=path_to_record_folder,
+                save_inner_splits_best_models=True
+            ),
             n_trials=25,
             seed=SEED
         )
@@ -121,12 +124,12 @@ if __name__ == '__main__':
         model_hyperparameter = TorchModelHyperparameter(
             constructor=UNEXtractor,
             parameters={
-                        "image_keys": ["CT", "PT"],
-                        "channels": FixedHyperparameter(name="channels", value=(64, 128, 256, 512, 1024)),
-                        "kernel_size": FixedHyperparameter(name="kernel_size", value=3),
-                        "num_res_units": FixedHyperparameter(name="num_res_units", value=2),
-                        "dropout_cnn": FloatHyperparameter(name="dropout_cnn", low=0.2, high=0.8),
-                        "dropout_fnn": FloatHyperparameter(name="dropout_fnn", low=0.1, high=0.4)
+                "image_keys": ["CT", "PT"],
+                "channels": FixedHyperparameter(name="channels", value=(64, 128, 256, 512, 1024)),
+                "kernel_size": FixedHyperparameter(name="kernel_size", value=3),
+                "num_res_units": FixedHyperparameter(name="num_res_units", value=2),
+                "dropout_cnn": FloatHyperparameter(name="dropout_cnn", low=0.2, high=0.8),
+                "dropout_fnn": FloatHyperparameter(name="dropout_fnn", low=0.1, high=0.4)
             }
         )
 
@@ -138,7 +141,7 @@ if __name__ == '__main__':
                     "weights": CategoricalHyperparameter(
                         name="weights",
                         choices=[
-                            "(0.25, 0.75)", "(0.333, 0.667)", "(0.5, 0.5)", "(0.667, 0.333)", "(0.75, 0.25)", "(1, 0)"
+                            "(0.25, 0.75)", "(0.333, 0.667)", "(0.5, 0.5)", "(0.667, 0.333)", "(0.75, 0.25)"
                         ]
                     )
                 }

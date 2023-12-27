@@ -27,14 +27,17 @@ class BestModelState:
 
     Elements
     --------
-    path_to_best_model_folder: str
-        The path to the current folder containing the best model records.
+    path_to_best_models_folder: str
+        The path to the current folder containing the best models records.
+    path_to_current_model_folder: str
+        The path to the current folder containing the current model records.
     score : ScoreContainer
         The current best model score.
     model : Model
         Best model.
     """
-    path_to_best_model_folder: str = None
+    path_to_best_models_folder: str = None
+    path_to_current_model_folder: str = None
     score: ScoreContainer = None
     model: Model = None
 

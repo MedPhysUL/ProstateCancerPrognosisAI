@@ -87,7 +87,10 @@ if __name__ == '__main__':
 
     tuner = Tuner(
         search_algorithm=search_algo,
-        recorder=TuningRecorder(path_to_record_folder=path_to_record_folder),
+        recorder=TuningRecorder(
+            path_to_record_folder=path_to_record_folder,
+            save_inner_splits_best_models=True
+        ),
         n_trials=25,
         seed=SEED
     )
@@ -112,7 +115,12 @@ if __name__ == '__main__':
             constructor=Adam,
             model_params_getter=lambda model: model.parameters(),
             parameters={
-                "lr": FloatHyperparameter(name="lr", low=1e-5, high=1e-3, log=True),
+                "lr": FloatHyperparameter(
+                    name="lr",
+                    low=1e-5,
+                    high=CNN_LR_HIGH_BOUND_DICT[task.target_column],
+                    log=True
+                ),
                 "weight_decay": FloatHyperparameter(name="weight_decay", low=1e-3, high=1e-1, log=True)
             }
         ),

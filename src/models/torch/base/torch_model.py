@@ -16,7 +16,7 @@ from typing import Dict, List, Optional
 
 from monai.data import DataLoader
 from torch import device as torch_device
-from torch import no_grad, random, round, sigmoid, stack
+from torch import no_grad, random, round, sigmoid, stack, Tensor
 
 from ...base import check_if_built, Model
 from ....data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset, TargetsType
@@ -48,7 +48,8 @@ class TorchModel(Model, ABC):
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None,
-            bayesian: bool = False
+            bayesian: bool = False,
+            temperature: Optional[Dict[str, Tensor]] = None
     ) -> None:
         """
         Sets the protected attributes and creates an embedding block if required.
@@ -61,10 +62,22 @@ class TorchModel(Model, ABC):
             The name of the model.
         seed : Optional[int]
             Random state used for reproducibility.
+        bayesian : bool
+            Whether the model is in bayesian mode.
+        temperature : Optional[Dict[str, Tensor]]
+            Temperature of the model.
         """
+        if bayesian:
+            assert temperature is not None, (
+                f"'TorchModel' requires that the 'temperature' argument be specified when the model is in bayesian "
+                f"mode."
+            )
+
         super().__init__(device=device, name=name, seed=seed)
 
         self._bayesian = bayesian
+        self._kl_divergence = None
+        self._temperature = temperature
 
     @property
     def bayesian(self) -> bool:
@@ -77,6 +90,30 @@ class TorchModel(Model, ABC):
             Whether the model is in bayesian mode.
         """
         return self._bayesian
+
+    @property
+    def kl_divergence(self) -> Optional[Dict[str, Tensor]]:
+        """
+        Returns the KL divergence of the model if it is in bayesian mode.
+
+        Returns
+        -------
+        kl_divergence : Optional[Dict[str, Tensor]]
+            KL divergence of the model.
+        """
+        return self._kl_divergence
+
+    @property
+    def temperature(self) -> Optional[Dict[str, Tensor]]:
+        """
+        Returns the temperature of the model if it is in bayesian mode.
+
+        Returns
+        -------
+        temperature : Optional[Dict[str, Tensor]]
+            Temperature of the model.
+        """
+        return self._temperature
 
     def build(self, dataset: ProstateCancerDataset) -> TorchModel:
         """
@@ -139,7 +176,8 @@ class TorchModel(Model, ABC):
     @no_grad()
     def fix_thresholds_to_optimal_values(
             self,
-            dataset: ProstateCancerDataset
+            dataset: ProstateCancerDataset,
+            n_samples: int = 10
     ) -> None:
         """
         Fix all classification thresholds to their optimal values according to a given metric.
@@ -148,8 +186,10 @@ class TorchModel(Model, ABC):
         ----------
         dataset : ProstateCancerDataset
             A prostate cancer dataset.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
         """
-        ModelEvaluator.fix_thresholds_to_optimal_values_with_dataset(model=self, dataset=dataset)
+        ModelEvaluator.fix_thresholds_to_optimal_values_with_dataset(model=self, dataset=dataset, n_samples=n_samples)
 
     @check_if_built
     @evaluation_function
@@ -157,7 +197,8 @@ class TorchModel(Model, ABC):
     def predict(
             self,
             features: FeaturesType,
-            probability: bool = True
+            probability: bool = True,
+            n_samples: int = 10
     ) -> TargetsType:
         """
         Returns predictions for all samples in a particular batch, particularly :
@@ -174,6 +215,8 @@ class TorchModel(Model, ABC):
         probability : bool
             Whether to return probability predictions or class predictions for binary classification task predictions.
             Doesn't affect regression, survival and segmentation tasks predictions.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
 
         Returns
         -------
@@ -182,7 +225,13 @@ class TorchModel(Model, ABC):
         """
         predictions = {}
         features = batch_to_device(features, self.device)
-        outputs = self(features)
+
+        if self.bayesian:
+            multi_outputs = [self(features) for _ in range(n_samples)]
+            keys = list(multi_outputs[0].keys())
+            outputs = {k: stack([output[k] for output in multi_outputs], dim=0).mean(dim=0) for k in keys}
+        else:
+            outputs = self(features)
 
         for task in self._tasks.binary_classification_tasks:
             if probability:
@@ -204,7 +253,8 @@ class TorchModel(Model, ABC):
             self,
             dataset: ProstateCancerDataset,
             mask: Optional[List[int]] = None,
-            probability: bool = True
+            probability: bool = True,
+            n_samples: int = 10
     ) -> Optional[TargetsType]:
         """
         Returns predictions for all samples in a particular subset of the dataset, determined using the 'mask'
@@ -226,6 +276,8 @@ class TorchModel(Model, ABC):
         probability : bool
             Whether to return probability predictions or class predictions for binary classification task predictions.
             Doesn't affect regression, survival and segmentation tasks predictions.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
 
         Returns
         -------
@@ -239,7 +291,7 @@ class TorchModel(Model, ABC):
 
         predictions = {task.name: [] for task in dataset.tasks}
         for features, _ in data_loader:
-            pred = self.predict(features=features, probability=probability)
+            pred = self.predict(features=features, probability=probability, n_samples=n_samples)
 
             for task in dataset.tasks.table_tasks:
                 predictions[task.name].append(pred[task.name])
@@ -254,7 +306,8 @@ class TorchModel(Model, ABC):
     def compute_score(
             self,
             features: FeaturesType,
-            targets: TargetsType
+            targets: TargetsType,
+            n_samples: int = 10
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns the scores for all samples in a particular batch.
@@ -265,13 +318,15 @@ class TorchModel(Model, ABC):
             Batch data items.
         targets : TargetsType
             Batch data items.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
 
         Returns
         -------
         scores : Dict[str, Dict[str, float]]
             Score for each task and each metric.
         """
-        pred = self.predict(features=features)
+        pred = self.predict(features=features, n_samples=n_samples)
 
         scores = {}
         for task in self._tasks:
@@ -286,7 +341,8 @@ class TorchModel(Model, ABC):
     def compute_score_on_dataset(
             self,
             dataset: ProstateCancerDataset,
-            mask: List[int]
+            mask: List[int],
+            n_samples: int = 10
     ) -> Dict[str, Dict[str, float]]:
         """
         Returns the score of all samples in a particular subset of the dataset, determined using a mask parameter.
@@ -297,10 +353,12 @@ class TorchModel(Model, ABC):
             A prostate cancer dataset.
         mask : List[int]
             A list of dataset idx for which we want to obtain the mean score.
+        n_samples : int
+            Number of samples to use for bayesian inference. Only used if the model is in bayesian mode. Defaults to 10.
 
         Returns
         -------
         scores : Dict[str, Dict[str, float]]
             Score for each task and each metric.
         """
-        return ModelEvaluator.compute_score_on_dataset(model=self, dataset=dataset, mask=mask)
+        return ModelEvaluator.compute_score_on_dataset(model=self, dataset=dataset, mask=mask, n_samples=n_samples)

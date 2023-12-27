@@ -16,9 +16,10 @@ from optuna.trial import FrozenTrial, Trial
 
 from ...callbacks.containers import TuningCallbackList
 from .containers import ModelEvaluationContainer, ScoreContainer
-from ....data.datasets import Mask, ProstateCancerDataset, Split
+from ....data.datasets import Mask, ProstateCancerDataset
 from ...hyperparameters.containers import HyperparameterDict
 from ....models.base.model import Model
+from ....models.torch import ModelConfig
 from .states import InnerLoopState, TrialState
 
 
@@ -28,6 +29,10 @@ class Objective(ABC):
     """
 
     DATASET_KEY = "dataset"
+    MODEL_INSTANCE_KEY = "model"
+    CONFIGS_KEY = "configs"
+    SEED_KEY = "seed"
+    TRAIN_METHOD_PARAMS_KEY = "train"
 
     def __init__(self) -> None:
         """
@@ -55,7 +60,8 @@ class Objective(ABC):
             callbacks: TuningCallbackList,
             dataset: ProstateCancerDataset,
             masks: Dict[int, Dict[str, List[int]]],
-            dataframes: Optional[Dict[int, pd.DataFrame]] = None
+            dataframes: Optional[Dict[int, pd.DataFrame]] = None,
+            model_configs: Optional[Dict[int, Dict[str, ModelConfig]]] = None
     ) -> List[float]:
         """
         Extracts hyperparameters suggested by optuna and executes the parallel inner loops.
@@ -72,6 +78,8 @@ class Objective(ABC):
             Dictionary of inner loops masks, i.e a dictionary with list of idx to use as train, valid and test masks.
         dataframes : Optional[Dict[int, pd.DataFrame]]
             Dictionary of dataframes to use for different inner splits.
+        model_configs : Optional[Dict[int, Dict[str, ModelConfig]]]
+            Dictionary of model configs to use for different inner splits.
 
         Returns
         -------
@@ -90,6 +98,10 @@ class Objective(ABC):
             self.inner_loop_state.idx = idx
 
             self._exec_inner_loop = self._build_inner_loop_runner()
+
+            if model_configs:
+                suggestion[self.TRAIN_METHOD_PARAMS_KEY][self.MODEL_INSTANCE_KEY][self.CONFIGS_KEY] = model_configs[idx]
+
             score = self._exec_inner_loop(callbacks=callbacks, suggestion=suggestion)
             scores.append(score)
 
@@ -131,7 +143,9 @@ class Objective(ABC):
             self,
             best_trial: FrozenTrial,
             dataset: ProstateCancerDataset,
-            path_to_save: str
+            path_to_save: str,
+            seed: int,
+            model_configs: Optional[Dict[str, ModelConfig]] = None,
     ) -> ModelEvaluationContainer:
         """
         Evaluates the best model.
@@ -144,6 +158,10 @@ class Objective(ABC):
             The dataset used for the current trial.
         path_to_save : str
             Path to save.
+        seed : int
+            Seed to use.
+        model_configs : Optional[Dict[str, ModelConfig]]
+            Model configs to use.
 
         Returns
         -------
@@ -151,6 +169,11 @@ class Objective(ABC):
             Model evaluation.
         """
         past_suggestion = self.hyperparameters.retrieve_past_suggestion(best_trial)
+        past_suggestion[self.TRAIN_METHOD_PARAMS_KEY][self.MODEL_INSTANCE_KEY][self.SEED_KEY] = seed
+
+        if model_configs:
+            past_suggestion[self.TRAIN_METHOD_PARAMS_KEY][self.MODEL_INSTANCE_KEY][self.CONFIGS_KEY] = model_configs
+
         hyperparameters = self.hyperparameters.build(past_suggestion)
         model_evaluation = self._test_hyperparameters(
             dataset=dataset,

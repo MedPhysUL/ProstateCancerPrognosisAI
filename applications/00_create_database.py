@@ -60,6 +60,7 @@ if __name__ == "__main__":
     # ----------------------------------------------------------------------------------------------------------- #
     patients_data_extractor = PatientsDataExtractor(
         path_to_patients_folder=LEARNING_SET_FOLDER_PATH,
+        tag="SeriesDescription",
         tag_values=SERIES_DESCRIPTIONS_PATH,
         transforms=transforms
     )

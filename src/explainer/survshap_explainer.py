@@ -8,7 +8,6 @@
     @Description:       This file contains a class used to analyse and explain how a model works using shapley values
     for survival tasks.
 """
-
 import os
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -25,6 +24,7 @@ from survshap.model_explanations.plot import (
 )
 import torch
 
+from applications.constants import *
 from ..data.datasets.prostate_cancer import FeaturesType, ProstateCancerDataset
 from ..models.base.model import Model
 from ..tasks.base import Task, TableTask
@@ -60,7 +60,7 @@ class DataFrameWrapper:
     def __init__(
             self,
             function,
-            dataset: ProstateCancerDataset,
+            features: List[str],
             task: SurvivalAnalysisTask,
     ) -> None:
         """
@@ -70,15 +70,14 @@ class DataFrameWrapper:
         ----------
         function
             The function with which to compute the cumulative hazard or survival functions.
-        dataset : ProstateCancerDataset
+        features : List[str]
             The dataset with which to compute the SurvSHAP values.
         task : SurvivalAnalysisTask
             The task for which to compute the SurvSHAP values.
         """
         self.function = function
-        self.dataset = dataset
         self.task = task
-        self.table_features_order = self.dataset.table_dataset.features_columns
+        self.table_features_order = features
 
     def _convert_data_frame_to_features_type(
             self,
@@ -138,7 +137,6 @@ class DataFrameWrapper:
         dataframe : pandas.DataFrame
             The converted FeaturesType.
         """
-        concatenated = torch.tensor([])
         array_list_to_cat = []
         for feature in self.table_features_order:
 
@@ -260,7 +258,8 @@ class TableSurvshapExplainer:
             self,
             model: Model,
             dataset: ProstateCancerDataset,
-            random_state: int = 11121
+            random_state: int = 11121,
+            mask: Optional[Tuple[int, int]] = None
     ) -> None:
         """
         Sets up the required attributes.
@@ -273,7 +272,13 @@ class TableSurvshapExplainer:
             The dataset to use to compute the SurvSHAP values.
         random_state : int
             A seed to set determinism. Defaults to 11121
+        mask : Optional[Tuple[int, int]]
+            A tuple of the first and last patients to limit the number of computational time required. Defaults to use
+            all patients which can be long.
         """
+        mpl.rc("axes", edgecolor="k")
+        mpl.rcParams["mathtext.fontset"] = "cm"
+        mpl.rcParams["font.family"] = "STIXGeneral"
         assert dataset.image_dataset is None and dataset.table_dataset is not None, (
             "SurvSHAP values require a table dataset and cannot be computed with a model that requires an image dataset"
         )
@@ -283,6 +288,7 @@ class TableSurvshapExplainer:
         self.feature_order = self.dataset.table_dataset.features_columns
         self.fitted = {}
         self.random_state = random_state
+        self.mask = mask
 
     @staticmethod
     def _get_structured_array(
@@ -295,9 +301,9 @@ class TableSurvshapExplainer:
         Parameters
         ----------
         event_indicator : np.ndarray
-            (N,) array with event indicator.
+            (N, ) array with event indicator.
         event_time : np.ndarray
-            (N,) array with event time.
+            (N, ) array with event time.
 
         Returns
         -------
@@ -342,15 +348,27 @@ class TableSurvshapExplainer:
                 to_numpy(self.dataset.table_dataset.y[task.name][:, 0]),
                 to_numpy(self.dataset.table_dataset.y[task.name][:, 1])
             )
+            if self.mask is not None:
+                y = y[self.mask[0]:self.mask[1]]
             data = pandas.DataFrame(to_numpy(self.dataset.table_dataset.x), columns=self.feature_order)
+            if self.mask is not None:
+                data = data.iloc[self.mask[0]:self.mask[1], :]
             if function == "chf":
-                wrapper = DataFrameWrapper(task.breslow_estimator.get_cumulative_hazard_function, self.dataset, task)
+                wrapper = DataFrameWrapper(
+                    task.breslow_estimator.get_cumulative_hazard_function,
+                    self.dataset.table_dataset.features_columns,
+                    task
+                )
                 explainer = survshap.SurvivalModelExplainer(model=self.model,
                                                             data=data,
                                                             y=y,
                                                             predict_cumulative_hazard_function=wrapper)
             elif function == "sf":
-                wrapper = DataFrameWrapper(task.breslow_estimator.get_survival_function, self.dataset, task)
+                wrapper = DataFrameWrapper(
+                    task.breslow_estimator.get_survival_function,
+                    self.dataset.table_dataset.features_columns,
+                    task
+                )
                 explainer = survshap.SurvivalModelExplainer(model=self.model,
                                                             data=data,
                                                             y=y,
@@ -370,7 +388,7 @@ class TableSurvshapExplainer:
 
     def plot_shap_lines_for_all_patients(
             self,
-            feature: Union[Dict[Tuple[str], List[int]], str],
+            features: Union[Dict[Tuple[str, ...], List[int]], str],
             function: str,
             show: bool = True,
             path_to_save_folder: Optional[str] = None,
@@ -385,10 +403,10 @@ class TableSurvshapExplainer:
 
         Parameters
         ----------
-        feature : Union[Dict[Tuple[str], List[int]], str]
+        features : Union[Dict[Tuple[str, ...], List[int]], str]
             A dictionary with keys being a tuple of desired features for a graph and values being a list of the indexes
             of the patients to put on the graph. The number of graphs will equal the number of keys in the dictionary.
-            E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
+            E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
             create two graphs. An empty list of patients indexes will graph all patients. If the original SurvSHAP(t)
             graphs are desired, simply input the chosen feature.
         function : str
@@ -401,8 +419,8 @@ class TableSurvshapExplainer:
         tasks : Optional[Union[Task, TaskList, List[Task]]]
             The tasks for which to plot the graphs. One graph will be created for each task.
         normalize : bool
-            Whether to normalize the values by dividing by the sum of the absolute values of all SurvSHAP(t) values for
-            a given feature at each timestamp. Defaults to False.
+            Whether to normalize the values by dividing by the sum of the absolute value of the SurvSHAP(t) values for
+            a given patient at each timestamp. Defaults to False.
         legend_length : int
             The number of patients to show in the legend, too many can clutter and hide the graph. Defaults to 5
         """
@@ -414,7 +432,7 @@ class TableSurvshapExplainer:
                 f"All tasks must be instances of 'TableTask'."
             )
 
-        if isinstance(feature, str):
+        if isinstance(features, str):
             for task in tasks:
                 explanation = self.compute_explanation(task=task, function=function)
                 model_plot_shap_lines_for_all_individuals(
@@ -422,21 +440,22 @@ class TableSurvshapExplainer:
                     timestamps=explanation.timestamps,
                     event_inds=explanation.event_ind,
                     event_times=explanation.event_times,
-                    variable=feature
+                    variable=features
                 )
         else:
             for task in tasks:
-                fig, arr = plt.subplots()
+                fig, arr = plt.subplots(figsize=(8, 6))
+
                 explanation = self.compute_explanation(task=task, function=function)
 
-                for features_list, patients in feature.items():
+                for features_list, patients in features.items():
                     patch_list = []
 
                     if len(patients) == 0:
                         patients = [i for i in range(len(explanation.individual_explanations))]
                     if normalize:
                         sum_of_values = {
-                            key: np.array([0 for _ in [explanation.timestamps]]) for key in self.feature_order
+                            key: np.array([0 for _ in [explanation.timestamps]]) for key in patients
                         }
 
                         for patient_index in patients:
@@ -444,12 +463,12 @@ class TableSurvshapExplainer:
 
                             for feature_name in features_list:
                                 y = [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
-                                sum_of_values[feature_name] = sum_of_values.get(feature_name) + np.abs(np.array(y))
+                                sum_of_values[patient_index] = sum_of_values.get(patient_index) + np.abs(np.array(y))
                     else:
                         sum_of_values = {
-                            key: np.array([1 for _ in [explanation.timestamps]]) for key in self.feature_order
+                            key: np.array([1 for _ in [explanation.timestamps]]) for key in patients
                         }
-                    colors = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(patients)))))
+                    colors = list(iter(BLUE_TO_SAND(np.linspace(0, 1, len(patients)))))
                     patient_ids_dict = self.dataset.table_dataset.row_idx_to_ids
 
                     for i, patient_index in enumerate(patients):
@@ -461,17 +480,18 @@ class TableSurvshapExplainer:
                         for feature_name in features_list:
                             y = np.array(
                                 [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
-                            )/sum_of_values[feature_name]
-                            arr.plot(x, y, color=colors[i])
+                            )/sum_of_values[patient_index]
+                            arr.plot(x, y, color=colors[i], linewidth=2)
 
                     normalize_name = "normalized" if normalize else "not_normalized"
-                    normalize_name_title = "normalized" if normalize else "not normalized"
-                    arr.set_xlabel(kwargs.get("xlabel", f"time"))
-                    arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
-                    arr.set_title(kwargs.get(
-                        "title", f"{task.target_column}: SHAP values by patient for {function}, {normalize_name_title}"
-                    ))
-                    arr.legend(handles=patch_list)
+                    arr.set_xlabel(kwargs.get("xlabel", "Time $($months$)$"), fontsize=18)
+                    arr.set_ylabel(kwargs.get("ylabel", "SHAP value"), fontsize=18)
+                    arr.legend(handles=patch_list, edgecolor="k", fontsize=16, handlelength=1.5, loc="upper right")
+                    arr.set_xlim(None, 190)
+                    arr.minorticks_on()
+                    arr.tick_params(axis="both", direction="in", color="k", which="major", labelsize=16, length=6)
+                    arr.tick_params(axis="both", direction="in", color="k", which="minor", labelsize=16, length=3)
+                    arr.grid(False)
 
                     if path_to_save_folder is not None:
                         path = os.path.join(
@@ -486,7 +506,7 @@ class TableSurvshapExplainer:
 
     def plot_shap_lines_for_features(
             self,
-            features: Union[List[str], Dict[Tuple[str], List[int]]],
+            features: Union[List[str], Dict[Tuple[str, ...], List[int]]],
             function: str,
             show: bool = True,
             path_to_save_folder: Optional[str] = None,
@@ -500,10 +520,10 @@ class TableSurvshapExplainer:
 
         Parameters
         ----------
-        features : Union[List[str], Dict[Tuple[str], List[int]]]
+        features : Union[List[str], Dict[Tuple[str, ...], List[int]]]
             A dictionary with keys being a tuple of desired features for a graph and values being a list of the indexes
             of the patients to put on the graph. The number of graphs will equal the number of keys in the dictionary.
-            E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
+            E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
             create two graphs. An empty list of patients indexes will graph all patients. If the original SurvSHAP(t)
             graphs are desired, simply input a list of the chosen features.
         function : str
@@ -519,8 +539,8 @@ class TableSurvshapExplainer:
             If transforming a feature into a discretized state is desired, then it is the Tuple of the number of bins
             and a list of the features to discretize.
         normalize : bool
-            Whether to normalize the values by dividing by the sum of the absolute values of all SurvSHAP(t) values for
-            a given feature at each timestamp. Defaults to False.
+            Whether to normalize the values by dividing by the sum of the absolute value of the SurvSHAP(t) values for
+            a given patient at each timestamp. Defaults to False.
         """
         if tasks is None:
             tasks = self.dataset.tasks.survival_analysis_tasks
@@ -538,12 +558,12 @@ class TableSurvshapExplainer:
 
         if isinstance(features, list):
             for task in tasks:
-                explainer = self.compute_explanation(task=task, function=function)
+                explanation = self.compute_explanation(task=task, function=function)
                 model_plot_shap_lines_for_variables(
-                    full_result=explainer.full_result,
-                    timestamps=explainer.timestamps,
-                    event_inds=explainer.event_ind,
-                    event_times=explainer.event_times,
+                    full_result=explanation.full_result,
+                    timestamps=explanation.timestamps,
+                    event_inds=explanation.event_ind,
+                    event_times=explanation.event_times,
                     variables=features,
                     to_discretize=discretize[1],
                     discretization_method=method,
@@ -552,12 +572,15 @@ class TableSurvshapExplainer:
                 )
         else:
             for task in tasks:
-                fig, arr = plt.subplots()
+                fig, arr = plt.subplots(figsize=(8, 6))
+
                 explanation = self.compute_explanation(task=task, function=function)
-                cmap = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(self.feature_order)))))
-                color_dict = {feature: cmap[i] for i, feature in enumerate(self.feature_order)}
+                # cmap = list(iter(BLUE_TO_SAND(np.linspace(0, 1, len(features.keys())))))
+                # color_dict = {feature: cmap[i] for i, feature in enumerate(list(features.keys()))}
 
                 for features_list, patients in features.items():
+                    cmap = list(iter(BLUE_TO_SAND(np.linspace(0, 1, len(features_list)))))
+                    color_dict = {feature: cmap[i] for i, feature in enumerate(features_list)}
                     patch_list = []
 
                     if len(patients) == 0:
@@ -565,7 +588,7 @@ class TableSurvshapExplainer:
 
                     if normalize:
                         sum_of_values = {
-                            key: np.array([0 for _ in [explanation.timestamps]]) for key in self.feature_order
+                            key: np.array([0 for _ in [explanation.timestamps]]) for key in patients
                         }
 
                         for patient_index in patients:
@@ -573,10 +596,10 @@ class TableSurvshapExplainer:
 
                             for feature_name in features_list:
                                 y = [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
-                                sum_of_values[feature_name] = sum_of_values.get(feature_name) + np.abs(np.array(y))
+                                sum_of_values[patient_index] = sum_of_values.get(patient_index) + np.abs(np.array(y))
                     else:
                         sum_of_values = {
-                            key: np.array([1 for _ in [explanation.timestamps]]) for key in self.feature_order
+                            key: np.array([1 for _ in [explanation.timestamps]]) for key in patients
                         }
 
                     for patient_index in patients:
@@ -586,20 +609,48 @@ class TableSurvshapExplainer:
                         for feature_name in features_list:
                             y = np.array(
                                 [k for k in exp.result.loc[self.feature_order.index(feature_name), :].iloc[6:]]
-                            )/sum_of_values[feature_name]
-                            arr.plot(x, y, color=color_dict[feature_name])
+                            )/sum_of_values[patient_index]
+                            if feature_name in PN_TASK_FEATURES:
+                                if task.name == PN_TASK.name:
+                                    arr.plot(x, y, color=LEGEND_DATA[feature_name][1], linewidth=2, linestyle='dashed')
+                            elif feature_name in BCR_TASK_FEATURES:
+                                if task.name == BCR_TASK.name:
+                                    arr.plot(x, y, color=LEGEND_DATA[feature_name][1], linewidth=2, linestyle='dashed')
+                            else:
+                                arr.plot(x, y, color=LEGEND_DATA[feature_name][1], linewidth=2)
 
                     for feature_name in features_list:
-                        patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
+                        if feature_name in PN_TASK_FEATURES:
+                            if task.name == PN_TASK.name:
+                                patch_list += [mpl.patches.Patch(
+                                    color=LEGEND_DATA[feature_name][1],
+                                    label=LEGEND_DATA[feature_name][0],
+                                    linestyle="--"
+                                )]
+                        elif feature_name in BCR_TASK_FEATURES:
+                            if task.name == BCR_TASK.name:
+                                patch_list += [mpl.patches.Patch(
+                                    color=LEGEND_DATA[feature_name][1],
+                                    label=LEGEND_DATA[feature_name][0],
+                                    linestyle="--"
+                                )]
+                        else:
+                            patch_list += [mpl.patches.Patch(
+                                color=LEGEND_DATA[feature_name][1],
+                                label=LEGEND_DATA[feature_name][0],
+                                linestyle="-"
+                            )]
 
                     normalize_name = "normalized" if normalize else "not_normalized"
-                    normalize_name_title = "normalized" if normalize else "not normalized"
-                    arr.set_xlabel(kwargs.get("xlabel", f"time"))
-                    arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
-                    arr.set_title(kwargs.get(
-                        "title", f"{task.target_column}: SHAP values by feature for {function}, {normalize_name_title}"
-                    ))
-                    arr.legend(handles=patch_list)
+                    arr.set_xlabel(kwargs.get("xlabel", "Time $($months$)$"), fontsize=18)
+                    arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"), fontsize=18)
+                    arr.legend(handles=patch_list, edgecolor="k", fontsize=13, handlelength=1.5, loc="upper right")
+                    arr.set_xlim(None, 190)
+                    arr.minorticks_on()
+                    arr.tick_params(axis="both", direction="in", color="k", which="major", labelsize=16, length=6)
+                    arr.tick_params(axis="both", direction="in", color="k", which="minor", labelsize=16, length=3)
+                    arr.grid(False)
+                    arr.set_xlim(None, 190)
 
                     if path_to_save_folder is not None:
                         path = os.path.join(
@@ -614,11 +665,12 @@ class TableSurvshapExplainer:
 
     def plot_shap_average_of_absolute_value(
             self,
-            features: Union[List[str], Dict[Tuple[str], List[int]]],
+            features: Union[List[str], Dict[Tuple[str, ...], List[int]]],
             function: str,
             tasks: Optional[Union[Task, TaskList, List[Task]]],
             show: bool = True,
             path_to_save_folder: Optional[str] = None,
+            normalize: bool = False,
             **kwargs
 
     ) -> None:
@@ -627,10 +679,10 @@ class TableSurvshapExplainer:
 
         Parameters
         ----------
-        features : List[str]
+        features : Union[List[str], Dict[Tuple[str, ...], List[int]]]
             A dictionary with keys being a tuple of desired features for a graph and values being a list of the indexes
             of the patients to put on the graph. The number of graphs will equal the number of keys in the dictionary.
-            E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
+            E.g. {["PSA", "AGE"]: [0, 1, 2, 3, 4], ["GLEASON_GLOBAL", "GLEASON_SECONDARY"]: [5, 6, 7, 8, 9]} would
             create two graphs. An empty list of patients indexes will graph all patients. If the original SurvSHAP(t)
             graphs are desired, simply input a list of the chosen features.
         function : str
@@ -642,6 +694,9 @@ class TableSurvshapExplainer:
             Whether to show the graph. Defaults to True.
         path_to_save_folder : Optional[str],
             Whether to save the graph, if so, then this value is the path to the save folder.
+        normalize : bool
+            Whether to normalize the values by dividing by the sum of the absolute value of the SurvSHAP(t) values for
+            a given patient at each timestamp. Defaults to False.
         """
         if tasks is None:
             tasks = self.dataset.tasks.survival_analysis_tasks
@@ -653,24 +708,28 @@ class TableSurvshapExplainer:
 
         if isinstance(features, list):
             for task in tasks:
-                explainer = self.compute_explanation(task=task, function=function)
+                explanation = self.compute_explanation(task=task, function=function)
                 model_plot_mean_abs_shap_values(
-                    result=explainer.result,
-                    timestamps=explainer.timestamps,
-                    event_inds=explainer.event_ind,
-                    event_times=explainer.event_times,
+                    result=explanation.result,
+                    timestamps=explanation.timestamps,
+                    event_inds=explanation.event_ind,
+                    event_times=explanation.event_times,
                     variables=features
                 )
         else:
             for task in tasks:
-                fig, arr = plt.subplots()
+                fig, arr = plt.subplots(figsize=(8, 6))
+
                 explanation = self.compute_explanation(task=task, function=function)
-                cmap = list(iter(plt.cm.rainbow(np.linspace(0, 1, len(self.feature_order)))))
-                color_dict = {feature: cmap[i] for i, feature in enumerate(self.feature_order)}
+                # cmap = list(iter(BLUE_TO_SAND(np.linspace(0, 1, len(features.keys())))))
+                # color_dict = {feature: cmap[i] for i, feature in enumerate(list(features.keys()))}
 
                 for features_list, patients in features.items():
+                    cmap = list(iter(BLUE_TO_SAND(np.linspace(0, 1, len(features_list)))))
+                    color_dict = {feature: cmap[i] for i, feature in enumerate(features_list)}
                     if len(patients) == 0:
                         patients = [i for i in range(len(explanation.individual_explanations))]
+
                     sum_of_values = {key: np.array([0 for _ in [explanation.timestamps]]) for key in self.feature_order}
 
                     for patient_index in patients:
@@ -681,18 +740,46 @@ class TableSurvshapExplainer:
                             sum_of_values[feature_name] = sum_of_values.get(feature_name) + np.abs(np.array(y))
                     patch_list = []
 
+                    if normalize:
+                        sum_of_averages = np.array([0 for _ in [explanation.timestamps]])
+                        for feature_name in features_list:
+                            sum_of_averages = sum_of_averages + sum_of_values[feature_name]/(len(patients))
+                    else:
+                        sum_of_averages = np.array([1 for _ in [explanation.timestamps]])
+
                     for feature_name in features_list:
-                        average_values = sum_of_values[feature_name]/(len(patients))
+                        average_values = sum_of_values[feature_name]/(len(patients))/sum_of_averages
 
-                        arr.plot(explanation.timestamps, average_values, color=color_dict[feature_name])
-                        patch_list += [mpl.patches.Patch(color=color_dict[feature_name], label=feature_name)]
+                        arr.plot(explanation.timestamps, average_values, color=color_dict[feature_name], linewidth=2)
+                        if feature_name in PN_TASK_FEATURES:
+                            if task.name == PN_TASK.name:
+                                patch_list += [mpl.patches.Patch(
+                                    color=LEGEND_DATA[feature_name][1],
+                                    label=LEGEND_DATA[feature_name][0],
+                                    linestyle="--"
+                                )]
+                        elif feature_name in BCR_TASK_FEATURES:
+                            if task.name == BCR_TASK.name:
+                                patch_list += [mpl.patches.Patch(
+                                    color=LEGEND_DATA[feature_name][1],
+                                    label=LEGEND_DATA[feature_name][0],
+                                    linestyle="--"
+                                )]
+                        else:
+                            patch_list += [mpl.patches.Patch(
+                                color=LEGEND_DATA[feature_name][1],
+                                label=LEGEND_DATA[feature_name][0],
+                                linestyle="-"
+                            )]
 
-                    arr.set_xlabel(kwargs.get("xlabel", f"time"))
-                    arr.set_ylabel(kwargs.get("ylabel", f"SHAP value"))
-                    arr.set_title(kwargs.get(
-                        "title", f"{task.target_column}: Average of absolute value of SHAP values for {function}"
-                    ))
-                    arr.legend(handles=patch_list)
+                    arr.set_xlabel(kwargs.get("xlabel", "Time $($months$)$"), fontsize=18)
+                    arr.set_ylabel(kwargs.get("ylabel", "SHAP value"), fontsize=18)
+                    arr.legend(handles=patch_list, edgecolor="k", fontsize=13, handlelength=1.5, loc="upper right")
+                    arr.set_xlim(None, 190)
+                    arr.minorticks_on()
+                    arr.tick_params(axis="both", direction="in", color="k", which="major", labelsize=16, length=6)
+                    arr.tick_params(axis="both", direction="in", color="k", which="minor", labelsize=16, length=3)
+                    arr.grid(False)
 
                     if path_to_save_folder is not None:
                         path = os.path.join(

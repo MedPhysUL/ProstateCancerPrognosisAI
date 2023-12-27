@@ -35,8 +35,7 @@ class SegmentationTask(Task):
                 ]
             ] = None,
             hps_tuning_metric: Optional[SegmentationMetric] = None,
-            name: Optional[str] = None,
-            temperature: float = 1e-7
+            name: Optional[str] = None
     ):
         """
         Sets protected attributes.
@@ -63,8 +62,6 @@ class SegmentationTask(Task):
             A metric used for Optuna hyperparameters optimization.
         name : Optional[str]
             The name of the task.
-        temperature : float
-            The coefficient by which the KL divergence is multiplied when the loss is being computed.
         """
         default_name = f"{self.__class__.__name__}('modality'={repr(modality)}, 'organ'={repr(organ)})"
         name = name if name else default_name
@@ -74,8 +71,7 @@ class SegmentationTask(Task):
             name=name,
             criterion=criterion,
             early_stopping_metric=early_stopping_metric,
-            evaluation_metrics=evaluation_metrics,
-            temperature=temperature
+            evaluation_metrics=evaluation_metrics
         )
         self._validate_metrics_type(type_=SegmentationMetric)
         self._validate_criterion_type(type_=SegmentationLoss)

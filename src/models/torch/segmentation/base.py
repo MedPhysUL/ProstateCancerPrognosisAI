@@ -32,7 +32,8 @@ class Segmentor(TorchModel, ABC):
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None,
-            bayesian: bool = False
+            bayesian: bool = False,
+            temperature: Optional[Dict[str, float]] = None
     ):
         """
         Initializes the model.
@@ -47,13 +48,19 @@ class Segmentor(TorchModel, ABC):
             The name of the model.
         seed : Optional[int]
             Random state used for reproducibility.
+        bayesian : bool
+            Whether to use a bayesian model or not.
+        temperature : Optional[Dict[str, float]]
+            Dictionary containing the temperature for each tasks. The temperature is the coefficient by which the KL
+            divergence is multiplied when the loss is being computed. Keys are the task names and values are the
+            temperature for each task.
         """
-        super().__init__(device=device, name=name, seed=seed, bayesian=bayesian)
+        super().__init__(device=device, name=name, seed=seed, bayesian=bayesian, temperature=temperature)
 
         self.image_keys = [image_keys] if isinstance(image_keys, str) else image_keys
         self.segmentor: Optional[Module] = None
 
-        self.kl_divergence: Optional[Dict[str, Tensor]] = None
+        self._kl_divergence: Optional[Dict[str, Tensor]] = None
 
     @abstractmethod
     def _build_segmentor(self, dataset: ProstateCancerDataset) -> Module:
@@ -111,7 +118,7 @@ class Segmentor(TorchModel, ABC):
             y, kl = self.segmentor(cat([features.image[k] for k in self.image_keys], 1))
 
             kl_divergence = {task.name: kl for task in self._tasks.segmentation_tasks}
-            self.kl_divergence = kl_divergence
+            self._kl_divergence = kl_divergence
 
         else:
             y = self.segmentor(cat([features.image[k] for k in self.image_keys], 1))

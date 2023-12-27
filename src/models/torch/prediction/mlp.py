@@ -9,7 +9,6 @@
 """
 
 from __future__ import annotations
-from ast import literal_eval
 from typing import Dict, Mapping, Optional, Sequence, Tuple, Union
 
 from torch import device as torch_device
@@ -30,7 +29,8 @@ class MLP(Predictor):
             self,
             features_columns: Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]] = None,
             multi_task_mode: Union[str, MultiTaskMode] = MultiTaskMode.FULLY_SHARED,
-            hidden_channels: Union[str, Sequence[int]] = (25, 25, 25),
+            n_layers: int = 3,
+            n_neurons: int = 10,
             activation: Union[Tuple, str] = "PRELU",
             dropout: Union[Tuple, str, float] = 0.0,
             bias: bool = True,
@@ -38,7 +38,13 @@ class MLP(Predictor):
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None,
-            bayesian: bool = False
+            bayesian: bool = False,
+            temperature: Optional[Dict[str, float]] = None,
+            prior_mean: float = 0.0,
+            prior_variance: float = 0.1,
+            posterior_mu_init: float = 0.0,
+            posterior_rho_init: float = -3.0,
+            standard_deviation: float = 0.1
     ):
         """
         Initializes the model.
@@ -46,14 +52,16 @@ class MLP(Predictor):
         Parameters
         ----------
         features_columns : Optional[Union[str, Sequence[str], Mapping[str, Sequence[str]]]]
-            The names of the features columns. If a mapping is provided, the keys must be the target columns associated
-            to the task.
+            The names of the features columns. If a mapping is provided, the keys must be the task names and the values
+            must be the features columns for each task. If None, all columns are used as features.
         multi_task_mode : Union[str, MultiTaskMode]
             Available modes are 'separated' or 'fully_shared'. If 'separated', a separate extractor model is used for
             each task. If 'fully_shared', a fully shared extractor model is used. All layers are shared between the
             tasks.
-        hidden_channels : Union[str, Sequence[int]]
-            List with number of units in each hidden layer. Defaults to (25, 25, 25).
+        n_layers : int
+            Number of layers. Defaults to 3.
+        n_neurons : int
+            Number of neurons per layer. Defaults to 10.
         activation : Union[Tuple, str]
             Activation function. Defaults to "PRELU".
         dropout : Union[Tuple, str, float]
@@ -70,6 +78,22 @@ class MLP(Predictor):
             Random state used for reproducibility. Defaults to None.
         bayesian : bool
             Whether the model should implement variational inference.
+        temperature : Optional[Dict[str, float]]
+            Dictionary containing the temperature for each tasks. The temperature is the coefficient by which the KL
+            divergence is multiplied when the loss is being computed. Keys are the task names and values are the
+            temperature for each task.
+        prior_mean : float
+            Mean of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
+        prior_variance : float
+            Prior variance used to calculate KL divergence.
+        posterior_mu_init : float
+            Initial value of the trainable mu parameter representing the mean of the Gaussian approximate of the
+            posterior distribution.
+        posterior_rho_init : float
+            Rho parameter for reparametrization for the initial posterior distribution.
+        standard_deviation : float
+            Standard deviation of the gaussian distribution used to sample the initial posterior mu and initial
+            posterior rho for the gaussian distribution from which the initial weights are sampled.
         """
         super().__init__(
             features_columns=features_columns,
@@ -77,14 +101,21 @@ class MLP(Predictor):
             device=device,
             name=name,
             seed=seed,
-            bayesian=bayesian
+            bayesian=bayesian,
+            temperature=temperature
         )
 
-        self.hidden_channels = literal_eval(hidden_channels) if isinstance(hidden_channels, str) else hidden_channels
+        self.hidden_channels = [n_neurons] * n_layers
         self.activation = activation
         self.dropout = dropout
         self.bias = bias
         self.adn_ordering = adn_ordering
+
+        self.prior_mean = prior_mean
+        self.prior_variance = prior_variance
+        self.posterior_mu_init = posterior_mu_init
+        self.posterior_rho_init = posterior_rho_init
+        self.standard_deviation = standard_deviation
 
         self.predictor = None
 
@@ -116,7 +147,12 @@ class MLP(Predictor):
                 dropout=self.dropout,
                 act=self.activation,
                 bias=self.bias,
-                adn_ordering=self.adn_ordering
+                adn_ordering=self.adn_ordering,
+                prior_mean=self.prior_mean,
+                prior_variance=self.prior_variance,
+                posterior_mu_init=self.posterior_mu_init,
+                posterior_rho_init=self.posterior_rho_init,
+                standard_deviation=self.standard_deviation
             )
         else:
             fcn = FullyConnectedNet(
@@ -131,14 +167,14 @@ class MLP(Predictor):
 
         return DataParallel(fcn).to(self.device)
 
-    def _get_in_channels(self, target_column: str) -> int:
+    def _get_in_channels(self, task_name: str) -> int:
         """
         Returns the number of input channels.
 
         Parameters
         ----------
-        target_column : str
-            The target column.
+        task_name : str
+            The task name.
 
         Returns
         -------
@@ -146,7 +182,7 @@ class MLP(Predictor):
             The number of input channels.
         """
         if isinstance(self.features_columns, Mapping):
-            return len(self.features_columns[target_column])
+            return len(self.features_columns[task_name])
         else:
             return len(self.features_columns)
 
@@ -168,7 +204,7 @@ class MLP(Predictor):
             predictor = ModuleDict()
             for task in self._tasks.table_tasks:
                 predictor[task.name] = self._build_single_predictor(
-                    in_channels=self._get_in_channels(task.target_column),
+                    in_channels=self._get_in_channels(task.name),
                     out_channels=1
                 )
             return predictor
@@ -179,7 +215,11 @@ class MLP(Predictor):
                 out_channels=len(self._tasks.table_tasks)
             )
 
-    def _get_prediction(self, table_data: Union[Tensor, Dict[str, Tensor]]) -> Union[Dict[str, Tensor], tuple]:
+    def _get_prediction(
+            self,
+            table_data: Union[Tensor, Dict[str, Tensor]],
+            ids: Tuple[str]
+    ) -> Union[Dict[str, Tensor], tuple]:
         """
         Returns the prediction.
 
@@ -187,6 +227,8 @@ class MLP(Predictor):
         ----------
         table_data : Union[Tensor, Dict[str, Tensor]]
             The table data.
+        ids : Tuple[str]
+            The patient IDs.
 
         Returns
         -------

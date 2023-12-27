@@ -18,6 +18,7 @@ from .callbacks import TuningRecorder
 from .callbacks.base import TuningCallback
 from .callbacks.containers import TuningCallbackList
 from ..data.datasets import Mask, ProstateCancerDataset, Split
+from ..models.torch import ModelConfig
 from .search_algorithm import Objective, SearchAlgorithm
 from .states import BestModelState, OuterLoopState, StudyState, TuningState
 
@@ -127,7 +128,10 @@ class Tuner:
             objective: Objective,
             dataset: ProstateCancerDataset,
             masks: Dict[int, Dict[str, Union[List[int], Dict[int, Dict[str, List[int]]]]]],
-            dataframes: Optional[Dict[int, Dict[str, Union[pd.DataFrame, Dict[int, pd.DataFrame]]]]] = None
+            dataframes: Optional[Dict[int, Dict[str, Union[pd.DataFrame, Dict[int, pd.DataFrame]]]]] = None,
+            model_configs: Optional[
+                Dict[int, Dict[str, Union[Dict[str, ModelConfig], Dict[int, Dict[str, ModelConfig]]]]]
+            ] = None
     ) -> None:
         """
         Performs nested subsampling validations to evaluate a model and tune the hyperparameters.
@@ -142,6 +146,8 @@ class Tuner:
             Dict with list of idx to use as train, valid and test masks.
         dataframes : Optional[Dict[int, Dict[str, Union[pd.DataFrame, Dict[int, pd.DataFrame]]]]]
             Dictionary with dataframes to use for different splits.
+        model_configs : Optional[Dict[int, Dict[str, Union[Dict[str, ModelConfig], Dict[int, Dict[str, ModelConfig]]]]]]
+            Dictionary with model configs to use for different splits.
         """
         assert len(dataset.tunable_tasks) > 0, (
             "No tunable task found in the dataset. A tunable task is a task with a `hps_tuning_metric` attribute. "
@@ -158,10 +164,19 @@ class Tuner:
             self.outer_loop_state.dataset = dataset
 
             self.callbacks.on_outer_loop_start(self)
-            self._exec_study(dataset, mask[Mask.INNER], objective, dataframes[idx][Split.INNER] if dataframes else None)
-            self._update_dataset(dataset, mask, dataframes[idx][Split.OUTER] if dataframes else None)
+            inner_dataframes = dataframes[idx][Split.INNER] if dataframes else None
+            inner_model_configs = model_configs[idx][Split.INNER] if model_configs else None
+            self._exec_study(dataset, mask[Mask.INNER], objective, inner_dataframes, inner_model_configs)
 
-            self._exec_best_model_evaluation(dataset, objective)
+            self._update_dataset(dataset, mask, dataframes[idx][Split.OUTER] if dataframes else None)
+            self._exec_best_model_evaluation(
+                dataset=dataset,
+                objective=objective,
+                model_configs=model_configs[idx][Split.OUTER] if model_configs else None
+            )
+            self._exec_inner_loops_best_models_evaluation(
+                dataset, mask[Mask.INNER], objective, inner_dataframes, inner_model_configs
+            )
             self.callbacks.on_outer_loop_end(self)
 
         self.callbacks.on_tuning_end(self)
@@ -194,7 +209,8 @@ class Tuner:
             dataset: ProstateCancerDataset,
             inner_masks: Dict[int, Dict[str, List[int]]],
             objective: Objective,
-            inner_dataframes: Optional[Dict[int, pd.DataFrame]] = None
+            inner_dataframes: Optional[Dict[int, pd.DataFrame]] = None,
+            inner_model_configs: Optional[Dict[int, Dict[str, ModelConfig]]] = None
     ):
         """
         Executes a single study.
@@ -209,6 +225,8 @@ class Tuner:
             The objective.
         inner_dataframes : Optional[Dict[int, pd.DataFrame]]
             Dictionary of dataframes to use for different inner splits.
+        inner_model_configs : Optional[Dict[int, Dict[str, ModelConfig]]]
+            Dictionary of model configs to use for different inner splits.
         """
         self.callbacks.on_study_start(self)
 
@@ -219,6 +237,7 @@ class Tuner:
             dataset=dataset,
             callbacks=self.callbacks,
             dataframes=inner_dataframes,
+            model_configs=inner_model_configs,
             study_name=f"{self.SPLIT_PREFIX}_{self.outer_loop_state.idx}",
             verbose=self.verbose
         )
@@ -226,10 +245,44 @@ class Tuner:
         self.study_state.best_trial = self._get_best_trial()
         self.callbacks.on_study_end(self)
 
+    def _exec_inner_loops_best_models_evaluation(
+            self,
+            dataset: ProstateCancerDataset,
+            masks: Dict[int, Dict[str, List[int]]],
+            objective: Objective,
+            dataframes: Optional[Dict[int, pd.DataFrame]] = None,
+            model_configs: Optional[Dict[int, Dict[str, ModelConfig]]] = None
+    ):
+        """
+        Executes the evaluation of the best models of the inner loops.
+
+        Parameters
+        ----------
+        dataset : ProstateCancerDataset
+            The dataset used for the current trial.
+        masks : Dict[int, Dict[str, List[int]]]
+            Dictionary of inner loops masks, i.e a dictionary with list of idx to use as train, valid and test masks.
+        objective : Objective
+            The objective.
+        dataframes : Optional[Dict[int, pd.DataFrame]]
+            Dictionary of dataframes to use for different inner splits.
+        model_configs : Optional[Dict[int, Dict[str, ModelConfig]]]
+            Dictionary of model configs to use for different inner splits.
+        """
+        if self.recorder.save_inner_splits_best_models:
+            for idx, mask in masks.items():
+                self._update_dataset(dataset=dataset, mask=mask, dataframe=dataframes[idx] if dataframes else None)
+
+                configs = model_configs[idx] if model_configs else None
+                self._exec_best_model_evaluation(dataset, objective, False, idx, configs)
+
     def _exec_best_model_evaluation(
             self,
             dataset: ProstateCancerDataset,
-            objective: Objective
+            objective: Objective,
+            outer: bool = True,
+            idx: Optional[int] = None,
+            model_configs: Optional[Dict[str, ModelConfig]] = None
     ):
         """
         Executes the evaluation of the model using the best trial hyperparameters.
@@ -240,17 +293,25 @@ class Tuner:
             The dataset used for the current trial.
         objective : Objective
             The objective.
+        outer : bool
+            Whether the evaluation is performed on the outer loop or not.
+        idx : Optional[int]
+            The index of the INNER loop. None if outer is True.
+        model_configs : Optional[Dict[str, ModelConfig]]
+            Dictionary of model configs to use for different tasks.
         """
-        self.callbacks.on_best_model_evaluation_start(self)
+        self.callbacks.on_best_model_evaluation_start(self, outer=outer, idx=idx)
 
         model_evaluation = objective.exec_best_model_evaluation(
             best_trial=self.study_state.best_trial,
             dataset=dataset,
-            path_to_save=self.best_model_state.path_to_best_model_folder
+            model_configs=model_configs,
+            path_to_save=self.best_model_state.path_to_current_model_folder,
+            seed=self.seed
         )
         self.best_model_state.score = model_evaluation.score
         self.best_model_state.model = model_evaluation.trained_model
-        self.callbacks.on_best_model_evaluation_end(self)
+        self.callbacks.on_best_model_evaluation_end(self, outer=outer, idx=idx)
 
     def _set_seed(self):
         """

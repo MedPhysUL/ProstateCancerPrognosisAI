@@ -38,8 +38,7 @@ class SurvivalAnalysisTask(TableTask):
                 ]
             ] = None,
             hps_tuning_metric: Optional[SurvivalAnalysisMetric] = None,
-            name: Optional[str] = None,
-            temperature: float = 1e-7
+            name: Optional[str] = None
     ):
         """
         Sets protected attributes.
@@ -66,8 +65,6 @@ class SurvivalAnalysisTask(TableTask):
             A metric used for Optuna hyperparameters optimization.
         name : Optional[str]
             The name of the task.
-        temperature : float
-            The coefficient by which the KL divergence is multiplied when the loss is being computed.
         """
         name = name if name else f"{self.__class__.__name__}('event_indicator_column'={repr(event_indicator_column)})"
 
@@ -77,8 +74,7 @@ class SurvivalAnalysisTask(TableTask):
             target_column=event_indicator_column,
             criterion=criterion,
             early_stopping_metric=early_stopping_metric,
-            evaluation_metrics=evaluation_metrics,
-            temperature=temperature
+            evaluation_metrics=evaluation_metrics
         )
 
         self._breslow_estimator = BreslowEstimator()

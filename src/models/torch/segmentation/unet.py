@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 from ast import literal_eval
-from typing import Optional, Sequence, Union
+from typing import Dict, Optional, Sequence, Union
 
 from torch import device as torch_device
 from torch import cat, stack, sum, Tensor
@@ -40,7 +40,12 @@ class _UNet(Module):
             dropout: float,
             bias: bool,
             adn_ordering: str,
-            bayesian: bool
+            bayesian: bool,
+            prior_mean: float = 0.0,
+            prior_variance: float = 0.1,
+            posterior_mu_init: float = 0.0,
+            posterior_rho_init: float = -3.0,
+            standard_deviation: float = 0.1
     ):
         """
         Initializes the UNet.
@@ -74,6 +79,18 @@ class _UNet(Module):
             Order of operations in ADN layer.
         bayesian : bool
             Whether the model implements variational inference.
+        prior_mean : float
+            Mean of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
+        prior_variance : float
+            Prior variance used to calculate KL divergence.
+        posterior_mu_init : float
+            Initial value of the trainable mu parameter representing the mean of the Gaussian approximate of the
+            posterior distribution.
+        posterior_rho_init : float
+            Rho parameter for reparametrization for the initial posterior distribution.
+        standard_deviation : float
+            Standard deviation of the gaussian distribution used to sample the initial posterior mu and initial
+            posterior rho for the gaussian distribution from which the initial weights are sampled.
         """
         super().__init__()
 
@@ -91,6 +108,14 @@ class _UNet(Module):
         self.adn_ordering = adn_ordering
 
         self.bayesian = bayesian
+        self.prior_mean = prior_mean
+        self.prior_variance = prior_variance
+        self.posterior_mu_init = posterior_mu_init
+        self.posterior_rho_init = posterior_rho_init
+        self.standard_deviation = standard_deviation
+
+        self.encoders = self._get_encoder_path()
+        self.decoders = self._get_decoder_path()
 
     def _get_encoder_path(self) -> ModuleDict:
         """
@@ -114,7 +139,12 @@ class _UNet(Module):
                     stride=1 if i == len(self.channels) - 1 else self.strides[i],   # No downsizing in bottom layer.
                     act=self.act,
                     norm=self.norm,
-                    dropout=self.dropout
+                    dropout=self.dropout,
+                    prior_mean=self.prior_mean,
+                    prior_variance=self.prior_variance,
+                    posterior_mu_init=self.posterior_mu_init,
+                    posterior_rho_init=self.posterior_rho_init,
+                    standard_deviation=self.standard_deviation
                 )
             else:
                 conv = EncoderBlock(
@@ -159,7 +189,12 @@ class _UNet(Module):
                         act=self.act,
                         norm=self.norm,
                         dropout=self.dropout,
-                        is_top=True if i == 0 else False
+                        is_top=True if i == 0 else False,
+                        prior_mean=self.prior_mean,
+                        prior_variance=self.prior_variance,
+                        posterior_mu_init=self.posterior_mu_init,
+                        posterior_rho_init=self.posterior_rho_init,
+                        standard_deviation=self.standard_deviation
                     )
                 else:
                     up_conv = DecoderBlock(
@@ -276,7 +311,13 @@ class Unet(Segmentor):
             device: Optional[torch_device] = None,
             name: Optional[str] = None,
             seed: Optional[int] = None,
-            bayesian: bool = False
+            bayesian: bool = False,
+            temperature: Optional[Dict[str, float]] = None,
+            prior_mean: float = 0.0,
+            prior_variance: float = 0.1,
+            posterior_mu_init: float = 0.0,
+            posterior_rho_init: float = -3.0,
+            standard_deviation: float = 0.1
     ):
         """
         Initializes the model.
@@ -313,13 +354,30 @@ class Unet(Segmentor):
             Random state used for reproducibility.
         bayesian : bool
             Whether the model implements variational inference.
+        temperature : Optional[Dict[str, float]]
+            Dictionary containing the temperature for each tasks. The temperature is the coefficient by which the KL
+            divergence is multiplied when the loss is being computed. Keys are the task names and values are the
+            temperature for each task.
+        prior_mean : float
+            Mean of the prior arbitrary Gaussian distribution to be used to calculate the KL divergence.
+        prior_variance : float
+            Prior variance used to calculate KL divergence.
+        posterior_mu_init : float
+            Initial value of the trainable mu parameter representing the mean of the Gaussian approximate of the
+            posterior distribution.
+        posterior_rho_init : float
+            Rho parameter for reparametrization for the initial posterior distribution.
+        standard_deviation : float
+            Standard deviation of the gaussian distribution used to sample the initial posterior mu and initial
+            posterior rho for the gaussian distribution from which the initial weights are sampled.
         """
         super().__init__(
             image_keys=image_keys,
             device=device,
             name=name,
             seed=seed,
-            bayesian=bayesian
+            bayesian=bayesian,
+            temperature=temperature
         )
 
         self.channels = literal_eval(channels) if isinstance(channels, str) else channels
@@ -332,6 +390,12 @@ class Unet(Segmentor):
         self.dropout = dropout
         self.bias = bias
         self.adn_ordering = adn_ordering
+
+        self.prior_mean = prior_mean
+        self.prior_variance = prior_variance
+        self.posterior_mu_init = posterior_mu_init
+        self.posterior_rho_init = posterior_rho_init
+        self.standard_deviation = standard_deviation
 
     def _build_segmentor(self, dataset: ProstateCancerDataset) -> Module:
         """
@@ -360,7 +424,12 @@ class Unet(Segmentor):
             dropout=self.dropout,
             bias=self.bias,
             adn_ordering=self.adn_ordering,
-            bayesian=self.bayesian
+            bayesian=self.bayesian,
+            prior_mean=self.prior_mean,
+            prior_variance=self.prior_variance,
+            posterior_mu_init=self.posterior_mu_init,
+            posterior_rho_init=self.posterior_rho_init,
+            standard_deviation=self.standard_deviation
         )
 
         return DataParallel(unet).to(self.device)

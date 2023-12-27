@@ -19,6 +19,7 @@ from ..callbacks.containers import TuningCallbackList
 from ...data.datasets import ProstateCancerDataset
 from ..hyperparameters.containers import HyperparameterDict
 from ..hyperparameters.torch import TrainerHyperparameter, TrainMethodHyperparameter
+from ...models.torch import ModelConfig
 from ...training import Trainer
 
 
@@ -72,7 +73,8 @@ class TorchObjective(Objective):
             callbacks: TuningCallbackList,
             dataset: ProstateCancerDataset,
             masks: Dict[int, Dict[str, List[int]]],
-            dataframes: Optional[Dict[int, pd.DataFrame]] = None
+            dataframes: Optional[Dict[int, pd.DataFrame]] = None,
+            model_configs: Optional[Dict[int, Dict[str, ModelConfig]]] = None
     ) -> List[float]:
         """
         Extracts hyperparameters suggested by optuna and executes the parallel inner loops.
@@ -89,6 +91,8 @@ class TorchObjective(Objective):
             Dictionary of inner loops masks, i.e a dictionary with list of idx to use as train, valid and test masks.
         dataframes : Optional[Dict[int, pd.DataFrame]]
             Dictionary of dataframes to use for the inner loops.
+        model_configs : Optional[Dict[int, Dict[str, ModelConfig]]]
+            Dictionary of model configurations to use for the inner loops.
 
         Returns
         -------
@@ -96,13 +100,15 @@ class TorchObjective(Objective):
             List of task scores associated with the set of hyperparameters.
         """
         self._set_dataset(dataset)
-        return super().__call__(trial, callbacks, dataset, masks, dataframes)
+        return super().__call__(trial, callbacks, dataset, masks, dataframes, model_configs)
 
     def exec_best_model_evaluation(
             self,
             best_trial: FrozenTrial,
             dataset: ProstateCancerDataset,
-            path_to_save: str
+            path_to_save: str,
+            seed: int,
+            model_configs: Optional[Dict[str, ModelConfig]] = None
     ) -> ModelEvaluationContainer:
         """
         Evaluates the best model.
@@ -115,6 +121,10 @@ class TorchObjective(Objective):
             The dataset used for the current trial.
         path_to_save : str
             Path to save.
+        seed : int
+            Seed.
+        model_configs : Optional[Dict[str, ModelConfig]]
+            Model configuration.
 
         Returns
         -------
@@ -122,7 +132,7 @@ class TorchObjective(Objective):
             Model evaluation.
         """
         self._set_dataset(dataset)
-        return super().exec_best_model_evaluation(best_trial, dataset, path_to_save)
+        return super().exec_best_model_evaluation(best_trial, dataset, path_to_save, seed, model_configs)
 
     def _set_dataset(self, dataset: ProstateCancerDataset):
         """

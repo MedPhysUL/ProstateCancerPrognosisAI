@@ -44,7 +44,8 @@ from src.tuning.callbacks import TuningRecorder
 from src.tuning.hyperparameters.optuna import (
     CategoricalHyperparameter,
     FixedHyperparameter,
-    FloatHyperparameter
+    FloatHyperparameter,
+    IntegerHyperparameter
 )
 from src.tuning.hyperparameters.torch import (
     CheckpointHyperparameter,
@@ -102,7 +103,7 @@ def get_dataframes_dictionary(
 if __name__ == '__main__':
     for task in TABLE_TASKS:
         df_dict = get_dataframes_dictionary(
-            path_to_dataframes_folder=os.path.join(AUTOMATIC_FILTERED_RADIOMICS_PATH, task.target_column),
+            path_to_dataframes_folder=os.path.join(DEEP_FILTERED_RADIOMICS_PATH, task.target_column),
             n_outer_loops=5,
             n_inner_loops=5
         )
@@ -119,7 +120,7 @@ if __name__ == '__main__':
 
         path_to_record_folder = os.path.join(
             EXPERIMENTS_PATH,
-            f"{task.target_column}(MLP - Clinical data and automatic radiomics)"
+            f"{task.target_column}(MLP - Clinical data and deep radiomics)"
         )
 
         search_algo = SearchAlgorithm(
@@ -141,10 +142,8 @@ if __name__ == '__main__':
             constructor=MLP,
             parameters={
                 "activation": FixedHyperparameter(name="activation", value="PReLU"),
-                "hidden_channels": CategoricalHyperparameter(
-                    name="hidden_channels",
-                    choices=["(10, 10, 10)", "(20, 20, 20)", "(30, 30, 30)", "(40, 40, 40)"]
-                ),
+                "n_layers": IntegerHyperparameter(name="n_layers", low=0, high=3),
+                "n_neurons": IntegerHyperparameter(name="n_neurons", low=5, high=20, step=5),
                 "dropout": FloatHyperparameter(name="dropout", low=0.05, high=0.25)
             }
         )
@@ -186,14 +185,14 @@ if __name__ == '__main__':
             # checkpoint=CheckpointHyperparameter(save_freq=20)
         )
 
-        train_methode_hyperparameter = TrainMethodHyperparameter(
+        train_method_hyperparameter = TrainMethodHyperparameter(
             model=model_hyperparameter,
             learning_algorithms=learning_algorithm_hyperparameter
         )
 
         objective = TorchObjective(
             trainer_hyperparameter=trainer_hyperparameter,
-            train_method_hyperparameter=train_methode_hyperparameter
+            train_method_hyperparameter=train_method_hyperparameter
         )
 
         masks = extract_masks(MASKS_PATH, k=5, l=5)
